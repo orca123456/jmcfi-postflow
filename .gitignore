@@ -1,0 +1,33 @@
+# Dependencies
+frontend-rn/node_modules/
+backend/vendor/
+
+# Build outputs
+frontend-rn/.expo/
+frontend-rn/dist/
+frontend-rn/build/
+
+# Environment files
+backend/.env
+frontend-rn/.env
+frontend-rn/.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Laravel
+backend/bootstrap/cache/*.php
+backend/storage/logs/*.log
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
