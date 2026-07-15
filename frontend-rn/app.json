@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "JMCFI PostFlow",
+    "slug": "jmcfi-postflow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/jmc_logo.png",
+    "scheme": "jmcfi-postflow",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/jmc_logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
