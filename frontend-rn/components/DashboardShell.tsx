@@ -8,11 +8,14 @@ import {
   SafeAreaView,
   useWindowDimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleLabel, getRoleColor } from '../store/auth';
+import { useThemeStore } from '../store/theme';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../constants/theme';
+import { ChatBot } from './ChatBot';
 
 interface DashboardShellProps {
   title: string;
@@ -32,6 +35,84 @@ export function DashboardShell({
   const { user, logout } = useAuthStore();
   const { width } = useWindowDimensions();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = React.useState(false);
+  const { isDarkMode, toggleDarkMode } = useThemeStore();
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const styleId = 'postflow-theme-styles';
+    let styleTag = document.getElementById(styleId);
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      styleTag.innerHTML = `
+        :root {
+          --color-primary: #0B2545;
+          --color-primary-light: #134074;
+          --color-primary-dark: #081F37;
+          --color-accent: #FFC72C;
+          --color-wisteria: #EEF4F8;
+          --color-background: #F4F6F9;
+          --color-surface: #FFFFFF;
+          --color-surface-secondary: #EEF4F8;
+          --color-text-primary: #1A1A2E;
+          --color-text-secondary: #6B7280;
+          --color-text-muted: #9CA3AF;
+          --color-text-on-primary: #FFFFFF;
+          --color-success: #16A34A;
+          --color-warning: #D97706;
+          --color-error: #DC2626;
+          --color-info: #2563EB;
+          --color-border: #E5E7EB;
+          --color-border-focus: #0B2545;
+          --color-admin: #7C3AED;
+          --color-requestor: #2563EB;
+          --color-office-head: #D97706;
+          --color-vp: #DC2626;
+          --color-president: #0F766E;
+          --color-imc-qa: #7C3AED;
+          --color-publisher: #374151;
+        }
+        
+        .dark-theme {
+          --color-primary: #1E293B;
+          --color-primary-light: #334155;
+          --color-primary-dark: #0F172A;
+          --color-accent: #FFD15C;
+          --color-wisteria: #1E293B;
+          --color-background: #0B1329;
+          --color-surface: #1C2541;
+          --color-surface-secondary: #1E293B;
+          --color-text-primary: #F8FAFC;
+          --color-text-secondary: #94A3B8;
+          --color-text-muted: #64748B;
+          --color-text-on-primary: #FFFFFF;
+          --color-success: #22C55E;
+          --color-warning: #F59E0B;
+          --color-error: #EF4444;
+          --color-info: #3B82F6;
+          --color-border: #334155;
+          --color-border-focus: #FFC72C;
+          --color-admin: #A78BFA;
+          --color-requestor: #60A5FA;
+          --color-office-head: #F59E0B;
+          --color-vp: #F87171;
+          --color-president: #14B8A6;
+          --color-imc-qa: #C084FC;
+          --color-publisher: #9CA3AF;
+        }
+      `;
+      document.head.appendChild(styleTag);
+    }
+
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark-theme');
+      document.body.classList.add('dark-theme');
+    } else {
+      document.documentElement.classList.remove('dark-theme');
+      document.body.classList.remove('dark-theme');
+    }
+  }, [isDarkMode]);
 
   const handleLogout = async () => {
     await logout();
@@ -61,7 +142,7 @@ export function DashboardShell({
       userRole === 'imc_qa_checker' ||
       userRole === 'it_publisher'
     ) {
-      const active = activeTab ?? 'approval-queue';
+      const active = activeTab ?? 'dashboard';
       const queueLabel = userRole === 'it_publisher' ? 'Publishing Queue' : 'Approval Queue';
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline' as const, active: active === 'dashboard' },
@@ -77,6 +158,7 @@ export function DashboardShell({
       { id: 'overview', label: 'Overview', icon: 'grid-outline' as const, active: active === 'overview' },
       { id: 'user-management', label: 'User Management', icon: 'people-outline' as const, active: active === 'user-management' },
       { id: 'all-posts', label: 'All Posts', icon: 'document-text-outline' as const, active: active === 'all-posts' },
+      { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
     ];
   };
 
@@ -92,6 +174,18 @@ export function DashboardShell({
           <Text style={styles.logoSubtitle}>Submission Approval System</Text>
         </View>
         <View style={styles.headerRight}>
+          {/* DARK MODE TOGGLE */}
+          <TouchableOpacity 
+            onPress={toggleDarkMode}
+            style={styles.headerIconButton}
+          >
+            <Ionicons 
+              name={isDarkMode ? "sunny-outline" : "moon-outline"} 
+              size={18} 
+              color={Colors.textSecondary} 
+            />
+          </TouchableOpacity>
+
           {userRole === 'requestor' && isDesktop && (
             <View style={styles.topRightNav}>
               <Ionicons name="notifications-outline" size={18} color={Colors.textSecondary} style={styles.navIconSpacing} />
@@ -103,7 +197,7 @@ export function DashboardShell({
               style={styles.profileTrigger} 
               onPress={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
             >
-              <View style={styles.avatarCircleMini}>
+              <View style={[styles.avatarCircleMini, { backgroundColor: roleColor || Colors.primary }]}>
                 <Text style={styles.avatarTextMini}>
                   {user?.name?.substring(0, 2).toUpperCase() ?? 'EH'}
                 </Text>
@@ -121,7 +215,7 @@ export function DashboardShell({
               <View style={styles.dropdownContainer}>
                 {/* Header Info */}
                 <View style={styles.dropdownHeader}>
-                  <View style={styles.avatarCircleLarge}>
+                  <View style={[styles.avatarCircleLarge, { backgroundColor: roleColor || Colors.primary }]}>
                     <Text style={styles.avatarTextLarge}>
                       {user?.name?.substring(0, 2).toUpperCase() ?? 'EH'}
                     </Text>
@@ -232,7 +326,7 @@ export function DashboardShell({
                   <Ionicons
                     name={item.icon}
                     size={18}
-                    color={item.active ? (userRole === 'admin' ? '#FFF' : '#0B2545') : Colors.textSecondary}
+                    color={item.active ? (userRole === 'admin' ? '#FFF' : Colors.textPrimary) : Colors.textSecondary}
                   />
                   <Text
                     style={[
@@ -289,6 +383,9 @@ export function DashboardShell({
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Floating ChatBot */}
+      <ChatBot />
     </SafeAreaView>
   );
 }
@@ -302,7 +399,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.lg,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -317,12 +414,12 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   headerDivider: {
     width: 1,
     height: 18,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
   },
   logoSubtitle: {
     fontSize: FontSize.sm,
@@ -332,6 +429,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  headerIconButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   topRightNav: {
     flexDirection: 'row',
@@ -346,10 +452,10 @@ const styles = StyleSheet.create({
   },
   topRightNavLinkActive: {
     fontSize: FontSize.sm,
-    color: '#0B2545',
+    color: Colors.primary,
     fontWeight: FontWeight.bold,
     borderBottomWidth: 2,
-    borderBottomColor: '#0B2545',
+    borderBottomColor: Colors.primary,
     paddingBottom: 4,
   },
   navIconSpacing: {
@@ -362,20 +468,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 24,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
   },
   avatarCircleMini: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarTextMini: {
-    color: '#FFFFFF',
+    color: Colors.textOnPrimary,
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -385,7 +491,7 @@ const styles = StyleSheet.create({
   triggerNameText: {
     fontSize: 12,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   triggerSubtext: {
     fontSize: 10,
@@ -397,10 +503,10 @@ const styles = StyleSheet.create({
     top: 42,
     right: 0,
     width: 280,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -420,12 +526,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarTextLarge: {
-    color: '#FFFFFF',
+    color: Colors.textOnPrimary,
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
   },
@@ -436,7 +542,7 @@ const styles = StyleSheet.create({
   dropdownNameText: {
     fontSize: FontSize.sm + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   dropdownEmailText: {
     fontSize: FontSize.xs + 1,
@@ -445,7 +551,7 @@ const styles = StyleSheet.create({
   },
   dropdownDivider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.border,
     marginVertical: 4,
   },
   dropdownItemsList: {
@@ -464,7 +570,7 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   itemSubtitle: {
     fontSize: FontSize.xs,
@@ -477,7 +583,7 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     width: 240,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRightWidth: 1,
     borderRightColor: Colors.border,
     paddingHorizontal: Spacing.md,
@@ -494,7 +600,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 4,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -504,7 +610,7 @@ const styles = StyleSheet.create({
   sidebarTitle: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   sidebarSubtitle: {
     fontSize: 9,
@@ -531,7 +637,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   sidebarNavItemActive: {
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
   },
   sidebarNavItemActiveGold: {
     backgroundColor: '#FED65B', // Premium JMCFI Gold background matching screenshot
@@ -542,11 +648,11 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   sidebarNavLabelActive: {
-    color: '#FFFFFF',
+    color: Colors.textOnPrimary,
     fontWeight: FontWeight.semiBold,
   },
   sidebarNavLabelActiveGold: {
-    color: '#0B2545', // Dark navy text on gold background
+    color: Colors.primary, // Dynamic primary text on gold background
     fontWeight: FontWeight.bold,
   },
   sidebarFooter: {

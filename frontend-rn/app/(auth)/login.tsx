@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Animated, Easing, KeyboardAvoidingView, Platform, ScrollView,
-  Dimensions, Image
+  Image, useWindowDimensions
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleDashboardPath } from '../../store/auth';
-import { Colors } from '../../constants/theme';
 
 const ROLES = [
   { label: 'Administrator', value: 'admin', email: 'admin@jmcfi.edu.ph' },
@@ -19,63 +19,66 @@ const ROLES = [
 ];
 
 const AnimatedBackground = () => {
+  const { width, height } = useWindowDimensions();
   const animValue1 = useRef(new Animated.Value(0)).current;
   const animValue2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(animValue1, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(animValue1, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+        Animated.timing(animValue1, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(animValue1, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' })
       ])
     ).start();
 
     Animated.loop(
       Animated.sequence([
-        Animated.timing(animValue2, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(animValue2, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+        Animated.timing(animValue2, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(animValue2, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' })
       ])
     ).start();
   }, []);
 
-  const moveLR3s = animValue1.interpolate({ inputRange: [0, 1], outputRange: [0, 100] });
-  const moveRL3s = animValue1.interpolate({ inputRange: [0, 1], outputRange: [0, -100] });
-  
-  const moveLR4s = animValue2.interpolate({ inputRange: [0, 1], outputRange: [0, 100] });
-  const moveRL4s = animValue2.interpolate({ inputRange: [0, 1], outputRange: [0, -100] });
+  const offsetA = Math.min(width * 0.26, 160);
+  const offsetB = Math.min(width * 0.16, 105);
+
+  const translateA = animValue1.interpolate({ inputRange: [0, 1], outputRange: [0, offsetA] });
+  const translateB = animValue2.interpolate({ inputRange: [0, 1], outputRange: [0, -offsetB] });
 
   return (
     <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#F6F0FA', overflow: 'hidden' }]}>
-      <View style={{
-        flex: 1,
-        transform: [{ rotate: '-12deg' }, { skewY: '-12deg' }],
+      <Animated.View style={{
         position: 'absolute',
-        top: -200, bottom: -200, left: -200, right: -200,
-        flexDirection: 'row'
-      }}>
-        <View style={{ flex: 1 }}>
-          {/* Top light gradient area */}
-          <View style={{ height: '40%', backgroundColor: '#FAF5FF' }} />
-          
-          <Animated.View style={[styles.boxLightWisteria, { transform: [{ translateX: moveLR3s }], height: 60, marginTop: 40, width: '40%', alignSelf: 'flex-start' }]} />
-          
-          <View style={[styles.boxGrape, { height: 100, marginTop: 60, width: '25%' }]} />
-          
-          <Animated.View style={[styles.boxWisteria, { transform: [{ translateX: moveLR3s }], height: 150, width: '35%', marginTop: 20 }]} />
-          
-          <Animated.View style={[styles.boxIndigo, { transform: [{ translateX: moveLR3s }], height: 80, width: '20%', marginLeft: '25%', marginTop: 20 }]} />
-        </View>
+        width: width * 0.7,
+        height: height * 0.42,
+        backgroundColor: 'rgba(143, 63, 255, 0.22)',
+        borderRadius: 90,
+        top: -height * 0.08,
+        left: -width * 0.08,
+        transform: [{ translateX: translateA }, { rotate: '18deg' }],
+      }} />
 
-        <View style={{ flex: 1, alignItems: 'flex-end', paddingTop: '20%' }}>
-          <Animated.View style={[styles.boxSunglow, { transform: [{ translateX: moveRL4s }], height: 120, width: '30%', marginRight: '10%' }]} />
-          
-          <Animated.View style={[styles.boxWisteria, { transform: [{ translateX: moveRL3s }], height: 200, width: '40%', marginTop: 20 }]} />
-          
-          <Animated.View style={[styles.boxIndigo, { transform: [{ translateX: moveRL4s }], height: 90, width: '15%', marginRight: '5%', marginTop: 20 }]} />
-          
-          <Animated.View style={[styles.boxLightWisteria, { transform: [{ translateX: moveRL3s }], height: 60, width: '25%', marginRight: '15%', marginTop: 20 }]} />
-        </View>
-      </View>
+      <Animated.View style={{
+        position: 'absolute',
+        width: width * 0.55,
+        height: height * 0.33,
+        backgroundColor: 'rgba(248, 196, 255, 0.28)',
+        borderRadius: 72,
+        top: height * 0.22,
+        right: -width * 0.08,
+        transform: [{ translateX: translateB }, { rotate: '-16deg' }],
+      }} />
+
+      <Animated.View style={{
+        position: 'absolute',
+        width: width * 0.46,
+        height: height * 0.2,
+        backgroundColor: 'rgba(255, 183, 65, 0.24)',
+        borderRadius: 64,
+        bottom: -height * 0.06,
+        left: width * 0.1,
+        transform: [{ translateX: translateA }, { rotate: '8deg' }],
+      }} />
     </View>
   );
 };
@@ -86,6 +89,7 @@ export default function LoginScreen() {
   
   const [email, setEmail] = useState('admin@jmcfi.edu.ph');
   const [password, setPassword] = useState('password123');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [staySignedIn, setStaySignedIn] = useState(true);
 
@@ -140,12 +144,20 @@ export default function LoginScreen() {
 
               <View style={styles.field}>
                   <Text style={styles.label}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.passwordInput}
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                    />
+                    <TouchableOpacity 
+                      style={styles.eyeIcon} 
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
               </View>
 
 
@@ -166,7 +178,7 @@ export default function LoginScreen() {
 
           <View style={styles.footerLink}>
             <View style={styles.listing}>
-              <Text style={styles.listingLink}>© {new Date().getFullYear()} JMCFI PostFlow • System • TechNyc Dev •</Text>
+              <Text style={styles.listingLink}>© 2026 JMCFI POSTFLOW  System TechNycDev</Text>
             </View>
           </View>
         </View>
@@ -203,54 +215,75 @@ const styles = StyleSheet.create({
     height: 80,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
-    color: Colors.primary,
-    letterSpacing: -0.5,
+    color: '#4b0082',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   formbgOuter: {
     width: '100%',
-    maxWidth: 448,
+    maxWidth: 440,
     paddingHorizontal: 16,
   },
   formbg: {
     backgroundColor: '#fff',
-    borderRadius: 4,
+    borderRadius: 10,
     shadowColor: '#3c4257',
-    shadowOffset: { width: 0, height: 7 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowRadius: 16,
+    elevation: 6,
   },
   formbgInner: {
-    padding: 48,
+    padding: 32,
   },
   subtitle: {
-    fontSize: 20,
-    lineHeight: 28,
-    color: '#1a1f36',
+    fontSize: 18,
+    lineHeight: 26,
+    color: '#4B5563',
     paddingBottom: 24,
   },
   field: {
     paddingBottom: 24,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1f36',
-    marginBottom: 10,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#4B5563',
+    marginBottom: 8,
   },
   input: {
-    fontSize: 16,
-    lineHeight: 28,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     minHeight: 44,
     borderWidth: 1,
-    borderColor: Colors.primaryLight,
-    borderRadius: 4,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
     backgroundColor: '#fff',
     color: '#1a1f36',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 44,
+    color: '#1a1f36',
+  },
+  eyeIcon: {
+    padding: 10,
   },
   grid5050: {
     flexDirection: 'row',
@@ -293,20 +326,14 @@ const styles = StyleSheet.create({
     color: '#1a1f36',
   },
   submitButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 8,
+    backgroundColor: '#4b0082',
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 4,
+    borderRadius: 6,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
-    borderBottomWidth: 3,
-    borderBottomColor: Colors.accent,
+    width: '100%',
   },
   submitText: {
     color: '#fff',
@@ -337,14 +364,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 24,
-    paddingBottom: 24,
-    gap: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+    flexWrap: 'nowrap',
   },
   listingLink: {
-    color: Colors.primaryLight,
-    fontWeight: '600',
-    fontSize: 14,
-    opacity: 0.8,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    fontSize: 13,
+    textAlign: 'center',
+    flexShrink: 0,
   }
 });

@@ -14,14 +14,21 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
+import { usePolicyStore } from '../../../store/policy';
 
 export default function PresidentDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
 
+  const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
+
+  useEffect(() => {
+    fetchPolicy();
+  }, []);
+
   // Tab State: 'dashboard' | 'approval-queue' | 'analytics' | 'policy-rules' | 'account-settings'
-  const [activeTab, setActiveTab] = useState('approval-queue');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
@@ -109,15 +116,15 @@ export default function PresidentDashboard() {
 
             <Card style={[styles.metricCard, { borderLeftColor: '#4B5563' }]}>
               <View style={styles.metricHeader}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#4B5563" />
+                <Ionicons name="shield-checkmark-outline" size={18} color={Colors.textSecondary} />
               </View>
               <Text style={styles.metricValue}>98.5</Text>
               <Text style={styles.metricLabel}>Compliance Score</Text>
             </Card>
 
-            <Card style={[styles.metricCard, { borderLeftColor: '#0B2545' }]}>
+            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
               <View style={styles.metricHeader}>
-                <Ionicons name="flash-outline" size={18} color="#0B2545" />
+                <Ionicons name="flash-outline" size={18} color={Colors.textPrimary} />
               </View>
               <Text style={styles.metricValue}>4.2h</Text>
               <Text style={styles.metricLabel}>Avg. Clearance Speed</Text>
@@ -158,7 +165,7 @@ export default function PresidentDashboard() {
                   style={[styles.filterBtn, { justifyContent: 'flex-start', height: 36, width: '100%' }]}
                   onPress={() => setActiveTab('policy-rules')}
                 >
-                  <Ionicons name="book-outline" size={16} color="#0B2545" />
+                  <Ionicons name="book-outline" size={16} color={Colors.textPrimary} />
                   <Text style={[styles.filterBtnText, { marginLeft: 6 }]}>View Website Posting Policy</Text>
                 </TouchableOpacity>
 
@@ -166,7 +173,7 @@ export default function PresidentDashboard() {
                   style={[styles.filterBtn, { justifyContent: 'flex-start', height: 36, width: '100%' }]}
                   onPress={() => setActiveTab('analytics')}
                 >
-                  <Ionicons name="bar-chart-outline" size={16} color="#0B2545" />
+                  <Ionicons name="bar-chart-outline" size={16} color={Colors.textPrimary} />
                   <Text style={[styles.filterBtnText, { marginLeft: 6 }]}>Open Analytics Dashboard</Text>
                 </TouchableOpacity>
               </View>
@@ -186,11 +193,11 @@ export default function PresidentDashboard() {
             </View>
             <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
               <TouchableOpacity style={styles.filterBtn} onPress={() => alert('Filtering requests...')}>
-                <Ionicons name="filter-outline" size={14} color="#4B5563" />
+                <Ionicons name="filter-outline" size={14} color={Colors.textSecondary} />
                 <Text style={styles.filterBtnText}>Filter</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.filterBtn} onPress={() => alert('Sorting by priority...')}>
-                <Ionicons name="swap-vertical-outline" size={14} color="#4B5563" />
+                <Ionicons name="swap-vertical-outline" size={14} color={Colors.textSecondary} />
                 <Text style={styles.filterBtnText}>Priority</Text>
               </TouchableOpacity>
             </View>
@@ -253,7 +260,7 @@ export default function PresidentDashboard() {
                         <View style={styles.statusBadgeYellow}>
                           <Text style={styles.statusBadgeYellowText}>{post.status}</Text>
                         </View>
-                        <Text style={{ fontSize: 9, color: '#6B7280' }}>{post.submitted}</Text>
+                        <Text style={{ fontSize: 9, color: Colors.textSecondary }}>{post.submitted}</Text>
                       </View>
                     </View>
 
@@ -285,7 +292,7 @@ export default function PresidentDashboard() {
 
                     <View style={styles.actionButtonsRow}>
                       <TouchableOpacity style={styles.btnViewPreview} onPress={() => alert(`Opening preview window for "${post.title}"`)}>
-                        <Ionicons name="eye-outline" size={14} color="#0B2545" style={{ marginRight: 6 }} />
+                        <Ionicons name="eye-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 6 }} />
                         <Text style={styles.btnViewPreviewText}>View Full Preview</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.btnReturnRemarks} onPress={() => handleAction('Return with Remarks', post.title)}>
@@ -333,7 +340,7 @@ export default function PresidentDashboard() {
                         <View style={[
                           styles.chartBarFill,
                           { height: item.height },
-                          item.active && { backgroundColor: '#0B2545' }
+                          item.active && { backgroundColor: Colors.primary }
                         ]}>
                           <Text style={styles.chartBarTooltip}>{item.count}</Text>
                         </View>
@@ -378,7 +385,7 @@ export default function PresidentDashboard() {
                   {
                     id: 'act4',
                     icon: 'chatbubble-outline',
-                    color: '#4B5563',
+                    color: Colors.textSecondary,
                     bg: '#F3F4F6',
                     title: 'Comment on "Campus Tour"',
                     meta: 'Yesterday',
@@ -413,10 +420,10 @@ export default function PresidentDashboard() {
             </View>
             <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
               <TouchableOpacity style={styles.analyticsFilterBtn} onPress={() => alert('Filtering by time range...')}>
-                <Text style={{ fontSize: FontSize.xs, color: '#4B5563', fontWeight: 'bold', paddingHorizontal: 8 }}>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', paddingHorizontal: 8 }}>
                   Last 30 Days
                 </Text>
-                <Ionicons name="chevron-down" size={14} color="#4B5563" />
+                <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.btnApprove, { height: 32, paddingHorizontal: 16 }]}
@@ -430,9 +437,9 @@ export default function PresidentDashboard() {
 
           {/* Engagement Summary metrics */}
           <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: '#0B2545' }]}>
+            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
               <View style={styles.metricHeader}>
-                <Ionicons name="eye-outline" size={18} color="#0B2545" />
+                <Ionicons name="eye-outline" size={18} color={Colors.textPrimary} />
                 <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+14.2%</Text>
               </View>
               <Text style={styles.metricValue}>128.4K</Text>
@@ -568,60 +575,14 @@ export default function PresidentDashboard() {
 
       {/* ----------------- POLICY & RULES TAB ----------------- */}
       {activeTab === 'policy-rules' && (() => {
-        const policySections = [
-          {
-            id: 'sec-1',
-            title: '1. Purpose',
-            icon: 'book-outline' as const,
-            bg: '#EFF6FF',
-            color: '#0B2545',
-            content: 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
-          },
-          {
-            id: 'sec-2',
-            title: '2. Scope & Limitations',
-            icon: 'shield-checkmark-outline' as const,
-            bg: '#F3E8FF',
-            color: '#7C3AED',
-            bullets: [
-              { title: 'Brand Integrity', desc: 'All content must adhere to the official JMCFI Brand Guidelines (colors, logos, typography).' },
-              { title: 'Platform Limitation', desc: 'This policy applies exclusively to the official school domain and subdomains.' },
-              { title: 'Editorial Control', desc: 'The school reserves the right to edit, reject, or remove any content without prior notice.' },
-              { title: 'Non-Compliance', desc: 'Violation results in immediate removal from the platform and potential disciplinary action.' },
-            ],
-          },
-          {
-            id: 'sec-3',
-            title: '3. Acceptable Content',
-            icon: 'checkmark-circle-outline' as const,
-            bg: '#DCFCE7',
-            color: '#16A34A',
-            bullets: [
-              { title: 'Academic & Professional', desc: 'Content must support the school\'s mission, be factually accurate, and maintain an inclusive tone.' },
-              { title: 'Visual Standards', desc: 'Use approved templates, high-resolution media, and official school colors/logo only.' },
-              { title: 'Consent (Minors Under 18)', desc: 'Written parental/guardian consent is required.' },
-              { title: 'Consent (Adults 18+)', desc: 'Student\'s own signed consent is required.' },
-            ],
-          },
-          {
-            id: 'sec-4',
-            title: '4. Prohibited Content',
-            icon: 'alert-circle-outline' as const,
-            bg: '#FEE2E2',
-            color: '#DC2626',
-            bullets: [
-              { title: 'Academic Misconduct', desc: 'Cheating guides, answer keys, or plagiarism.' },
-              { title: 'Inappropriate Material', desc: 'Bullying, hate speech, explicit content, or harassment.' },
-              { title: 'Commercial/Political', desc: 'Unauthorized ads, personal fundraising, or political endorsements.' },
-              { title: 'Privacy Breach', desc: 'Publishing student grades, private addresses, or administrative records.' },
-            ],
-          },
-        ];
-
         const filteredSections = policySections.filter(sec => {
           const query = policySearchQuery.toLowerCase();
           if (!query) return true;
-          return sec.title.toLowerCase().includes(query) || sec.content?.toLowerCase().includes(query) || sec.bullets?.some(b => b.title.toLowerCase().includes(query) || b.desc.toLowerCase().includes(query));
+          const titleMatch = sec.title.toLowerCase().includes(query);
+          const contentMatch = sec.content?.toLowerCase().includes(query);
+          const bulletsMatch = sec.bullets?.some(b => b.title.toLowerCase().includes(query) || b.desc.toLowerCase().includes(query));
+          const stepsMatch = sec.steps?.some(s => s.title.toLowerCase().includes(query) || s.desc.toLowerCase().includes(query));
+          return titleMatch || contentMatch || bulletsMatch || stepsMatch;
         });
 
         return (
@@ -631,7 +592,7 @@ export default function PresidentDashboard() {
               <View>
                 <Text style={styles.welcomeTitle}>School Website Posting Policy</Text>
                 <Text style={styles.welcomeSubtitle}>
-                  Effective Date: Jun 26, 2026 &bull; Last Updated: July 15, 2026
+                  Effective Date: {effectiveDate} &bull; Last Updated: {lastUpdatedDate}
                 </Text>
               </View>
               
@@ -642,63 +603,96 @@ export default function PresidentDashboard() {
                   value={policySearchQuery}
                   onChangeText={setPolicySearchQuery}
                 />
-                <Ionicons name="search" size={16} color="#6B7280" style={{ marginRight: 12 }} />
+                <Ionicons name="search" size={16} color={Colors.textSecondary} style={{ marginRight: 12 }} />
               </View>
             </View>
 
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              {/* Left navigation index - desktop only */}
+              {/* Left quick navigation index - desktop only */}
               {isLargeScreen && (
                 <View style={styles.policySidebar}>
                   <Text style={styles.policySidebarTitle}>POLICY SECTIONS</Text>
-                  {policySections.map((sec) => (
+                  {filteredSections.map((sec) => (
                     <TouchableOpacity
                       key={sec.id}
-                      style={[styles.policySidebarItem, { backgroundColor: '#FFFFFF' }]}
-                      onPress={() => alert(`Scrolling to ${sec.title}...`)}
+                      style={[styles.policySidebarItem, { backgroundColor: Colors.surface }]}
+                      onPress={() => alert(`Navigating to section: ${sec.title}`)}
                     >
-                      <Ionicons name={sec.icon} size={16} color="#4B5563" />
+                      <View style={[styles.bulletPoint, { backgroundColor: sec.color }]} />
                       <Text style={styles.policySidebarLabel} numberOfLines={1}>{sec.title.substring(3)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
-              {/* Main Policy Cards */}
+              {/* Main content guidelines */}
               <View style={styles.policyDetailCol}>
-                {filteredSections.map((sec) => (
-                  <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
-                    <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
-                      <View style={[styles.activityIconBg, { backgroundColor: sec.bg, borderColor: sec.color }]}>
-                        <Ionicons name={sec.icon} size={14} color={sec.color} />
+                {filteredSections.length > 0 ? (
+                  filteredSections.map((sec) => (
+                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
+                      <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
+                        <View style={[styles.activityIconBg, { backgroundColor: sec.bg, borderColor: sec.color }]}>
+                          <Ionicons name={sec.icon as any} size={14} color={sec.color} />
+                        </View>
+                        <Text style={styles.tableCardTitle}>{sec.title}</Text>
                       </View>
-                      <Text style={styles.tableCardTitle}>{sec.title}</Text>
-                    </View>
 
-                    {sec.content && (
-                      <Text style={styles.policyCardBodyText}>{sec.content}</Text>
-                    )}
+                      {sec.content && (
+                        <Text style={styles.policyCardBodyText}>{sec.content}</Text>
+                      )}
 
-                    {sec.bullets && (
-                      <View style={styles.policyBulletsList}>
-                        {sec.bullets.map((bullet, idx) => (
-                          <View key={idx} style={styles.policyBulletItem}>
-                            <Ionicons
-                              name={sec.id === 'sec-4' ? 'close-circle' : 'checkmark-circle'}
-                              size={18}
-                              color={sec.color}
-                              style={{ marginTop: 1 }}
-                            />
-                            <View style={styles.policyBulletTextCol}>
-                              <Text style={styles.policyBulletTitle}>{bullet.title}</Text>
-                              <Text style={styles.policyBulletDesc}>{bullet.desc}</Text>
+                      {sec.bullets && (
+                        <View style={styles.policyBulletsList}>
+                          {sec.bullets.map((bullet, idx) => (
+                            <View key={idx} style={styles.policyBulletItem}>
+                              <Ionicons
+                                name={sec.id === 'sec-4' ? 'close-circle' : 'checkmark-circle'}
+                                size={18}
+                                color={sec.color}
+                                style={{ marginTop: 1 }}
+                              />
+                              <View style={styles.policyBulletTextCol}>
+                                <Text style={styles.policyBulletTitle}>{bullet.title}</Text>
+                                <Text style={styles.policyBulletDesc}>{bullet.desc}</Text>
+                              </View>
                             </View>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </Card>
-                ))}
+                          ))}
+                        </View>
+                      )}
+
+                      {sec.steps && (
+                        <View style={styles.policyBulletsList}>
+                          {sec.steps.map((step, idx) => (
+                            <View key={idx} style={styles.policyBulletItem}>
+                              <Ionicons
+                                name="arrow-forward-circle"
+                                size={18}
+                                color={sec.color}
+                                style={{ marginTop: 1 }}
+                              />
+                              <View style={styles.policyBulletTextCol}>
+                                <Text style={styles.policyBulletTitle}>{idx + 1}. {step.title}</Text>
+                                <Text style={styles.policyBulletDesc}>{step.desc}</Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {sec.contact && (
+                        <Text style={[styles.policyCardBodyText, { marginTop: 10, fontWeight: 'bold' }]}>
+                          {sec.contact}
+                        </Text>
+                      )}
+                    </Card>
+                  ))
+                ) : (
+                  <View style={styles.policyEmptyState}>
+                    <Ionicons name="search-outline" size={36} color={Colors.textMuted} />
+                    <Text style={styles.postTitleText}>No policy guidelines found</Text>
+                    <Text style={styles.welcomeSubtitle}>Try adjusting your search criteria.</Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -722,8 +716,8 @@ export default function PresidentDashboard() {
             <View style={{ flex: 1.5 }}>
               <Card style={styles.tableCard}>
                 <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
-                  <View style={[styles.activityIconBg, { backgroundColor: '#EFF6FF', borderColor: '#0B2545' }]}>
-                    <Ionicons name="person-outline" size={14} color="#0B2545" />
+                  <View style={[styles.activityIconBg, { backgroundColor: '#EFF6FF', borderColor: Colors.primary }]}>
+                    <Ionicons name="person-outline" size={14} color={Colors.textPrimary} />
                   </View>
                   <Text style={styles.tableCardTitle}>Profile Information</Text>
                 </View>
@@ -760,7 +754,7 @@ export default function PresidentDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
                     value={user?.email ?? 'president@jmcfi.edu.ph'}
                     editable={false}
                   />
@@ -769,7 +763,7 @@ export default function PresidentDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT / ROLE</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
                     value="Executive Office of the President"
                     editable={false}
                   />
@@ -813,7 +807,7 @@ export default function PresidentDashboard() {
                   />
                 </View>
 
-                <TouchableOpacity style={[styles.btnApprove, { backgroundColor: '#0B2545', height: 36, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
+                <TouchableOpacity style={[styles.btnApprove, { backgroundColor: Colors.primary, height: 36, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
                   <Text style={styles.btnApproveText}>Change Password</Text>
                 </TouchableOpacity>
               </Card>
@@ -826,7 +820,7 @@ export default function PresidentDashboard() {
       {activeTab !== 'dashboard' && activeTab !== 'approval-queue' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'account-settings' && (
         <Card style={styles.placeholderCard}>
           <View style={styles.placeholderIconContainer}>
-            <Ionicons name="construct-outline" size={32} color="#9CA3AF" />
+            <Ionicons name="construct-outline" size={32} color={Colors.textMuted} />
           </View>
           <Text style={styles.placeholderTitle}>{activeTab.replace(/-/g, ' ').toUpperCase()} VIEW</Text>
           <Text style={styles.placeholderSubtitle}>
@@ -853,7 +847,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: FontSize.xxl - 2,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   welcomeSubtitle: {
     fontSize: FontSize.sm,
@@ -864,11 +858,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -879,9 +873,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 160,
     padding: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderLeftWidth: 4,
     borderRadius: 6,
     gap: 4,
@@ -902,7 +896,7 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 28,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginTop: 2,
   },
   badgeOrangeText: {
@@ -918,9 +912,9 @@ const styles = StyleSheet.create({
 
   // Table Styles
   tableCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -928,22 +922,22 @@ const styles = StyleSheet.create({
   tableCardTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     gap: 6,
   },
   filterBtnText: {
     fontSize: FontSize.xs,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     fontWeight: FontWeight.bold,
   },
   btnApprove: {
@@ -953,7 +947,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
   },
   btnApproveText: {
     fontSize: FontSize.xs,
@@ -972,9 +966,9 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   configCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -997,7 +991,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   activityTextCol: {
     flex: 1,
@@ -1006,7 +1000,7 @@ const styles = StyleSheet.create({
   activityTitleText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   activityMetaText: {
     fontSize: FontSize.xs,
@@ -1023,13 +1017,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginTop: 4,
   },
   postTitleText: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   postMetaText: {
     fontSize: FontSize.xs,
@@ -1049,9 +1043,9 @@ const styles = StyleSheet.create({
 
   // Clearance card custom styling
   clearanceCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -1135,16 +1129,16 @@ const styles = StyleSheet.create({
     width: 72,
     height: 32,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
   },
   carouselSlideText: {
     fontSize: 9,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: Colors.textSecondary,
   },
   actionButtonsRow: {
     flexDirection: 'row',
@@ -1155,15 +1149,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#0B2545',
+    borderColor: Colors.primary,
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   btnViewPreviewText: {
     fontSize: FontSize.xs,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   btnReturnRemarks: {
@@ -1174,7 +1168,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   btnReturnRemarksText: {
     fontSize: FontSize.xs,
@@ -1201,7 +1195,7 @@ const styles = StyleSheet.create({
   },
   chartAxisLabel: {
     fontSize: 9,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
     fontWeight: FontWeight.bold,
   },
   chartPlotArea: {
@@ -1219,7 +1213,7 @@ const styles = StyleSheet.create({
   chartBarBackground: {
     width: 24,
     height: '100%',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     borderRadius: 2,
     justifyContent: 'flex-end',
     overflow: 'hidden',
@@ -1240,9 +1234,9 @@ const styles = StyleSheet.create({
 
   // Placeholders
   placeholderCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.xxl,
     alignItems: 'center',
@@ -1254,14 +1248,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginTop: 4,
   },
   placeholderSubtitle: {
@@ -1275,9 +1269,9 @@ const styles = StyleSheet.create({
   // Policy tab styles
   policySidebar: {
     width: 180,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.md,
     gap: Spacing.xs,
@@ -1286,7 +1280,7 @@ const styles = StyleSheet.create({
   policySidebarTitle: {
     fontSize: FontSize.xs,
     fontWeight: 'bold',
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginBottom: Spacing.xs,
     letterSpacing: 0.5,
   },
@@ -1300,7 +1294,7 @@ const styles = StyleSheet.create({
   },
   policySidebarLabel: {
     fontSize: FontSize.sm,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   policyDetailCol: {
@@ -1308,9 +1302,9 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   policySectionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderLeftWidth: 4,
     borderRadius: 6,
     padding: Spacing.lg,
@@ -1331,11 +1325,11 @@ const styles = StyleSheet.create({
   policyBulletTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   policyBulletDesc: {
     fontSize: FontSize.sm,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     lineHeight: 18,
     marginTop: 2,
   },
@@ -1343,7 +1337,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
     lineHeight: 20,
-    whiteSpace: 'pre-wrap',
+    
   },
 
   // Account Settings Styles
@@ -1360,7 +1354,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1376,7 +1370,7 @@ const styles = StyleSheet.create({
   profilePicTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   profilePicSubtitle: {
     fontSize: FontSize.xs,
@@ -1396,7 +1390,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profilePicUploadBtnText: {
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -1426,12 +1420,12 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     height: 36,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     color: Colors.textPrimary,
   },
   analyticsFilterBtn: {
@@ -1439,18 +1433,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 32,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingHorizontal: 8,
   },
   analyticsPlatformCard: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: 12,
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   platformLeft: {
     flexDirection: 'row',
@@ -1467,7 +1461,7 @@ const styles = StyleSheet.create({
   platformNameText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   platformProgressSubtext: {
     fontSize: FontSize.xs,
@@ -1476,7 +1470,7 @@ const styles = StyleSheet.create({
   },
   progressBarWrapper: {
     height: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     borderRadius: 3,
     overflow: 'hidden',
   },

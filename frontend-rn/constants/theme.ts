@@ -1,41 +1,45 @@
+import { Platform } from 'react-native';
+
+const isWeb = Platform.OS === 'web';
+
 // JMCFI PostFlow Design System
 export const Colors = {
   // Primary brand colors
-  primary: '#0B2545',         // JMCFI Deep Navy Blue
-  primaryLight: '#134074',    // JMCFI Royal Blue
-  primaryDark: '#081F37',     // Dark Navy
-  accent: '#FFC72C',          // JMCFI Gold
-  wisteria: '#EEF4F8',        // Very Light Blue-Gray Tint
+  primary: isWeb ? 'var(--color-primary)' : '#0B2545',         // JMCFI Deep Navy Blue
+  primaryLight: isWeb ? 'var(--color-primary-light)' : '#134074',    // JMCFI Royal Blue
+  primaryDark: isWeb ? 'var(--color-primary-dark)' : '#081F37',     // Dark Navy
+  accent: isWeb ? 'var(--color-accent)' : '#FFC72C',          // JMCFI Gold
+  wisteria: isWeb ? 'var(--color-wisteria)' : '#EEF4F8',        // Very Light Blue-Gray Tint
 
   // Background
-  background: '#F4F6F9',      // Clean neutral light gray
-  surface: '#FFFFFF',
-  surfaceSecondary: '#EEF4F8',
+  background: isWeb ? 'var(--color-background)' : '#F4F6F9',      // Clean neutral light gray
+  surface: isWeb ? 'var(--color-surface)' : '#FFFFFF',
+  surfaceSecondary: isWeb ? 'var(--color-surface-secondary)' : '#EEF4F8',
 
   // Text
-  textPrimary: '#1A1A2E',
-  textSecondary: '#6B7280',
-  textMuted: '#9CA3AF',
-  textOnPrimary: '#FFFFFF',
+  textPrimary: isWeb ? 'var(--color-text-primary)' : '#1A1A2E',
+  textSecondary: isWeb ? 'var(--color-text-secondary)' : '#6B7280',
+  textMuted: isWeb ? 'var(--color-text-muted)' : '#9CA3AF',
+  textOnPrimary: isWeb ? 'var(--color-text-on-primary)' : '#FFFFFF',
 
   // Status colors
-  success: '#16A34A',
-  warning: '#D97706',
-  error: '#DC2626',
-  info: '#2563EB',
+  success: isWeb ? 'var(--color-success)' : '#16A34A',
+  warning: isWeb ? 'var(--color-warning)' : '#D97706',
+  error: isWeb ? 'var(--color-error)' : '#DC2626',
+  info: isWeb ? 'var(--color-info)' : '#2563EB',
 
   // Border
-  border: '#E5E7EB',
-  borderFocus: '#0B2545',
+  border: isWeb ? 'var(--color-border)' : '#E5E7EB',
+  borderFocus: isWeb ? 'var(--color-border-focus)' : '#0B2545',
 
   // Role badge colors
-  admin: '#7C3AED',
-  requestor: '#2563EB',
-  officeHead: '#D97706',
-  vp: '#DC2626',
-  president: '#0F766E',
-  imcQa: '#7C3AED',
-  publisher: '#374151',
+  admin: isWeb ? 'var(--color-admin)' : '#7C3AED',
+  requestor: isWeb ? 'var(--color-requestor)' : '#2563EB',
+  officeHead: isWeb ? 'var(--color-office-head)' : '#D97706',
+  vp: isWeb ? 'var(--color-vp)' : '#DC2626',
+  president: isWeb ? 'var(--color-president)' : '#0F766E',
+  imcQa: isWeb ? 'var(--color-imc-qa)' : '#7C3AED',
+  publisher: isWeb ? 'var(--color-publisher)' : '#374151',
 };
 
 export const Spacing = {
