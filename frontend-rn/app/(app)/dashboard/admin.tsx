@@ -17,6 +17,7 @@ import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { dashboardApi, postsApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
+import { usePolicyStore } from '../../../store/policy';
 
 interface StatCardProps {
   label: string;
@@ -39,7 +40,7 @@ const CustomStatCard: React.FC<StatCardProps> = ({
   badgeText,
   badgeColor = Colors.textSecondary,
   badgeBgColor = '#F3F4F6',
-  valueColor = '#0B2545',
+  valueColor = Colors.textPrimary,
 }) => {
   return (
     <Card style={styles.statCard}>
@@ -86,8 +87,46 @@ export default function AdminDashboard() {
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
   
-  // Tab state: 'overview' | 'user-management' | 'all-posts' | 'account-settings'
+  // Tab state: 'overview' | 'user-management' | 'all-posts' | 'account-settings' | 'policy-rules'
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Policy rules store hooks & states
+  const {
+    policySections,
+    effectiveDate,
+    lastUpdatedDate,
+    fetchPolicy,
+    updatePolicy,
+    isLoading: isPolicyLoading
+  } = usePolicyStore();
+
+  const [editableEffectiveDate, setEditableEffectiveDate] = useState('');
+  const [editableLastUpdatedDate, setEditableLastUpdatedDate] = useState('');
+  const [editableSections, setEditableSections] = useState<any[]>([]);
+
+  const [editingBulletSecIdx, setEditingBulletSecIdx] = useState<number | null>(null);
+  const [editingBulletIdx, setEditingBulletIdx] = useState<number | null>(null);
+  const [editingBulletTitle, setEditingBulletTitle] = useState('');
+  const [editingBulletDesc, setEditingBulletDesc] = useState('');
+  const [newBulletSecIdx, setNewBulletSecIdx] = useState<number | null>(null);
+  const [newBulletTitle, setNewBulletTitle] = useState('');
+  const [newBulletDesc, setNewBulletDesc] = useState('');
+
+  useEffect(() => {
+    fetchPolicy();
+  }, []);
+
+  useEffect(() => {
+    if (policySections) {
+      setEditableSections(JSON.parse(JSON.stringify(policySections)));
+    }
+    if (effectiveDate) {
+      setEditableEffectiveDate(effectiveDate);
+    }
+    if (lastUpdatedDate) {
+      setEditableLastUpdatedDate(lastUpdatedDate);
+    }
+  }, [policySections, effectiveDate, lastUpdatedDate]);
 
   // Stats Dashboard state
   const [stats, setStats] = useState<any>(null);
@@ -279,7 +318,7 @@ export default function AdminDashboard() {
 
   // Platform Distribution mock data
   const platforms = [
-    { name: 'Facebook', percentage: 65, barColor: '#0B2545' },
+    { name: 'Facebook', percentage: 65, barColor: Colors.primary },
     { name: 'Instagram', percentage: 15, barColor: '#B45309' },
     { name: 'Twitter/X', percentage: 10, barColor: '#6B7280' },
     { name: 'Portal', percentage: 10, barColor: '#3B82F6' },
@@ -292,7 +331,7 @@ export default function AdminDashboard() {
       case 'vp':
         return { label: 'VICE PRESIDENT', color: '#B45309', bgColor: '#FEF3C7' };
       case 'it_publisher':
-        return { label: 'IT / PUBLISHER', color: '#4B5563', bgColor: '#E5E7EB' };
+        return { label: 'IT / PUBLISHER', color: Colors.textSecondary, bgColor: '#E5E7EB' };
       case 'requestor':
         return { label: 'REQUESTOR', color: '#0F766E', bgColor: '#CCFBF1' };
       case 'office_head':
@@ -302,7 +341,7 @@ export default function AdminDashboard() {
       case 'imc_qa':
         return { label: 'IMC / QA', color: '#6366F1', bgColor: '#E0E7FF' };
       default:
-        return { label: role.toUpperCase(), color: '#374151', bgColor: '#F3F4F6' };
+        return { label: role.toUpperCase(), color: Colors.textPrimary, bgColor: '#F3F4F6' };
     }
   };
 
@@ -535,7 +574,7 @@ export default function AdminDashboard() {
                     fontSize: 13,
                     borderRadius: 4,
                     border: '1px solid #E5E7EB',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: Colors.surface,
                     color: '#1A1A2E',
                     paddingLeft: 10,
                     paddingRight: 8,
@@ -563,7 +602,7 @@ export default function AdminDashboard() {
                     fontSize: 13,
                     borderRadius: 4,
                     border: '1px solid #E5E7EB',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: Colors.surface,
                     color: '#1A1A2E',
                     paddingLeft: 10,
                     paddingRight: 8,
@@ -630,7 +669,7 @@ export default function AdminDashboard() {
                                 fontSize: 10,
                                 borderRadius: 4,
                                 border: '1px solid #E5E7EB',
-                                backgroundColor: '#FFFFFF',
+                                backgroundColor: Colors.surface,
                                 color: '#1A1A2E',
                                 paddingLeft: 4,
                                 paddingRight: 2,
@@ -796,19 +835,19 @@ export default function AdminDashboard() {
                           style={styles.actionIconButton}
                           onPress={() => setActivePostActionDetails({ type: 'view', post })}
                         >
-                          <Ionicons name="eye-outline" size={16} color="#0B2545" />
+                          <Ionicons name="eye-outline" size={16} color={Colors.textPrimary} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.actionIconButton}
                           onPress={() => setActivePostActionDetails({ type: 'comment', post })}
                         >
-                          <Ionicons name="chatbubble-outline" size={15} color="#4B5563" />
+                          <Ionicons name="chatbubble-outline" size={15} color={Colors.textSecondary} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.actionIconButton}
                           onPress={() => setActivePostActionDetails({ type: 'history', post })}
                         >
-                          <Ionicons name="time-outline" size={16} color="#4B5563" />
+                          <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -888,7 +927,7 @@ export default function AdminDashboard() {
               <Card style={styles.formCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerIconWrapper}>
-                    <Ionicons name="person" size={18} color="#0B2545" />
+                    <Ionicons name="person" size={18} color={Colors.textPrimary} />
                   </View>
                   <Text style={styles.cardTitle}>Profile Information</Text>
                 </View>
@@ -927,7 +966,7 @@ export default function AdminDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
                     value={user?.email ?? 'admin@jmcfi.edu.ph'}
                     editable={false}
                   />
@@ -936,7 +975,7 @@ export default function AdminDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>ROLE</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
                     value="Administrator"
                     editable={false}
                   />
@@ -980,11 +1019,326 @@ export default function AdminDashboard() {
                   />
                 </View>
 
-                <TouchableOpacity style={[styles.submitButton, { backgroundColor: '#0B2545', marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: Colors.primary, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
                   <Text style={styles.submitButtonText}>Change Password</Text>
                 </TouchableOpacity>
               </Card>
             </View>
+          </View>
+        </View>
+      )}
+
+      {activeTab === 'policy-rules' && (
+        <View style={styles.formContainer}>
+          <View style={styles.topActionRow}>
+            <View style={styles.breadcrumbColumn}>
+              <Text style={styles.breadcrumbText}>
+                SETTINGS <Text style={{ color: Colors.textMuted }}>&gt;</Text> POLICY RULES
+              </Text>
+              <Text style={styles.mainPageTitle}>School Website Posting Policy Management</Text>
+              <Text style={styles.mainPageSubtitle}>
+                Edit dates and update guidelines for website content compliance. Changes are updated immediately.
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+            {/* Left Column: Dates & Purpose & Sections Editor */}
+            <View style={styles.leftColumn}>
+              
+              {/* Card 1: Dates config */}
+              <Card style={styles.formCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.headerIconWrapper}>
+                    <Ionicons name="calendar-outline" size={18} color={Colors.textPrimary} />
+                  </View>
+                  <Text style={styles.cardTitle}>Policy Timestamps</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap' }}>
+                  <View style={[styles.fieldGroup, { flex: 1, minWidth: 200 }]}>
+                    <Text style={styles.inputLabel}>EFFECTIVE DATE</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editableEffectiveDate}
+                      onChangeText={setEditableEffectiveDate}
+                      placeholder="e.g. Jun 26, 2026"
+                    />
+                  </View>
+                  <View style={[styles.fieldGroup, { flex: 1, minWidth: 200 }]}>
+                    <Text style={styles.inputLabel}>LAST UPDATED DATE</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editableLastUpdatedDate}
+                      onChangeText={setEditableLastUpdatedDate}
+                      placeholder="e.g. July 15, 2026"
+                    />
+                  </View>
+                </View>
+              </Card>
+
+              {/* Card 2: Section 1 Purpose editing */}
+              {editableSections.map((sec, secIdx) => {
+                if (sec.id === 'sec-1') {
+                  return (
+                    <Card key={sec.id} style={styles.formCard}>
+                      <View style={styles.cardHeader}>
+                        <View style={[styles.headerIconWrapper, { backgroundColor: '#EFF6FF' }]}>
+                          <Ionicons name="book" size={18} color={Colors.textPrimary} />
+                        </View>
+                        <Text style={styles.cardTitle}>{sec.title}</Text>
+                      </View>
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.inputLabel}>PURPOSE CONTENT TEXT</Text>
+                        <TextInput
+                          style={[styles.textInput, { height: 100, textAlignVertical: 'top', paddingTop: 8 }]}
+                          multiline={true}
+                          value={sec.content}
+                          onChangeText={(text) => {
+                            const newSecs = [...editableSections];
+                            newSecs[secIdx].content = text;
+                            setEditableSections(newSecs);
+                          }}
+                        />
+                      </View>
+                    </Card>
+                  );
+                }
+
+                // Cards 3, 4, 5: Bullet sections editing
+                return (
+                  <Card key={sec.id} style={styles.formCard}>
+                    <View style={styles.cardHeader}>
+                      <View style={[styles.headerIconWrapper, { backgroundColor: sec.bg }]}>
+                        <Ionicons name={sec.icon} size={18} color={sec.color} />
+                      </View>
+                      <Text style={styles.cardTitle}>{sec.title}</Text>
+                    </View>
+
+                    {/* Bullets List */}
+                    <View style={{ gap: Spacing.sm }}>
+                      {sec.bullets?.map((bullet: any, bulletIdx: number) => {
+                        const isEditing = editingBulletSecIdx === secIdx && editingBulletIdx === bulletIdx;
+                        return (
+                          <View key={bulletIdx} style={styles.policyEditItemRow}>
+                            {isEditing ? (
+                              <View style={{ flex: 1, gap: 8, padding: 8, backgroundColor: Colors.surfaceSecondary, borderRadius: 4, borderWidth: 1, borderColor: Colors.border }}>
+                                <Text style={styles.inputLabel}>BULLET TITLE</Text>
+                                <TextInput
+                                  style={styles.textInput}
+                                  value={editingBulletTitle}
+                                  onChangeText={setEditingBulletTitle}
+                                />
+                                <Text style={styles.inputLabel}>BULLET DESCRIPTION</Text>
+                                <TextInput
+                                  style={[styles.textInput, { height: 60 }]}
+                                  multiline={true}
+                                  value={editingBulletDesc}
+                                  onChangeText={setEditingBulletDesc}
+                                />
+                                <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                                  <TouchableOpacity
+                                    style={[styles.smallBtn, { backgroundColor: '#E5E7EB' }]}
+                                    onPress={() => {
+                                      setEditingBulletSecIdx(null);
+                                      setEditingBulletIdx(null);
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={[styles.smallBtn, { backgroundColor: Colors.primary }]}
+                                    onPress={() => {
+                                      if (!editingBulletTitle.trim() || !editingBulletDesc.trim()) {
+                                        alert('Please fill out all fields.');
+                                        return;
+                                      }
+                                      const newSecs = [...editableSections];
+                                      newSecs[secIdx].bullets[bulletIdx] = {
+                                        title: editingBulletTitle,
+                                        desc: editingBulletDesc
+                                      };
+                                      setEditableSections(newSecs);
+                                      setEditingBulletSecIdx(null);
+                                      setEditingBulletIdx(null);
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFFFFF' }}>Apply</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            ) : (
+                              <View style={styles.bulletDisplayRow}>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.bulletTitleDisplay}>{bullet.title}</Text>
+                                  <Text style={styles.bulletDescDisplay}>{bullet.desc}</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                  <TouchableOpacity
+                                    style={styles.bulletActionBtn}
+                                    onPress={() => {
+                                      setEditingBulletSecIdx(secIdx);
+                                      setEditingBulletIdx(bulletIdx);
+                                      setEditingBulletTitle(bullet.title);
+                                      setEditingBulletDesc(bullet.desc);
+                                    }}
+                                  >
+                                    <Ionicons name="create-outline" size={14} color={Colors.textPrimary} />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={styles.bulletActionBtn}
+                                    onPress={() => {
+                                      if (confirm('Delete this policy rule bullet?')) {
+                                        const newSecs = [...editableSections];
+                                        newSecs[secIdx].bullets.splice(bulletIdx, 1);
+                                        setEditableSections(newSecs);
+                                      }
+                                    }}
+                                  >
+                                    <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Add Bullet Button/Form */}
+                    {newBulletSecIdx === secIdx ? (
+                      <View style={{ gap: 8, padding: 12, backgroundColor: Colors.background, borderRadius: 6, borderWidth: 1, borderColor: Colors.border, marginTop: 10 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textPrimary }}>ADD NEW POLICY RULE</Text>
+                        <View style={{ gap: 4 }}>
+                          <Text style={styles.inputLabel}>TITLE</Text>
+                          <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. Content Accuracy"
+                            value={newBulletTitle}
+                            onChangeText={setNewBulletTitle}
+                          />
+                        </View>
+                        <View style={{ gap: 4 }}>
+                          <Text style={styles.inputLabel}>DESCRIPTION</Text>
+                          <TextInput
+                            style={[styles.textInput, { height: 50 }]}
+                            multiline={true}
+                            placeholder="e.g. All facts must be verified before publishing."
+                            value={newBulletDesc}
+                            onChangeText={setNewBulletDesc}
+                          />
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                          <TouchableOpacity
+                            style={[styles.smallBtn, { backgroundColor: '#E5E7EB' }]}
+                            onPress={() => setNewBulletSecIdx(null)}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.smallBtn, { backgroundColor: '#16A34A' }]}
+                            onPress={() => {
+                              if (!newBulletTitle.trim() || !newBulletDesc.trim()) {
+                                alert('Please fill out both title and description.');
+                                return;
+                              }
+                              const newSecs = [...editableSections];
+                              if (!newSecs[secIdx].bullets) {
+                                newSecs[secIdx].bullets = [];
+                              }
+                              newSecs[secIdx].bullets.push({
+                                title: newBulletTitle,
+                                desc: newBulletDesc
+                              });
+                              setEditableSections(newSecs);
+                              setNewBulletTitle('');
+                              setNewBulletDesc('');
+                              setNewBulletSecIdx(null);
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFFFFF' }}>Add Rule</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.addBulletBtn}
+                        onPress={() => {
+                          setNewBulletSecIdx(secIdx);
+                          setNewBulletTitle('');
+                          setNewBulletDesc('');
+                        }}
+                      >
+                        <Ionicons name="add-circle-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
+                        <Text style={styles.addBulletBtnText}>Add Guidelines Rule</Text>
+                      </TouchableOpacity>
+                    )}
+                  </Card>
+                );
+              })}
+
+              {/* Global Save Button Card */}
+              <Card style={[styles.formCard, { backgroundColor: '#F8FAFC' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <View style={{ flex: 1, minWidth: 200 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary }}>Apply Updates to Platform Policies</Text>
+                    <Text style={{ fontSize: 11, color: Colors.textSecondary, marginTop: 2 }}>
+                      This will immediately update policy compliance guidelines for Requestors, Office Heads, IMC/QA, Publisher, and VPs.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.submitButton, { marginTop: 0, paddingHorizontal: 24, minWidth: 160 }]}
+                    disabled={isPolicyLoading}
+                    onPress={async () => {
+                      const success = await updatePolicy(
+                        editableEffectiveDate,
+                        editableLastUpdatedDate,
+                        editableSections
+                      );
+                      if (success) {
+                        alert('Posting Policy Rules & dates updated successfully!');
+                      } else {
+                        alert('Failed to update policy settings. Please try again.');
+                      }
+                    }}
+                  >
+                    {isPolicyLoading ? (
+                      <Text style={styles.submitButtonText}>Saving...</Text>
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-done" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.submitButtonText}>Save Policy Rules</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </Card>
+
+            </View>
+
+            {/* Right Column: Policy Preview info */}
+            <View style={styles.rightColumn}>
+              <Card style={styles.configCard}>
+                <Text style={styles.configCardTitle}>Policy Publishing Info</Text>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.inputLabel}>PREVIEW BANNER STATE</Text>
+                  <View style={{ padding: 12, backgroundColor: '#EFF6FF', borderRadius: 4, borderWidth: 1, borderColor: '#DBEAFE', marginTop: 4 }}>
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary }}>School Website Posting Policy</Text>
+                    <Text style={{ fontSize: 11, color: '#1E40AF', marginTop: 4 }}>
+                      Effective: {editableEffectiveDate} &bull; Last Updated: {editableLastUpdatedDate}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.inputLabel}>COMPLIANCE TIPS FOR ADMIN</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18, marginTop: 4 }}>
+                    - Update the <Text style={{ fontWeight: '600' }}>Effective Date</Text> when introducing major revisions.{"\n"}
+                    - Use clear headings in <Text style={{ fontWeight: '600' }}>Purpose Text</Text> to summarize scope.{"\n"}
+                    - Ensure AI Compliance guidelines in the backend align with these rules.
+                  </Text>
+                </View>
+              </Card>
+            </View>
+
           </View>
         </View>
       )}
@@ -1102,7 +1456,7 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: FontSize.xxl - 2,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   subTitle: {
     fontSize: FontSize.sm,
@@ -1127,9 +1481,9 @@ const styles = StyleSheet.create({
     minWidth: 200,
     padding: Spacing.md,
     gap: Spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     shadowColor: 'transparent',
   },
@@ -1160,7 +1514,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 10,
     fontWeight: FontWeight.bold,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   statValue: {
@@ -1179,24 +1533,24 @@ const styles = StyleSheet.create({
   },
   activityCard: {
     flex: 1.5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
   },
   distributionCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
   },
   sectionHeader: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
   activityList: {
@@ -1206,12 +1560,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     padding: Spacing.md,
     borderRadius: 4,
     borderLeftWidth: 3,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
   },
   activityLeft: {
     flexDirection: 'row',
@@ -1283,9 +1637,9 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   userCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
   },
@@ -1313,20 +1667,20 @@ const styles = StyleSheet.create({
   formInput: {
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   passwordInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   passwordInput: {
     flex: 1,
@@ -1344,13 +1698,13 @@ const styles = StyleSheet.create({
   dropdownTrigger: {
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   dropdownTriggerText: {
     fontSize: FontSize.sm,
@@ -1361,9 +1715,9 @@ const styles = StyleSheet.create({
     top: 66,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     zIndex: 9999,
     shadowColor: '#000',
@@ -1385,7 +1739,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   createAccountButton: {
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 20,
     height: 38,
     borderRadius: 4,
@@ -1411,11 +1765,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 10,
     height: 32,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     width: 200,
   },
   searchInput: {
@@ -1426,14 +1780,14 @@ const styles = StyleSheet.create({
   },
   table: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     overflow: 'visible',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -1442,7 +1796,7 @@ const styles = StyleSheet.create({
   tableHeaderCell: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#4B5563',
+    color: Colors.textSecondary,
   },
   tableRow: {
     flexDirection: 'row',
@@ -1498,20 +1852,20 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semiBold,
   },
   cancelActionText: {
-    color: '#6B7280',
+    color: Colors.textSecondary,
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.semiBold,
   },
   inlineDropdownTrigger: {
     height: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     width: '100%',
   },
   inlineDropdownTriggerText: {
@@ -1526,9 +1880,9 @@ const styles = StyleSheet.create({
     top: 26,
     left: 0,
     width: 140,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     zIndex: 999,
     shadowColor: '#000',
@@ -1571,7 +1925,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     gap: 6,
   },
   statusSelectButtonText: {
@@ -1584,9 +1938,9 @@ const styles = StyleSheet.create({
     top: 36,
     right: 0,
     width: 160,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     zIndex: 999,
     shadowColor: '#000',
@@ -1598,7 +1952,7 @@ const styles = StyleSheet.create({
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 16,
     height: 32,
     borderRadius: 4,
@@ -1614,7 +1968,7 @@ const styles = StyleSheet.create({
   postTitleText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   postMetaText: {
     fontSize: FontSize.xs,
@@ -1648,7 +2002,7 @@ const styles = StyleSheet.create({
   platformMiniBadgeText: {
     fontSize: 9,
     fontWeight: FontWeight.bold,
-    color: '#4B5563',
+    color: Colors.textSecondary,
   },
   actionIconsRow: {
     flexDirection: 'row',
@@ -1681,12 +2035,12 @@ const styles = StyleSheet.create({
   },
   pageButton: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 32,
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   pageButtonDisabled: {
     opacity: 0.5,
@@ -1699,15 +2053,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   pageIndexButtonActive: {
-    backgroundColor: '#0B2545',
-    borderColor: '#0B2545',
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   pageIndexButtonText: {
     fontSize: FontSize.xs + 1,
@@ -1729,7 +2083,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 550,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -1743,7 +2097,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   modalBody: {
     maxHeight: 400,
@@ -1770,7 +2124,7 @@ const styles = StyleSheet.create({
   bodyBoldLabel: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   bodyValueText: {
     fontSize: FontSize.sm,
@@ -1780,11 +2134,11 @@ const styles = StyleSheet.create({
   bodyMockPostContent: {
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     padding: Spacing.md,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     fontStyle: 'italic',
     lineHeight: 20,
     marginTop: 6,
@@ -1793,17 +2147,17 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   mockComment: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     padding: 12,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     gap: 4,
   },
   commentUser: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   commentText: {
     fontSize: FontSize.sm,
@@ -1817,14 +2171,14 @@ const styles = StyleSheet.create({
   commentInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 38,
     fontSize: FontSize.sm,
   },
   commentSendBtn: {
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 16,
     borderRadius: 4,
     justifyContent: 'center',
@@ -1860,7 +2214,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   modalCloseBtn: {
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 20,
     height: 36,
     borderRadius: 4,
@@ -1891,13 +2245,13 @@ const styles = StyleSheet.create({
   breadcrumbText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#0B2545',
+    color: Colors.textPrimary,
     letterSpacing: 0.5,
   },
   mainPageTitle: {
     fontSize: FontSize.xxl - 2,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   mainPageSubtitle: {
     fontSize: FontSize.sm,
@@ -1921,9 +2275,9 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   formCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -1947,7 +2301,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   fieldGroup: {
     gap: 6,
@@ -1956,17 +2310,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   textInput: {
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   submitButton: {
     flexDirection: 'row',
@@ -1974,7 +2328,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     marginTop: 8,
   },
@@ -1996,7 +2350,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2012,7 +2366,7 @@ const styles = StyleSheet.create({
   profilePicTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   profilePicSubtitle: {
     fontSize: FontSize.xs,
@@ -2032,7 +2386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profilePicUploadBtnText: {
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -2049,5 +2403,57 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 11,
     fontWeight: FontWeight.bold,
+  },
+  policyEditItemRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingVertical: Spacing.sm,
+  },
+  bulletDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  bulletTitleDisplay: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#1A1A2E',
+  },
+  bulletDescDisplay: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  bulletActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBulletBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.primary,
+    borderRadius: 4,
+    height: 36,
+    marginTop: 10,
+  },
+  addBulletBtnText: {
+    fontSize: FontSize.xs,
+    color: Colors.textPrimary,
+    fontWeight: FontWeight.bold,
+  },
+  smallBtn: {
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

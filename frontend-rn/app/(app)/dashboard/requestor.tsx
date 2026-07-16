@@ -15,11 +15,18 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
+import { usePolicyStore } from '../../../store/policy';
 
 export default function RequestorDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
+
+  const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
+
+  useEffect(() => {
+    fetchPolicy();
+  }, []);
 
   // Tab State: 'dashboard' | 'post-requests' | 'approval-queue' | 'analytics' | 'policy-rules'
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -278,7 +285,7 @@ export default function RequestorDashboard() {
               style={styles.createRequestBtnGold}
               onPress={() => setActiveTab('post-requests')}
             >
-              <Ionicons name="add" size={18} color="#0B2545" style={{ marginRight: 6 }} />
+              <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
               <Text style={styles.createRequestBtnGoldText}>Create New Request</Text>
             </TouchableOpacity>
           </View>
@@ -333,10 +340,10 @@ export default function RequestorDashboard() {
               <Text style={styles.tableCardTitle}>Recent Post Requests</Text>
               <View style={styles.tableHeaderActions}>
                 <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => alert('Sorting requests...')}>
-                  <Ionicons name="filter" size={16} color="#4B5563" />
+                  <Ionicons name="filter" size={16} color={Colors.textSecondary} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => alert('Exporting requests...')}>
-                  <Ionicons name="download" size={16} color="#4B5563" />
+                  <Ionicons name="download" size={16} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -355,7 +362,7 @@ export default function RequestorDashboard() {
                 <View key={req.id} style={styles.tableRow}>
                   <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
-                      <Ionicons name={req.thumbnailIcon} size={16} color="#4B5563" />
+                      <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
                     </View>
                     <View>
                       <Text style={styles.postTitleText}>{req.title}</Text>
@@ -373,10 +380,10 @@ export default function RequestorDashboard() {
                   </View>
                   <View style={[styles.cellFlex1, styles.actionsCell]}>
                     <TouchableOpacity onPress={() => alert(`Previewing ${req.title}`)}>
-                      <Ionicons name={req.actionIcon1} size={16} color="#4B5563" />
+                      <Ionicons name={req.actionIcon1} size={16} color={Colors.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => alert(`Executing action on ${req.title}`)}>
-                      <Ionicons name={req.actionIcon2} size={16} color="#4B5563" />
+                      <Ionicons name={req.actionIcon2} size={16} color={Colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -391,7 +398,7 @@ export default function RequestorDashboard() {
                   disabled={dashboardPage === 1}
                   onPress={() => setDashboardPage(prev => Math.max(prev - 1, 1))}
                 >
-                  <Ionicons name="chevron-back" size={14} color="#6B7280" />
+                  <Ionicons name="chevron-back" size={14} color={Colors.textSecondary} />
                 </TouchableOpacity>
 
                 {[1, 2, 3].map((pNum) => (
@@ -411,7 +418,7 @@ export default function RequestorDashboard() {
                   disabled={dashboardPage === 3}
                   onPress={() => setDashboardPage(prev => Math.min(prev + 1, 3))}
                 >
-                  <Ionicons name="chevron-forward" size={14} color="#6B7280" />
+                  <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -434,7 +441,7 @@ export default function RequestorDashboard() {
             </View>
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity style={styles.draftButton} onPress={handleSaveDraft}>
-                <Ionicons name="save-outline" size={16} color="#0B2545" style={{ marginRight: 6 }} />
+                <Ionicons name="save-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
                 <Text style={styles.draftButtonText}>Save as Draft</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitButton} onPress={handleSubmitRequest}>
@@ -450,7 +457,7 @@ export default function RequestorDashboard() {
               <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) && { zIndex: 100, position: 'relative' }]}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerIconWrapper}>
-                    <Ionicons name="information-circle" size={18} color="#0B2545" />
+                    <Ionicons name="information-circle" size={18} color={Colors.textPrimary} />
                   </View>
                   <Text style={styles.cardTitle}>Basic Information</Text>
                 </View>
@@ -533,7 +540,7 @@ export default function RequestorDashboard() {
               <Card style={styles.formCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerIconWrapper}>
-                    <Ionicons name="document-text" size={18} color="#0B2545" />
+                    <Ionicons name="document-text" size={18} color={Colors.textPrimary} />
                   </View>
                   <Text style={styles.cardTitle}>Content & Caption</Text>
                 </View>
@@ -555,7 +562,7 @@ export default function RequestorDashboard() {
                       {caption.length} / 2200 characters
                     </Text>
                     <TouchableOpacity style={styles.checkPolicyBtn} onPress={handleCheckPolicy}>
-                      <Ionicons name="shield-checkmark-outline" size={14} color="#0B2545" style={{ marginRight: 4 }} />
+                      <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
                       <Text style={styles.checkPolicyBtnText}>Check Policy Alignment</Text>
                     </TouchableOpacity>
                   </View>
@@ -565,7 +572,7 @@ export default function RequestorDashboard() {
               <Card style={styles.formCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerIconWrapper}>
-                    <Ionicons name="images" size={18} color="#0B2545" />
+                    <Ionicons name="images" size={18} color={Colors.textPrimary} />
                   </View>
                   <Text style={styles.cardTitle}>Media & Assets</Text>
                 </View>
@@ -573,7 +580,7 @@ export default function RequestorDashboard() {
                 <View style={[styles.uploadGridRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
                   <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Media uploader triggered.')}>
                     <View style={styles.uploadZoneCircle}>
-                      <Ionicons name="cloud-upload-outline" size={24} color="#4B5563" />
+                      <Ionicons name="cloud-upload-outline" size={24} color={Colors.textSecondary} />
                     </View>
                     <Text style={styles.uploadZoneTitle}>Upload Main Media</Text>
                     <Text style={styles.uploadZoneSubtitle}>
@@ -583,7 +590,7 @@ export default function RequestorDashboard() {
 
                   <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Documents uploader triggered.')}>
                     <View style={styles.uploadZoneCircle}>
-                      <Ionicons name="attach-outline" size={22} color="#4B5563" />
+                      <Ionicons name="attach-outline" size={22} color={Colors.textSecondary} />
                     </View>
                     <Text style={styles.uploadZoneTitle}>Supporting Docs</Text>
                     <Text style={styles.uploadZoneSubtitle}>
@@ -667,7 +674,7 @@ export default function RequestorDashboard() {
                 </View>
 
                 <View style={styles.scheduleInfoBox}>
-                  <Ionicons name="information-circle-outline" size={16} color="#0B2545" style={{ marginTop: 2 }} />
+                  <Ionicons name="information-circle-outline" size={16} color={Colors.textPrimary} style={{ marginTop: 2 }} />
                   <Text style={styles.scheduleInfoText}>
                     Posts must be submitted at least 48 hours before the preferred publication time for administrative review.
                   </Text>
@@ -715,7 +722,7 @@ export default function RequestorDashboard() {
                   </View>
 
                   <View style={styles.mockPostMediaPlaceholder}>
-                    <Ionicons name="image-outline" size={32} color="#9CA3AF" />
+                    <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
                     <Text style={styles.mockPostMediaPlaceholderText}>
                       Upload media to see your content preview here...
                     </Text>
@@ -723,13 +730,13 @@ export default function RequestorDashboard() {
 
                   <View style={styles.mockPostActionsRow}>
                     <View style={styles.mockActionGroup}>
-                      <Ionicons name="heart-outline" size={18} color="#4B5563" />
+                      <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
                     </View>
                     <View style={styles.mockActionGroup}>
-                      <Ionicons name="chatbubble-outline" size={17} color="#4B5563" />
+                      <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
                     </View>
                     <View style={styles.mockActionGroup}>
-                      <Ionicons name="share-social-outline" size={18} color="#4B5563" />
+                      <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
                     </View>
                   </View>
                 </View>
@@ -775,7 +782,7 @@ export default function RequestorDashboard() {
               {/* Stepper Footer / Action Notes */}
               <View style={styles.queueCardFooter}>
                 <View style={styles.actionNoteContainer}>
-                  <Ionicons name="arrow-forward-circle-outline" size={16} color="#0B2545" />
+                  <Ionicons name="arrow-forward-circle-outline" size={16} color={Colors.textPrimary} />
                   <Text style={styles.actionNoteText}>
                     <Text style={{ fontWeight: 'bold' }}>Next Action: </Text>
                     {post.nextAction}
@@ -788,14 +795,14 @@ export default function RequestorDashboard() {
                     style={styles.queueActionBtn}
                     onPress={() => alert(`Reviewing details for: ${post.title}`)}
                   >
-                    <Ionicons name="eye-outline" size={16} color="#0B2545" style={{ marginRight: 6 }} />
+                    <Ionicons name="eye-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
                     <Text style={styles.queueActionBtnText}>Preview</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.queueActionBtn}
                     onPress={() => setSelectedQueuePost(post)}
                   >
-                    <Ionicons name="chatbubble-ellipses-outline" size={15} color="#0B2545" style={{ marginRight: 6 }} />
+                    <Ionicons name="chatbubble-ellipses-outline" size={15} color={Colors.textPrimary} style={{ marginRight: 6 }} />
                     <Text style={styles.queueActionBtnText}>Review Comments ({post.comments.length})</Text>
                   </TouchableOpacity>
                 </View>
@@ -826,7 +833,7 @@ export default function RequestorDashboard() {
               <Card style={styles.formCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerIconWrapper}>
-                    <Ionicons name="person" size={18} color="#0B2545" />
+                    <Ionicons name="person" size={18} color={Colors.textPrimary} />
                   </View>
                   <Text style={styles.cardTitle}>Profile Information</Text>
                 </View>
@@ -865,7 +872,7 @@ export default function RequestorDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
                     value={user?.email ?? 'maria.delacruz@jmcfi.edu.ph'}
                     editable={false}
                   />
@@ -874,7 +881,7 @@ export default function RequestorDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
                     value="College of Computing Studies"
                     editable={false}
                   />
@@ -918,7 +925,7 @@ export default function RequestorDashboard() {
                   />
                 </View>
 
-                <TouchableOpacity style={[styles.submitButton, { backgroundColor: '#0B2545', marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: Colors.primary, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
                   <Text style={styles.submitButtonText}>Change Password</Text>
                 </TouchableOpacity>
               </Card>
@@ -940,13 +947,13 @@ export default function RequestorDashboard() {
             </View>
             <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
               <TouchableOpacity style={styles.analyticsFilterBtn} onPress={() => alert('Filtering by time range...')}>
-                <Text style={{ fontSize: FontSize.xs, color: '#4B5563', fontWeight: 'bold', paddingHorizontal: 8 }}>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', paddingHorizontal: 8 }}>
                   Last 30 Days
                 </Text>
-                <Ionicons name="chevron-down" size={14} color="#4B5563" />
+                <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.createRequestBtnGold, { backgroundColor: '#0B2545' }]}
+                style={[styles.createRequestBtnGold, { backgroundColor: Colors.primary }]}
                 onPress={() => alert('Generating PDF reports...')}
               >
                 <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
@@ -957,9 +964,9 @@ export default function RequestorDashboard() {
 
           {/* Engagement Summary metrics */}
           <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: '#0B2545' }]}>
+            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
               <View style={styles.metricHeader}>
-                <Ionicons name="eye-outline" size={18} color="#0B2545" />
+                <Ionicons name="eye-outline" size={18} color={Colors.textPrimary} />
                 <Text style={[styles.metricBadgeTextBlue, { color: '#16A34A' }]}>+14.2%</Text>
               </View>
               <Text style={styles.metricValue}>128.4K</Text>
@@ -1139,7 +1146,7 @@ export default function RequestorDashboard() {
                 <View key={idx} style={styles.tableRow}>
                   <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: item.iconBg }]}>
-                      <Ionicons name={item.icon as any} size={16} color="#4B5563" />
+                      <Ionicons name={item.icon as any} size={16} color={Colors.textSecondary} />
                     </View>
                     <View>
                       <Text style={styles.postTitleText}>{item.title}</Text>
@@ -1161,90 +1168,6 @@ export default function RequestorDashboard() {
 
       {/* ----------------- POLICY & RULES TAB ----------------- */}
       {activeTab === 'policy-rules' && (() => {
-        const policySections = [
-          {
-            id: 'sec-1',
-            title: '1. Purpose',
-            icon: 'book-outline' as const,
-            bg: '#EFF6FF',
-            color: '#0B2545',
-            content: 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
-          },
-          {
-            id: 'sec-2',
-            title: '2. Scope & Limitations',
-            icon: 'shield-checkmark-outline' as const,
-            bg: '#F3E8FF',
-            color: '#7C3AED',
-            bullets: [
-              { title: 'Brand Integrity', desc: 'All content must adhere to the official JMCFI Brand Guidelines (colors, logos, typography).' },
-              { title: 'Platform Limitation', desc: 'This policy applies exclusively to the official school domain and subdomains.' },
-              { title: 'Editorial Control', desc: 'The school reserves the right to edit, reject, or remove any content without prior notice.' },
-              { title: 'Non-Compliance', desc: 'Violation results in immediate removal from the platform and potential disciplinary action.' },
-            ],
-          },
-          {
-            id: 'sec-3',
-            title: '3. Acceptable Content',
-            icon: 'checkmark-circle-outline' as const,
-            bg: '#DCFCE7',
-            color: '#16A34A',
-            bullets: [
-              { title: 'Academic & Professional', desc: 'Content must support the school\'s mission, be factually accurate, and maintain an inclusive tone.' },
-              { title: 'Visual Standards', desc: 'Use approved templates, high-resolution media, and official school colors/logo only.' },
-              { title: 'Consent (Minors Under 18)', desc: 'Written parental/guardian consent is required.' },
-              { title: 'Consent (Adults 18+)', desc: 'Student\'s own signed consent is required.' },
-            ],
-          },
-          {
-            id: 'sec-4',
-            title: '4. Prohibited Content',
-            icon: 'alert-circle-outline' as const,
-            bg: '#FEE2E2',
-            color: '#DC2626',
-            bullets: [
-              { title: 'Academic Misconduct', desc: 'Cheating guides, answer keys, or plagiarism.' },
-              { title: 'Inappropriate Material', desc: 'Bullying, hate speech, explicit content, or harassment.' },
-              { title: 'Commercial/Political', desc: 'Unauthorized ads, personal fundraising, or political endorsements.' },
-              { title: 'Privacy Breach', desc: 'Publishing student grades, private addresses, or administrative records.' },
-            ],
-          },
-          {
-            id: 'sec-5',
-            title: '5. Copyright & Intellectual Property',
-            icon: 'copy-outline' as const,
-            bg: '#FEF3C7',
-            color: '#D97706',
-            bullets: [
-              { title: 'Ownership rights', desc: 'Posters must own the rights to content or have written permission.' },
-              { title: 'Student Work', desc: 'Showcasing student work requires proper consent (see Section 3).' },
-              { title: 'Approved Media', desc: 'Images/music must be sourced from the school\'s asset library or royalty-free databases.' },
-            ],
-          },
-          {
-            id: 'sec-6',
-            title: '6. Posting Process Flow',
-            icon: 'git-network-outline' as const,
-            bg: '#EFF6FF',
-            color: '#2563EB',
-            steps: [
-              { title: 'Content Creation', desc: 'Poster submits request (Title, Caption, Media).' },
-              { title: 'Quality Check', desc: 'Verification of brand guidelines and factual accuracy.' },
-              { title: 'Approval', desc: 'Multi-level sign-off (Dept Head, VP, President if required).' },
-              { title: 'Publishing', desc: 'Final deployment by the IT Department.' },
-            ],
-          },
-          {
-            id: 'sec-7',
-            title: '7. Enforcement & Contact',
-            icon: 'warning-outline' as const,
-            bg: '#F5F5F5',
-            color: '#4B5563',
-            content: 'First Offense: Content removal and formal warning.\nRepeated Violations: Permanent revocation of posting privileges.\nSerious Breaches: Referral to the Disciplinary Board or HR.',
-            contact: 'For questions, email communication@jmc.edu.ph or it@jmc.edu.ph.',
-          },
-        ];
-
         const filteredSections = policySections.filter(sec => {
           const query = policySearchQuery.toLowerCase();
           if (!query) return true;
@@ -1262,7 +1185,7 @@ export default function RequestorDashboard() {
               <View>
                 <Text style={styles.welcomeTitle}>School Website Posting Policy</Text>
                 <Text style={styles.welcomeSubtitle}>
-                  Effective Date: Jun 26, 2026 &bull; Last Updated: July 15, 2026
+                  Effective Date: {effectiveDate} &bull; Last Updated: {lastUpdatedDate}
                 </Text>
               </View>
               
@@ -1273,7 +1196,7 @@ export default function RequestorDashboard() {
                   value={policySearchQuery}
                   onChangeText={setPolicySearchQuery}
                 />
-                <Ionicons name="search" size={16} color="#6B7280" style={styles.inputFieldIcon} />
+                <Ionicons name="search" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
               </View>
             </View>
 
@@ -1282,13 +1205,13 @@ export default function RequestorDashboard() {
               {isLargeScreen && (
                 <View style={styles.policySidebar}>
                   <Text style={styles.policySidebarTitle}>POLICY SECTIONS</Text>
-                  {policySections.map((sec) => (
+                  {filteredSections.map((sec) => (
                     <TouchableOpacity
                       key={sec.id}
-                      style={[styles.policySidebarItem, { backgroundColor: '#FFFFFF' }]}
-                      onPress={() => alert(`Scrolling to ${sec.title}...`)}
+                      style={[styles.policySidebarItem, { backgroundColor: Colors.surface }]}
+                      onPress={() => alert(`Navigating to section: ${sec.title}`)}
                     >
-                      <Ionicons name={sec.icon} size={16} color="#4B5563" />
+                      <View style={[styles.bulletPoint, { backgroundColor: sec.color }]} />
                       <Text style={styles.policySidebarLabel} numberOfLines={1}>{sec.title.substring(3)}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1302,7 +1225,7 @@ export default function RequestorDashboard() {
                     <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
                       <View style={styles.cardHeader}>
                         <View style={[styles.headerIconWrapper, { backgroundColor: sec.bg }]}>
-                          <Ionicons name={sec.icon} size={16} color={sec.color} />
+                          <Ionicons name={sec.icon as any} size={16} color={sec.color} />
                         </View>
                         <Text style={styles.cardTitle}>{sec.title}</Text>
                       </View>
@@ -1356,7 +1279,7 @@ export default function RequestorDashboard() {
                   ))
                 ) : (
                   <View style={styles.policyEmptyState}>
-                    <Ionicons name="search-outline" size={36} color="#9CA3AF" />
+                    <Ionicons name="search-outline" size={36} color={Colors.textMuted} />
                     <Text style={styles.postTitleText}>No policy guidelines found</Text>
                     <Text style={styles.welcomeSubtitle}>Try adjusting your search criteria.</Text>
                   </View>
@@ -1401,7 +1324,7 @@ export default function RequestorDashboard() {
                   selectedQueuePost.comments.map((c: any, index: number) => (
                     <View key={index} style={styles.commentItem}>
                       <View style={styles.commentHeader}>
-                        <Ionicons name="person-circle" size={20} color="#0B2545" />
+                        <Ionicons name="person-circle" size={20} color={Colors.textPrimary} />
                         <Text style={styles.commentAuthor}>{c.author}</Text>
                       </View>
                       <Text style={styles.commentContent}>{c.text}</Text>
@@ -1443,7 +1366,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: FontSize.xxl - 2,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   welcomeSubtitle: {
     fontSize: FontSize.sm,
@@ -1459,7 +1382,7 @@ const styles = StyleSheet.create({
   },
   createRequestBtnGoldText: {
     fontSize: FontSize.sm,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   metricsRow: {
@@ -1471,9 +1394,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 150,
     padding: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderLeftWidth: 4,
     borderRadius: 6,
     gap: 4,
@@ -1493,7 +1416,7 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 28,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginTop: 2,
   },
   metricLabel: {
@@ -1502,9 +1425,9 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   tableCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -1512,7 +1435,7 @@ const styles = StyleSheet.create({
   tableCardTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   tableHeaderArea: {
     flexDirection: 'row',
@@ -1527,21 +1450,21 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   table: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     overflow: 'hidden',
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -1550,7 +1473,7 @@ const styles = StyleSheet.create({
   tableHeaderCell: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#4B5563',
+    color: Colors.textSecondary,
   },
   tableRow: {
     flexDirection: 'row',
@@ -1588,7 +1511,7 @@ const styles = StyleSheet.create({
   postTitleText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   postPlatformsText: {
     fontSize: FontSize.xs,
@@ -1630,25 +1553,25 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   pageIndexBtn: {
     width: 28,
     height: 28,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   pageIndexBtnActive: {
-    backgroundColor: '#0B2545',
-    borderColor: '#0B2545',
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   pageIndexBtnText: {
     fontSize: FontSize.xs,
@@ -1679,13 +1602,13 @@ const styles = StyleSheet.create({
   breadcrumbText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#0B2545',
+    color: Colors.textPrimary,
     letterSpacing: 0.5,
   },
   mainPageTitle: {
     fontSize: FontSize.xxl - 2,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   mainPageSubtitle: {
     fontSize: FontSize.sm,
@@ -1700,15 +1623,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#0B2545',
+    borderColor: Colors.primary,
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   draftButtonText: {
     fontSize: FontSize.sm,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   submitButton: {
@@ -1717,7 +1640,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
   },
   submitButtonText: {
     fontSize: FontSize.sm,
@@ -1742,17 +1665,17 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   formCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
   },
   configCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.sm,
@@ -1776,7 +1699,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   fieldGroup: {
     gap: 6,
@@ -1784,17 +1707,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   textInput: {
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   inlineFieldsRow: {
     gap: Spacing.md,
@@ -1802,13 +1725,13 @@ const styles = StyleSheet.create({
   dropdownSelector: {
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   dropdownSelectorText: {
     fontSize: FontSize.sm,
@@ -1819,9 +1742,9 @@ const styles = StyleSheet.create({
     top: 66,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     zIndex: 999,
     shadowColor: '#000',
@@ -1841,11 +1764,11 @@ const styles = StyleSheet.create({
   },
   textArea: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     padding: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     minHeight: 120,
     textAlignVertical: 'top',
   },
@@ -1869,7 +1792,7 @@ const styles = StyleSheet.create({
   },
   checkPolicyBtnText: {
     fontSize: FontSize.xs,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
   uploadGridRow: {
@@ -1878,7 +1801,7 @@ const styles = StyleSheet.create({
   uploadZone: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: Colors.border,
     borderStyle: 'dashed',
     borderRadius: 6,
     padding: Spacing.lg,
@@ -1892,14 +1815,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   uploadZoneTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   uploadZoneSubtitle: {
     fontSize: FontSize.xs - 1,
@@ -1909,7 +1832,7 @@ const styles = StyleSheet.create({
   configCardTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   platformsList: {
@@ -1920,10 +1843,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   platformLeft: {
     flexDirection: 'row',
@@ -1940,21 +1863,21 @@ const styles = StyleSheet.create({
   platformNameText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   checkboxOutline: {
     width: 18,
     height: 18,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: Colors.border,
     borderRadius: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   checkboxChecked: {
-    backgroundColor: '#0B2545',
-    borderColor: '#0B2545',
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   inputIconWrapper: {
     flexDirection: 'row',
@@ -1965,12 +1888,12 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     paddingLeft: 12,
     paddingRight: 36,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   inputFieldIcon: {
     position: 'absolute',
@@ -1987,14 +1910,14 @@ const styles = StyleSheet.create({
   },
   scheduleInfoText: {
     fontSize: FontSize.xs,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     flex: 1,
     lineHeight: 16,
   },
   previewModeRow: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: Spacing.sm,
@@ -2004,14 +1927,14 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   previewToggleBtnActive: {
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
   },
   previewToggleText: {
     fontSize: FontSize.xs,
-    color: '#374151',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.medium,
   },
   previewToggleTextActive: {
@@ -2020,10 +1943,10 @@ const styles = StyleSheet.create({
   },
   previewMockupFrame: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingBottom: Spacing.sm,
   },
   mockPostHeader: {
@@ -2038,14 +1961,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mockPostAuthorName: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   mockPostMetaSubtext: {
     fontSize: FontSize.xs - 1,
@@ -2061,9 +1984,9 @@ const styles = StyleSheet.create({
   },
   mockPostMediaPlaceholder: {
     height: 180,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     marginHorizontal: 12,
     borderRadius: 6,
     justifyContent: 'center',
@@ -2073,7 +1996,7 @@ const styles = StyleSheet.create({
   },
   mockPostMediaPlaceholderText: {
     fontSize: FontSize.xs,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
     textAlign: 'center',
   },
   mockPostActionsRow: {
@@ -2092,9 +2015,9 @@ const styles = StyleSheet.create({
 
   // Approval Queue Tab Styles
   queueCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -2110,7 +2033,7 @@ const styles = StyleSheet.create({
   queuePostTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   queuePostMeta: {
     fontSize: FontSize.xs,
@@ -2151,7 +2074,7 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     fontSize: 9,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     fontWeight: FontWeight.bold,
     textAlign: 'center',
   },
@@ -2187,7 +2110,7 @@ const styles = StyleSheet.create({
   },
   actionNoteText: {
     fontSize: FontSize.xs + 1,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     lineHeight: 16,
   },
   queueCardActions: {
@@ -2198,15 +2121,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#0B2545',
+    borderColor: Colors.primary,
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 28,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   queueActionBtnText: {
     fontSize: FontSize.xs,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.bold,
   },
 
@@ -2221,7 +2144,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -2235,7 +2158,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   modalBody: {
     maxHeight: 300,
@@ -2257,9 +2180,9 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
   },
   commentItem: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     padding: 10,
     marginBottom: Spacing.sm,
@@ -2273,7 +2196,7 @@ const styles = StyleSheet.create({
   commentAuthor: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   commentContent: {
     fontSize: FontSize.sm,
@@ -2294,7 +2217,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   modalCloseBtn: {
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 20,
     height: 36,
     borderRadius: 4,
@@ -2319,7 +2242,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2335,7 +2258,7 @@ const styles = StyleSheet.create({
   profilePicTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   profilePicSubtitle: {
     fontSize: FontSize.xs,
@@ -2355,7 +2278,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profilePicUploadBtnText: {
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -2391,7 +2314,7 @@ const styles = StyleSheet.create({
   },
   chartAxisLabel: {
     fontSize: 9,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
     fontWeight: FontWeight.bold,
   },
   chartPlotArea: {
@@ -2409,14 +2332,14 @@ const styles = StyleSheet.create({
   chartBarBackground: {
     width: 32,
     height: '100%',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     borderRadius: 4,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   chartBarFill: {
     width: '100%',
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     borderRadius: 2,
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -2429,11 +2352,11 @@ const styles = StyleSheet.create({
   },
   analyticsPlatformCard: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: 12,
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     marginBottom: 10,
   },
   platformProgressSubtext: {
@@ -2443,7 +2366,7 @@ const styles = StyleSheet.create({
   },
   progressBarWrapper: {
     height: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -2456,17 +2379,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 32,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingHorizontal: 8,
   },
   // Policy Dashboard Styles
   policySidebar: {
     width: 220,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.md,
     gap: Spacing.xs,
@@ -2475,7 +2398,7 @@ const styles = StyleSheet.create({
   policySidebarTitle: {
     fontSize: FontSize.xs,
     fontWeight: 'bold',
-    color: '#0B2545',
+    color: Colors.textPrimary,
     marginBottom: Spacing.xs,
     letterSpacing: 0.5,
   },
@@ -2489,7 +2412,7 @@ const styles = StyleSheet.create({
   },
   policySidebarLabel: {
     fontSize: FontSize.sm,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   policyDetailCol: {
@@ -2497,9 +2420,9 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   policySectionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderLeftWidth: 4,
     borderRadius: 6,
     padding: Spacing.lg,
@@ -2519,11 +2442,11 @@ const styles = StyleSheet.create({
   policyBulletTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   policyBulletDesc: {
     fontSize: FontSize.sm,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     lineHeight: 18,
     marginTop: 2,
   },
@@ -2531,7 +2454,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
     lineHeight: 20,
-    whiteSpace: 'pre-wrap',
+    
   },
   policyFlowTimeline: {
     marginTop: 6,
@@ -2551,7 +2474,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#0B2545',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
@@ -2575,7 +2498,7 @@ const styles = StyleSheet.create({
   policyFlowTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#0B2545',
+    color: Colors.textPrimary,
   },
   policyFlowDesc: {
     fontSize: FontSize.xs + 1,
@@ -2585,14 +2508,14 @@ const styles = StyleSheet.create({
   },
   policyContactText: {
     fontSize: FontSize.sm,
-    color: '#0B2545',
+    color: Colors.textPrimary,
     fontWeight: FontWeight.semiBold,
     fontStyle: 'italic',
   },
   policyEmptyState: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.xxl,
     alignItems: 'center',

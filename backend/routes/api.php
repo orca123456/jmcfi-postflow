@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\PublishingController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\AIComplianceController;
 
+use App\Http\Controllers\Api\PolicySettingController;
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
@@ -56,6 +58,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('violations', ViolationController::class)->only(['index', 'show', 'update']);
     Route::post('violations/{violation}/resolve', [ViolationController::class, 'resolve']);
     Route::get('violations/dashboard/stats', [ViolationController::class, 'getDashboardStats']);
+
+    // Policy Settings
+    Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);
+    Route::post('policy-settings', [PolicySettingController::class, 'updateSettings']);
 
     // AI Compliance
     Route::post('ai/check/{post}', [AIComplianceController::class, 'checkCompliance']);

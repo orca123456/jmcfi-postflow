@@ -81,4 +81,10 @@ export const publishingApi = {
   cancel: (id: number) => api.post(`/publishing/${id}/cancel`),
 };
 
+// ── Policy Settings endpoints ──────────────────────────────────────────────
+export const policyApi = {
+  get: () => api.get('/policy-settings'),
+  update: (data: object) => api.post('/policy-settings', data),
+};
+
 export default api;
