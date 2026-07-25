@@ -56,9 +56,87 @@ export default function RequestorDashboard() {
 
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
+  const [selectedRow, setSelectedRow] = useState<any | null>(null);
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
+
+  // Drafts State
+  const [drafts, setDrafts] = useState([
+    {
+      id: 'd1',
+      title: '2024 College Intramurals Opening Ceremony',
+      category: 'Campus Event',
+      department: 'Student Affairs',
+      caption: 'Get ready for the biggest sports event of the year! The JMCFI Intramurals 2024 kicks off next Monday with live performances, parade of athletes, and exciting matches.',
+      dateSaved: 'Oct 24, 2024 at 2:30 PM',
+      platforms: { facebook: true, instagram: true, portal: false },
+      publishDate: '28/10/2024',
+    },
+    {
+      id: 'd2',
+      title: 'Library Extended Hours During Finals Week',
+      category: 'Academic Announcement',
+      department: "Registrar's Office",
+      caption: 'Notice to all students: The Main Library will remain open until 10:00 PM starting next week to support your midterm preparations.',
+      dateSaved: 'Oct 20, 2024 at 11:15 AM',
+      platforms: { facebook: true, instagram: false, portal: true },
+      publishDate: '25/10/2024',
+    },
+  ]);
+
+  // Rejected Posts State
+  const [rejectedPosts, setRejectedPosts] = useState([
+    {
+      id: 'r1',
+      title: 'Off-Campus Beach Outing Post',
+      category: 'Campus Event',
+      department: 'Student Affairs',
+      rejectedDate: 'Oct 23, 2024',
+      rejectedBy: 'Vice President of Academic Affairs (Dr. A. Santos)',
+      rejectionReason: "Unapproved institutional activity. All off-campus student gatherings require a signed permit from the Student Affairs Office and President's approval prior to social media promotion.",
+      caption: 'Join us for an exciting beach day at Samal Island this coming weekend! Transportation provided for all enrolled students.',
+      platforms: { facebook: true, instagram: true, portal: false },
+    },
+    {
+      id: 'r2',
+      title: 'Tuition Fee Payment Reminder',
+      category: 'Policy Update',
+      department: 'Finance Department',
+      rejectedDate: 'Oct 19, 2024',
+      rejectedBy: 'IMC QA Reviewer (M. Flores)',
+      rejectionReason: 'Incorrect account details in caption. Please verify official bank account number with Finance before requesting a public post.',
+      caption: 'Reminder: 2nd Trimester tuition fee installment is due on Friday. Please settle payments at the cashier or bank transfer.',
+      platforms: { facebook: true, instagram: false, portal: true },
+    },
+  ]);
+
+  // Handlers for Drafts and Rejected
+  const handleEditDraft = (draft: any) => {
+    setPostTitle(draft.title || '');
+    setCategory(draft.category || 'Academic Announcement');
+    setDepartment(draft.department || 'College of Computing Studies');
+    setCaption(draft.caption || '');
+    if (draft.platforms) setPlatforms(draft.platforms);
+    if (draft.publishDate) setPublishDate(draft.publishDate);
+    setActiveTab('request');
+    alert(`Draft "${draft.title}" loaded into request form. You can now edit and submit!`);
+  };
+
+  const handleDeleteDraft = (id: string) => {
+    setDrafts(prev => prev.filter(d => d.id !== id));
+    alert('Draft deleted successfully.');
+  };
+
+  const handleCreateNewFromRejected = (post: any) => {
+    setPostTitle(post.title ? `${post.title} (Revised)` : '');
+    setCategory(post.category || 'Academic Announcement');
+    setDepartment(post.department || 'College of Computing Studies');
+    setCaption(post.caption || '');
+    if (post.platforms) setPlatforms(post.platforms);
+    setActiveTab('request');
+    alert(`Created new request form pre-filled with data from "${post.title}". Please revise according to approver comments.`);
+  };
 
   // Categories & Departments options
   const categoryOptions = [
@@ -265,6 +343,35 @@ export default function RequestorDashboard() {
     );
   };
 
+  const getMockSteps = (status: string) => {
+    if (status === 'APPROVED' || status === 'PUBLISHED') {
+      return [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Dept Head', state: 'completed' },
+        { label: 'VP / Pres', state: 'completed' },
+        { label: 'IMC QA', state: 'completed' },
+        { label: 'Publisher', state: status === 'PUBLISHED' ? 'completed' : 'active' },
+      ];
+    } else if (status === 'PENDING') {
+      return [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Dept Head', state: 'active' },
+        { label: 'VP / Pres', state: 'upcoming' },
+        { label: 'IMC QA', state: 'upcoming' },
+        { label: 'Publisher', state: 'upcoming' },
+      ];
+    } else if (status === 'RETURNED') {
+      return [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Dept Head', state: 'revision' },
+        { label: 'VP / Pres', state: 'upcoming' },
+        { label: 'IMC QA', state: 'upcoming' },
+        { label: 'Publisher', state: 'upcoming' },
+      ];
+    }
+    return [];
+  };
+
   return (
     <DashboardShell
       title="Content Approval System"
@@ -291,48 +398,7 @@ export default function RequestorDashboard() {
           </View>
 
           {/* Metrics Row */}
-          <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="paper-plane-outline" size={18} color="#2563EB" />
-                <Text style={styles.metricBadgeTextBlue}>+12%</Text>
-              </View>
-              <Text style={styles.metricValue}>42</Text>
-              <Text style={styles.metricLabel}>Total Submitted</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#D97706' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="hourglass-outline" size={18} color="#D97706" />
-              </View>
-              <Text style={styles.metricValue}>08</Text>
-              <Text style={styles.metricLabel}>Pending</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#16A34A' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#16A34A" />
-              </View>
-              <Text style={styles.metricValue}>24</Text>
-              <Text style={styles.metricLabel}>Approved</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#DC2626' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
-              </View>
-              <Text style={styles.metricValue}>05</Text>
-              <Text style={styles.metricLabel}>Returned</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="globe-outline" size={18} color="#2563EB" />
-              </View>
-              <Text style={styles.metricValue}>18</Text>
-              <Text style={styles.metricLabel}>Published</Text>
-            </Card>
-          </View>
+          
 
           {/* Recent Post Requests Table */}
           <Card style={styles.tableCard}>
@@ -359,7 +425,7 @@ export default function RequestorDashboard() {
               </View>
 
               {mockRequests.map((req) => (
-                <View key={req.id} style={styles.tableRow}>
+                <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedRow(req)}>
                   <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
                       <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
@@ -386,7 +452,7 @@ export default function RequestorDashboard() {
                       <Ionicons name={req.actionIcon2} size={16} color={Colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -427,7 +493,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- CREATE NEW REQUEST TAB ----------------- */}
-      {activeTab === 'post-requests' && (
+      {(activeTab === 'post-requests' || activeTab === 'request') && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
             <View style={styles.breadcrumbColumn}>
@@ -452,295 +518,315 @@ export default function RequestorDashboard() {
           </View>
 
           {/* Form Layout Split */}
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            <View style={styles.leftColumn}>
-              <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) && { zIndex: 100, position: 'relative' }]}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.headerIconWrapper}>
-                    <Ionicons name="information-circle" size={18} color={Colors.textPrimary} />
-                  </View>
-                  <Text style={styles.cardTitle}>Basic Information</Text>
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>POST TITLE</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g., Enrollment Announcement 2024"
-                    value={postTitle}
-                    onChangeText={setPostTitle}
-                  />
-                </View>
-
-                <View style={[styles.inlineFieldsRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
-                  <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isCategoryDropdownOpen ? 60 : 1 }]}>
-                    <Text style={styles.inputLabel}>CATEGORY</Text>
-                    <TouchableOpacity
-                      style={styles.dropdownSelector}
-                      onPress={() => {
-                        setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                        setIsDeptDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownSelectorText}>{category}</Text>
-                      <Ionicons name="chevron-down-outline" size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-
-                    {isCategoryDropdownOpen && (
-                      <View style={styles.dropdownMenu}>
-                        {categoryOptions.map((opt, idx) => (
-                          <TouchableOpacity
-                            key={idx}
-                            style={styles.dropdownItem}
-                            onPress={() => {
-                              setCategory(opt);
-                              setIsCategoryDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={styles.dropdownItemText}>{opt}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isDeptDropdownOpen ? 60 : 1 }]}>
-                    <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                    <TouchableOpacity
-                      style={styles.dropdownSelector}
-                      onPress={() => {
-                        setIsDeptDropdownOpen(!isDeptDropdownOpen);
-                        setIsCategoryDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownSelectorText}>{department}</Text>
-                      <Ionicons name="chevron-down-outline" size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-
-                    {isDeptDropdownOpen && (
-                      <View style={styles.dropdownMenu}>
-                        {departmentOptions.map((opt, idx) => (
-                          <TouchableOpacity
-                            key={idx}
-                            style={styles.dropdownItem}
-                            onPress={() => {
-                              setDepartment(opt);
-                              setIsDeptDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={styles.dropdownItemText}>{opt}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </Card>
-
-              <Card style={styles.formCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.headerIconWrapper}>
-                    <Ionicons name="document-text" size={18} color={Colors.textPrimary} />
-                  </View>
-                  <Text style={styles.cardTitle}>Content & Caption</Text>
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>CAPTION TEXT</Text>
-                  <TextInput
-                    style={styles.textArea}
-                    placeholder="Write your post caption here. Ensure it follows the university's brand voice and tonal guidelines..."
-                    multiline
-                    numberOfLines={6}
-                    value={caption}
-                    onChangeText={(val) => {
-                      if (val.length <= 2200) setCaption(val);
-                    }}
-                  />
-                  <View style={styles.textAreaFooter}>
-                    <Text style={styles.characterCounter}>
-                      {caption.length} / 2200 characters
-                    </Text>
-                    <TouchableOpacity style={styles.checkPolicyBtn} onPress={handleCheckPolicy}>
-                      <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
-                      <Text style={styles.checkPolicyBtnText}>Check Policy Alignment</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Card>
-
-              <Card style={styles.formCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.headerIconWrapper}>
-                    <Ionicons name="images" size={18} color={Colors.textPrimary} />
-                  </View>
-                  <Text style={styles.cardTitle}>Media & Assets</Text>
-                </View>
-
-                <View style={[styles.uploadGridRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
-                  <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Media uploader triggered.')}>
-                    <View style={styles.uploadZoneCircle}>
-                      <Ionicons name="cloud-upload-outline" size={24} color={Colors.textSecondary} />
+          <View style={{ gap: Spacing.lg }}>
+            {/* ROW 1 */}
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <View style={styles.leftColumn}>
+                {/* Basic Information Card */}
+                <Card style={[styles.formCard, { flex: 1 }, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.headerIconWrapper}>
+                      <Ionicons name="information-circle" size={18} color={Colors.textPrimary} />
                     </View>
-                    <Text style={styles.uploadZoneTitle}>Upload Main Media</Text>
-                    <Text style={styles.uploadZoneSubtitle}>
-                      Images (JPG, PNG) or Videos (MP4) up to 50MB
-                    </Text>
-                  </TouchableOpacity>
+                    <Text style={styles.cardTitle}>Basic Information</Text>
+                  </View>
 
-                  <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Documents uploader triggered.')}>
-                    <View style={styles.uploadZoneCircle}>
-                      <Ionicons name="attach-outline" size={22} color={Colors.textSecondary} />
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>POST TITLE</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g., Enrollment Announcement 2024"
+                      value={postTitle}
+                      onChangeText={setPostTitle}
+                    />
+                  </View>
+
+                  <View style={[styles.inlineFieldsRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
+                    <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isCategoryDropdownOpen ? 60 : 1 }]}>
+                      <Text style={styles.inputLabel}>CATEGORY</Text>
+                      <TouchableOpacity
+                        style={styles.dropdownSelector}
+                        onPress={() => {
+                          setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                          setIsDeptDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownSelectorText}>{category}</Text>
+                        <Ionicons name="chevron-down-outline" size={16} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+
+                      {isCategoryDropdownOpen && (
+                        <View style={styles.dropdownMenu}>
+                          {categoryOptions.map((opt, idx) => (
+                            <TouchableOpacity
+                              key={idx}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setCategory(opt);
+                                setIsCategoryDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={styles.dropdownItemText}>{opt}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.uploadZoneTitle}>Supporting Docs</Text>
-                    <Text style={styles.uploadZoneSubtitle}>
-                      PDFs, briefs, or reference materials
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Card>
+
+                    <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isDeptDropdownOpen ? 60 : 1 }]}>
+                      <Text style={styles.inputLabel}>DEPARTMENT</Text>
+                      <TouchableOpacity
+                        style={styles.dropdownSelector}
+                        onPress={() => {
+                          setIsDeptDropdownOpen(!isDeptDropdownOpen);
+                          setIsCategoryDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownSelectorText}>{department}</Text>
+                        <Ionicons name="chevron-down-outline" size={16} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+
+                      {isDeptDropdownOpen && (
+                        <View style={styles.dropdownMenu}>
+                          {departmentOptions.map((opt, idx) => (
+                            <TouchableOpacity
+                              key={idx}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setDepartment(opt);
+                                setIsDeptDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={styles.dropdownItemText}>{opt}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </Card>
+              </View>
+
+              <View style={styles.rightColumn}>
+                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.headerIconWrapper}>
+                      <Ionicons name="share-social" size={18} color={Colors.textPrimary} />
+                    </View>
+                    <Text style={styles.cardTitle}>Target Platforms</Text>
+                  </View>
+                  
+                  <View style={styles.platformsList}>
+                    <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('facebook')}>
+                      <View style={styles.platformLeft}>
+                        <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
+                          <Ionicons name="logo-facebook" size={18} color="#1877F2" />
+                        </View>
+                        <Text style={styles.platformNameText}>Facebook</Text>
+                      </View>
+                      <View style={[styles.checkboxOutline, platforms.facebook && styles.checkboxChecked]}>
+                        {platforms.facebook && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('instagram')}>
+                      <View style={styles.platformLeft}>
+                        <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
+                          <Ionicons name="logo-instagram" size={18} color="#E1306C" />
+                        </View>
+                        <Text style={styles.platformNameText}>Instagram</Text>
+                      </View>
+                      <View style={[styles.checkboxOutline, platforms.instagram && styles.checkboxChecked]}>
+                        {platforms.instagram && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('portal')}>
+                      <View style={styles.platformLeft}>
+                        <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
+                          <Ionicons name="globe-outline" size={18} color="#059669" />
+                        </View>
+                        <Text style={styles.platformNameText}>Website Portal</Text>
+                      </View>
+                      <View style={[styles.checkboxOutline, platforms.portal && styles.checkboxChecked]}>
+                        {platforms.portal && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              </View>
             </View>
 
-            <View style={styles.rightColumn}>
-              <Card style={styles.configCard}>
-                <Text style={styles.configCardTitle}>Target Platforms</Text>
-                
-                <View style={styles.platformsList}>
-                  <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('facebook')}>
-                    <View style={styles.platformLeft}>
-                      <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
-                        <Ionicons name="logo-facebook" size={18} color="#1877F2" />
-                      </View>
-                      <Text style={styles.platformNameText}>Facebook</Text>
+            {/* ROW 2 */}
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <View style={styles.leftColumn}>
+                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.headerIconWrapper}>
+                      <Ionicons name="document-text" size={18} color={Colors.textPrimary} />
                     </View>
-                    <View style={[styles.checkboxOutline, platforms.facebook && styles.checkboxChecked]}>
-                      {platforms.facebook && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
-                    </View>
-                  </TouchableOpacity>
+                    <Text style={styles.cardTitle}>Content & Caption</Text>
+                  </View>
 
-                  <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('instagram')}>
-                    <View style={styles.platformLeft}>
-                      <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
-                        <Ionicons name="logo-instagram" size={18} color="#E1306C" />
-                      </View>
-                      <Text style={styles.platformNameText}>Instagram</Text>
-                    </View>
-                    <View style={[styles.checkboxOutline, platforms.instagram && styles.checkboxChecked]}>
-                      {platforms.instagram && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('portal')}>
-                    <View style={styles.platformLeft}>
-                      <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
-                        <Ionicons name="globe-outline" size={18} color="#059669" />
-                      </View>
-                      <Text style={styles.platformNameText}>Website Portal</Text>
-                    </View>
-                    <View style={[styles.checkboxOutline, platforms.portal && styles.checkboxChecked]}>
-                      {platforms.portal && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </Card>
-
-              <Card style={styles.configCard}>
-                <Text style={styles.configCardTitle}>Scheduling</Text>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>PUBLICATION DATE</Text>
-                  <View style={styles.inputIconWrapper}>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>CAPTION TEXT</Text>
                     <TextInput
-                      style={styles.textInputWithIcon}
-                      placeholder="dd/mm/yyyy"
-                      value={publishDate}
-                      onChangeText={setPublishDate}
+                      style={styles.textArea}
+                      placeholder="Write your post caption here. Ensure it follows the university's brand voice and tonal guidelines..."
+                      multiline
+                      numberOfLines={6}
+                      value={caption}
+                      onChangeText={(val) => {
+                        if (val.length <= 2200) setCaption(val);
+                      }}
                     />
-                    <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
-                  </View>
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>PREFERRED TIME</Text>
-                  <View style={styles.inputIconWrapper}>
-                    <TextInput
-                      style={styles.textInputWithIcon}
-                      placeholder="--:-- --"
-                      value={publishTime}
-                      onChangeText={setPublishTime}
-                    />
-                    <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
-                  </View>
-                </View>
-
-                <View style={styles.scheduleInfoBox}>
-                  <Ionicons name="information-circle-outline" size={16} color={Colors.textPrimary} style={{ marginTop: 2 }} />
-                  <Text style={styles.scheduleInfoText}>
-                    Posts must be submitted at least 48 hours before the preferred publication time for administrative review.
-                  </Text>
-                </View>
-              </Card>
-
-              <Card style={styles.configCard}>
-                <Text style={styles.configCardTitle}>Live Preview</Text>
-                
-                <View style={styles.previewModeRow}>
-                  <TouchableOpacity
-                    style={[styles.previewToggleBtn, previewMode === 'mobile' && styles.previewToggleBtnActive]}
-                    onPress={() => setPreviewMode('mobile')}
-                  >
-                    <Text style={[styles.previewToggleText, previewMode === 'mobile' && styles.previewToggleTextActive]}>
-                      Mobile
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.previewToggleBtn, previewMode === 'desktop' && styles.previewToggleBtnActive]}
-                    onPress={() => setPreviewMode('desktop')}
-                  >
-                    <Text style={[styles.previewToggleText, previewMode === 'desktop' && styles.previewToggleTextActive]}>
-                      Desktop
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.previewMockupFrame}>
-                  <View style={styles.mockPostHeader}>
-                    <View style={styles.mockPostAvatarCircle}>
-                      <Ionicons name="business" size={14} color="#FFFFFF" />
+                    <View style={styles.textAreaFooter}>
+                      <Text style={styles.characterCounter}>
+                        {caption.length} / 2200 characters
+                      </Text>
+                      <TouchableOpacity style={styles.checkPolicyBtn} onPress={handleCheckPolicy}>
+                        <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
+                        <Text style={styles.checkPolicyBtnText}>Check Policy Alignment</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.mockPostAuthorName}>JMCFI Institutional</Text>
-                      <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
+                  </View>
+                </Card>
+              </View>
+
+              <View style={styles.rightColumn}>
+                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.headerIconWrapper}>
+                      <Ionicons name="calendar" size={18} color={Colors.textPrimary} />
                     </View>
-                    <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                    <Text style={styles.cardTitle}>Scheduling (Optional)</Text>
                   </View>
 
-                  <View style={styles.mockPostContentArea}>
-                    <Text style={styles.mockPostCaptionText}>
-                      {caption ? caption : 'Upload media to see your content preview here...'}
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>PUBLICATION DATE</Text>
+                    <View style={styles.inputIconWrapper}>
+                      <TextInput
+                        style={styles.textInputWithIcon}
+                        placeholder="dd/mm/yyyy"
+                        value={publishDate}
+                        onChangeText={setPublishDate}
+                      />
+                      <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
+                    </View>
+                  </View>
+
+                  <View style={styles.scheduleInfoBox}>
+                    <Ionicons name="information-circle-outline" size={16} color={Colors.textPrimary} style={{ marginTop: 2 }} />
+                    <Text style={styles.scheduleInfoText}>
+                      Posts must be submitted at least 48 hours before the preferred publication date for administrative review.
                     </Text>
                   </View>
+                </Card>
+              </View>
+            </View>
 
-                  <View style={styles.mockPostMediaPlaceholder}>
-                    <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
-                    <Text style={styles.mockPostMediaPlaceholderText}>
-                      Upload media to see your content preview here...
-                    </Text>
+            {/* ROW 3 */}
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <View style={styles.leftColumn}>
+                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.headerIconWrapper}>
+                      <Ionicons name="images" size={18} color={Colors.textPrimary} />
+                    </View>
+                    <Text style={styles.cardTitle}>Media & Assets</Text>
                   </View>
 
-                  <View style={styles.mockPostActionsRow}>
-                    <View style={styles.mockActionGroup}>
-                      <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+                  <View style={[styles.uploadGridRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
+                    <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Media uploader triggered.')}>
+                      <View style={styles.uploadZoneCircle}>
+                        <Ionicons name="cloud-upload-outline" size={24} color={Colors.textSecondary} />
+                      </View>
+                      <Text style={styles.uploadZoneTitle}>Upload Main Media</Text>
+                      <Text style={styles.uploadZoneSubtitle}>
+                        Images (JPG, PNG) or Videos (MP4) up to 50MB
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Documents uploader triggered.')}>
+                      <View style={styles.uploadZoneCircle}>
+                        <Ionicons name="attach-outline" size={22} color={Colors.textSecondary} />
+                      </View>
+                      <Text style={styles.uploadZoneTitle}>Supporting Docs</Text>
+                      <Text style={styles.uploadZoneSubtitle}>
+                        PDFs, briefs, or reference materials
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              </View>
+
+              <View style={styles.rightColumn}>
+                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.headerIconWrapper}>
+                      <Ionicons name="eye" size={18} color={Colors.textPrimary} />
                     </View>
-                    <View style={styles.mockActionGroup}>
-                      <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+                    <Text style={styles.cardTitle}>Live Preview</Text>
+                  </View>
+                  
+                  <View style={styles.previewModeRow}>
+                    <TouchableOpacity
+                      style={[styles.previewToggleBtn, previewMode === 'mobile' && styles.previewToggleBtnActive]}
+                      onPress={() => setPreviewMode('mobile')}
+                    >
+                      <Text style={[styles.previewToggleText, previewMode === 'mobile' && styles.previewToggleTextActive]}>
+                        Mobile
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.previewToggleBtn, previewMode === 'desktop' && styles.previewToggleBtnActive]}
+                      onPress={() => setPreviewMode('desktop')}
+                    >
+                      <Text style={[styles.previewToggleText, previewMode === 'desktop' && styles.previewToggleTextActive]}>
+                        Desktop
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.previewMockupFrame}>
+                    <View style={styles.mockPostHeader}>
+                      <View style={styles.mockPostAvatarCircle}>
+                        <Ionicons name="business" size={14} color="#FFFFFF" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.mockPostAuthorName}>JMCFI Institutional</Text>
+                        <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
+                      </View>
+                      <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
                     </View>
-                    <View style={styles.mockActionGroup}>
-                      <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
+
+                    <View style={styles.mockPostContentArea}>
+                      <Text style={styles.mockPostCaptionText}>
+                        {caption ? caption : 'Upload media to see your content preview here...'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.mockPostMediaPlaceholder}>
+                      <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                      <Text style={styles.mockPostMediaPlaceholderText}>
+                        Upload media to see your content preview here...
+                      </Text>
+                    </View>
+
+                    <View style={styles.mockPostActionsRow}>
+                      <View style={styles.mockActionGroup}>
+                        <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+                      </View>
+                      <View style={styles.mockActionGroup}>
+                        <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+                      </View>
+                      <View style={styles.mockActionGroup}>
+                        <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
+                      </View>
                     </View>
                   </View>
-                </View>
-              </Card>
+                </Card>
+              </View>
             </View>
           </View>
         </View>
@@ -934,238 +1020,6 @@ export default function RequestorDashboard() {
         </View>
       )}
 
-      {/* ----------------- ANALYTICS TAB ----------------- */}
-      {activeTab === 'analytics' && (
-        <View style={styles.dashboardContainer}>
-          {/* Header row */}
-          <View style={styles.dashboardHeaderRow}>
-            <View>
-              <Text style={styles.welcomeTitle}>Performance Analytics</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Monitor reach, engagement levels, and publishing efficiency metrics for your department.
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-              <TouchableOpacity style={styles.analyticsFilterBtn} onPress={() => alert('Filtering by time range...')}>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', paddingHorizontal: 8 }}>
-                  Last 30 Days
-                </Text>
-                <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.createRequestBtnGold, { backgroundColor: Colors.primary }]}
-                onPress={() => alert('Generating PDF reports...')}
-              >
-                <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={[styles.createRequestBtnGoldText, { color: '#FFFFFF' }]}>Export Report</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Engagement Summary metrics */}
-          <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="eye-outline" size={18} color={Colors.textPrimary} />
-                <Text style={[styles.metricBadgeTextBlue, { color: '#16A34A' }]}>+14.2%</Text>
-              </View>
-              <Text style={styles.metricValue}>128.4K</Text>
-              <Text style={styles.metricLabel}>Total Impressions</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#FFC72C' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="heart-outline" size={18} color="#FFC72C" />
-                <Text style={[styles.metricBadgeTextBlue, { color: '#16A34A' }]}>+8.5%</Text>
-              </View>
-              <Text style={styles.metricValue}>8.2%</Text>
-              <Text style={styles.metricLabel}>Engagement Rate</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#16A34A' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="time-outline" size={18} color="#16A34A" />
-                <Text style={[styles.metricBadgeTextBlue, { color: '#16A34A' }]}>-0.4d</Text>
-              </View>
-              <Text style={styles.metricValue}>1.8 Days</Text>
-              <Text style={styles.metricLabel}>Avg. Approval Time</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="checkbox-outline" size={18} color="#2563EB" />
-                <Text style={[styles.metricBadgeTextBlue, { color: '#16A34A' }]}>+3.1%</Text>
-              </View>
-              <Text style={styles.metricValue}>92.3%</Text>
-              <Text style={styles.metricLabel}>First-time Approval</Text>
-            </Card>
-          </View>
-
-          {/* Charts Layout section */}
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Monthly Posting Volume native bar chart */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
-              <Text style={styles.tableCardTitle}>Monthly Posting Activity</Text>
-              <Text style={styles.welcomeSubtitle}>Active publications count per month during this academic year.</Text>
-              
-              <View style={styles.chartContainer}>
-                {/* Visual grid line markers */}
-                <View style={styles.chartYAxis}>
-                  <Text style={styles.chartAxisLabel}>40</Text>
-                  <Text style={styles.chartAxisLabel}>30</Text>
-                  <Text style={styles.chartAxisLabel}>20</Text>
-                  <Text style={styles.chartAxisLabel}>10</Text>
-                  <Text style={styles.chartAxisLabel}>0</Text>
-                </View>
-
-                <View style={styles.chartPlotArea}>
-                  {/* Monthly column bars */}
-                  {[
-                    { month: 'May', count: 18, height: '45%' },
-                    { month: 'Jun', count: 24, height: '60%' },
-                    { month: 'Jul', count: 32, height: '80%' },
-                    { month: 'Aug', count: 12, height: '30%' },
-                    { month: 'Sep', count: 38, height: '95%' },
-                    { month: 'Oct', count: 28, height: '70%' },
-                  ].map((item, idx) => (
-                    <View key={idx} style={styles.chartBarWrapper}>
-                      <View style={styles.chartBarBackground}>
-                        <View style={[styles.chartBarFill, { height: item.height }]}>
-                          <Text style={styles.chartBarTooltip}>{item.count}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.chartAxisLabel}>{item.month}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </Card>
-
-            {/* Platform Performance metrics */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
-              <Text style={styles.configCardTitle}>Target Channel Breakdown</Text>
-              <Text style={styles.welcomeSubtitle}>Reach volume distribution share by platform channel.</Text>
-
-              <View style={[styles.platformsList, { marginTop: 12 }]}>
-                {/* Facebook */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
-                      <Ionicons name="logo-facebook" size={18} color="#1877F2" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Facebook</Text>
-                      <Text style={styles.platformProgressSubtext}>82.5K reach &bull; 64% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '64%', backgroundColor: '#1877F2' }]} />
-                  </View>
-                </View>
-
-                {/* Instagram */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
-                      <Ionicons name="logo-instagram" size={18} color="#E1306C" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Instagram</Text>
-                      <Text style={styles.platformProgressSubtext}>27.1K reach &bull; 21% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '21%', backgroundColor: '#E1306C' }]} />
-                  </View>
-                </View>
-
-                {/* Portal */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
-                      <Ionicons name="globe-outline" size={18} color="#059669" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Website Portal</Text>
-                      <Text style={styles.platformProgressSubtext}>18.8K clicks &bull; 15% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '15%', backgroundColor: '#059669' }]} />
-                  </View>
-                </View>
-              </View>
-            </Card>
-          </View>
-
-          {/* Top performing content posts table leaderboard */}
-          <Card style={styles.tableCard}>
-            <Text style={styles.tableCardTitle}>Top Performing Content Requests</Text>
-            
-            <View style={[styles.table, { marginTop: 12 }]}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Title & Channel</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Views / Clicks</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Likes</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Engagement Rate</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>First-Time Approved</Text>
-              </View>
-
-              {[
-                {
-                  title: 'Annual Scholars Recognition Gala',
-                  platform: 'Facebook, Instagram',
-                  views: '42,500',
-                  likes: '4,120',
-                  rate: '9.7%',
-                  icon: 'ribbon-outline',
-                  iconBg: '#E0F2FE',
-                  approved: 'Yes',
-                },
-                {
-                  title: 'New MBA Program Announcement',
-                  platform: 'Website Portal',
-                  views: '18,800',
-                  likes: '840',
-                  rate: '4.5%',
-                  icon: 'school-outline',
-                  iconBg: '#F3E8FF',
-                  approved: 'Yes',
-                },
-                {
-                  title: 'Midterm Stress Relief Workshop',
-                  platform: 'Facebook',
-                  views: '12,200',
-                  likes: '980',
-                  rate: '8.0%',
-                  icon: 'happy-outline',
-                  iconBg: '#FEF3C7',
-                  approved: 'No',
-                },
-              ].map((item, idx) => (
-                <View key={idx} style={styles.tableRow}>
-                  <View style={[styles.cellFlex2, styles.titleCellContainer]}>
-                    <View style={[styles.thumbnailPlaceholder, { backgroundColor: item.iconBg }]}>
-                      <Ionicons name={item.icon as any} size={16} color={Colors.textSecondary} />
-                    </View>
-                    <View>
-                      <Text style={styles.postTitleText}>{item.title}</Text>
-                      <Text style={styles.postPlatformsText}>{item.platform}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.tableCellText, styles.cellFlex1]}>{item.views}</Text>
-                  <Text style={[styles.tableCellText, styles.cellFlex1]}>{item.likes}</Text>
-                  <Text style={[styles.tableCellText, styles.cellFlex1, { fontWeight: 'bold', color: '#16A34A' }]}>{item.rate}</Text>
-                  <Text style={[styles.tableCellText, styles.cellFlex1, styles.alignRight, { color: item.approved === 'Yes' ? '#16A34A' : '#DC2626', fontWeight: 'bold' }]}>
-                    {item.approved}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </Card>
-        </View>
-      )}
-
       {/* ----------------- POLICY & RULES TAB ----------------- */}
       {activeTab === 'policy-rules' && (() => {
         const filteredSections = policySections.filter(sec => {
@@ -1222,7 +1076,7 @@ export default function RequestorDashboard() {
               <View style={styles.policyDetailCol}>
                 {filteredSections.length > 0 ? (
                   filteredSections.map((sec) => (
-                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
+                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }] as any}>
                       <View style={styles.cardHeader}>
                         <View style={[styles.headerIconWrapper, { backgroundColor: sec.bg }]}>
                           <Ionicons name={sec.icon as any} size={16} color={sec.color} />
@@ -1261,7 +1115,7 @@ export default function RequestorDashboard() {
                                 <View style={styles.policyFlowDot}>
                                   <Text style={styles.policyFlowDotText}>{idx + 1}</Text>
                                 </View>
-                                {idx < sec.steps.length - 1 && <View style={styles.policyFlowLine} />}
+                                {sec.steps && idx < sec.steps.length - 1 && <View style={styles.policyFlowLine} />}
                               </View>
                               <View style={styles.policyFlowContent}>
                                 <Text style={styles.policyFlowTitle}>{step.title}</Text>
@@ -1290,8 +1144,210 @@ export default function RequestorDashboard() {
         );
       })()}
 
+      {/* ----------------- DRAFTS TAB ----------------- */}
+      {(activeTab === 'draft' || activeTab === 'drafts') && (
+        <View style={styles.dashboardContainer}>
+          <View style={styles.dashboardHeaderRow}>
+            <View>
+              <Text style={styles.welcomeTitle}>Draft Post Requests</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Manage your saved post request drafts. You can edit, update, or submit them for approval.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.createRequestBtnGold}
+              onPress={() => setActiveTab('request')}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
+              <Text style={styles.createRequestBtnGoldText}>+ Create New Request</Text>
+            </TouchableOpacity>
+          </View>
+
+          {drafts.length === 0 ? (
+            <Card style={styles.formCard}>
+              <View style={{ alignItems: 'center', padding: Spacing.xl, gap: Spacing.sm }}>
+                <Ionicons name="create-outline" size={48} color={Colors.textMuted} />
+                <Text style={styles.cardTitle}>No Saved Drafts</Text>
+                <Text style={styles.welcomeSubtitle}>You don't have any saved drafts right now.</Text>
+                <TouchableOpacity
+                  style={[styles.createRequestBtnGold, { marginTop: Spacing.sm }]}
+                  onPress={() => setActiveTab('request')}
+                >
+                  <Text style={styles.createRequestBtnGoldText}>Start a New Request</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          ) : (
+            <View style={{ gap: Spacing.md }}>
+              {drafts.map((draft) => (
+                <Card key={draft.id} style={styles.formCard}>
+                  <View style={styles.queueCardHeader}>
+                    <View style={styles.queueCardTitleCol}>
+                      <Text style={styles.queuePostTitle}>{draft.title}</Text>
+                      <Text style={styles.queuePostMeta}>
+                        Last Saved: {draft.dateSaved} &bull; Category: {draft.category}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9' }]}>
+                      <Text style={[styles.statusBadgeText, { color: '#475569' }]}>
+                        DRAFT
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ backgroundColor: '#F8FAFC', padding: Spacing.md, borderRadius: 6, marginVertical: Spacing.xs }}>
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', marginBottom: 4 }}>
+                      CAPTION PREVIEW
+                    </Text>
+                    <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary, fontStyle: 'italic' }}>
+                      "{draft.caption || 'No caption text provided yet.'}"
+                    </Text>
+                  </View>
+
+                  <View style={styles.queueCardFooter}>
+                    <View style={styles.actionNoteContainer}>
+                      <Ionicons name="folder-open-outline" size={16} color={Colors.textPrimary} />
+                      <Text style={styles.actionNoteText}>
+                        <Text style={{ fontWeight: 'bold' }}>Department: </Text>
+                        {draft.department}
+                      </Text>
+                    </View>
+
+                    <View style={styles.queueCardActions}>
+                      <TouchableOpacity
+                        style={[styles.queueActionBtn, { backgroundColor: Colors.primary }]}
+                        onPress={() => handleEditDraft(draft)}
+                      >
+                        <Ionicons name="create-outline" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={[styles.queueActionBtnText, { color: '#FFFFFF', fontWeight: 'bold' }]}>Edit & Submit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.queueActionBtn}
+                        onPress={() => handleDeleteDraft(draft.id)}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#DC2626" style={{ marginRight: 4 }} />
+                        <Text style={[styles.queueActionBtnText, { color: '#DC2626' }]}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Card>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ----------------- REJECTED TAB ----------------- */}
+      {(activeTab === 'rejected' || activeTab === 'rejected-requests') && (
+        <View style={styles.dashboardContainer}>
+          <View style={styles.dashboardHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.welcomeTitle}>Rejected Content Requests</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Inspect approver remarks for rejected requests. Note that rejected requests cannot be re-submitted directly, but you can create a new request based on them.
+              </Text>
+            </View>
+          </View>
+
+          {rejectedPosts.length === 0 ? (
+            <Card style={styles.formCard}>
+              <View style={{ alignItems: 'center', padding: Spacing.xl, gap: Spacing.sm }}>
+                <Ionicons name="checkmark-circle-outline" size={48} color="#16A34A" />
+                <Text style={styles.cardTitle}>No Rejected Requests</Text>
+                <Text style={styles.welcomeSubtitle}>All of your submitted requests have passed or are currently in review.</Text>
+              </View>
+            </Card>
+          ) : (
+            <View style={{ gap: Spacing.lg }}>
+              {rejectedPosts.map((post) => (
+                <Card key={post.id} style={[styles.formCard, { borderColor: '#FECDD3' }]}>
+                  {/* Rejected Card Header */}
+                  <View style={styles.queueCardHeader}>
+                    <View style={styles.queueCardTitleCol}>
+                      <Text style={styles.queuePostTitle}>{post.title}</Text>
+                      <Text style={styles.queuePostMeta}>
+                        Rejected Date: {post.rejectedDate} &bull; Category: {post.category}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}>
+                      <Text style={[styles.statusBadgeText, { color: '#B91C1C' }]}>
+                        REJECTED
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Approver Remarks Container */}
+                  <View style={{
+                    backgroundColor: '#FFF1F2',
+                    borderWidth: 1,
+                    borderColor: '#FDA4AF',
+                    borderRadius: 6,
+                    padding: Spacing.md,
+                    gap: 6,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="alert-circle" size={18} color="#E11D48" />
+                      <Text style={{ fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#9F1239' }}>
+                        Approver Remarks ({post.rejectedBy}):
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: FontSize.sm, color: '#881337', lineHeight: 20 }}>
+                      "{post.rejectionReason}"
+                    </Text>
+                  </View>
+
+                  {/* Post Content Details Preview */}
+                  <View style={{ backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 6, padding: Spacing.md, gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: Colors.textSecondary, letterSpacing: 0.5 }}>
+                      SUBMITTED CAPTION PREVIEW
+                    </Text>
+                    <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
+                      {post.caption}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
+                      Department: {post.department}
+                    </Text>
+                  </View>
+
+                  {/* Audit Notice Box */}
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: '#F8FAFC',
+                    paddingHorizontal: Spacing.md,
+                    paddingVertical: 10,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}>
+                    <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, flex: 1 }}>
+                      <Text style={{ fontWeight: 'bold' }}>Audit Compliance Notice: </Text>
+                      This rejected record is locked for audit history and cannot be directly resubmitted. Use the button below to generate a new request based on this post.
+                    </Text>
+                  </View>
+
+                  {/* Actions */}
+                  <View style={styles.queueCardFooter}>
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity
+                      style={styles.createRequestBtnGold}
+                      onPress={() => handleCreateNewFromRejected(post)}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
+                      <Text style={styles.createRequestBtnGoldText}>Create Request Again</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       {/* Other Placeholder tabs */}
-      {activeTab !== 'dashboard' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && (
+      {activeTab !== 'dashboard' && activeTab !== 'request' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'draft' && activeTab !== 'drafts' && activeTab !== 'rejected' && activeTab !== 'rejected-requests' && (
         <Card style={styles.formCard}>
           <Text style={styles.cardTitle}>{activeTab.replace(/-/g, ' ').toUpperCase()}</Text>
           <Text style={styles.mainPageSubtitle}>This section is currently under development.</Text>
@@ -1339,6 +1395,48 @@ export default function RequestorDashboard() {
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
                   onPress={() => setSelectedQueuePost(null)}
+                >
+                  <Text style={styles.modalCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Approval Flow Progress Modal for Recent Requests Row Click */}
+      {selectedRow && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setSelectedRow(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Approval Flow Progress</Text>
+                <TouchableOpacity onPress={() => setSelectedRow(null)}>
+                  <Ionicons name="close" size={24} color={Colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody}>
+                <Text style={styles.modalPostTitle}>{selectedRow.title}</Text>
+                <Text style={styles.modalPostMeta}>Status: {selectedRow.status}</Text>
+                <View style={styles.modalDivider} />
+                
+                <View style={styles.stepperContainer}>
+                  {getMockSteps(selectedRow.status).map((step, index, arr) =>
+                    renderStep(step, index, index === arr.length - 1)
+                  )}
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setSelectedRow(null)}
                 >
                   <Text style={styles.modalCloseText}>Close</Text>
                 </TouchableOpacity>
@@ -1652,6 +1750,7 @@ const styles = StyleSheet.create({
   },
   rowLayout: {
     flexDirection: 'row',
+    alignItems: 'stretch',
   },
   columnLayout: {
     flexDirection: 'column',
@@ -2521,5 +2620,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+  titleSection: {
+    marginBottom: Spacing.xl,
+  },
+  bulletPoint: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

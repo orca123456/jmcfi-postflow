@@ -9,6 +9,8 @@ import {
   useWindowDimensions,
   Image,
   Platform,
+  Animated,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,7 +37,45 @@ export function DashboardShell({
   const { user, logout } = useAuthStore();
   const { width } = useWindowDimensions();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = React.useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isHamburgerHovered, setIsHamburgerHovered] = React.useState(false);
+  const [sidebarOpenedByHover, setSidebarOpenedByHover] = React.useState(false);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
+
+  const MIN_WIDTH = 64;
+  const MAX_WIDTH = 240;
+  const sidebarWidthAnim = React.useRef(new Animated.Value(MIN_WIDTH)).current;
+
+  const openSidebar = React.useCallback(() => {
+    setIsSidebarOpen(true);
+    Animated.spring(sidebarWidthAnim, {
+      toValue: MAX_WIDTH,
+      useNativeDriver: false, // width animation doesn't support native driver
+      tension: 70,
+      friction: 12,
+    }).start();
+  }, [sidebarWidthAnim]);
+
+  const closeSidebar = React.useCallback(() => {
+    Animated.spring(sidebarWidthAnim, {
+      toValue: MIN_WIDTH,
+      useNativeDriver: false,
+      tension: 70,
+      friction: 12,
+    }).start(() => {
+      setIsSidebarOpen(false);
+      setSidebarOpenedByHover(false);
+    });
+  }, [sidebarWidthAnim]);
+
+  const toggleSidebar = () => {
+    if (isSidebarOpen) {
+      closeSidebar();
+    } else {
+      setSidebarOpenedByHover(false);
+      openSidebar();
+    }
+  };
 
   React.useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -123,41 +163,48 @@ export function DashboardShell({
   const roleColor = getRoleColor(user?.role ?? '');
   const userRole = user?.role ?? 'requestor';
 
-  // Dynamic sidebar navigation items depending on the user's role
   const getSidebarNavItems = () => {
     if (userRole === 'requestor') {
-      const active = activeTab ?? 'approval-queue';
+      const active = activeTab ?? 'dashboard';
       return [
-        { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline' as const, active: active === 'dashboard' },
-        { id: 'approval-queue', label: 'Approval Queue', icon: 'checkbox-outline' as const, active: active === 'approval-queue' },
-        { id: 'analytics', label: 'Analytics', icon: 'bar-chart-outline' as const, active: active === 'analytics' },
+        { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
+        { id: 'request', label: 'Request', icon: 'document-text-outline' as const, active: active === 'request' || active === 'post-requests' },
+        { id: 'draft', label: 'Draft', icon: 'create-outline' as const, active: active === 'draft' },
+        { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
     }
 
     if (
       userRole === 'office_head' ||
-      userRole === 'vice_president' ||
       userRole === 'president' ||
       userRole === 'imc_qa_checker' ||
-      userRole === 'it_publisher'
+      userRole === 'vice_president'
     ) {
       const active = activeTab ?? 'dashboard';
-      const queueLabel = userRole === 'it_publisher' ? 'Publishing Queue' : 'Approval Queue';
       return [
-        { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline' as const, active: active === 'dashboard' },
-        { id: 'approval-queue', label: queueLabel, icon: 'checkbox-outline' as const, active: active === 'approval-queue' },
-        { id: 'analytics', label: 'Analytics', icon: 'bar-chart-outline' as const, active: active === 'analytics' },
+        { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
+        { id: 'approved', label: 'Approved', icon: 'checkmark-circle-outline' as const, active: active === 'approved' },
+        { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
     }
 
-    // Default admin items
+    if (userRole === 'it_publisher') {
+      const active = activeTab ?? 'overview';
+      return [
+        { id: 'overview', label: 'Overview', icon: 'grid-outline' as const, active: active === 'overview' },
+        { id: 'user-management', label: 'User Management', icon: 'people-outline' as const, active: active === 'user-management' },
+        { id: 'analytics', label: 'Analytics', icon: 'bar-chart-outline' as const, active: active === 'analytics' },
+        { id: 'audit-logs', label: 'Audit Logs', icon: 'shield-checkmark-outline' as const, active: active === 'audit-logs' },
+        { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
+      ];
+    }
+
+    // Default fallback
     const active = activeTab ?? 'overview';
     return [
       { id: 'overview', label: 'Overview', icon: 'grid-outline' as const, active: active === 'overview' },
-      { id: 'user-management', label: 'User Management', icon: 'people-outline' as const, active: active === 'user-management' },
-      { id: 'all-posts', label: 'All Posts', icon: 'document-text-outline' as const, active: active === 'all-posts' },
       { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
     ];
   };
@@ -166,12 +213,30 @@ export function DashboardShell({
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Top Header */}
+        {/* Top Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.logoText}>JMCFI POSTFLOW</Text>
-          <View style={styles.headerDivider} />
-          <Text style={styles.logoSubtitle}>Submission Approval System</Text>
+          {/* Hamburger with hover ripple */}
+          <TouchableOpacity
+            style={[
+              styles.hamburgerBtn,
+              isHamburgerHovered && styles.hamburgerBtnHovered,
+            ]}
+            onPress={toggleSidebar}
+            {...(Platform.OS === 'web' ? {
+              // @ts-ignore
+              onMouseEnter: () => setIsHamburgerHovered(true),
+              onMouseLeave: () => setIsHamburgerHovered(false),
+            } : {})}
+          >
+            <Ionicons name="menu-outline" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Image 
+            source={require('../assets/images/jmc_logo.png')} 
+            style={{ width: 28, height: 28, borderRadius: 14 }} 
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>JMCFI PostFLow</Text>
         </View>
         <View style={styles.headerRight}>
           {/* DARK MODE TOGGLE */}
@@ -182,13 +247,13 @@ export function DashboardShell({
             <Ionicons 
               name={isDarkMode ? "sunny-outline" : "moon-outline"} 
               size={18} 
-              color={Colors.textSecondary} 
+              color="#FFFFFF" 
             />
           </TouchableOpacity>
 
           {userRole === 'requestor' && isDesktop && (
             <View style={styles.topRightNav}>
-              <Ionicons name="notifications-outline" size={18} color={Colors.textSecondary} style={styles.navIconSpacing} />
+              <Ionicons name="notifications-outline" size={18} color="#FFFFFF" style={styles.navIconSpacing} />
             </View>
           )}
           <View style={{ position: 'relative', zIndex: 100 }}>
@@ -197,7 +262,7 @@ export function DashboardShell({
               style={styles.profileTrigger} 
               onPress={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
             >
-              <View style={[styles.avatarCircleMini, { backgroundColor: roleColor || Colors.primary }]}>
+              <View style={[styles.avatarCircleMini, { backgroundColor: roleColor || '#FFC72C' }]}>
                 <Text style={styles.avatarTextMini}>
                   {user?.name?.substring(0, 2).toUpperCase() ?? 'EH'}
                 </Text>
@@ -207,7 +272,7 @@ export function DashboardShell({
                   <Text style={styles.triggerNameText}>{user?.name ?? 'Esther Howard'}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-down" size={14} color="#6B7280" style={{ marginLeft: 2 }} />
+              <Ionicons name="chevron-down" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
 
             {/* DROPDOWN OVERLAY */}
@@ -230,14 +295,14 @@ export function DashboardShell({
                 
                 {/* Menu items */}
                 <ScrollView style={styles.dropdownItemsList}>
-                  {userRole === 'admin' && (
+                  {userRole === 'it_publisher' && (
                     <TouchableOpacity 
                       style={styles.dropdownItem} 
-                      onPress={() => { setIsProfileDropdownOpen(false); alert('Admin settings clicked'); }}
+                      onPress={() => { setIsProfileDropdownOpen(false); if (onTabChange) onTabChange('user-management'); }}
                     >
-                      <Ionicons name="options-outline" size={18} color="#4B5563" />
+                      <Ionicons name="people-outline" size={18} color="#4B5563" />
                       <View style={styles.itemTextContainer}>
-                        <Text style={styles.itemTitle}>Admin settings</Text>
+                        <Text style={styles.itemTitle}>User Management</Text>
                         <Text style={styles.itemSubtitle}>Manage members, access & more</Text>
                       </View>
                     </TouchableOpacity>
@@ -261,19 +326,6 @@ export function DashboardShell({
 
                   <TouchableOpacity 
                     style={styles.dropdownItem} 
-                    onPress={() => { setIsProfileDropdownOpen(false); alert('Help Center clicked'); }}
-                  >
-                    <Ionicons name="help-circle-outline" size={18} color="#4B5563" />
-                    <View style={styles.itemTextContainer}>
-                      <Text style={styles.itemTitle}>Help Center</Text>
-                      <Text style={styles.itemSubtitle}>Find answers and contact support</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
                     onPress={() => { setIsProfileDropdownOpen(false); handleLogout(); }}
                   >
                     <Ionicons name="log-out-outline" size={18} color="#4B5563" />
@@ -290,71 +342,102 @@ export function DashboardShell({
 
       {/* Main Layout Container */}
       <View style={styles.mainContainer}>
-        {/* Left Sidebar - Desktop only */}
+        {/* ── Animated Sidebar (Pushes content, Google Classroom style) ── */}
         {isDesktop && (
-          <View style={styles.sidebar}>
-            <View style={styles.sidebarHeaderContainer}>
-              <Image 
-                source={require('../assets/images/jmc_logo.png')} 
-                style={{ width: 42, height: 42, borderRadius: 21 }} 
-                resizeMode="contain"
-              />
-              <View style={styles.sidebarHeader}>
-                <Text style={styles.sidebarTitle}>JMCFI Postflow</Text>
-                <Text style={styles.sidebarSubtitle}>Content Approval System</Text>
+          <Animated.View
+            style={[
+              styles.sidebar,
+              { width: sidebarWidthAnim }
+            ]}
+            {...(Platform.OS === 'web' ? {
+              // @ts-ignore
+              onMouseEnter: () => {
+                if (!isSidebarOpen) {
+                  setSidebarOpenedByHover(true);
+                  openSidebar();
+                }
+              },
+              onMouseLeave: () => {
+                if (sidebarOpenedByHover) {
+                  closeSidebar();
+                }
+              },
+            } : {})}
+          >
+            {/* Inner fixed width container to prevent text wrapping during animation */}
+            <View style={[styles.sidebarInner, { width: MAX_WIDTH }]}>
+              <View>
+                <View style={styles.sidebarHeaderContainer}>
+                  <Image
+                    source={require('../assets/images/jmc_logo.png')}
+                    style={{ width: 36, height: 36, borderRadius: 18 }}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.sidebarHeader}>
+                    <Text style={styles.sidebarTitle}>COBE</Text>
+                  </View>
+                </View>
+
+                <View style={styles.sidebarDivider} />
+
+                <View style={styles.sidebarNav}>
+                  {sidebarNavItems.map((item, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[
+                        styles.sidebarNavItem,
+                        item.active && styles.sidebarNavItemActivePurple,
+                      ]}
+                      onPress={() => {
+                        if (onTabChange) onTabChange(item.id);
+                        if (sidebarOpenedByHover) closeSidebar();
+                      }}
+                    >
+                      <View style={styles.sidebarNavIconWrapper}>
+                        <Ionicons name={item.icon} size={22} color="#FFFFFF" />
+                      </View>
+                      <Animated.View style={{ 
+                        opacity: sidebarWidthAnim.interpolate({
+                          inputRange: [MIN_WIDTH, MAX_WIDTH],
+                          outputRange: [0, 1]
+                        }) 
+                      }}>
+                        <Text
+                          style={[
+                            styles.sidebarNavLabel,
+                            item.active && styles.sidebarNavLabelActivePurple,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.label}
+                        </Text>
+                      </Animated.View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Bottom footer */}
+              <View style={styles.sidebarFooter}>
+                <TouchableOpacity style={styles.sidebarNavItem} onPress={() => alert('Help Center is under development.')}>
+                  <View style={styles.sidebarNavIconWrapper}>
+                    <Ionicons name="help-circle-outline" size={22} color="rgba(255,255,255,0.8)" />
+                  </View>
+                  <Animated.View style={{ 
+                    opacity: sidebarWidthAnim.interpolate({
+                      inputRange: [MIN_WIDTH, MAX_WIDTH],
+                      outputRange: [0, 1]
+                    }) 
+                  }}>
+                    <Text style={styles.sidebarFooterLabel} numberOfLines={1}>Help Center</Text>
+                  </Animated.View>
+                </TouchableOpacity>
               </View>
             </View>
-            
-            <View style={styles.sidebarDivider} />
-
-            <View style={styles.sidebarNav}>
-              {sidebarNavItems.map((item, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[
-                    styles.sidebarNavItem,
-                    item.active && (userRole === 'admin' ? styles.sidebarNavItemActive : styles.sidebarNavItemActiveGold),
-                  ]}
-                  onPress={() => {
-                    if (onTabChange) {
-                      onTabChange(item.id);
-                    } else {
-                      alert(`${item.label} is under development.`);
-                    }
-                  }}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={18}
-                    color={item.active ? (userRole === 'admin' ? '#FFF' : Colors.textPrimary) : Colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.sidebarNavLabel,
-                      item.active && (userRole === 'admin' ? styles.sidebarNavLabelActive : styles.sidebarNavLabelActiveGold),
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Bottom items in Sidebar */}
-            <View style={styles.sidebarFooter}>
-              <TouchableOpacity style={styles.sidebarFooterItem} onPress={() => alert('Help Center is under development.')}>
-                <Ionicons name="help-circle-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.sidebarFooterLabel}>Help Center</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.sidebarFooterItem} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.sidebarFooterLabel}>Sign Out</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </Animated.View>
         )}
 
-        {/* Content Wrapper */}
+        {/* Content Wrapper — full width always since sidebar overlays */}
         <View style={styles.contentWrapper}>
           <ScrollView
             style={styles.content}
@@ -399,31 +482,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 12,
+    backgroundColor: '#4C007C', // Deep purple matching screenshot
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#3B0061',
     zIndex: 10,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   logoText: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    fontFamily: 'Kameron_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
   headerDivider: {
     width: 1,
     height: 18,
-    backgroundColor: Colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   logoSubtitle: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   headerRight: {
     flexDirection: 'row',
@@ -433,11 +518,9 @@ const styles = StyleSheet.create({
   headerIconButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   topRightNav: {
     flexDirection: 'row',
@@ -447,15 +530,15 @@ const styles = StyleSheet.create({
   },
   topRightNavLink: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    color: '#FFFFFF',
     fontWeight: FontWeight.medium,
   },
   topRightNavLinkActive: {
     fontSize: FontSize.sm,
-    color: Colors.primary,
+    color: '#FFFFFF',
     fontWeight: FontWeight.bold,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.primary,
+    borderBottomColor: '#FFFFFF',
     paddingBottom: 4,
   },
   navIconSpacing: {
@@ -465,23 +548,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 24,
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   avatarCircleMini: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FFC72C',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarTextMini: {
-    color: Colors.textOnPrimary,
+    color: Colors.textPrimary,
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -491,11 +572,11 @@ const styles = StyleSheet.create({
   triggerNameText: {
     fontSize: 12,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#FFFFFF',
   },
   triggerSubtext: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.7)',
     marginTop: 1,
   },
   dropdownContainer: {
@@ -509,7 +590,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 5,
     zIndex: 999,
@@ -581,26 +662,48 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
+  // Hamburger button
+  hamburgerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+    backgroundColor: 'transparent',
+  },
+  hamburgerBtnHovered: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+
+  // Left edge hover detection zone (REMOVED)
+  
+  // Backdrop overlay (REMOVED)
+  
+  // Sidebar — now inline, animated width
   sidebar: {
-    width: 240,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#4C007C',
+    overflow: 'hidden',
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
+    borderRightColor: '#3B0061',
+  },
+  sidebarInner: {
+    flex: 1,
+    paddingTop: Spacing.md,
     justifyContent: 'space-between',
   },
   sidebarHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    paddingHorizontal: 14,
+    gap: 16,
+    marginBottom: Spacing.sm,
   },
   schoolIconContainer: {
     width: 32,
     height: 32,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -608,68 +711,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sidebarTitle: {
-    fontSize: FontSize.lg,
+    fontSize: FontSize.lg + 2,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  sidebarSubtitle: {
-    fontSize: 9,
-    color: Colors.textSecondary,
-    marginTop: 2,
-    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   sidebarDivider: {
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginBottom: Spacing.md,
+    marginTop: 4,
+    marginHorizontal: Spacing.md,
   },
   sidebarNav: {
     flex: 1,
-    gap: Spacing.xs,
+    gap: 6,
+    paddingHorizontal: 8,
   },
   sidebarNavItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
     paddingVertical: 10,
-    borderRadius: 4,
+    borderRadius: 20, // Rounded pill shape matching screenshot
   },
-  sidebarNavItemActive: {
-    backgroundColor: Colors.primary,
+  sidebarNavIconWrapper: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sidebarNavItemActiveGold: {
-    backgroundColor: '#FED65B', // Premium JMCFI Gold background matching screenshot
+  sidebarNavItemActivePurple: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)', // Lighter purple pill fill for active tab
   },
   sidebarNavLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    fontSize: FontSize.md,
+    color: '#FFFFFF',
     fontWeight: FontWeight.medium,
   },
-  sidebarNavLabelActive: {
-    color: Colors.textOnPrimary,
-    fontWeight: FontWeight.semiBold,
-  },
-  sidebarNavLabelActiveGold: {
-    color: Colors.primary, // Dynamic primary text on gold background
+  sidebarNavLabelActivePurple: {
+    color: '#FFFFFF',
     fontWeight: FontWeight.bold,
   },
   sidebarFooter: {
     paddingVertical: Spacing.md,
-    gap: Spacing.sm,
+    paddingHorizontal: 8,
+    gap: 6,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  sidebarFooterItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   sidebarFooterLabel: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   contentWrapper: {
     flex: 1,

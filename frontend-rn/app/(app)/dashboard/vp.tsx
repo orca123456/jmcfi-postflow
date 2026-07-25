@@ -7,6 +7,7 @@ import {
   TextInput,
   useWindowDimensions,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,736 +28,519 @@ export default function VPDashboard() {
     fetchPolicy();
   }, []);
 
-  // Tab State: 'dashboard' | 'approval-queue' | 'analytics' | 'policy-rules' | 'account-settings'
+  // Tab State: 'dashboard' | 'policy-rules'
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Preview Device State
-  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
-
-  // Selected Post for Details Preview
-  const [selectedPostIndex, setSelectedPostIndex] = useState(0);
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
+  const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
 
-  // Mock VP pending requests list
-  const mockPendingPosts = [
-    {
-      id: 'vp1',
-      title: 'Institutional Founding Anniversary Campaign',
-      dept: 'Dept: External Relations',
-      channels: ['FACEBOOK', 'INSTAGRAM'],
-      remark: 'Content aligns with the 25-year milestone theme. All branding assets are updated. Highly recommended for immediate release.',
-      remarkAuthor: 'Dr. Elena Cruz (Head of PR)',
-      remarkColor: '#3B82F6',
-      date: 'Oct 24, 2023, 09:00 AM',
-      caption: 'Celebrating 25 years of JMCFI\'s commitment to quality education! Join us as we look back at the milestones that shaped our institution and the bright future ahead. #JMCFI25 #EducationExcellence #Legacy',
-      previewImage: 'FOUNDERS DAY CELEBRATION',
-      timeline: [
-        { title: 'Content Creator', meta: 'Submitted: Oct 20, 14:30', desc: 'Drafted based on latest brand guide.', status: 'complete' },
-        { title: 'Office Head Review', meta: 'Approved: Oct 22, 10:15', desc: 'Verified assets and copy.', status: 'complete' },
-        { title: 'VP Approval', meta: 'Awaiting Action', desc: '', status: 'active' },
-        { title: 'Social Media Deployment', meta: 'Scheduled: Oct 24, 09:00', desc: '', status: 'pending' },
-      ],
-    },
-    {
-      id: 'vp2',
-      title: 'Academic Excellence Awards 2023 Announcement',
-      dept: 'Dept: Registrar Office',
-      channels: ['TWITTER'],
-      remark: 'Student list verified against records. Text is concise. Ready for scheduling.',
-      remarkAuthor: 'Mr. Robert Tan (Registrar)',
-      remarkColor: '#10B981',
-      date: 'Oct 25, 2023, 10:30 AM',
-      caption: 'Recognizing the hard work and dedication of our academic achievers! Congratulations to all students on the Dean\'s List for the First Semester of AY 2023-2024. Keep shining! #AcademicExcellence',
-      previewImage: 'ACADEMIC EXCELLENCE',
-      timeline: [
-        { title: 'Content Creator', meta: 'Submitted: Oct 21, 11:20', desc: 'Compiled list from Registrar database.', status: 'complete' },
-        { title: 'Office Head Review', meta: 'Approved: Oct 23, 09:40', desc: 'Validated student credentials and honors.', status: 'complete' },
-        { title: 'VP Approval', meta: 'Awaiting Action', desc: '', status: 'active' },
-        { title: 'Social Media Deployment', meta: 'Scheduled: Oct 25, 10:30', desc: '', status: 'pending' },
-      ],
-    },
-    {
-      id: 'vp3',
-      title: 'Campus Safety Protocol - New Guidelines',
-      dept: 'Dept: Admin Services',
-      channels: ['LINKEDIN', 'WEBSITE'],
-      remark: 'Critical update for faculty. Needs urgent clearance. I\'ve noted that we should emphasize the gate hours.',
-      remarkAuthor: 'Engr. David Lim (Admin Head)',
-      remarkColor: '#EF4444',
-      date: 'Oct 26, 2023, 08:00 AM',
-      caption: 'To ensure a safe environment for everyone on campus, please review the revised gate hours and safety protocols effective next Monday. Your cooperation is highly appreciated. #CampusSafety',
-      previewImage: 'CAMPUS SAFETY GUIDELINES',
-      timeline: [
-        { title: 'Content Creator', meta: 'Submitted: Oct 22, 08:15', desc: 'Drafted new gate entry guidelines.', status: 'complete' },
-        { title: 'Office Head Review', meta: 'Approved: Oct 23, 14:10', desc: 'Confirmed with safety committee.', status: 'complete' },
-        { title: 'VP Approval', meta: 'Awaiting Action', desc: '', status: 'active' },
-        { title: 'Social Media Deployment', meta: 'Scheduled: Oct 26, 08:00', desc: '', status: 'pending' },
-      ],
-    },
-  ];
+  // Modal / Selected Request Preview State
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
 
-  const handleAction = (type: string, title: string) => {
-    alert(`Action: "${type}" successfully triggered for request:\n"${title}"`);
+  // Reject Modal State
+  const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
+  const [requestToReject, setRequestToReject] = useState<any | null>(null);
+  const [rejectComment, setRejectComment] = useState('');
+
+  // Mock VP pending requests list matching design screenshot
+  const [requestsList, setRequestsList] = useState([
+    {
+      id: 'req1',
+      title: 'Intramurals 2026 Opening Ceremony',
+      category: 'Event',
+      dept: 'CITE',
+      requestedBy: 'Juan Dela Cruz',
+      requestedByRole: 'Staff',
+      date: 'May 19, 2026',
+      time: '10:30 AM',
+      platforms: ['facebook', 'instagram', 'website'],
+      caption: 'The spirit of unity, excellence, and sportsmanship comes alive! Join us as we proudly open Intramurals 2026. #Intramurals2026 #JMCFI',
+      previewBanner: 'INTRAMURALS 2026 OPENING CEREMONY',
+      attachment: 'intramurals2026_banner.jpg',
+      attachmentSize: '1.2 MB',
+      status: 'PENDING',
+    },
+    {
+      id: 'req2',
+      title: 'Scholarship Program 2026',
+      category: 'Announcement',
+      dept: 'COBE',
+      requestedBy: 'Maria Santos',
+      requestedByRole: 'Faculty',
+      date: 'May 18, 2026',
+      time: '02:15 PM',
+      platforms: ['facebook', 'website'],
+      caption: 'Applications for the AY 2026-2027 Academic Scholarship Program are now open! Check out the requirements and deadline details on our official website portal.',
+      previewBanner: 'SCHOLARSHIP PROGRAM 2026',
+      attachment: 'scholarship_guidelines.pdf',
+      attachmentSize: '850 KB',
+      status: 'PENDING',
+    },
+    {
+      id: 'req3',
+      title: 'Community Outreach Activity',
+      category: 'Community',
+      dept: 'CAS',
+      requestedBy: 'Alex Rivera',
+      requestedByRole: 'Coordinator',
+      date: 'May 17, 2026',
+      time: '11:00 AM',
+      platforms: ['facebook', 'instagram'],
+      caption: 'Together we build a stronger community. CAS leads volunteerism initiative in Barangay Malagamot. Join us this coming weekend!',
+      previewBanner: 'COMMUNITY OUTREACH 2026',
+      attachment: 'outreach_photos.zip',
+      attachmentSize: '4.5 MB',
+      status: 'PENDING',
+    },
+    {
+      id: 'req4',
+      title: 'Career Fair 2026',
+      category: 'Event',
+      dept: 'COBE',
+      requestedBy: 'Grace Lee',
+      requestedByRole: 'Officer',
+      date: 'May 16, 2026',
+      time: '09:30 AM',
+      platforms: ['facebook', 'instagram', 'website'],
+      caption: 'Connect with top industry partners and secure your dream career at the annual JMCFI Career Fair 2026! Pre-registration is now open.',
+      previewBanner: 'CAREER FAIR 2026',
+      attachment: 'career_fair_poster.png',
+      attachmentSize: '2.1 MB',
+      status: 'PENDING',
+    },
+    {
+      id: 'req5',
+      title: 'CITE Week 2026 Teaser',
+      category: 'Teaser',
+      dept: 'CITE',
+      requestedBy: 'Kevin Tan',
+      requestedByRole: 'Staff',
+      date: 'May 15, 2026',
+      time: '04:45 PM',
+      platforms: ['facebook', 'instagram'],
+      caption: 'Innovation meets passion! Get ready for CITE Week 2026: Shaping the Future of Technology. Stay tuned for exciting event line-ups!',
+      previewBanner: 'CITE WEEK 2026 TEASER',
+      attachment: 'teaser_video.mp4',
+      attachmentSize: '15.8 MB',
+      status: 'PENDING',
+    },
+  ]);
+
+  const [approvedRequests, setApprovedRequests] = useState([
+    {
+      id: 'req6',
+      title: 'CED Orientation 2026',
+      category: 'Event',
+      dept: 'CED',
+      requestedBy: 'Sarah Connor',
+      requestedByRole: 'Dean',
+      date: 'May 10, 2026',
+      time: '08:00 AM',
+      platforms: ['facebook'],
+      caption: 'Welcome to the CED family! Orientation begins...',
+      previewBanner: 'CED ORIENTATION',
+      attachment: 'ced_orientation.pdf',
+      attachmentSize: '2.5 MB',
+      status: 'APPROVED',
+    }
+  ]);
+
+  const [rejectedRequests, setRejectedRequests] = useState([
+    {
+      id: 'req7',
+      title: 'CAS Acquaintance Party',
+      category: 'Event',
+      dept: 'CAS',
+      requestedBy: 'John Doe',
+      requestedByRole: 'Student',
+      date: 'May 12, 2026',
+      time: '01:00 PM',
+      platforms: ['facebook', 'instagram'],
+      caption: 'Let us party!',
+      previewBanner: 'CAS PARTY',
+      attachment: 'cas_party.png',
+      attachmentSize: '1.1 MB',
+      status: 'REJECTED',
+      rejectionReason: 'Please revise the caption to be more formal and appropriate for a university page.',
+    }
+  ]);
+
+  const departmentOptions = ['All Departments', 'CITE', 'COBE', 'CAS', 'CED'];
+
+  // Handler for quick actions
+  const handleApprove = (req: any) => {
+    alert(`Request Approved: "${req.title}"`);
+    setSelectedRequest(null);
   };
 
+  const handleRejectClick = (req: any) => {
+    setRequestToReject(req);
+    setRejectComment('');
+    setIsRejectModalVisible(true);
+  };
+
+  const confirmReject = () => {
+    alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
+    setIsRejectModalVisible(false);
+    setRequestToReject(null);
+    setSelectedRequest(null);
+  };
+
+  const handleRequestRevision = (req: any) => {
+    alert(`Revision Requested for: "${req.title}"`);
+    setSelectedRequest(null);
+  };
+
+  const getRequestsForTab = () => {
+    if (activeTab === 'approved') return approvedRequests;
+    if (activeTab === 'rejected') return rejectedRequests;
+    return requestsList;
+  };
+
+  const filteredRequests = getRequestsForTab().filter((req) => {
+    const matchesDept =
+      selectedDepartment === 'All Departments' || req.dept === selectedDepartment;
+    const matchesSearch =
+      req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      req.category.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesDept && matchesSearch;
+  });
+
   const isLargeScreen = width > 1024;
-  const activePost = mockPendingPosts[selectedPostIndex] || mockPendingPosts[0];
 
   return (
     <DashboardShell
-      title="Vice President — Executive Approval Console"
+      title="Vice President Dashboard"
       activeTab={activeTab}
       onTabChange={setActiveTab}
     >
-      {/* ----------------- DASHBOARD TAB ----------------- */}
-      {activeTab === 'dashboard' && (
+      {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected') && (
         <View style={styles.dashboardContainer}>
-          {/* Header row */}
-          <View style={styles.dashboardHeaderRow}>
-            <View>
-              <Text style={styles.welcomeTitle}>Welcome, Vice President</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Executive overview of content approvals and quality benchmarks for Jose Maria College.
-              </Text>
+          {/* Header Row with Greeting and Department Filter */}
+          {activeTab === 'dashboard' && (
+            <View style={styles.dashboardHeaderRow}>
+              <View>
+                <Text style={styles.greetingTitle}>Good morning, Vice President! 👋</Text>
+                <Text style={styles.greetingSubtitle}>
+                  Review and approve content requests from departments.
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity
-              style={[styles.btnBatchApprove, { height: 32, paddingHorizontal: 16 }]}
-              onPress={() => setActiveTab('approval-queue')}
-            >
-              <Ionicons name="checkbox-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.btnBatchApproveText}>Go to Approval Queue</Text>
-            </TouchableOpacity>
-          </View>
+          )}
 
-          {/* KPI Summary metrics */}
-          <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="time-outline" size={18} color={Colors.textPrimary} />
-                <Text style={[styles.badgeOrangeText, { color: '#EA580C' }]}>+2 today</Text>
-              </View>
-              <Text style={styles.metricValue}>12</Text>
-              <Text style={styles.metricLabel}>Pending VP Review</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#FFC72C' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="mail-unread-outline" size={18} color="#FFC72C" />
-              </View>
-              <Text style={styles.metricValue}>04</Text>
-              <Text style={styles.metricLabel}>Escalated to President</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#16A34A' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="checkmark-done-outline" size={18} color="#16A34A" />
-              </View>
-              <Text style={styles.metricValue}>48</Text>
-              <Text style={styles.metricLabel}>Approved MTD</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="speedometer-outline" size={18} color="#2563EB" />
-              </View>
-              <Text style={styles.metricValue}>2.4h</Text>
-              <Text style={styles.metricLabel}>Avg. Response Speed</Text>
-            </Card>
-          </View>
-
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Quick Pending Items list */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
-              <Text style={styles.tableCardTitle}>Awaiting Immediate VP Signature</Text>
-              <Text style={styles.welcomeSubtitle}>Below are requests that require your sign-off to proceed.</Text>
-
-              <View style={{ gap: 12, marginTop: 12 }}>
-                {mockPendingPosts.map((post, idx) => (
-                  <View key={post.id} style={[styles.analyticsPlatformCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={styles.postTitleText}>{post.title}</Text>
-                      <Text style={styles.postMetaText}>By {post.remarkAuthor.split('(')[0]} &bull; {post.date.split(',')[0]}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.btnApproveAction, { height: 28 }]}
-                      onPress={() => {
-                        setSelectedPostIndex(idx);
-                        setActiveTab('approval-queue');
-                      }}
-                    >
-                      <Text style={styles.btnApproveActionText}>Review Draft</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </Card>
-
-            {/* Quick Links & Resources */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
-              <Text style={styles.configCardTitle}>Resources & Policies</Text>
-              <Text style={styles.welcomeSubtitle}>Quick links to institutional guidelines and posting regulations.</Text>
-
-              <View style={{ gap: 10, marginTop: 12 }}>
-                <TouchableOpacity
-                  style={[styles.filterBtn, { justifyContent: 'flex-start', height: 36, width: '100%' }]}
-                  onPress={() => setActiveTab('policy-rules')}
-                >
-                  <Ionicons name="book-outline" size={16} color={Colors.textPrimary} />
-                  <Text style={[styles.filterBtnText, { marginLeft: 6 }]}>View Website Posting Policy</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.filterBtn, { justifyContent: 'flex-start', height: 36, width: '100%' }]}
-                  onPress={() => setActiveTab('analytics')}
-                >
-                  <Ionicons name="bar-chart-outline" size={16} color={Colors.textPrimary} />
-                  <Text style={[styles.filterBtnText, { marginLeft: 6 }]}>Open Analytics Dashboard</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.analyticsPlatformCard, { backgroundColor: Colors.surfaceSecondary, borderWidth: 0, padding: 12, width: '100%' }]}>
-                  <Text style={{ fontSize: FontSize.xs, fontWeight: 'bold', color: Colors.textPrimary }}>EXECUTIVE BENCHMARK</Text>
-                  <Text style={[styles.welcomeSubtitle, { marginTop: 4, lineHeight: 16 }]}>
-                    All digital publications must be verified against academic records (for students) and brand integrity markers before final release.
-                  </Text>
+          {/* Metric Summary Cards Row */}
+          {activeTab === 'dashboard' && (
+            <View style={styles.metricsGrid}>
+              {/* Card 1: For My Approval */}
+              <Card style={styles.metricCard}>
+                <View style={styles.metricCardHeader}>
+                <View style={[styles.metricIconBg, { backgroundColor: '#F3E8FF' }]}>
+                  <Ionicons name="document-text" size={20} color="#7C3AED" />
                 </View>
               </View>
+              <Text style={styles.metricLabel}>For My Approval</Text>
+              <Text style={styles.metricCount}>8</Text>
+              <Text style={styles.metricSubtext}>Requests awaiting your approval</Text>
             </Card>
-          </View>
-        </View>
-      )}
 
-      {/* ----------------- APPROVAL QUEUE TAB ----------------- */}
-      {activeTab === 'approval-queue' && (
-        <View style={styles.dashboardContainer}>
-          {/* Header section */}
-          <View style={styles.dashboardHeaderRow}>
-            <View>
-              <Text style={styles.welcomeSubtitle}>EXECUTIVE OVERVIEW</Text>
-              <Text style={styles.welcomeTitle}>Vice President Dashboard</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Reviewing 12 pending requests approved by Office Heads.
-              </Text>
+            {/* Card 2: Approved */}
+            <Card style={styles.metricCard}>
+              <View style={styles.metricCardHeader}>
+                <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="checkmark-circle" size={20} color="#D97706" />
+                </View>
+              </View>
+              <Text style={styles.metricLabel}>Approved</Text>
+              <Text style={styles.metricCount}>24</Text>
+              <Text style={styles.metricSubtext}>Requests you approved</Text>
+            </Card>
+
+            {/* Card 3: Rejected */}
+            <Card style={styles.metricCard}>
+              <View style={styles.metricCardHeader}>
+                <View style={[styles.metricIconBg, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="close-circle" size={20} color="#DC2626" />
+                </View>
+              </View>
+              <Text style={styles.metricLabel}>Rejected</Text>
+              <Text style={styles.metricCount}>5</Text>
+              <Text style={styles.metricSubtext}>Requests you rejected</Text>
+            </Card>
+
+            {/* Card 4: Published */}
+            <Card style={styles.metricCard}>
+              <View style={styles.metricCardHeader}>
+                <View style={[styles.metricIconBg, { backgroundColor: '#DBEAFE' }]}>
+                  <Ionicons name="paper-plane" size={20} color="#2563EB" />
+                </View>
+              </View>
+              <Text style={styles.metricLabel}>Published</Text>
+              <Text style={styles.metricCount}>18</Text>
+                <Text style={styles.metricSubtext}>Requests published</Text>
+              </Card>
             </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-              <TouchableOpacity style={styles.filterBtn} onPress={() => alert('Filtering VP requests...')}>
-                <Ionicons name="filter-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.filterBtnText}>Filter</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnBatchApprove} onPress={() => alert('Batch approving all 12 requests...')}>
-                <Ionicons name="checkbox-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.btnBatchApproveText}>Batch Approve</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
 
-          {/* Metric cards summary */}
-          <View style={styles.metricsRow}>
-            {/* Card 1 */}
-            <Card style={[styles.metricCard, { borderLeftColor: '#E5E7EB' }]}>
-              <View style={styles.metricHeader}>
-                <View style={[styles.activityIconBg, { backgroundColor: '#EFF6FF', borderWidth: 0 }]}>
-                  <Ionicons name="document-text-outline" size={16} color="#2563EB" />
-                </View>
-                <View style={styles.badgeOrange}>
-                  <Text style={styles.badgeOrangeText}>+2 today</Text>
-                </View>
-              </View>
-              <Text style={styles.metricValue}>12</Text>
-              <Text style={styles.metricLabel}>PENDING REVIEW</Text>
-            </Card>
-
-            {/* Card 2 */}
-            <Card style={[styles.metricCard, { borderLeftColor: '#E5E7EB' }]}>
-              <View style={styles.metricHeader}>
-                <View style={[styles.activityIconBg, { backgroundColor: '#FEF3C7', borderWidth: 0 }]}>
-                  <Ionicons name="mail-unread-outline" size={16} color="#D97706" />
-                </View>
-              </View>
-              <Text style={styles.metricValue}>4</Text>
-              <Text style={styles.metricLabel}>ESCALATED TO PRESIDENT</Text>
-            </Card>
-
-            {/* Card 3 */}
-            <Card style={[styles.metricCard, { borderLeftColor: '#E5E7EB' }]}>
-              <View style={styles.metricHeader}>
-                <View style={[styles.activityIconBg, { backgroundColor: '#ECFDF5', borderWidth: 0 }]}>
-                  <Ionicons name="checkbox-outline" size={16} color="#16A34A" />
-                </View>
-              </View>
-              <Text style={styles.metricValue}>48</Text>
-              <Text style={styles.metricLabel}>FINALIZED THIS WEEK</Text>
-            </Card>
-
-            {/* Card 4 (Dark Blue) */}
-            <Card style={[styles.metricCard, { backgroundColor: Colors.primary, borderLeftColor: Colors.primary, shadowColor: 'transparent' }]}>
-              <View style={styles.metricHeader}>
-                <View style={[styles.activityIconBg, { backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 0 }]}>
-                  <Ionicons name="speedometer-outline" size={16} color="#FFFFFF" />
-                </View>
-              </View>
-              <Text style={[styles.metricValue, { color: '#FFFFFF' }]}>2.4 hrs</Text>
-              <Text style={[styles.metricLabel, { color: '#FFFFFF', opacity: 0.8 }]}>AVG. RESPONSE TIME</Text>
-            </Card>
-          </View>
-
-          {/* Pending Approvals Table */}
+          {/* Main Content Card: Requests List */}
           <Card style={styles.tableCard}>
-            <View style={styles.tableCardHeader}>
-              <Text style={styles.tableCardTitle}>Requests Awaiting VP Approval</Text>
-              <View style={styles.priorityBadge}>
-                <Text style={styles.priorityBadgeText}>Priority View</Text>
-              </View>
-            </View>
+            {/* Table Control Header */}
+            <View style={styles.tableCardHeaderRow}>
+              <Text style={styles.tableTitle}>
+                {activeTab === 'dashboard' ? 'Requests Awaiting Your Approval' : activeTab === 'approved' ? 'Approved Requests' : 'Rejected Requests'}
+              </Text>
 
-            {/* Table layout */}
-            <View style={styles.table}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>REQUEST DETAILS</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex2_5]}>OFFICE HEAD REMARK</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1_2]}>MEDIA PREVIEW</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1_2]}>POST DATE</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1_5, styles.alignRight]}>ACTIONS</Text>
-              </View>
+              <View style={styles.tableControlsRight}>
+                {/* Search Bar */}
+                <View style={styles.searchBox}>
+                  <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search requests..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                </View>
 
-              {mockPendingPosts.map((post, idx) => (
-                <View key={post.id} style={[styles.tableRow, selectedPostIndex === idx && styles.tableRowSelected]}>
-                  <TouchableOpacity style={[styles.cellFlex2, styles.titleCellCol]} onPress={() => setSelectedPostIndex(idx)}>
-                    <Text style={styles.postTitleText}>{post.title}</Text>
-                    <Text style={styles.postMetaText}>{post.dept}</Text>
-                    <View style={styles.channelsBadgeRow}>
-                      {post.channels.map((chan) => (
-                        <View key={chan} style={styles.channelWordBadge}>
-                          <Text style={styles.channelWordBadgeText}>{chan}</Text>
-                        </View>
-                      ))}
-                    </View>
+                {/* Department Dropdown Selector */}
+                <View style={{ position: 'relative', zIndex: 50 }}>
+                  <TouchableOpacity
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
+                    onPress={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+                  >
+                    <Text style={styles.departmentDropdownText}>{selectedDepartment}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
-                  <View style={[styles.cellFlex2_5, styles.remarkCellCol, { borderLeftColor: post.remarkColor }]}>
-                    <Text style={styles.remarkQuoteText}>"{post.remark}"</Text>
-                    <Text style={styles.remarkAuthorText}>— {post.remarkAuthor}</Text>
-                  </View>
+                  {isDeptDropdownOpen && (
+                    <View style={styles.dropdownMenu}>
+                      {departmentOptions.map((deptOption) => (
+                        <TouchableOpacity
+                          key={deptOption}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setSelectedDepartment(deptOption);
+                            setIsDeptDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownItemText}>{deptOption}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
 
-                  <View style={[styles.cellFlex1_2, { alignItems: 'center' }]}>
-                    <View style={styles.tableMediaBox}>
+                {/* Filter Button */}
+                <TouchableOpacity style={styles.filterBtn} onPress={() => alert('Filter options')}>
+                  <Ionicons name="options-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
+                  <Text style={styles.filterBtnText}>Filter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Requests Table */}
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
+                <Text style={[styles.tableHeaderCell, styles.flexDept]}>DEPARTMENT</Text>
+                <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
+                <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
+                <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
+                <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
+              </View>
+
+              {filteredRequests.map((req) => (
+                <View key={req.id} style={styles.tableRow}>
+                  {/* REQUEST TITLE + CATEGORY TAG */}
+                  <View style={[styles.cellContainer, styles.flexTitle]}>
+                    <View style={styles.thumbnailBox}>
                       <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitleText}>{req.title}</Text>
+                      <View style={styles.categoryPill}>
+                        <Text style={styles.categoryPillText}>{req.category}</Text>
+                      </View>
                     </View>
                   </View>
 
-                  <Text style={[styles.tableCellText, styles.cellFlex1_2, { fontSize: FontSize.xs }]}>{post.date.replace(/, /g, '\n')}</Text>
+                  {/* DEPARTMENT */}
+                  <View style={[styles.cellContainer, styles.flexDept]}>
+                    <Text style={styles.rowDeptText}>{req.dept}</Text>
+                  </View>
 
-                  <View style={[styles.cellFlex1_5, styles.actionsRow]}>
-                    {/* Approve checkmark button */}
-                    <TouchableOpacity style={styles.actionBtnCheck} onPress={() => handleAction('Approve', post.title)}>
-                      <Ionicons name="checkmark" size={14} color="#16A34A" />
+                  {/* REQUESTED BY */}
+                  <View style={[styles.cellContainer, styles.flexUser]}>
+                    <Text style={styles.rowUserName}>{req.requestedBy}</Text>
+                    <Text style={styles.rowUserRole}>{req.requestedByRole}</Text>
+                  </View>
+
+                  {/* REQUESTED ON */}
+                  <View style={[styles.cellContainer, styles.flexDate]}>
+                    <Text style={styles.rowDateText}>{req.date}</Text>
+                    <Text style={styles.rowTimeText}>{req.time}</Text>
+                  </View>
+
+                  {/* PLATFORMS */}
+                  <View style={[styles.cellContainer, styles.flexPlatforms, { flexDirection: 'row', gap: 6, justifyContent: 'flex-start' }]}>
+                    {req.platforms.includes('facebook') && (
+                      <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                        <Ionicons name="logo-facebook" size={13} color="#1877F2" />
+                      </View>
+                    )}
+                    {req.platforms.includes('instagram') && (
+                      <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
+                        <Ionicons name="logo-instagram" size={13} color="#E1306C" />
+                      </View>
+                    )}
+                    {req.platforms.includes('website') && (
+                      <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
+                        <Ionicons name="globe-outline" size={13} color="#059669" />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ACTIONS */}
+                  <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
+                    <TouchableOpacity
+                      style={styles.btnViewRow}
+                      onPress={() => {
+                        setSelectedRequest(req);
+                        setModalPlatformTab('facebook');
+                      }}
+                    >
+                      <Ionicons name="eye-outline" size={13} color={Colors.textPrimary} style={{ marginRight: 3 }} />
+                      <Text style={styles.btnViewRowText}>View</Text>
                     </TouchableOpacity>
-                    {/* Return arrow button */}
-                    <TouchableOpacity style={styles.actionBtnReturn} onPress={() => handleAction('Return', post.title)}>
-                      <Ionicons name="arrow-undo" size={14} color="#DC2626" />
-                    </TouchableOpacity>
-                    {/* Escalate button */}
-                    <TouchableOpacity style={styles.actionBtnToPres} onPress={() => handleAction('Escalate to President', post.title)}>
-                      <Ionicons name="arrow-forward-outline" size={12} color={Colors.textPrimary} style={{ marginRight: 2 }} />
-                      <Text style={styles.actionBtnToPresText}>TO PRES</Text>
-                    </TouchableOpacity>
+
+                    {activeTab === 'dashboard' && (
+                      <>
+                        <TouchableOpacity
+                          style={styles.btnApproveRow}
+                          onPress={() => handleApprove(req)}
+                        >
+                          <Ionicons name="checkmark" size={13} color="#16A34A" style={{ marginRight: 3 }} />
+                          <Text style={styles.btnApproveRowText}>Approve</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.btnRejectRow}
+                          onPress={() => handleRejectClick(req)}
+                        >
+                          <Ionicons name="close" size={13} color="#DC2626" style={{ marginRight: 3 }} />
+                          <Text style={styles.btnRejectRowText}>Reject</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 </View>
               ))}
             </View>
 
+            {/* Table Footer & Pagination */}
             <View style={styles.tableFooter}>
-              <Text style={styles.tableFooterText}>Showing 3 of 12 requests</Text>
+              <Text style={styles.tableFooterText}>
+                Showing 1 to {filteredRequests.length} of 8 requests
+              </Text>
+
               <View style={styles.paginationRow}>
                 <TouchableOpacity style={styles.arrowBtn} disabled={true}>
-                  <Ionicons name="chevron-back" size={14} color="#D1D5DB" />
+                  <Ionicons name="chevron-back" size={14} color="#9CA3AF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.pageIndexBtn, styles.pageIndexBtnActive]}>
-                  <Text style={[styles.pageIndexBtnText, styles.pageIndexBtnTextActive]}>1</Text>
+
+                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnActive]}>
+                  <Text style={[styles.pageBtnText, styles.pageBtnTextActive]}>1</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.pageIndexBtn}>
-                  <Text style={styles.pageIndexBtnText}>2</Text>
+
+                <TouchableOpacity style={styles.pageBtn}>
+                  <Text style={styles.pageBtnText}>2</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.pageIndexBtn}>
-                  <Text style={styles.pageIndexBtnText}>3</Text>
-                </TouchableOpacity>
+
                 <TouchableOpacity style={styles.arrowBtn}>
                   <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
                 </TouchableOpacity>
+
+                <View style={styles.pageCountSelector}>
+                  <Text style={styles.pageCountSelectorText}>10 / page</Text>
+                  <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
+                </View>
               </View>
             </View>
           </Card>
-
-          {/* Lower layout section split */}
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Left detail panel */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
-              <View style={styles.previewHeaderRow}>
-                <Text style={styles.tableCardTitle}>Content Review Detail</Text>
-                <View style={styles.statusBadgeYellow}>
-                  <Text style={styles.statusBadgeYellowText}>Awaiting Your Signature</Text>
-                </View>
-              </View>
-
-              <View style={[styles.splitLayout, { flexDirection: 'row', gap: Spacing.lg, marginTop: 10 }]}>
-                {/* Caption / remark input */}
-                <View style={{ flex: 1, gap: 12 }}>
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>POST CAPTION</Text>
-                    <View style={styles.captionBox}>
-                      <Text style={styles.captionText}>{activePost.caption}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>ADD VP REVIEW REMARK</Text>
-                    <TextInput
-                      style={styles.remarkTextInput}
-                      placeholder="Enter instructions or approval notes..."
-                      multiline={true}
-                    />
-                  </View>
-
-                  <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                    <TouchableOpacity
-                      style={[styles.btnBatchApprove, { height: 38, paddingHorizontal: 16 }]}
-                      onPress={() => alert(`Digitally Signed & Approved: "${activePost.title}"`)}
-                    >
-                      <Ionicons name="create-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={styles.btnBatchApproveText}>Digitally Sign & Approve</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtnReturn, { width: 38, height: 38, borderRadius: 4 }]}
-                      onPress={() => alert(`Escalated draft to President: "${activePost.title}"`)}
-                    >
-                      <Ionicons name="arrow-forward-outline" size={18} color={Colors.textPrimary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Visual Device Preview */}
-                <View style={{ width: 180, alignItems: 'center' }}>
-                  <Text style={styles.inputLabel}>VISUAL MOCKUP</Text>
-                  
-                  <View style={styles.phoneMockup}>
-                    {/* Status Bar */}
-                    <View style={styles.phoneStatusBar}>
-                      <View style={styles.phoneAvatarCircle}>
-                        <Ionicons name="business" size={10} color="#FFFFFF" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.phoneAuthorName, { fontSize: 8 }]}>JMCFI Official</Text>
-                      </View>
-                    </View>
-
-                    {/* Graphic Area */}
-                    <View style={[styles.phonePostMedia, { height: 110 }]}>
-                      <View style={styles.mockPostGraphicBg}>
-                        <Text style={[styles.mockPostGraphicText, { fontSize: 9, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 4 }]}>
-                          {activePost.previewImage}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Captions */}
-                    <ScrollView style={styles.phoneCaptionScroll} nestedScrollEnabled={true}>
-                      <Text style={[styles.phoneCaptionText, { fontSize: 8, lineHeight: 10 }]}>
-                        <Text style={{ fontWeight: 'bold' }}>JMCFI Official </Text>
-                        {activePost.caption}
-                      </Text>
-                    </ScrollView>
-                  </View>
-                </View>
-              </View>
-            </Card>
-
-            {/* Right detail panel - Approval Path */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
-              <Text style={styles.configCardTitle}>Approval Path</Text>
-              
-              <View style={styles.timelineList}>
-                {activePost.timeline.map((step, idx) => (
-                  <View key={idx} style={styles.timelineItem}>
-                    <View style={styles.timelineLeftCol}>
-                      <View style={[
-                        styles.timelineDotCircle,
-                        step.status === 'complete' && { backgroundColor: '#10B981' },
-                        step.status === 'active' && { backgroundColor: Colors.primary },
-                        step.status === 'pending' && { backgroundColor: '#E5E7EB' },
-                      ]}>
-                        <Ionicons
-                          name={
-                            step.title === 'Content Creator' ? 'person-outline' :
-                            step.title === 'Office Head Review' ? 'shield-checkmark-outline' :
-                            step.title === 'VP Approval' ? 'create-outline' : 'flag-outline'
-                          }
-                          size={12}
-                          color="#FFFFFF"
-                        />
-                      </View>
-                      {idx < activePost.timeline.length - 1 && <View style={styles.timelineLineLink} />}
-                    </View>
-
-                    <View style={styles.timelineRightCol}>
-                      <Text style={styles.timelineStepTitle}>{step.title}</Text>
-                      <Text style={styles.timelineStepMeta}>{step.meta}</Text>
-                      {step.desc ? (
-                        <View style={styles.timelineStepDescCard}>
-                          <Text style={styles.timelineStepDescText}>"{step.desc}"</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          </View>
         </View>
       )}
 
-      {/* ----------------- ANALYTICS TAB ----------------- */}
-      {activeTab === 'analytics' && (
-        <View style={styles.dashboardContainer}>
-          {/* Header row */}
-          <View style={styles.dashboardHeaderRow}>
-            <View>
-              <Text style={styles.welcomeTitle}>Performance Analytics</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Monitor reach, engagement levels, and publishing efficiency metrics for your department.
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-              <TouchableOpacity style={styles.analyticsFilterBtn} onPress={() => alert('Filtering by time range...')}>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', paddingHorizontal: 8 }}>
-                  Last 30 Days
-                </Text>
-                <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btnBatchApprove, { height: 32, paddingHorizontal: 16 }]}
-                onPress={() => alert('Generating VP Analytics report...')}
-              >
-                <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={[styles.btnBatchApproveText, { color: '#FFFFFF' }]}>Export Report</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Engagement Summary metrics */}
-          <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="eye-outline" size={18} color={Colors.textPrimary} />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+14.2%</Text>
-              </View>
-              <Text style={styles.metricValue}>128.4K</Text>
-              <Text style={styles.metricLabel}>Total Impressions</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#FFC72C' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="heart-outline" size={18} color="#FFC72C" />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+8.5%</Text>
-              </View>
-              <Text style={styles.metricValue}>8.2%</Text>
-              <Text style={styles.metricLabel}>Engagement Rate</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#16A34A' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="time-outline" size={18} color="#16A34A" />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>-0.4d</Text>
-              </View>
-              <Text style={styles.metricValue}>1.8 Days</Text>
-              <Text style={styles.metricLabel}>Avg. Approval Time</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="checkbox-outline" size={18} color="#2563EB" />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+3.1%</Text>
-              </View>
-              <Text style={styles.metricValue}>92.3%</Text>
-              <Text style={styles.metricLabel}>First-time Approval</Text>
-            </Card>
-          </View>
-
-          {/* Charts Layout section */}
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Monthly Posting Volume native bar chart */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
-              <Text style={styles.tableCardTitle}>Monthly Posting Activity</Text>
-              <Text style={styles.welcomeSubtitle}>Active publications count per month during this academic year.</Text>
-              
-              <View style={styles.chartContainer}>
-                {/* Visual Y-Axis markers */}
-                <View style={styles.chartYAxis}>
-                  <Text style={styles.chartAxisLabel}>40</Text>
-                  <Text style={styles.chartAxisLabel}>30</Text>
-                  <Text style={styles.chartAxisLabel}>20</Text>
-                  <Text style={styles.chartAxisLabel}>10</Text>
-                  <Text style={styles.chartAxisLabel}>0</Text>
-                </View>
-
-                <View style={styles.chartPlotArea}>
-                  {/* Monthly column bars */}
-                  {[
-                    { month: 'May', count: 18, height: '45%' },
-                    { month: 'Jun', count: 24, height: '60%' },
-                    { month: 'Jul', count: 32, height: '80%' },
-                    { month: 'Aug', count: 12, height: '30%' },
-                    { month: 'Sep', count: 38, height: '95%' },
-                    { month: 'Oct', count: 28, height: '70%' },
-                  ].map((item, idx) => (
-                    <View key={idx} style={styles.chartBarWrapper}>
-                      <View style={styles.chartBarBackground}>
-                        <View style={[styles.chartBarFill, { height: item.height }]}>
-                          <Text style={styles.chartBarTooltip}>{item.count}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.chartAxisLabel}>{item.month}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </Card>
-
-            {/* Platform Performance breakdown */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
-              <Text style={styles.configCardTitle}>Target Channel Breakdown</Text>
-              <Text style={styles.welcomeSubtitle}>Reach volume distribution share by platform channel.</Text>
-
-              <View style={{ marginTop: 12, gap: 10 }}>
-                {/* Facebook */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
-                      <Ionicons name="logo-facebook" size={18} color="#1877F2" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Facebook</Text>
-                      <Text style={styles.platformProgressSubtext}>82.5K reach &bull; 64% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '64%', backgroundColor: '#1877F2' }]} />
-                  </View>
-                </View>
-
-                {/* Instagram */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
-                      <Ionicons name="logo-instagram" size={18} color="#E1306C" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Instagram</Text>
-                      <Text style={styles.platformProgressSubtext}>27.1K reach &bull; 21% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '21%', backgroundColor: '#E1306C' }]} />
-                  </View>
-                </View>
-
-                {/* Website Portal */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
-                      <Ionicons name="globe-outline" size={18} color="#059669" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Website Portal</Text>
-                      <Text style={styles.platformProgressSubtext}>18.8K clicks &bull; 15% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '15%', backgroundColor: '#059669' }]} />
-                  </View>
-                </View>
-              </View>
-            </Card>
-          </View>
-        </View>
-      )}
-
+      {/* ----------------- POLICY RULES TAB ----------------- */}
       {activeTab === 'policy-rules' && (() => {
-        const filteredSections = policySections.filter(sec => {
+        const filteredSections = policySections.filter((sec) => {
           const query = policySearchQuery.toLowerCase();
           if (!query) return true;
-          return sec.title.toLowerCase().includes(query) || sec.content?.toLowerCase().includes(query) || sec.bullets?.some(b => b.title.toLowerCase().includes(query) || b.desc.toLowerCase().includes(query));
+          return (
+            sec.title.toLowerCase().includes(query) ||
+            sec.content?.toLowerCase().includes(query) ||
+            sec.bullets?.some(
+              (b) =>
+                b.title.toLowerCase().includes(query) ||
+                b.desc.toLowerCase().includes(query)
+            )
+          );
         });
 
         return (
           <View style={styles.dashboardContainer}>
-            {/* Header row */}
             <View style={styles.dashboardHeaderRow}>
               <View>
-                <Text style={styles.welcomeTitle}>School Website Posting Policy</Text>
-                <Text style={styles.welcomeSubtitle}>
+                <Text style={styles.greetingTitle}>School Website Posting Policy</Text>
+                <Text style={styles.greetingSubtitle}>
                   Effective Date: {effectiveDate} &bull; Last Updated: {lastUpdatedDate}
                 </Text>
               </View>
-              
-              <View style={[styles.periodBadge, { minWidth: 260, paddingHorizontal: 0 }]}>
+
+              <View style={[styles.searchBox, { minWidth: 260 }]}>
                 <TextInput
-                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm, outlineStyle: 'none' }}
+                  style={styles.searchInput}
                   placeholder="Search policy guidelines..."
                   value={policySearchQuery}
                   onChangeText={setPolicySearchQuery}
                 />
-                <Ionicons name="search" size={16} color={Colors.textSecondary} style={{ marginRight: 12 }} />
+                <Ionicons name="search" size={16} color={Colors.textSecondary} />
               </View>
             </View>
 
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              {/* Left navigation menu (Index) */}
               {isLargeScreen && (
                 <View style={styles.policySidebar}>
                   <Text style={styles.policySidebarTitle}>POLICY SECTIONS</Text>
                   {policySections.map((sec) => (
                     <TouchableOpacity
                       key={sec.id}
-                      style={[styles.policySidebarItem, { backgroundColor: Colors.surface }]}
-                      onPress={() => alert(`Scrolling to ${sec.title}...`)}
+                      style={styles.policySidebarItem}
+                      onPress={() => alert(`Navigating to ${sec.title}`)}
                     >
-                      <Ionicons name={sec.icon} size={16} color={Colors.textSecondary} />
-                      <Text style={styles.policySidebarLabel} numberOfLines={1}>{sec.title.substring(3)}</Text>
+                      <Text style={styles.policySidebarItemText}>{sec.title}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
-              {/* Main Policy Cards */}
-              <View style={styles.policyDetailCol}>
+              <View style={styles.policyContentArea}>
                 {filteredSections.map((sec) => (
-                  <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
-                    <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
-                      <View style={[styles.activityIconBg, { backgroundColor: sec.bg, borderColor: sec.color }]}>
-                        <Ionicons name={sec.icon} size={14} color={sec.color} />
-                      </View>
-                      <Text style={styles.tableCardTitle}>{sec.title}</Text>
-                    </View>
-
-                    {sec.content && (
-                      <Text style={styles.policyCardBodyText}>{sec.content}</Text>
-                    )}
-
+                  <Card key={sec.id} style={styles.policyCard}>
+                    <Text style={styles.policyCardTitle}>{sec.title}</Text>
+                    {sec.content && <Text style={styles.policyContentText}>{sec.content}</Text>}
                     {sec.bullets && (
-                      <View style={styles.policyBulletsList}>
-                        {sec.bullets.map((bullet, idx) => (
-                          <View key={idx} style={styles.policyBulletItem}>
-                            <Ionicons
-                              name={sec.id === 'sec-4' ? 'close-circle' : 'checkmark-circle'}
-                              size={18}
-                              color={sec.color}
-                              style={{ marginTop: 1 }}
-                            />
-                            <View style={styles.policyBulletTextCol}>
-                              <Text style={styles.policyBulletTitle}>{bullet.title}</Text>
-                              <Text style={styles.policyBulletDesc}>{bullet.desc}</Text>
-                            </View>
+                      <View style={{ gap: 8, marginTop: 8 }}>
+                        {sec.bullets.map((bullet, bIdx) => (
+                          <View key={bIdx} style={styles.bulletRow}>
+                            <Text style={styles.bulletTitle}>{bullet.title}: </Text>
+                            <Text style={styles.bulletDesc}>{bullet.desc}</Text>
                           </View>
                         ))}
                       </View>
@@ -774,8 +558,8 @@ export default function VPDashboard() {
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>
-              <Text style={styles.welcomeTitle}>Account Settings</Text>
-              <Text style={styles.welcomeSubtitle}>
+              <Text style={styles.greetingTitle}>Account Settings</Text>
+              <Text style={styles.greetingSubtitle}>
                 Manage your institutional profile picture, credentials, and settings.
               </Text>
             </View>
@@ -785,17 +569,17 @@ export default function VPDashboard() {
             {/* Left settings card */}
             <View style={{ flex: 1.5 }}>
               <Card style={styles.tableCard}>
-                <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
-                  <View style={[styles.activityIconBg, { backgroundColor: '#EFF6FF', borderColor: Colors.primary }]}>
-                    <Ionicons name="person-outline" size={14} color={Colors.textPrimary} />
-                  </View>
-                  <Text style={styles.tableCardTitle}>Profile Information</Text>
+                <View style={[styles.tableCardHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10, marginBottom: 12 }]}>
+                  <Ionicons name="person-outline" size={18} color="#7C3AED" />
+                  <Text style={styles.tableTitle}>Profile Information</Text>
                 </View>
 
                 {/* Profile Picture Upload Section */}
                 <View style={styles.profilePicUploadContainer}>
-                  <View style={styles.profilePicLarge}>
-                    <Text style={styles.profilePicLargeText}>VP</Text>
+                  <View style={[styles.profilePicLarge, { backgroundColor: '#7C3AED' }]}>
+                    <Text style={styles.profilePicLargeText}>
+                      {user?.name ? user.name.substring(0, 2).toUpperCase() : 'VP'}
+                    </Text>
                   </View>
                   <View style={styles.profilePicActionCol}>
                     <Text style={styles.profilePicTitle}>Profile Picture</Text>
@@ -817,15 +601,15 @@ export default function VPDashboard() {
                   <Text style={styles.inputLabel}>FULL NAME</Text>
                   <TextInput
                     style={styles.textInput}
-                    defaultValue={user?.name ?? 'VICE.PRESIDENT User'}
+                    defaultValue={user?.name ?? 'Vice President'}
                   />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
-                    value={user?.email ?? 'vice.president@jmcfi.edu.ph'}
+                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    value={user?.email ?? 'vp@jmcfi.edu.ph'}
                     editable={false}
                   />
                 </View>
@@ -833,22 +617,22 @@ export default function VPDashboard() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT / ROLE</Text>
                   <TextInput
-                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
-                    value="Executive Office of Vice President"
+                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+                    value="Office of the Vice President"
                     editable={false}
                   />
                 </View>
 
-                <TouchableOpacity style={[styles.btnBatchApprove, { height: 36 }]} onPress={() => alert('Profile settings saved successfully!')}>
-                  <Text style={styles.btnBatchApproveText}>Save Details</Text>
+                <TouchableOpacity style={[styles.btnViewRow, { backgroundColor: '#7C3AED', paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start', borderRadius: 6 }]} onPress={() => alert('Profile settings saved successfully!')}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>Save Details</Text>
                 </TouchableOpacity>
               </Card>
             </View>
 
             {/* Right settings card */}
             <View style={{ flex: 1 }}>
-              <Card style={styles.configCard}>
-                <Text style={styles.configCardTitle}>Update Password</Text>
+              <Card style={styles.tableCard}>
+                <Text style={[styles.tableTitle, { marginBottom: 12 }]}>Update Password</Text>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
@@ -877,8 +661,8 @@ export default function VPDashboard() {
                   />
                 </View>
 
-                <TouchableOpacity style={[styles.btnBatchApprove, { backgroundColor: Colors.primary, height: 36, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
-                  <Text style={styles.btnBatchApproveText}>Change Password</Text>
+                <TouchableOpacity style={[styles.btnViewRow, { backgroundColor: '#7C3AED', paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start', borderRadius: 6, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>Change Password</Text>
                 </TouchableOpacity>
               </Card>
             </View>
@@ -886,27 +670,297 @@ export default function VPDashboard() {
         </View>
       )}
 
-      {/* Placeholders for other tabs */}
-      {activeTab !== 'dashboard' && activeTab !== 'approval-queue' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'account-settings' && (
-        <Card style={styles.placeholderCard}>
-          <View style={styles.placeholderIconContainer}>
-            <Ionicons name="construct-outline" size={32} color={Colors.textMuted} />
+      {/* ----------------- CONTENT REQUEST PREVIEW MODAL ----------------- */}
+      {selectedRequest && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setSelectedRequest(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              {/* Modal Header */}
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalHeaderTitle}>Content Request Preview</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setSelectedRequest(null)}
+                >
+                  <Ionicons name="close" size={20} color={Colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Modal Body Split */}
+              <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
+                <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                  {/* Left Side: Social Media Mockup Preview */}
+                  <View style={styles.modalLeftColumn}>
+                    {/* Platform Selector Tabs */}
+                    <View style={styles.modalPlatformTabs}>
+                      <TouchableOpacity
+                        style={[
+                          styles.modalPlatformTab,
+                          modalPlatformTab === 'facebook' && styles.modalPlatformTabActive,
+                        ]}
+                        onPress={() => setModalPlatformTab('facebook')}
+                      >
+                        <Ionicons name="logo-facebook" size={14} color={modalPlatformTab === 'facebook' ? '#1877F2' : Colors.textSecondary} />
+                        <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'facebook' && styles.modalPlatformTabTextActive]}>
+                          Facebook
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.modalPlatformTab,
+                          modalPlatformTab === 'instagram' && styles.modalPlatformTabActive,
+                        ]}
+                        onPress={() => setModalPlatformTab('instagram')}
+                      >
+                        <Ionicons name="logo-instagram" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
+                        <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActive]}>
+                          Instagram
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.modalPlatformTab,
+                          modalPlatformTab === 'website' && styles.modalPlatformTabActive,
+                        ]}
+                        onPress={() => setModalPlatformTab('website')}
+                      >
+                        <Ionicons name="globe-outline" size={14} color={modalPlatformTab === 'website' ? '#059669' : Colors.textSecondary} />
+                        <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'website' && styles.modalPlatformTabTextActive]}>
+                          Website
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Social Post Card Mockup */}
+                    <View style={styles.socialMockupCard}>
+                      <View style={styles.socialHeader}>
+                        <View style={styles.socialAvatar}>
+                          <Ionicons name="school" size={16} color="#FFFFFF" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.socialAuthorName}>Jose Maria College Foundation, Inc.</Text>
+                          <Text style={styles.socialTimeText}>Just now &bull; 🌍</Text>
+                        </View>
+                        <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                      </View>
+
+                      <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
+
+                      {/* Mockup Image Media Banner */}
+                      <View style={styles.socialMediaBanner}>
+                        <Ionicons name="sparkles" size={28} color="#FFFFFF" style={{ marginBottom: 6 }} />
+                        <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                      </View>
+
+                      {/* Social Action Footer */}
+                      <View style={styles.socialFooterActions}>
+                        <TouchableOpacity style={styles.socialActionBtn}>
+                          <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
+                          <Text style={styles.socialActionText}>Like</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.socialActionBtn}>
+                          <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
+                          <Text style={styles.socialActionText}>Comment</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.socialActionBtn}>
+                          <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
+                          <Text style={styles.socialActionText}>Share</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Right Side: Request Details Metadata */}
+                  <View style={styles.modalRightColumn}>
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Title</Text>
+                      <Text style={styles.metaTitleVal}>{selectedRequest.title}</Text>
+                    </View>
+
+                    <View style={styles.metaRowGrid}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.metaLabel}>Department</Text>
+                        <View style={styles.deptBadge}>
+                          <Text style={styles.deptBadgeText}>{selectedRequest.dept}</Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.metaLabel}>Category</Text>
+                        <Text style={styles.metaVal}>{selectedRequest.category}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.metaRowGrid}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.metaLabel}>Requested By</Text>
+                        <Text style={styles.metaVal}>
+                          {selectedRequest.requestedBy} ({selectedRequest.requestedByRole})
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.metaRowGrid}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.metaLabel}>Requested On</Text>
+                        <Text style={styles.metaVal}>
+                          {selectedRequest.date} {selectedRequest.time}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.metaRowGrid}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.metaLabel}>Target Platforms</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                          {selectedRequest.platforms.includes('facebook') && (
+                            <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                              <Ionicons name="logo-facebook" size={14} color="#1877F2" />
+                            </View>
+                          )}
+                          {selectedRequest.platforms.includes('instagram') && (
+                            <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
+                              <Ionicons name="logo-instagram" size={14} color="#E1306C" />
+                            </View>
+                          )}
+                          {selectedRequest.platforms.includes('website') && (
+                            <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
+                              <Ionicons name="globe-outline" size={14} color="#059669" />
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.metaDivider} />
+
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Caption / Main Text</Text>
+                      <Text style={styles.metaCaptionBox}>{selectedRequest.caption}</Text>
+                    </View>
+
+                    {/* Attachments Section */}
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Attachments (1)</Text>
+                      <View style={styles.attachmentCard}>
+                        <View style={styles.attachmentThumb}>
+                          <Ionicons name="document-attach-outline" size={18} color="#7C3AED" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.attachmentName}>{selectedRequest.attachment}</Text>
+                          <Text style={styles.attachmentSize}>{selectedRequest.attachmentSize}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Modal Footer Actions */}
+              <View style={styles.modalFooterRow}>
+                <TouchableOpacity
+                  style={styles.btnModalClose}
+                  onPress={() => setSelectedRequest(null)}
+                >
+                  <Text style={styles.btnModalCloseText}>Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.btnModalApprove}
+                  onPress={() => handleApprove(selectedRequest)}
+                >
+                  <Text style={styles.btnModalApproveText}>Approve</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.btnModalReject}
+                  onPress={() => handleRejectClick(selectedRequest)}
+                >
+                  <Text style={styles.btnModalRejectText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-          <Text style={styles.placeholderTitle}>{activeTab.replace(/-/g, ' ').toUpperCase()} VIEW</Text>
-          <Text style={styles.placeholderSubtitle}>
-            This dashboard layout is currently under construction and will be integrated with database entities.
-          </Text>
-        </Card>
+        </Modal>
+      )}
+
+      {/* Reject Modal */}
+      {isRejectModalVisible && (
+        <Modal
+          visible={isRejectModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsRejectModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContainer, { width: 400, maxWidth: '90%' }]}>
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalHeaderTitle}>Reject Request</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setIsRejectModalVisible(false)}
+                >
+                  <Ionicons name="close" size={20} color={Colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+              <View style={{ padding: 20 }}>
+                <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: 12 }}>
+                  Please provide a reason for rejecting "{requestToReject?.title}".
+                </Text>
+                <TextInput
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: BorderRadius.md,
+                    padding: 12,
+                    minHeight: 100,
+                    textAlignVertical: 'top',
+                    fontSize: FontSize.sm,
+                    backgroundColor: '#F9FAFB',
+                    outlineStyle: 'none',
+                  } as any}
+                  placeholder="Enter rejection reason or comment here..."
+                  multiline
+                  value={rejectComment}
+                  onChangeText={setRejectComment}
+                />
+              </View>
+              <View style={styles.modalFooterRow}>
+                <TouchableOpacity
+                  style={styles.btnModalClose}
+                  onPress={() => setIsRejectModalVisible(false)}
+                >
+                  <Text style={styles.btnModalCloseText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.btnModalReject}
+                  onPress={confirmReject}
+                >
+                  <Text style={styles.btnModalRejectText}>Confirm Reject</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       )}
     </DashboardShell>
   );
 }
 
 const styles = StyleSheet.create({
-  // Dashboard Layout
+  // Outer Container
   dashboardContainer: {
     gap: Spacing.lg,
   },
+
+  // Header & Greeting
   dashboardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -914,343 +968,419 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.md,
   },
-  welcomeTitle: {
-    fontSize: FontSize.xxl - 2,
+  greetingTitle: {
+    fontSize: FontSize.xl + 2,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#111827',
   },
-  welcomeSubtitle: {
+  greetingSubtitle: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    color: '#6B7280',
+    marginTop: 2,
   },
-  periodBadge: {
+
+  // Department Dropdown
+  departmentDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    height: 32,
-    backgroundColor: Colors.surface,
+    borderColor: '#E5E7EB',
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  periodBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: Colors.textSecondary,
+  departmentDropdownText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    color: '#374151',
   },
-  metricsRow: {
+  dropdownMenu: {
+    position: 'absolute',
+    top: 42,
+    right: 0,
+    width: 160,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemText: {
+    fontSize: FontSize.sm,
+    color: '#374151',
+  },
+
+  // Metrics Grid (4 Cards)
+  metricsGrid: {
     flexDirection: 'row',
-    gap: Spacing.md,
     flexWrap: 'wrap',
+    gap: Spacing.md,
   },
   metricCard: {
     flex: 1,
-    minWidth: 160,
+    minWidth: 200,
     padding: Spacing.md,
-    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderLeftWidth: 4,
-    borderRadius: 6,
-    gap: 4,
-    shadowColor: 'transparent',
+    borderColor: '#F3F4F6',
   },
-  metricHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  metricCardHeader: {
+    marginBottom: 8,
+  },
+  metricIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
     alignItems: 'center',
-    height: 24,
   },
   metricLabel: {
-    fontSize: 10,
-    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    letterSpacing: 0.5,
+    color: '#374151',
+    textTransform: 'uppercase',
   },
-  metricValue: {
-    fontSize: 28,
+  metricCount: {
+    fontSize: FontSize.xxl + 4,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    marginTop: 2,
+    color: '#111827',
+    marginVertical: 2,
   },
-  badgeOrange: {
-    backgroundColor: '#FFF7ED',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FFEDD5',
-  },
-  badgeOrangeText: {
-    color: '#EA580C',
+  metricSubtext: {
     fontSize: FontSize.xs - 1,
-    fontWeight: FontWeight.bold,
-  },
-  badgeGreen: {
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-  },
-  badgeGreenText: {
-    color: '#16A34A',
-    fontSize: FontSize.xs - 1,
-    fontWeight: FontWeight.bold,
+    color: '#9CA3AF',
   },
 
-  // Table Styles
+  // Main Table Card
   tableCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
-    gap: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
-  tableCardHeader: {
+  tableCardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+    zIndex: 100,
   },
-  tableCardTitle: {
+  tableTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#111827',
   },
-  priorityBadge: {
-    backgroundColor: '#FEF3C7',
+  tableControlsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: BorderRadius.md,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
+    height: 36,
+    width: 200,
   },
-  priorityBadgeText: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: '#D97706',
-    textTransform: 'uppercase',
-  },
+  searchInput: {
+    flex: 1,
+    fontSize: FontSize.xs + 1,
+    color: '#111827',
+    outlineStyle: 'none',
+  } as any,
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: BorderRadius.md,
     paddingHorizontal: 12,
-    height: 32,
-    backgroundColor: Colors.surface,
-    gap: 6,
+    height: 36,
   },
   filterBtnText: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.bold,
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.medium,
+    color: '#374151',
   },
-  btnBatchApprove: {
-    borderRadius: 4,
-    paddingHorizontal: 14,
-    height: 32,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-  },
-  btnBatchApproveText: {
-    fontSize: FontSize.xs,
-    color: '#FFFFFF',
-    fontWeight: FontWeight.bold,
-  },
+
+  // Table Layout
   table: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
+    width: '100%',
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceSecondary,
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    borderRadius: BorderRadius.sm,
   },
   tableHeaderCell: {
     fontSize: FontSize.xs - 1,
     fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
+    color: '#6B7280',
     letterSpacing: 0.5,
   },
+
+  // Column Flex Multipliers
+  flexTitle: { flex: 2.2 },
+  flexDept: { flex: 1 },
+  flexUser: { flex: 1.5 },
+  flexDate: { flex: 1.3 },
+  flexPlatforms: { flex: 1.2 },
+  flexActions: { flex: 2 },
+  alignRight: { textAlign: 'right' },
+
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  tableRowSelected: {
-    backgroundColor: '#F8FAFC',
+  cellContainer: {
+    justifyContent: 'center',
   },
-  tableCellText: {
-    fontSize: FontSize.sm,
-    color: Colors.textPrimary,
+  thumbnailBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
-  cellFlex2_5: { flex: 2.5 },
-  cellFlex2: { flex: 2 },
-  cellFlex1_5: { flex: 1.5 },
-  cellFlex1_2: { flex: 1.2 },
-  cellFlex1: { flex: 1 },
-  alignRight: { textAlign: 'right' },
-  titleCellCol: {
-    gap: 4,
-  },
-  postTitleText: {
+  rowTitleText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#111827',
   },
-  postMetaText: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
-  channelsBadgeRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 4,
-  },
-  channelWordBadge: {
-    backgroundColor: '#EFF6FF',
+  categoryPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F3F4F6',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 2,
+    borderRadius: 4,
+    marginTop: 3,
   },
-  channelWordBadgeText: {
-    fontSize: 8,
-    color: '#1E40AF',
-    fontWeight: 'bold',
+  categoryPillText: {
+    fontSize: 10,
+    fontWeight: FontWeight.medium,
+    color: '#4B5563',
   },
-  remarkCellCol: {
-    borderLeftWidth: 3,
-    paddingLeft: 8,
-    gap: 4,
-  },
-  remarkQuoteText: {
+  rowDeptText: {
     fontSize: FontSize.xs + 1,
-    color: Colors.textPrimary,
-    fontStyle: 'italic',
-    lineHeight: 15,
+    fontWeight: FontWeight.bold,
+    color: '#4B5563',
   },
-  remarkAuthorText: {
+  rowUserName: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.bold,
+    color: '#111827',
+  },
+  rowUserRole: {
     fontSize: FontSize.xs - 1,
-    color: Colors.textSecondary,
-    fontWeight: 'bold',
+    color: '#6B7280',
   },
-  tableMediaBox: {
-    width: 48,
-    height: 32,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
+  rowDateText: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.medium,
+    color: '#374151',
+  },
+  rowTimeText: {
+    fontSize: FontSize.xs - 1,
+    color: '#9CA3AF',
+  },
+  platformIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  actionsRow: {
+
+  // Row Action Buttons
+  rowActionsGroup: {
     flexDirection: 'row',
-    gap: 6,
     justifyContent: 'flex-end',
-    alignItems: 'center',
+    gap: 6,
   },
-  actionBtnCheck: {
-    width: 26,
-    height: 26,
-    borderWidth: 1,
-    borderColor: '#10B981',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-  },
-  actionBtnReturn: {
-    width: 26,
-    height: 26,
-    borderWidth: 1,
-    borderColor: '#DC2626',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-  },
-  actionBtnToPres: {
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    height: 26,
+  btnViewRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  actionBtnToPresText: {
-    fontSize: 9,
-    color: Colors.textPrimary,
-    fontWeight: 'bold',
+  btnViewRowText: {
+    fontSize: 11,
+    fontWeight: FontWeight.medium,
+    color: '#374151',
   },
+  btnApproveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    backgroundColor: '#F0FDF4',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  btnApproveRowText: {
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: '#15803D',
+  },
+  btnRejectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  btnRejectRowText: {
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: '#B91C1C',
+  },
+
+  // Table Footer
   tableFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: Spacing.md,
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   tableFooterText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
+    color: '#6B7280',
   },
   paginationRow: {
     flexDirection: 'row',
-    gap: Spacing.xs,
     alignItems: 'center',
+    gap: 6,
   },
   arrowBtn: {
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
   },
-  pageIndexBtn: {
-    width: 26,
-    height: 26,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
+  pageBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
   },
-  pageIndexBtnActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+  pageBtnActive: {
+    backgroundColor: '#4C1D95',
   },
-  pageIndexBtnText: {
+  pageBtnText: {
     fontSize: FontSize.xs,
-    color: Colors.textPrimary,
+    color: '#374151',
   },
-  pageIndexBtnTextActive: {
+  pageBtnTextActive: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontWeight: FontWeight.bold,
+  },
+  pageCountSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  pageCountSelectorText: {
+    fontSize: FontSize.xs,
+    color: '#374151',
   },
 
-  // Split view grid layout
+  // Modal Overlay & Container
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
+  modalContainer: {
+    width: '100%',
+    maxWidth: 780,
+    maxHeight: '90%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalHeaderTitle: {
+    fontSize: FontSize.md + 1,
+    fontWeight: FontWeight.bold,
+    color: '#111827',
+  },
+  modalCloseIconBtn: {
+    padding: 4,
+  },
+  modalBodyScroll: {
+    maxHeight: 520,
+  },
+  modalBodyContent: {
+    padding: Spacing.lg,
+  },
+
+  // Layout Splits
   splitLayout: {
     gap: Spacing.lg,
   },
@@ -1260,406 +1390,314 @@ const styles = StyleSheet.create({
   columnLayout: {
     flexDirection: 'column',
   },
-  configCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    padding: Spacing.lg,
-    gap: Spacing.md,
+
+  modalSplitRow: {
+    gap: Spacing.xl,
+  },
+  modalLeftColumn: {
+    flex: 1.2,
+  },
+  modalRightColumn: {
+    flex: 1,
+    gap: 10,
   },
 
-  // Preview styling
-  previewHeaderRow: {
+  // Social Media Mockup
+  modalPlatformTabs: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: Spacing.md,
+  },
+  modalPlatformTab: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-  },
-  configCardTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  captionBox: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    padding: 10,
-    backgroundColor: Colors.surfaceSecondary,
-    minHeight: 80,
-  },
-  captionText: {
-    fontSize: FontSize.xs + 1,
-    color: Colors.textPrimary,
-    lineHeight: 16,
-  },
-  remarkTextInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    height: 80,
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: FontSize.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-    textAlignVertical: 'top',
+    paddingVertical: 6,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#F3F4F6',
   },
-  phoneMockup: {
-    width: 140,
-    height: 220,
-    borderWidth: 6,
-    borderColor: '#1E293B',
-    borderRadius: 16,
-    backgroundColor: Colors.surface,
-    overflow: 'hidden',
-    marginTop: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  modalPlatformTabActive: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
-  phoneStatusBar: {
+  modalPlatformTabText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+    color: '#6B7280',
+  },
+  modalPlatformTabTextActive: {
+    color: '#1D4ED8',
+    fontWeight: FontWeight.bold,
+  },
+
+  socialMockupCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    backgroundColor: '#FFFFFF',
+  },
+  socialHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    gap: 10,
+    marginBottom: 10,
+  },
+  socialAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialAuthorName: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.bold,
+    color: '#111827',
+  },
+  socialTimeText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+  },
+  socialCaptionText: {
+    fontSize: FontSize.xs + 1,
+    color: '#374151',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  socialMediaBanner: {
+    height: 180,
+    backgroundColor: '#312E81',
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.md,
+    marginBottom: 12,
+  },
+  socialMediaBannerText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  socialFooterActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 8,
+    justifyContent: 'space-around',
+  },
+  socialActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  phoneAvatarCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  phoneAuthorName: {
-    fontSize: 7,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-  },
-  phonePostMedia: {
-    backgroundColor: '#FAFAFA',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  mockPostGraphicBg: {
-    flex: 1,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 6,
-  },
-  mockPostGraphicText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: '#1E40AF',
-    textAlign: 'center',
-    borderColor: '#1E40AF',
-    letterSpacing: 0.5,
-  },
-  phoneCaptionScroll: {
-    flex: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  phoneCaptionText: {
-    color: Colors.textPrimary,
-  },
-  statusBadgeYellow: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  statusBadgeYellowText: {
-    color: '#D97706',
-    fontSize: 9,
-    fontWeight: FontWeight.bold,
+  socialActionText: {
+    fontSize: FontSize.xs,
+    color: '#6B7280',
   },
 
-  // Timeline Progress path styling
-  timelineList: {
-    gap: 0,
-    marginTop: 6,
+  // Right Details Column
+  metaRow: {
+    marginBottom: 6,
   },
-  timelineItem: {
+  metaRowGrid: {
     flexDirection: 'row',
-    alignItems: 'stretch',
-    minHeight: 52,
+    gap: 12,
+    marginBottom: 6,
   },
-  timelineLeftCol: {
-    alignItems: 'center',
-    width: 24,
-    marginRight: 10,
-  },
-  timelineDotCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  timelineLineLink: {
-    flex: 1,
-    width: 2,
-    backgroundColor: '#E5E7EB',
-    zIndex: 1,
-    marginVertical: 1,
-  },
-  timelineRightCol: {
-    flex: 1,
-    paddingBottom: 10,
-    gap: 2,
-  },
-  timelineStepTitle: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  timelineStepMeta: {
-    fontSize: 9,
-    color: Colors.textSecondary,
-  },
-  timelineStepDescCard: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    padding: 6,
-    marginTop: 2,
-  },
-  timelineStepDescText: {
+  metaLabel: {
     fontSize: FontSize.xs - 1,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
+    fontWeight: FontWeight.bold,
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    marginBottom: 2,
   },
-
-  // Placeholders
-  placeholderCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    padding: Spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    minHeight: 300,
-  },
-  placeholderIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderTitle: {
+  metaTitleVal: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#111827',
+  },
+  metaVal: {
+    fontSize: FontSize.xs + 1,
+    color: '#374151',
+  },
+  deptBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  deptBadgeText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: '#6D28D9',
+  },
+  metaDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 8,
+  },
+  metaCaptionBox: {
+    fontSize: FontSize.xs + 1,
+    color: '#374151',
+    lineHeight: 18,
+    backgroundColor: '#F9FAFB',
+    padding: 10,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  attachmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: BorderRadius.md,
+    padding: 10,
     marginTop: 4,
   },
-  placeholderSubtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 400,
-    lineHeight: 18,
+  attachmentThumb: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#EDE9FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentName: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.bold,
+    color: '#1E293B',
+  },
+  attachmentSize: {
+    fontSize: 10,
+    color: '#64748B',
   },
 
-  // Analytics tab styles
-  analyticsFilterBtn: {
+  // Modal Footer (4 Action Buttons)
+  modalFooterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    height: 32,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 8,
-  },
-  chartContainer: {
-    flexDirection: 'row',
-    height: 220,
-    marginTop: 20,
-    paddingRight: 10,
-    alignItems: 'stretch',
-  },
-  chartYAxis: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    width: 30,
-    paddingBottom: 22,
-    paddingRight: 6,
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
-  },
-  chartAxisLabel: {
-    fontSize: 9,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.bold,
-  },
-  chartPlotArea: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    paddingLeft: 10,
-  },
-  chartBarWrapper: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 8,
-  },
-  chartBarBackground: {
-    width: 32,
-    height: '100%',
-    backgroundColor: Colors.background,
-    borderRadius: 4,
     justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  chartBarFill: {
-    width: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 4,
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    backgroundColor: '#FAFAFA',
   },
-  chartBarTooltip: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: 'bold',
-  },
-  analyticsPlatformCard: {
+  btnModalClose: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    padding: 12,
-    gap: 10,
-    backgroundColor: Colors.surface,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
   },
-  platformLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  btnModalCloseText: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.medium,
+    color: '#374151',
   },
-  platformIconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+  btnModalRevision: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FEF3C7',
   },
-  platformNameText: {
-    fontSize: FontSize.sm,
+  btnModalRevisionText: {
+    fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#B45309',
   },
-  platformProgressSubtext: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    marginTop: 1,
+  btnModalApprove: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    backgroundColor: '#ECFDF5',
   },
-  progressBarWrapper: {
-    height: 6,
-    backgroundColor: Colors.background,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  btnApproveAction: {
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    height: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-  },
-  btnApproveActionText: {
-    fontSize: FontSize.xs,
-    color: '#FFFFFF',
+  btnModalApproveText: {
+    fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
+    color: '#047857',
+  },
+  btnModalReject: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  btnModalRejectText: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.bold,
+    color: '#B91C1C',
   },
 
-  // Policy tab styles
+  // Policy Styles
   policySidebar: {
-    width: 200,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    padding: Spacing.md,
-    gap: Spacing.xs,
-    alignSelf: 'flex-start',
+    width: 220,
+    gap: 6,
   },
   policySidebarTitle: {
     fontSize: FontSize.xs,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    letterSpacing: 0.5,
+    fontWeight: FontWeight.bold,
+    color: '#9CA3AF',
+    marginBottom: 6,
   },
   policySidebarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#F9FAFB',
   },
-  policySidebarLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.medium,
+  policySidebarItemText: {
+    fontSize: FontSize.xs + 1,
+    color: '#374151',
   },
-  policyDetailCol: {
+  policyContentArea: {
     flex: 1,
-    gap: Spacing.lg,
-  },
-  policySectionCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderLeftWidth: 4,
-    borderRadius: 6,
-    padding: Spacing.lg,
     gap: Spacing.md,
   },
-  policyBulletsList: {
-    gap: 12,
-    marginTop: 8,
+  policyCard: {
+    padding: Spacing.lg,
   },
-  policyBulletItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-  },
-  policyBulletTextCol: {
-    flex: 1,
-  },
-  policyBulletTitle: {
-    fontSize: FontSize.sm,
+  policyCardTitle: {
+    fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#111827',
+    marginBottom: 8,
   },
-  policyBulletDesc: {
+  policyContentText: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  policyCardBodyText: {
-    fontSize: FontSize.sm,
-    color: Colors.textPrimary,
+    color: '#4B5563',
     lineHeight: 20,
-    
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  bulletTitle: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.bold,
+    color: '#111827',
+  },
+  bulletDesc: {
+    fontSize: FontSize.xs + 1,
+    color: '#4B5563',
   },
 
   // Account Settings Styles
@@ -1676,7 +1714,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#7C3AED',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1692,11 +1730,11 @@ const styles = StyleSheet.create({
   profilePicTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#111827',
   },
   profilePicSubtitle: {
     fontSize: FontSize.xs,
-    color: Colors.textSecondary,
+    color: '#6B7280',
   },
   profilePicButtonsRow: {
     flexDirection: 'row',
@@ -1712,7 +1750,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profilePicUploadBtnText: {
-    color: Colors.textPrimary,
+    color: '#111827',
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -1737,27 +1775,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 10,
     fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
+    color: '#6B7280',
     letterSpacing: 0.5,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E5E7EB',
     borderRadius: 4,
     height: 36,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-  },
-  activityIconBg: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    marginTop: 2,
+    backgroundColor: '#FFFFFF',
+    color: '#111827',
   },
 });
