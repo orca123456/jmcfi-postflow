@@ -69,11 +69,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       console.log("Login API failed, falling back to mock auth...");
       
       let mockRole = 'requestor';
-      if (email.includes('admin')) mockRole = 'admin';
+      if (email.includes('admin') || email.includes('publisher') || email.includes('it') || email.includes('support')) mockRole = 'it_publisher';
       else if (email.includes('vp') || email.includes('academic')) mockRole = 'vice_president';
       else if (email.includes('president')) mockRole = 'president';
       else if (email.includes('head')) mockRole = 'office_head';
-      else if (email.includes('publisher') || email.includes('support')) mockRole = 'it_publisher';
       else if (email.includes('imc') || email.includes('qa')) mockRole = 'imc_qa_checker';
 
       const user = {
@@ -119,39 +118,36 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 // Role helper
 export const getRoleDashboardPath = (role: string): string => {
   const map: Record<string, string> = {
-    admin: '/dashboard/admin',
     requestor: '/dashboard/requestor',
     office_head: '/dashboard/office-head',
     vice_president: '/dashboard/vp',
     president: '/dashboard/president',
     imc_qa_checker: '/dashboard/imc-qa',
-    it_publisher: '/dashboard/publisher',
+    it_publisher: '/dashboard/it-admin',
   };
   return map[role] ?? '/dashboard/requestor';
 };
 
 export const getRoleLabel = (role: string): string => {
   const labels: Record<string, string> = {
-    admin: 'Administrator',
     requestor: 'Content Requestor',
     office_head: 'Office Head',
     vice_president: 'Vice President',
     president: 'President',
     imc_qa_checker: 'IMC/QA Checker',
-    it_publisher: 'IT Publisher',
+    it_publisher: 'IT Admin',
   };
   return labels[role] ?? role;
 };
 
 export const getRoleColor = (role: string): string => {
   const colors: Record<string, string> = {
-    admin: '#7C3AED',
     requestor: '#2563EB',
     office_head: '#D97706',
     vice_president: '#DC2626',
     president: '#0F766E',
     imc_qa_checker: '#7C3AED',
-    it_publisher: '#374151',
+    it_publisher: '#0F172A',
   };
   return colors[role] ?? '#6B7280';
 };

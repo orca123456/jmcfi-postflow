@@ -9,13 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleDashboardPath } from '../../store/auth';
 
 const ROLES = [
-  { label: 'Administrator', value: 'admin', email: 'admin@jmcfi.edu.ph' },
   { label: 'Content Requestor', value: 'requestor', email: 'maria.delacruz@jmcfi.edu.ph' },
   { label: 'Office Head', value: 'office_head', email: 'office.head@jmcfi.edu.ph' },
   { label: 'Vice President', value: 'vp', email: 'vp@jmcfi.edu.ph' },
   { label: 'President', value: 'president', email: 'president@jmcfi.edu.ph' },
   { label: 'IMC/QA Checker', value: 'imc_qa', email: 'imc.qa@jmcfi.edu.ph' },
-  { label: 'IT Publisher', value: 'it_publisher', email: 'it.publisher@jmcfi.edu.ph' },
+  { label: 'IT Admin (Publisher)', value: 'it_publisher', email: 'it.support@jmcfi.edu.ph' },
 ];
 
 const AnimatedBackground = () => {
@@ -46,7 +45,7 @@ const AnimatedBackground = () => {
   const translateB = animValue2.interpolate({ inputRange: [0, 1], outputRange: [0, -offsetB] });
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#F6F0FA', overflow: 'hidden' }]}>
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F6F0FA', overflow: 'hidden' }]}>
       <Animated.View style={{
         position: 'absolute',
         width: width * 0.7,
@@ -87,7 +86,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuthStore();
   
-  const [email, setEmail] = useState('admin@jmcfi.edu.ph');
+  const [email, setEmail] = useState('it.support@jmcfi.edu.ph');
   const [password, setPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);

@@ -137,82 +137,7 @@ export default function PublisherDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* KPI Summary metrics */}
-          <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="cloud-upload-outline" size={18} color={Colors.textPrimary} />
-                <Text style={styles.badgeOrangeText}>READY</Text>
-              </View>
-              <Text style={styles.metricValue}>12</Text>
-              <Text style={styles.metricLabel}>Awaiting Clearance</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="calendar-outline" size={18} color="#2563EB" />
-              </View>
-              <Text style={styles.metricValue}>05</Text>
-              <Text style={styles.metricLabel}>Scheduled Items</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#16A34A' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="checkmark-done-circle-outline" size={18} color="#16A34A" />
-              </View>
-              <Text style={styles.metricValue}>142</Text>
-              <Text style={styles.metricLabel}>Successfully Published</Text>
-            </Card>
-          </View>
-
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Quick Pending Items list */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
-              <Text style={styles.tableCardTitle}>Awaiting Final Dissemination</Text>
-              <Text style={styles.welcomeSubtitle}>Below are requests that require your final publishing approval.</Text>
-
-              <View style={{ gap: 12, marginTop: 12 }}>
-                {mockPublishQueue.map((post) => (
-                  <View key={post.id} style={[styles.analyticsPlatformCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={styles.postTitleText}>{post.title}</Text>
-                      <Text style={styles.postMetaText}>{post.sub}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.btnApprove, { height: 28 }]}
-                      onPress={() => setActiveTab('approval-queue')}
-                    >
-                      <Text style={styles.btnApproveText}>Publish Now</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </Card>
-
-            {/* Quick Links & Resources */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
-              <Text style={styles.configCardTitle}>Resources & Policies</Text>
-              <Text style={styles.welcomeSubtitle}>Quick links to institutional guidelines and posting regulations.</Text>
-
-              <View style={{ gap: 10, marginTop: 12 }}>
-                <TouchableOpacity
-                  style={[styles.filterBtn, { justifyContent: 'flex-start', height: 36, width: '100%' }]}
-                  onPress={() => setActiveTab('policy-rules')}
-                >
-                  <Ionicons name="book-outline" size={16} color={Colors.textPrimary} />
-                  <Text style={[styles.filterBtnText, { marginLeft: 6 }]}>View Website Posting Policy</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.filterBtn, { justifyContent: 'flex-start', height: 36, width: '100%' }]}
-                  onPress={() => setActiveTab('analytics')}
-                >
-                  <Ionicons name="bar-chart-outline" size={16} color={Colors.textPrimary} />
-                  <Text style={[styles.filterBtnText, { marginLeft: 6 }]}>Open Analytics Dashboard</Text>
-                </TouchableOpacity>
-              </View>
-            </Card>
-          </View>
+          
         </View>
       )}
 
@@ -231,7 +156,7 @@ export default function PublisherDashboard() {
             <View style={{ flexDirection: 'row', gap: Spacing.md, alignItems: 'center' }}>
               <View style={[styles.periodBadge, { minWidth: 260, paddingHorizontal: 0 }]}>
                 <TextInput
-                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm, outlineStyle: 'none' }}
+                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm, outlineStyle: 'none' as any }}
                   placeholder="Search queue..."
                   value={queueSearchQuery}
                   onChangeText={setQueueSearchQuery}
@@ -398,172 +323,6 @@ export default function PublisherDashboard() {
         </View>
       )}
 
-      {/* ----------------- ANALYTICS TAB ----------------- */}
-      {activeTab === 'analytics' && (
-        <View style={styles.dashboardContainer}>
-          {/* Header row */}
-          <View style={styles.dashboardHeaderRow}>
-            <View>
-              <Text style={styles.welcomeTitle}>Performance Analytics</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Monitor reach, engagement levels, and publishing efficiency metrics for your department.
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-              <TouchableOpacity style={styles.analyticsFilterBtn} onPress={() => alert('Filtering by time range...')}>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', paddingHorizontal: 8 }}>
-                  Last 30 Days
-                </Text>
-                <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btnApprove, { height: 32, paddingHorizontal: 16 }]}
-                onPress={() => alert('Generating publisher report...')}
-              >
-                <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={[styles.btnApproveText, { color: '#FFFFFF' }]}>Export Report</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Engagement Summary metrics */}
-          <View style={styles.metricsRow}>
-            <Card style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="eye-outline" size={18} color={Colors.textPrimary} />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+14.2%</Text>
-              </View>
-              <Text style={styles.metricValue}>128.4K</Text>
-              <Text style={styles.metricLabel}>Total Impressions</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#FFC72C' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="heart-outline" size={18} color="#FFC72C" />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+8.5%</Text>
-              </View>
-              <Text style={styles.metricValue}>8.2%</Text>
-              <Text style={styles.metricLabel}>Engagement Rate</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#16A34A' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="time-outline" size={18} color="#16A34A" />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>-0.4d</Text>
-              </View>
-              <Text style={styles.metricValue}>1.8 Days</Text>
-              <Text style={styles.metricLabel}>Avg. Approval Time</Text>
-            </Card>
-
-            <Card style={[styles.metricCard, { borderLeftColor: '#2563EB' }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name="checkbox-outline" size={18} color="#2563EB" />
-                <Text style={[styles.badgeGreenText, { color: '#16A34A' }]}>+3.1%</Text>
-              </View>
-              <Text style={styles.metricValue}>92.3%</Text>
-              <Text style={styles.metricLabel}>First-time Approval</Text>
-            </Card>
-          </View>
-
-          {/* Charts Layout section */}
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Monthly Posting Volume native bar chart */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
-              <Text style={styles.tableCardTitle}>Monthly Posting Activity</Text>
-              <Text style={styles.welcomeSubtitle}>Active publications count per month during this academic year.</Text>
-              
-              <View style={styles.chartContainer}>
-                {/* Visual Y-Axis markers */}
-                <View style={styles.chartYAxis}>
-                  <Text style={styles.chartAxisLabel}>40</Text>
-                  <Text style={styles.chartAxisLabel}>30</Text>
-                  <Text style={styles.chartAxisLabel}>20</Text>
-                  <Text style={styles.chartAxisLabel}>10</Text>
-                  <Text style={styles.chartAxisLabel}>0</Text>
-                </View>
-
-                <View style={styles.chartPlotArea}>
-                  {/* Monthly column bars */}
-                  {[
-                    { month: 'May', count: 18, height: '45%' },
-                    { month: 'Jun', count: 24, height: '60%' },
-                    { month: 'Jul', count: 32, height: '80%' },
-                    { month: 'Aug', count: 12, height: '30%' },
-                    { month: 'Sep', count: 38, height: '95%' },
-                    { month: 'Oct', count: 28, height: '70%' },
-                  ].map((item, idx) => (
-                    <View key={idx} style={styles.chartBarWrapper}>
-                      <View style={styles.chartBarBackground}>
-                        <View style={[styles.chartBarFill, { height: item.height }]}>
-                          <Text style={styles.chartBarTooltip}>{item.count}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.chartAxisLabel}>{item.month}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </Card>
-
-            {/* Platform Performance breakdown */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
-              <Text style={styles.configCardTitle}>Target Channel Breakdown</Text>
-              <Text style={styles.welcomeSubtitle}>Reach volume distribution share by platform channel.</Text>
-
-              <View style={{ marginTop: 12, gap: 10 }}>
-                {/* Facebook */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
-                      <Ionicons name="logo-facebook" size={18} color="#1877F2" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Facebook</Text>
-                      <Text style={styles.platformProgressSubtext}>82.5K reach &bull; 64% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '64%', backgroundColor: '#1877F2' }]} />
-                  </View>
-                </View>
-
-                {/* Instagram */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
-                      <Ionicons name="logo-instagram" size={18} color="#E1306C" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Instagram</Text>
-                      <Text style={styles.platformProgressSubtext}>27.1K reach &bull; 21% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '21%', backgroundColor: '#E1306C' }]} />
-                  </View>
-                </View>
-
-                {/* Website Portal */}
-                <View style={styles.analyticsPlatformCard}>
-                  <View style={styles.platformLeft}>
-                    <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
-                      <Ionicons name="globe-outline" size={18} color="#059669" />
-                    </View>
-                    <View>
-                      <Text style={styles.platformNameText}>Website Portal</Text>
-                      <Text style={styles.platformProgressSubtext}>18.8K clicks &bull; 15% share</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBarWrapper}>
-                    <View style={[styles.progressBarFill, { width: '15%', backgroundColor: '#059669' }]} />
-                  </View>
-                </View>
-              </View>
-            </Card>
-          </View>
-        </View>
-      )}
-
       {/* ----------------- POLICY & RULES TAB ----------------- */}
       {activeTab === 'policy-rules' && (() => {
         const filteredSections = policySections.filter(sec => {
@@ -589,7 +348,7 @@ export default function PublisherDashboard() {
               
               <View style={[styles.periodBadge, { minWidth: 260, paddingHorizontal: 0 }]}>
                 <TextInput
-                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm, outlineStyle: 'none' }}
+                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm, outlineStyle: 'none' as any }}
                   placeholder="Search policy guidelines..."
                   value={policySearchQuery}
                   onChangeText={setPolicySearchQuery}
@@ -1291,8 +1050,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 8,
     fontSize: 10,
-    color: Colors.textPrimary,
-    outlineStyle: 'none',
+    outlineStyle: 'none' as any,
   },
   btnPublishNow: {
     backgroundColor: Colors.primary,
@@ -1448,5 +1206,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 400,
     lineHeight: 18,
+  },
+  bulletPoint: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  activityIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  policyEmptyState: {
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  configCardTitle: {
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
   },
 });
