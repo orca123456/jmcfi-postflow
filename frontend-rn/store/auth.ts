@@ -65,6 +65,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           const roleMap: Record<string, string> = {
             'content_requestor': 'requestor',
             'it_admin': 'it_publisher',
+            'admin': 'it_publisher',
           };
           const rawRole = user.roles[0];
           user.role = roleMap[rawRole] ?? rawRole;
@@ -107,6 +108,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         const roleMap: Record<string, string> = {
           'content_requestor': 'requestor',
           'it_admin': 'it_publisher',
+          'admin': 'it_publisher',
         };
         if (user.role) {
           user.role = roleMap[user.role] ?? user.role;
