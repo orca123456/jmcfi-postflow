@@ -26,6 +26,10 @@ WORKDIR /app
 # Copy backend files
 COPY backend/ ./
 
+# Ensure required Laravel directories exist and are writable before composer install
+RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions \
+    && chmod -R 777 bootstrap/cache storage
+
 # Install Composer Dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
