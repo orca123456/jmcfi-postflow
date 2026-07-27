@@ -58,6 +58,17 @@ class PostMedia extends Model
 
     public function getUrlAttribute(): string
     {
-        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path);
+        if (env('RENDER_EXTERNAL_URL')) {
+            return rtrim(env('RENDER_EXTERNAL_URL'), '/') . '/storage/' . $this->file_path;
+        }
+        
+        $url = \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path);
+        
+        // Fallback for cases where APP_URL is still localhost but accessed externally
+        if (str_contains($url, 'localhost') && request()->getHost() !== 'localhost') {
+            return request()->getSchemeAndHttpHost() . '/storage/' . $this->file_path;
+        }
+
+        return $url;
     }
 }
