@@ -10,7 +10,9 @@ const getToken = async (): Promise<string | null> => {
   return SecureStore.getItemAsync('auth_token');
 };
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = Platform.OS === 'web' && process.env.NODE_ENV === 'production' 
+  ? '/api' 
+  : (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
