@@ -35,6 +35,10 @@ class FacebookPublishingService
             return ['id' => 'mock_fb_post_12345'];
         }
 
+        if ($mediaPath && !file_exists($mediaPath)) {
+            throw new Exception("Media file not found on the server. If the server restarted, uploaded files may have been lost. Please re-upload the image.");
+        }
+
         $endpoint = $mediaPath 
             ? "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/photos"
             : "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/feed";
@@ -45,7 +49,7 @@ class FacebookPublishingService
         ];
 
         try {
-            if ($mediaPath && file_exists($mediaPath)) {
+            if ($mediaPath) {
                 $response = Http::withoutVerifying()
                     ->attach('source', file_get_contents($mediaPath), basename($mediaPath))
                     ->post($endpoint, $payload);
