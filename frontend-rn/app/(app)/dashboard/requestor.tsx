@@ -8,7 +8,10 @@ import {
   useWindowDimensions,
   ScrollView,
   Modal,
+  Platform,
+  Image,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
@@ -16,6 +19,7 @@ import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { postsApi } from '../../../services/api';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -43,6 +47,8 @@ export default function RequestorDashboard() {
   });
   const [publishDate, setPublishDate] = useState('');
   const [publishTime, setPublishTime] = useState('');
+  const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [supportingDocs, setSupportingDocs] = useState<any[]>([]);
 
   // Dropdown States
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -62,54 +68,10 @@ export default function RequestorDashboard() {
   const [policySearchQuery, setPolicySearchQuery] = useState('');
 
   // Drafts State
-  const [drafts, setDrafts] = useState([
-    {
-      id: 'd1',
-      title: '2024 College Intramurals Opening Ceremony',
-      category: 'Campus Event',
-      department: 'Student Affairs',
-      caption: 'Get ready for the biggest sports event of the year! The JMCFI Intramurals 2024 kicks off next Monday with live performances, parade of athletes, and exciting matches.',
-      dateSaved: 'Oct 24, 2024 at 2:30 PM',
-      platforms: { facebook: true, instagram: true, portal: false },
-      publishDate: '28/10/2024',
-    },
-    {
-      id: 'd2',
-      title: 'Library Extended Hours During Finals Week',
-      category: 'Academic Announcement',
-      department: "Registrar's Office",
-      caption: 'Notice to all students: The Main Library will remain open until 10:00 PM starting next week to support your midterm preparations.',
-      dateSaved: 'Oct 20, 2024 at 11:15 AM',
-      platforms: { facebook: true, instagram: false, portal: true },
-      publishDate: '25/10/2024',
-    },
-  ]);
+  const [drafts, setDrafts] = useState<any[]>([]);
 
   // Rejected Posts State
-  const [rejectedPosts, setRejectedPosts] = useState([
-    {
-      id: 'r1',
-      title: 'Off-Campus Beach Outing Post',
-      category: 'Campus Event',
-      department: 'Student Affairs',
-      rejectedDate: 'Oct 23, 2024',
-      rejectedBy: 'Vice President of Academic Affairs (Dr. A. Santos)',
-      rejectionReason: "Unapproved institutional activity. All off-campus student gatherings require a signed permit from the Student Affairs Office and President's approval prior to social media promotion.",
-      caption: 'Join us for an exciting beach day at Samal Island this coming weekend! Transportation provided for all enrolled students.',
-      platforms: { facebook: true, instagram: true, portal: false },
-    },
-    {
-      id: 'r2',
-      title: 'Tuition Fee Payment Reminder',
-      category: 'Policy Update',
-      department: 'Finance Department',
-      rejectedDate: 'Oct 19, 2024',
-      rejectedBy: 'IMC QA Reviewer (M. Flores)',
-      rejectionReason: 'Incorrect account details in caption. Please verify official bank account number with Finance before requesting a public post.',
-      caption: 'Reminder: 2nd Trimester tuition fee installment is due on Friday. Please settle payments at the cashier or bank transfer.',
-      platforms: { facebook: true, instagram: false, portal: true },
-    },
-  ]);
+  const [rejectedPosts, setRejectedPosts] = useState<any[]>([]);
 
   // Handlers for Drafts and Rejected
   const handleEditDraft = (draft: any) => {
@@ -153,144 +115,172 @@ export default function RequestorDashboard() {
     'Finance Department',
   ];
 
-  // Mock Post Requests for Dashboard Table
-  const mockRequests = [
-    {
-      id: '1',
-      title: 'Annual Scholars Recognition Gala',
-      platforms: 'Facebook, Instagram',
-      category: 'Events & PR',
-      date: 'Oct 24, 2023',
-      status: 'PENDING',
-      statusColor: '#B45309',
-      statusBg: '#FEF3C7',
-      thumbnailIcon: 'ribbon-outline' as const,
-      thumbnailBg: '#E0F2FE',
-      actionIcon1: 'eye-outline' as const,
-      actionIcon2: 'pencil-outline' as const,
-    },
-    {
-      id: '2',
-      title: 'New MBA Program Announcement',
-      platforms: 'LinkedIn',
-      category: 'Academic Affairs',
-      date: 'Oct 22, 2023',
-      status: 'APPROVED',
-      statusColor: '#15803D',
-      statusBg: '#DCFCE7',
-      thumbnailIcon: 'school-outline' as const,
-      thumbnailBg: '#F3E8FF',
-      actionIcon1: 'eye-outline' as const,
-      actionIcon2: 'ellipsis-vertical-outline' as const,
-    },
-    {
-      id: '3',
-      title: 'Midterm Stress Relief Workshop',
-      platforms: 'Twitter, FB Story',
-      category: 'Student Services',
-      date: 'Oct 20, 2023',
-      status: 'RETURNED',
-      statusColor: '#B91C1C',
-      statusBg: '#FEE2E2',
-      thumbnailIcon: 'happy-outline' as const,
-      thumbnailBg: '#FEF3C7',
-      actionIcon1: 'eye-outline' as const,
-      actionIcon2: 'time-outline' as const,
-    },
-    {
-      id: '4',
-      title: 'Class of 2023 Highlight Reel',
-      platforms: 'TikTok, Instagram',
-      category: 'Alumni Relations',
-      date: 'Oct 18, 2023',
-      status: 'PUBLISHED',
-      statusColor: '#1E40AF',
-      statusBg: '#DBEAFE',
-      thumbnailIcon: 'videocam-outline' as const,
-      thumbnailBg: '#D1FAE5',
-      actionIcon1: 'eye-outline' as const,
-      actionIcon2: 'file-tray-full-outline' as const,
-    },
-  ];
+  // Posts State
+  const [mockRequests, setMockRequests] = useState<any[]>([]);
+  const [mockQueuePosts, setMockQueuePosts] = useState<any[]>([]);
 
-  // Mock Queue Stages tracking for Approval Queue Tab
-  const mockQueuePosts = [
-    {
-      id: 'q1',
-      title: 'Annual Scholars Recognition Gala',
-      date: 'Oct 24, 2023',
-      statusLabel: 'Awaiting IMC QA Review',
-      badgeColor: '#B45309',
-      badgeBg: '#FEF3C7',
-      nextAction: 'Awaiting assignment to a QA checker in the IMC Department.',
-      steps: [
-        { label: 'Submitted', state: 'completed' },
-        { label: 'Dept Head', state: 'completed' },
-        { label: 'VP / Pres', state: 'completed' },
-        { label: 'IMC QA', state: 'active' },
-        { label: 'Publisher', state: 'upcoming' },
-      ],
-      comments: [
-        { author: 'Office Head', text: 'This looks solid, good job team. Approved.' },
-      ],
-    },
-    {
-      id: 'q2',
-      title: 'Midterm Stress Relief Workshop',
-      date: 'Oct 20, 2023',
-      statusLabel: 'Revision Requested by Office Head',
-      badgeColor: '#B91C1C',
-      badgeBg: '#FEE2E2',
-      nextAction: 'Caption needs adjustment. Please fix grammar on dates and submit again.',
-      steps: [
-        { label: 'Submitted', state: 'completed' },
-        { label: 'Dept Head', state: 'revision' },
-        { label: 'VP / Pres', state: 'upcoming' },
-        { label: 'IMC QA', state: 'upcoming' },
-        { label: 'Publisher', state: 'upcoming' },
-      ],
-      comments: [
-        { author: 'Office Head', text: 'Please correct the time format from "3pm" to "3:00 PM".' },
-      ],
-    },
-    {
-      id: 'q3',
-      title: 'New MBA Program Announcement',
-      date: 'Oct 22, 2023',
-      statusLabel: 'Awaiting VP Sign-Off',
-      badgeColor: '#B45309',
-      badgeBg: '#FEF3C7',
-      nextAction: 'Pending signature validation from the Vice President of Academic Affairs.',
-      steps: [
-        { label: 'Submitted', state: 'completed' },
-        { label: 'Dept Head', state: 'completed' },
-        { label: 'VP / Pres', state: 'active' },
-        { label: 'IMC QA', state: 'upcoming' },
-        { label: 'Publisher', state: 'upcoming' },
-      ],
-      comments: [
-        { author: 'Office Head', text: 'Department signs off.' },
-        { author: 'IMC QA Officer', text: 'Alignment checks out. Brand compliance 100%.' },
-      ],
-    },
-  ];
+  const loadPosts = async () => {
+    try {
+      const res = await postsApi.list();
+      const posts = res.data.data;
+      
+      const mapPost = (p: any) => ({
+        ...p,
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        platforms: p.target_platforms ? p.target_platforms.join(', ') : '',
+        category: p.category?.name || 'Category',
+        department: p.requestor?.department || 'Department',
+        date: new Date(p.created_at).toLocaleDateString(),
+        dateSaved: new Date(p.created_at).toLocaleDateString(),
+        status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
+        statusLabel: p.status_label || p.status,
+        statusColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
+        statusBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
+        badgeColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
+        badgeBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
+        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+        thumbnailIcon: 'document-text-outline' as const,
+        thumbnailBg: '#E0F2FE',
+        actionIcon1: 'eye-outline' as const,
+        actionIcon2: 'pencil-outline' as const,
+        rejectedDate: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '',
+        rejectionReason: p.rejection_reason || 'No reason provided.',
+        nextAction: 'Pending review.',
+        steps: [
+          { label: 'Submitted', state: 'completed' },
+          { label: 'Dept Head', state: ['pending_office_head'].includes(p.status) ? 'active' : 'completed' },
+          { label: 'VP / Pres', state: ['pending_vice_president', 'pending_president'].includes(p.status) ? 'active' : 'upcoming' },
+          { label: 'IMC QA', state: ['pending_imc_qa'].includes(p.status) ? 'active' : 'upcoming' },
+          { label: 'Publisher', state: ['approved', 'scheduled', 'published'].includes(p.status) ? 'active' : 'upcoming' },
+        ],
+        comments: [],
+      });
 
-  const handleSaveDraft = () => {
-    alert('Content request saved as draft!');
+      const mapped = posts.map(mapPost);
+      setMockRequests(mapped);
+      setMockQueuePosts(mapped.filter((p: any) => p.status !== 'DRAFT'));
+      setDrafts(mapped.filter((p: any) => p.status === 'DRAFT'));
+      setRejectedPosts(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+    } catch (err) {
+      console.error('Failed to load posts', err);
+    }
   };
 
-  const handleSubmitRequest = () => {
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  const handleSaveDraft = async () => {
+    if (!postTitle || !caption) {
+      alert('Please enter a post title and caption before saving.');
+      return;
+    }
+    try {
+      const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
+      await postsApi.create({
+        title: postTitle,
+        caption_narrative: caption,
+        target_platforms: selectedPlatforms,
+        is_draft: true,
+      });
+      alert('Content request saved as draft!');
+      loadPosts();
+      setActiveTab('dashboard');
+    } catch (err: any) {
+      alert('Failed to save draft: ' + (err?.response?.data?.message || err.message));
+    }
+  };
+
+  const handleSubmitRequest = async () => {
     if (!postTitle || !caption) {
       alert('Please enter a post title and caption before submitting.');
       return;
     }
-    alert('Content request submitted successfully for review!');
-    setPostTitle('');
-    setCaption('');
-    setPublishDate('');
-    setPublishTime('');
-    setPlatforms({ facebook: false, instagram: false, portal: false });
-    setActiveTab('dashboard');
+
+    const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
+    if (selectedPlatforms.length === 0) {
+      alert('Please select at least one target platform before submitting.');
+      return;
+    }
+
+    if (mediaFiles.length === 0 && supportingDocs.length === 0) {
+      alert('Please attach at least one media or asset file before submitting.');
+      return;
+    }
+    
+    try {
+      const payload: any = {
+        title: postTitle,
+        caption_narrative: caption,
+        target_platforms: selectedPlatforms,
+        is_draft: false,
+      };
+
+      if (publishDate) {
+        const timePart = publishTime || '08:00';
+        const [d, m, y] = publishDate.split('/');
+        payload.preferred_schedule_at = `${y}-${m}-${d} ${timePart}:00`;
+      }
+
+      let res;
+      if (mediaFiles.length > 0 || supportingDocs.length > 0) {
+        const formData = new FormData();
+        formData.append('title', payload.title);
+        formData.append('caption_narrative', payload.caption_narrative);
+        payload.target_platforms.forEach((p: string) => {
+          formData.append('target_platforms[]', p);
+        });
+        formData.append('is_draft', '0');
+        if (payload.preferred_schedule_at) {
+          formData.append('preferred_schedule_at', payload.preferred_schedule_at);
+        }
+        
+        mediaFiles.forEach((file: any, idx: number) => {
+          if (Platform.OS === 'web' && file.file) {
+            formData.append('media[]', file.file);
+          } else {
+            formData.append('media[]', {
+              uri: file.uri,
+              name: file.name,
+              type: file.mimeType || 'image/jpeg',
+            } as any);
+          }
+        });
+        
+        supportingDocs.forEach((file: any, idx: number) => {
+          if (Platform.OS === 'web' && file.file) {
+            formData.append('supporting_docs[]', file.file);
+          } else {
+            formData.append('supporting_docs[]', {
+              uri: file.uri,
+              name: file.name,
+              type: file.mimeType || 'application/pdf',
+            } as any);
+          }
+        });
+        
+        res = await postsApi.createWithFiles(formData);
+      } else {
+        res = await postsApi.create(payload);
+      }
+      
+      // The backend store endpoint already submits the post if is_draft is false.
+      // Calling submit again is redundant and causes a 403 error.
+      
+      alert('Content request submitted successfully for review!');
+      setPostTitle('');
+      setCaption('');
+      setPublishDate('');
+      setPublishTime('');
+      setPlatforms({ facebook: false, instagram: false, portal: false });
+      setMediaFiles([]);
+      setSupportingDocs([]);
+      loadPosts();
+      setActiveTab('dashboard');
+    } catch (err: any) {
+      alert('Failed to submit request: ' + (err?.response?.data?.message || err.message));
+    }
   };
 
   const handleCheckPolicy = () => {
@@ -344,31 +334,64 @@ export default function RequestorDashboard() {
   };
 
   const getMockSteps = (status: string) => {
-    if (status === 'APPROVED' || status === 'PUBLISHED') {
+    const s = status ? status.toLowerCase() : '';
+
+    if (s === 'approved' || s === 'published' || s === 'scheduled') {
       return [
         { label: 'Submitted', state: 'completed' },
         { label: 'Dept Head', state: 'completed' },
-        { label: 'VP / Pres', state: 'completed' },
+        { label: 'Vice Pres', state: 'completed' },
         { label: 'IMC QA', state: 'completed' },
-        { label: 'Publisher', state: status === 'PUBLISHED' ? 'completed' : 'active' },
+        { label: 'Publisher', state: s === 'approved' ? 'active' : 'completed' },
       ];
-    } else if (status === 'PENDING') {
+    } else if (s === 'pending_office_head') {
       return [
         { label: 'Submitted', state: 'completed' },
         { label: 'Dept Head', state: 'active' },
-        { label: 'VP / Pres', state: 'upcoming' },
+        { label: 'Vice Pres', state: 'upcoming' },
         { label: 'IMC QA', state: 'upcoming' },
         { label: 'Publisher', state: 'upcoming' },
       ];
-    } else if (status === 'RETURNED') {
+    } else if (s === 'pending_vice_president' || s === 'pending_president') {
       return [
         { label: 'Submitted', state: 'completed' },
-        { label: 'Dept Head', state: 'revision' },
-        { label: 'VP / Pres', state: 'upcoming' },
+        { label: 'Dept Head', state: 'completed' },
+        { label: 'Vice Pres', state: 'active' },
         { label: 'IMC QA', state: 'upcoming' },
+        { label: 'Publisher', state: 'upcoming' },
+      ];
+    } else if (s === 'pending_imc_qa') {
+      return [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Dept Head', state: 'completed' },
+        { label: 'Vice Pres', state: 'completed' },
+        { label: 'IMC QA', state: 'active' },
+        { label: 'Publisher', state: 'upcoming' },
+      ];
+    } else if (s === 'returned_for_revision') {
+      return [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Revision', state: 'revision' },
+        { label: 'Vice Pres', state: 'upcoming' },
+        { label: 'IMC QA', state: 'upcoming' },
+        { label: 'Publisher', state: 'upcoming' },
+      ];
+    } else if (s === 'draft') {
+      return [
+        { label: 'Draft', state: 'active' },
+        { label: 'Dept Head', state: 'upcoming' },
+        { label: 'Vice Pres', state: 'upcoming' },
+        { label: 'IMC QA', state: 'upcoming' },
+        { label: 'Publisher', state: 'upcoming' },
+      ];
+    } else if (s.includes('pending')) {
+      return [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Review', state: 'active' },
         { label: 'Publisher', state: 'upcoming' },
       ];
     }
+    
     return [];
   };
 
@@ -428,7 +451,11 @@ export default function RequestorDashboard() {
                 <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedRow(req)}>
                   <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
-                      <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
+                      {req.thumbnailUrl ? (
+                        <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 4 }} resizeMode="cover" />
+                      ) : (
+                        <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
+                      )}
                     </View>
                     <View>
                       <Text style={styles.postTitleText}>{req.title}</Text>
@@ -705,16 +732,76 @@ export default function RequestorDashboard() {
                   <View style={styles.fieldGroup}>
                     <Text style={styles.inputLabel}>PUBLICATION DATE</Text>
                     <View style={styles.inputIconWrapper}>
-                      <TextInput
-                        style={styles.textInputWithIcon}
-                        placeholder="dd/mm/yyyy"
-                        value={publishDate}
-                        onChangeText={setPublishDate}
-                      />
+                      {Platform.OS === 'web' ? (
+                        <input
+                          type="date"
+                          value={publishDate ? publishDate.split('/').reverse().join('-') : ''}
+                          onChange={(e: any) => {
+                            const val = e.target.value;
+                            if (val) {
+                              const [y, m, d] = val.split('-');
+                              setPublishDate(`${d}/${m}/${y}`);
+                            } else {
+                              setPublishDate('');
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            border: 'none',
+                            outline: 'none',
+                            fontSize: '14px',
+                            fontFamily: 'inherit',
+                            color: '#1F2937',
+                            padding: '12px 40px 12px 16px',
+                            background: 'transparent',
+                            width: '100%',
+                            cursor: 'pointer',
+                          }}
+                        />
+                      ) : (
+                        <TextInput
+                          style={styles.textInputWithIcon}
+                          placeholder="dd/mm/yyyy"
+                          value={publishDate}
+                          onChangeText={setPublishDate}
+                        />
+                      )}
                       <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
                     </View>
                   </View>
 
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>PUBLICATION TIME (Optional)</Text>
+                    <View style={styles.inputIconWrapper}>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          type="time"
+                          value={publishTime}
+                          onChange={(e: any) => setPublishTime(e.target.value)}
+                          style={{
+                            flex: 1,
+                            border: 'none',
+                            outline: 'none',
+                            fontSize: '14px',
+                            fontFamily: 'inherit',
+                            color: '#1F2937',
+                            padding: '12px 40px 12px 16px',
+                            background: 'transparent',
+                            width: '100%',
+                            cursor: 'pointer',
+                          }}
+                        />
+                      ) : (
+                        <TextInput
+                          style={styles.textInputWithIcon}
+                          placeholder="HH:MM (24hr)"
+                          value={publishTime}
+                          onChangeText={setPublishTime}
+                        />
+                      )}
+                      <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
+                    </View>
+                  </View>
                   <View style={styles.scheduleInfoBox}>
                     <Ionicons name="information-circle-outline" size={16} color={Colors.textPrimary} style={{ marginTop: 2 }} />
                     <Text style={styles.scheduleInfoText}>
@@ -737,23 +824,85 @@ export default function RequestorDashboard() {
                   </View>
 
                   <View style={[styles.uploadGridRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
-                    <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Media uploader triggered.')}>
+                    <TouchableOpacity style={styles.uploadZone} onPress={async () => {
+                      try {
+                        const result = await DocumentPicker.getDocumentAsync({
+                          type: ['image/*', 'video/*'],
+                          multiple: true,
+                          copyToCacheDirectory: true,
+                        });
+                        if (!result.canceled && result.assets) {
+                          setMediaFiles(result.assets);
+                        }
+                      } catch (e) {
+                        if (Platform.OS === 'web') {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.multiple = true;
+                          input.accept = 'image/*,video/*';
+                          input.onchange = (ev: any) => {
+                            const files = Array.from(ev.target.files || []).map((f: any) => ({
+                              uri: URL.createObjectURL(f),
+                              name: f.name,
+                              mimeType: f.type,
+                              size: f.size,
+                              file: f,
+                            }));
+                            setMediaFiles(files);
+                          };
+                          input.click();
+                        }
+                      }
+                    }}>
                       <View style={styles.uploadZoneCircle}>
                         <Ionicons name="cloud-upload-outline" size={24} color={Colors.textSecondary} />
                       </View>
                       <Text style={styles.uploadZoneTitle}>Upload Main Media</Text>
                       <Text style={styles.uploadZoneSubtitle}>
-                        Images (JPG, PNG) or Videos (MP4) up to 50MB
+                        {mediaFiles.length > 0
+                          ? mediaFiles.map((f: any) => f.name).join(', ')
+                          : 'Images (JPG, PNG) or Videos (MP4) up to 50MB'}
                       </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.uploadZone} onPress={() => alert('Documents uploader triggered.')}>
+                    <TouchableOpacity style={styles.uploadZone} onPress={async () => {
+                      try {
+                        const result = await DocumentPicker.getDocumentAsync({
+                          type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
+                          multiple: true,
+                          copyToCacheDirectory: true,
+                        });
+                        if (!result.canceled && result.assets) {
+                          setSupportingDocs(result.assets);
+                        }
+                      } catch (e) {
+                        if (Platform.OS === 'web') {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.multiple = true;
+                          input.accept = '.pdf,.doc,.docx,.txt';
+                          input.onchange = (ev: any) => {
+                            const files = Array.from(ev.target.files || []).map((f: any) => ({
+                              uri: URL.createObjectURL(f),
+                              name: f.name,
+                              mimeType: f.type,
+                              size: f.size,
+                              file: f,
+                            }));
+                            setSupportingDocs(files);
+                          };
+                          input.click();
+                        }
+                      }
+                    }}>
                       <View style={styles.uploadZoneCircle}>
                         <Ionicons name="attach-outline" size={22} color={Colors.textSecondary} />
                       </View>
                       <Text style={styles.uploadZoneTitle}>Supporting Docs</Text>
                       <Text style={styles.uploadZoneSubtitle}>
-                        PDFs, briefs, or reference materials
+                        {supportingDocs.length > 0
+                          ? supportingDocs.map((f: any) => f.name).join(', ')
+                          : 'PDFs, briefs, or reference materials'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -806,12 +955,18 @@ export default function RequestorDashboard() {
                       </Text>
                     </View>
 
-                    <View style={styles.mockPostMediaPlaceholder}>
-                      <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
-                      <Text style={styles.mockPostMediaPlaceholderText}>
-                        Upload media to see your content preview here...
-                      </Text>
-                    </View>
+                    {mediaFiles && mediaFiles.length > 0 ? (
+                      <View style={{ width: '100%', aspectRatio: 4/3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', marginTop: 8 }}>
+                        <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      </View>
+                    ) : (
+                      <View style={styles.mockPostMediaPlaceholder}>
+                        <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                        <Text style={styles.mockPostMediaPlaceholderText}>
+                          Upload media to see your content preview here...
+                        </Text>
+                      </View>
+                    )}
 
                     <View style={styles.mockPostActionsRow}>
                       <View style={styles.mockActionGroup}>
@@ -1260,7 +1415,7 @@ export default function RequestorDashboard() {
           ) : (
             <View style={{ gap: Spacing.lg }}>
               {rejectedPosts.map((post) => (
-                <Card key={post.id} style={[styles.formCard, { borderColor: '#FECDD3' }]}>
+                <Card key={post.id} style={[styles.formCard, { borderColor: '#FECDD3' }] as any}>
                   {/* Rejected Card Header */}
                   <View style={styles.queueCardHeader}>
                     <View style={styles.queueCardTitleCol}>

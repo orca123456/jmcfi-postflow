@@ -15,6 +15,7 @@ import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { postsApi } from '../../../services/api';
 
 export default function PresidentDashboard() {
   const router = useRouter();
@@ -33,70 +34,55 @@ export default function PresidentDashboard() {
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
 
-  // Mock President critical clearances list
-  const mockClearancePosts = [
-    {
-      id: 'pr1',
-      title: 'Announcement: Inauguration of the JMCFI Research Center',
-      sub: 'Draft ID: #PR-8821 • Dept: Institutional Advancement',
-      status: 'PENDING PRESIDENT',
-      submitted: 'Submitted 2h ago',
-      body: 'We are proud to unveil our $15M commitment to the future of regional innovation. The new JMCFI Research Center is more than just a building; it is a catalyst for academic excellence and industry partnership in the heart of...',
-      urgent: true,
-      hasMedia: true,
-      mediaLabel: 'RESEARCH CENTER BUILDING',
-      reviewers: ['EC', 'MA'],
-      reviewersText: 'Approved by Content Manager & Dept Head',
-    },
-    {
-      id: 'pr2',
-      title: 'Institutional Motto Social Campaign',
-      sub: 'Draft ID: #SC-9012 • Dept: Marketing & Communications',
-      status: 'PENDING PRESIDENT',
-      submitted: 'Submitted 5h ago',
-      body: 'This series highlights the core values of JMCFI across Instagram and LinkedIn. It includes 5 carousel slides focusing on Heritage, Integrity, Innovation, and Service. All assets follow the updated 2024 Brand Standards Manual.',
-      urgent: false,
-      hasCarousel: true,
-      carouselSlides: ['Heritage', 'Integrity', 'Innovation', '+2'],
-      mediaLabel: 'COMMENCEMENT KEYNOTE VISUAL\n\n"Educating the heart and the mind is the foundation of institutional legacy."',
-    },
-  ];
+  const [mockClearancePosts, setMockClearancePosts] = useState<any[]>([]);
+  const [mockApprovedPosts, setMockApprovedPosts] = useState<any[]>([]);
+  const [mockRejectedPosts, setMockRejectedPosts] = useState<any[]>([]);
 
-  const mockApprovedPosts = [
-    {
-      id: 'pr3',
-      title: 'University Seal Redesign Launch',
-      sub: 'Draft ID: #PR-8833 • Dept: Institutional Advancement',
-      status: 'APPROVED',
-      submitted: 'Approved 1d ago',
-      body: 'Launch of the new JMCFI seal. All official documents will use this moving forward.',
-      urgent: false,
-      hasMedia: true,
-      mediaLabel: 'NEW SEAL',
-      reviewers: ['EC', 'MA'],
-      reviewersText: 'Approved by Content Manager & Dept Head',
+  const loadData = async () => {
+    try {
+      const res = await postsApi.list();
+      const posts = res.data.data;
+
+      const mapPost = (p: any) => ({
+        ...p,
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        sub: `Dept: ${p.department?.name || 'Unknown'}`,
+        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+        submitted: `Created: ${new Date(p.created_at).toLocaleDateString()}`,
+      });
+
+      const mapped = posts.map(mapPost);
+      setMockClearancePosts(mapped.filter((p: any) => p.status === 'PENDING_PRESIDENT'));
+      setMockApprovedPosts(mapped.filter((p: any) => ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      setMockRejectedPosts(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+    } catch (err) {
+      console.error(err);
     }
-  ];
+  };
 
-  const mockRejectedPosts = [
-    {
-      id: 'pr4',
-      title: 'Tuition Fee Adjustment Notice',
-      sub: 'Draft ID: #PR-8844 • Dept: Finance',
-      status: 'REJECTED',
-      submitted: 'Rejected 2d ago',
-      body: 'Notice regarding the 5% increase in tuition fees for the upcoming semester.',
-      urgent: true,
-      hasMedia: false,
-      mediaLabel: '',
-      reviewers: ['EC', 'MA'],
-      reviewersText: 'Approved by Content Manager & Dept Head',
-      rejectionReason: 'Please provide more details on the breakdown of the increase.',
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleApprove = async (id: number) => {
+    try {
+      await postsApi.approve(id, {});
+      alert('Request Approved! Forwarded to IMC QA.');
+      loadData();
+    } catch (err) {
+      alert('Failed to approve request.');
     }
-  ];
+  };
 
-  const handleAction = (type: string, title: string) => {
-    alert(`Action: "${type}" triggered successfully for presidential request:\n"${title}"`);
+  const handleReject = async (id: number) => {
+    try {
+      await postsApi.reject(id, { reason: 'Rejected by President' });
+      alert('Request Rejected.');
+      loadData();
+    } catch (err) {
+      alert('Failed to reject request.');
+    }
   };
 
   const isLargeScreen = width > 1024;
@@ -136,7 +122,7 @@ export default function PresidentDashboard() {
 
           <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
             {/* Quick Pending Items list */}
-            <Card style={[styles.tableCard, { flex: 1.5 }]}>
+            <Card style={[styles.tableCard, { flex: 1.5 }] as any}>
               <Text style={styles.tableCardTitle}>{titleText}</Text>
               <Text style={styles.welcomeSubtitle}>{subText}</Text>
 
@@ -147,19 +133,38 @@ export default function PresidentDashboard() {
                       <Text style={styles.postTitleText}>{post.title}</Text>
                       <Text style={styles.postMetaText}>{post.sub}</Text>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.btnApprove, { height: 28, backgroundColor: Colors.primary }]}
-                      onPress={() => alert('Viewing Draft')}
-                    >
-                      <Text style={styles.btnApproveText}>View Draft</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {activeTab === 'dashboard' ? (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.btnApprove, { height: 28, backgroundColor: Colors.success }]}
+                            onPress={() => handleApprove(post.id)}
+                          >
+                            <Text style={styles.btnApproveText}>Approve</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.btnApprove, { height: 28, backgroundColor: Colors.error }]}
+                            onPress={() => handleReject(post.id)}
+                          >
+                            <Text style={styles.btnApproveText}>Reject</Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.btnApprove, { height: 28, backgroundColor: Colors.primary }]}
+                          onPress={() => alert('Viewing Draft')}
+                        >
+                          <Text style={styles.btnApproveText}>View Draft</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 ))}
               </View>
             </Card>
 
             {/* Quick Links & Resources */}
-            <Card style={[styles.configCard, { flex: 1 }]}>
+            <Card style={[styles.configCard, { flex: 1 }] as any}>
               <Text style={styles.configCardTitle}>Resources & Policies</Text>
               <Text style={styles.welcomeSubtitle}>Quick links to institutional guidelines and posting regulations.</Text>
 
@@ -204,7 +209,7 @@ export default function PresidentDashboard() {
               
               <View style={[styles.periodBadge, { minWidth: 260, paddingHorizontal: 0 }]}>
                 <TextInput
-                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm, outlineStyle: 'none' }}
+                  style={{ flex: 1, paddingHorizontal: 12, fontSize: FontSize.sm } as any}
                   placeholder="Search policy guidelines..."
                   value={policySearchQuery}
                   onChangeText={setPolicySearchQuery}
@@ -224,7 +229,7 @@ export default function PresidentDashboard() {
                       style={[styles.policySidebarItem, { backgroundColor: Colors.surface }]}
                       onPress={() => alert(`Navigating to section: ${sec.title}`)}
                     >
-                      <View style={[styles.bulletPoint, { backgroundColor: sec.color }]} />
+                      <View style={[styles.bulletPoint as any, { backgroundColor: sec.color }]} />
                       <Text style={styles.policySidebarLabel} numberOfLines={1}>{sec.title.substring(3)}</Text>
                     </TouchableOpacity>
                   ))}
@@ -235,7 +240,7 @@ export default function PresidentDashboard() {
               <View style={styles.policyDetailCol}>
                 {filteredSections.length > 0 ? (
                   filteredSections.map((sec) => (
-                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
+                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }] as any}>
                       <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
                         <View style={[styles.activityIconBg, { backgroundColor: sec.bg, borderColor: sec.color }]}>
                           <Ionicons name={sec.icon as any} size={14} color={sec.color} />
@@ -293,7 +298,7 @@ export default function PresidentDashboard() {
                     </Card>
                   ))
                 ) : (
-                  <View style={styles.policyEmptyState}>
+                  <View style={styles.policyEmptyState as any}>
                     <Ionicons name="search-outline" size={36} color={Colors.textMuted} />
                     <Text style={styles.postTitleText}>No policy guidelines found</Text>
                     <Text style={styles.welcomeSubtitle}>Try adjusting your search criteria.</Text>
@@ -1083,5 +1088,22 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  configCardTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  bulletPoint: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  policyEmptyState: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.xl,
   },
 });

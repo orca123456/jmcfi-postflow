@@ -48,7 +48,7 @@ class AuthController extends Controller
             'middle_name' => $request->middle_name,
             'last_name' => $request->last_name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => $request->password, // Hashed automatically by model's 'hashed' cast
             'phone' => $request->phone,
             'department' => $request->department,
             'position' => $request->position,

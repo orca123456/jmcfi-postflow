@@ -29,7 +29,7 @@ class PostRejectedNotification extends Notification implements ShouldQueue
             ->greeting("Hello {$notifiable->first_name},")
             ->line("Your post request has been rejected.")
             ->line("**Post:** {$this->postRequest->title}")
-            ->line("**Reason:** {$this->reason ?? 'No specific reason provided'}")
+            ->line("**Reason:** " . ($this->reason ?? 'No specific reason provided'))
             ->action('View Post', url(config('app.frontend_url') . "/requestor/posts/{$this->postRequest->id}"))
             ->line('You may create a new post request addressing the concerns raised.');
     }

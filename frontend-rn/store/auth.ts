@@ -57,7 +57,24 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await authApi.login(email, password);
-      const { token, user } = response.data;
+      let { token, user } = response.data;
+
+      if (user) {
+        if (user.roles && user.roles.length > 0) {
+          // Normalize role names from DB to frontend expectations
+          const roleMap: Record<string, string> = {
+            'content_requestor': 'requestor',
+            'it_admin': 'it_publisher',
+          };
+          const rawRole = user.roles[0];
+          user.role = roleMap[rawRole] ?? rawRole;
+        } else if (!user.role) {
+          user.role = 'requestor';
+        }
+        if (!user.name && user.first_name) {
+          user.name = `${user.first_name} ${user.last_name}`;
+        }
+      }
 
       await storage.set('auth_token', token);
       await storage.set('auth_user', JSON.stringify(user));
@@ -65,30 +82,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ user, token, isLoading: false });
       return true;
     } catch (err: any) {
-      // Mock fallback for UI development when backend is down
-      console.log("Login API failed, falling back to mock auth...");
-      
-      let mockRole = 'requestor';
-      if (email.includes('admin') || email.includes('publisher') || email.includes('it') || email.includes('support')) mockRole = 'it_publisher';
-      else if (email.includes('vp') || email.includes('academic')) mockRole = 'vice_president';
-      else if (email.includes('president')) mockRole = 'president';
-      else if (email.includes('head')) mockRole = 'office_head';
-      else if (email.includes('imc') || email.includes('qa')) mockRole = 'imc_qa_checker';
-
-      const user = {
-        id: 1,
-        name: email.split('@')[0].toUpperCase() + ' User',
-        email: email,
-        role: mockRole,
-        department_id: 1,
-      };
-      const token = 'mock-jwt-token-123';
-
-      await storage.set('auth_token', token);
-      await storage.set('auth_user', JSON.stringify(user));
-
-      set({ user, token, isLoading: false });
-      return true;
+      const errorMessage = err.response?.data?.message || 'Login failed. Please check your credentials.';
+      set({ error: errorMessage, isLoading: false });
+      return false;
     }
   },
 
@@ -107,6 +103,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
+        // Normalize role names for backward compatibility with stored data
+        const roleMap: Record<string, string> = {
+          'content_requestor': 'requestor',
+          'it_admin': 'it_publisher',
+        };
+        if (user.role) {
+          user.role = roleMap[user.role] ?? user.role;
+        }
         set({ user, token });
       } catch (_) {}
     }

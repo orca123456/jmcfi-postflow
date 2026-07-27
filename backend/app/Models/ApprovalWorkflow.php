@@ -43,7 +43,6 @@ class ApprovalWorkflow extends Model
         return [
             'office_head' => 'Office Head',
             'vice_president' => 'Vice President',
-            'president' => 'President',
             'imc_qa' => 'IMC/QA Checker',
         ];
     }

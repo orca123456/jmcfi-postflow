@@ -11,6 +11,8 @@ use App\Models\PostMedia;
 use App\Models\PostCategory;
 use App\Models\ApprovalWorkflow;
 use App\Services\AIComplianceService;
+use App\Notifications\ApprovalNeededNotification;
+use App\Services\AuditLogService;
 use App\Services\ApprovalWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,7 +34,6 @@ class PostRequestController extends Controller
             'requestor',
             'media',
             'approvalWorkflows.approver',
-            'aiComplianceCheck',
             'policyViolations',
         ]);
 
@@ -63,6 +64,24 @@ class PostRequestController extends Controller
             ];
             if (isset($stageMap[$role])) {
                 $query->where('status', $stageMap[$role]);
+            }
+        }
+
+        // Hide rejected/returned posts from VP and IMC, only Admin and Requestor see them
+        if (!$request->has('my_requests')) {
+            $user = $request->user();
+            $role = $user->getRoleNames()->first();
+            
+            if (in_array($role, ['vice_president', 'imc_qa_checker', 'president'])) {
+                $query->where(function ($q) use ($user) {
+                    $q->whereNotIn('status', ['draft', 'returned_for_revision', 'rejected'])
+                      ->orWhereHas('approvalWorkflows', function ($aw) use ($user) {
+                          $aw->where('approver_id', $user->id)
+                             ->whereIn('action', ['rejected', 'returned_for_revision']);
+                      });
+                });
+            } elseif ($role === 'office_head') {
+                $query->whereNotIn('status', ['draft']);
             }
         }
 
@@ -109,13 +128,29 @@ class PostRequestController extends Controller
                     PostMedia::create([
                         'post_request_id' => $post->id,
                         'type' => $this->getMediaType($file->getMimeType()),
-                        'original_filename' => $file->getClientOriginalName(),
-                        'stored_filename' => $file->hashName(),
-                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
                         'mime_type' => $file->getMimeType(),
-                        'size' => $file->getSize(),
+                        'file_size' => $file->getSize(),
                         'sort_order' => $index,
                         'is_featured' => $index === 0,
+                    ]);
+                }
+            }
+
+            // Handle supporting documents
+            if ($request->hasFile('supporting_docs')) {
+                foreach ($request->file('supporting_docs') as $index => $file) {
+                    $path = $file->store('post-supporting-docs/' . $post->id, 'public');
+                    PostMedia::create([
+                        'post_request_id' => $post->id,
+                        'type' => 'document',
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'mime_type' => $file->getMimeType(),
+                        'file_size' => $file->getSize(),
+                        'sort_order' => 100 + $index,
+                        'is_featured' => false,
                     ]);
                 }
             }
@@ -126,9 +161,10 @@ class PostRequestController extends Controller
             }
 
             // Run AI compliance check if not draft
-            if (!$request->is_draft && $request->run_ai_check) {
-                $this->aiService->checkCompliance($post);
-            }
+            // Temporarily disabled as per user request to ensure smooth submission
+            // if (!$request->is_draft && $request->run_ai_check) {
+            //     $this->aiService->checkCompliance($post);
+            // }
 
             // Send notifications to approvers
             if (!$request->is_draft) {
@@ -137,7 +173,7 @@ class PostRequestController extends Controller
 
             return response()->json([
                 'data' => new PostRequestResource($post->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver', 'aiComplianceCheck'
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => $request->is_draft ? 'Post saved as draft' : 'Post submitted for approval',
             ], 201);
@@ -151,7 +187,6 @@ class PostRequestController extends Controller
             'requestor',
             'media',
             'approvalWorkflows.approver',
-            'aiComplianceCheck',
             'policyViolations.flaggedBy',
             'policyViolations.reviewedBy',
             'publishingRecords.publishedBy',
@@ -199,11 +234,10 @@ class PostRequestController extends Controller
                     PostMedia::create([
                         'post_request_id' => $postRequest->id,
                         'type' => $this->getMediaType($file->getMimeType()),
-                        'original_filename' => $file->getClientOriginalName(),
-                        'stored_filename' => $file->hashName(),
-                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
                         'mime_type' => $file->getMimeType(),
-                        'size' => $file->getSize(),
+                        'file_size' => $file->getSize(),
                         'sort_order' => $existingCount + $index,
                         'is_featured' => ($existingCount + $index) === 0,
                     ]);
@@ -226,7 +260,7 @@ class PostRequestController extends Controller
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver', 'aiComplianceCheck'
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => 'Post updated successfully',
             ]);
@@ -270,7 +304,7 @@ class PostRequestController extends Controller
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver', 'aiComplianceCheck'
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => 'Post submitted for approval',
             ]);
@@ -287,6 +321,8 @@ class PostRequestController extends Controller
 
         return DB::transaction(function () use ($request, $postRequest, $user) {
             $currentStage = $postRequest->currentApprovalStage();
+            $nextStage = $postRequest->getNextStage();
+
             $currentStage->update([
                 'action' => 'approved',
                 'approver_id' => $user->id,
@@ -294,15 +330,13 @@ class PostRequestController extends Controller
                 'acted_at' => now(),
             ]);
 
-            $nextStage = $postRequest->getNextStage();
-
             if ($nextStage) {
                 // Move to next stage
                 $statusMap = [
-                    'office_head' => PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-                    'vice_president' => PostRequest::STATUS_PENDING_PRESIDENT,
-                    'president' => PostRequest::STATUS_PENDING_IMC_QA,
-                    'imc_qa' => PostRequest::STATUS_APPROVED,
+                    'office_head' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                    'vice_president' => PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+                    'imc_qa' => PostRequest::STATUS_PENDING_IMC_QA,
+                    'it_publisher' => PostRequest::STATUS_APPROVED,
                 ];
                 
                 $postRequest->update([
@@ -322,11 +356,11 @@ class PostRequestController extends Controller
             }
 
             // Record audit trail
-            $this->recordAuditTrail($postRequest, 'approved', $user, $request->remarks);
+            AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $postRequest->title, 'INFO', ['post_id' => $postRequest->id, 'remarks' => $request->remarks], $request);
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver', 'aiComplianceCheck'
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => 'Post approved successfully',
             ]);
@@ -342,22 +376,25 @@ class PostRequestController extends Controller
         }
 
         $request->validate([
-            'rejection_reason' => 'required|string',
+            'rejection_reason' => 'required_without:reason|string',
+            'reason' => 'required_without:rejection_reason|string',
             'revision_guidance' => 'nullable|string',
         ]);
+        
+        $reason = $request->rejection_reason ?? $request->reason;
 
-        return DB::transaction(function () use ($request, $postRequest, $user) {
+        return DB::transaction(function () use ($request, $postRequest, $user, $reason) {
             $currentStage = $postRequest->currentApprovalStage();
             $currentStage->update([
                 'action' => 'rejected',
                 'approver_id' => $user->id,
-                'remarks' => $request->rejection_reason,
+                'remarks' => $reason,
                 'acted_at' => now(),
             ]);
 
             $postRequest->update([
                 'status' => PostRequest::STATUS_REJECTED,
-                'rejection_reason' => $request->rejection_reason,
+                'rejection_reason' => $reason,
             ]);
 
             // Create policy violation record if AI suggested
@@ -372,12 +409,13 @@ class PostRequestController extends Controller
                 ]);
             }
 
-            $this->recordAuditTrail($postRequest, 'rejected', $user, $request->rejection_reason);
-            $this->workflowService->notifyRequestor($postRequest, 'rejected', $request->rejection_reason);
+            // Record audit trail
+            AuditLogService::log('CONTENT_REJECT', 'Rejected post: ' . $postRequest->title, 'WARNING', ['post_id' => $postRequest->id, 'reason' => $reason], $request);
+            $this->workflowService->notifyRequestor($postRequest, 'rejected', $reason);
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver', 'aiComplianceCheck'
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => 'Post rejected',
             ]);
@@ -393,32 +431,36 @@ class PostRequestController extends Controller
         }
 
         $request->validate([
-            'revision_notes' => 'required|array',
-            'rejection_reason' => 'required|string',
+            'revision_notes' => 'nullable|array',
+            'rejection_reason' => 'required_without:reason|string',
+            'reason' => 'required_without:rejection_reason|string',
         ]);
 
-        return DB::transaction(function () use ($request, $postRequest, $user) {
+        $reason = $request->rejection_reason ?? $request->reason;
+
+        return DB::transaction(function () use ($request, $postRequest, $user, $reason) {
             $currentStage = $postRequest->currentApprovalStage();
             $currentStage->update([
                 'action' => 'returned_for_revision',
                 'approver_id' => $user->id,
-                'remarks' => $request->rejection_reason,
+                'remarks' => $reason,
                 'acted_at' => now(),
             ]);
 
             $postRequest->update([
                 'status' => PostRequest::STATUS_RETURNED_FOR_REVISION,
-                'rejection_reason' => $request->rejection_reason,
-                'revision_notes' => $request->revision_notes,
+                'rejection_reason' => $reason,
+                'revision_notes' => $request->revision_notes ?? [],
                 'revision_count' => $postRequest->revision_count + 1,
             ]);
 
-            $this->recordAuditTrail($postRequest, 'returned_for_revision', $user, $request->rejection_reason);
-            $this->workflowService->notifyRequestor($postRequest, 'returned_for_revision', $request->rejection_reason);
+            // Record audit trail
+            AuditLogService::log('CONTENT_REVISION', 'Returned post for revision: ' . $postRequest->title, 'WARNING', ['post_id' => $postRequest->id, 'reason' => $reason], $request);
+            $this->workflowService->notifyRequestor($postRequest, 'returned_for_revision', $reason);
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver', 'aiComplianceCheck'
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => 'Post returned for revision',
             ]);
@@ -442,45 +484,83 @@ class PostRequestController extends Controller
 
         $query = PostRequest::query();
 
-        switch ($role) {
-            case 'requestor':
-                $query->where('requestor_id', $user->id);
-                break;
-            case 'office_head':
-                $query->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD);
-                break;
-            case 'vice_president':
-                $query->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT);
-                break;
-            case 'president':
-                $query->where('status', PostRequest::STATUS_PENDING_PRESIDENT);
-                break;
-            case 'imc_qa_checker':
-                $query->where('status', PostRequest::STATUS_PENDING_IMC_QA);
-                break;
-            case 'it_publisher':
-                $query->where('status', PostRequest::STATUS_APPROVED)
-                      ->orWhere('status', PostRequest::STATUS_SCHEDULED);
-                break;
-            case 'admin':
-                // Admin sees all
-                break;
+        if (in_array($role, ['content_requestor', 'requestor'])) {
+            $query->where('requestor_id', $user->id);
+        } elseif (in_array($role, ['vice_president', 'imc_qa_checker', 'president'])) {
+            $query->where(function ($q) use ($user) {
+                $q->whereNotIn('status', ['draft', 'returned_for_revision', 'rejected'])
+                  ->orWhereHas('approvalWorkflows', function ($aw) use ($user) {
+                      $aw->where('approver_id', $user->id)
+                         ->whereIn('action', ['rejected', 'returned_for_revision']);
+                  });
+            });
+        } elseif ($role === 'office_head') {
+            $query->whereNotIn('status', ['draft']);
+        } elseif (in_array($role, ['it_admin', 'it_publisher'])) {
+            $query->whereIn('status', [
+                PostRequest::STATUS_APPROVED,
+                PostRequest::STATUS_SCHEDULED,
+            ]);
+        }
+        // Admin sees all
+
+        // Total user count (only for admin)
+        $totalUsers = 0;
+        if ($role === 'admin') {
+            $totalUsers = \App\Models\User::count();
         }
 
+        $totalSubmissions = (clone $query)->count();
+        $draftCount = (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count();
+        $pendingCount = (clone $query)->whereIn('status', [
+            PostRequest::STATUS_PENDING_OFFICE_HEAD,
+            PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+            PostRequest::STATUS_PENDING_PRESIDENT,
+            PostRequest::STATUS_PENDING_IMC_QA,
+        ])->count();
+        $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
+        $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
+        $returnedCount = (clone $query)->where('status', PostRequest::STATUS_RETURNED_FOR_REVISION)->count();
+        $scheduledCount = (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count();
+        $publishedCount = (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count();
+
+        // Recent post requests for activity feed (last 10)
+        $recentPosts = PostRequest::with(['requestor', 'approvalWorkflows.approver'])
+            ->orderBy('updated_at', 'desc')
+            ->take(10)
+            ->get()
+            ->map(function ($post) {
+                $currentStage = $post->currentApprovalStage();
+                return [
+                    'id' => $post->id,
+                    'title' => $post->title,
+                    'status' => $post->status,
+                    'status_label' => $post->status_label,
+                    'requestor_name' => $post->requestor?->first_name . ' ' . $post->requestor?->last_name,
+                    'requestor_initials' => strtoupper(substr($post->requestor?->first_name ?? 'U', 0, 1) . substr($post->requestor?->last_name ?? 'N', 0, 1)),
+                    'current_stage' => $currentStage?->stage_label,
+                    'current_approver' => $currentStage?->approver?->first_name . ' ' . $currentStage?->approver?->last_name,
+                    'updated_at' => $post->updated_at?->diffForHumans(),
+                    'created_at' => $post->created_at,
+                ];
+            });
+
         $stats = [
-            'total' => (clone $query)->count(),
-            'draft' => (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count(),
-            'pending' => (clone $query)->whereIn('status', [
-                PostRequest::STATUS_PENDING_OFFICE_HEAD,
-                PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-                PostRequest::STATUS_PENDING_PRESIDENT,
-                PostRequest::STATUS_PENDING_IMC_QA,
-            ])->count(),
-            'approved' => (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count(),
-            'rejected' => (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count(),
-            'returned_for_revision' => (clone $query)->where('status', PostRequest::STATUS_RETURNED_FOR_REVISION)->count(),
-            'scheduled' => (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count(),
-            'published' => (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count(),
+            'total_users' => $totalUsers,
+            'total_submissions' => $totalSubmissions,
+            'total' => $totalSubmissions,
+            'draft' => $draftCount,
+            'pending_review' => $pendingCount,
+            'pending' => $pendingCount,
+            'approved_posts' => $approvedCount,
+            'approved' => $approvedCount,
+            'rejected' => $rejectedCount,
+            'returned_revision' => $returnedCount,
+            'returned_for_revision' => $returnedCount,
+            'scheduled' => $scheduledCount,
+            'published_posts' => $publishedCount,
+            'published' => $publishedCount,
+            'recent_activity' => $recentPosts,
         ];
 
         return response()->json(['data' => $stats]);

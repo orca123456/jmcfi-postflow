@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { postsApi, dashboardApi } from '../../../services/api';
 
 export default function OfficeHeadDashboard() {
   const router = useRouter();
@@ -48,103 +50,64 @@ export default function OfficeHeadDashboard() {
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
-  // Mock Office Head pending requests list matching VP design structure
-  const [requestsList, setRequestsList] = useState([
-    {
-      id: 'oh1',
-      title: 'Hackathon 2026 Registration Announcement',
-      category: 'Event',
-      dept: 'CITE',
-      requestedBy: 'Kenneth Santos',
-      requestedByRole: 'Student Officer',
-      date: 'May 20, 2026',
-      time: '08:30 AM',
-      platforms: ['facebook', 'instagram', 'website'],
-      caption: 'Unleash your coding potential! Hackathon 2026 is officially open for registration. Form your teams now! #Hackathon2026 #CITE',
-      previewBanner: 'HACKATHON 2026 CODEFEST',
-      attachment: 'hackathon_guidelines.pdf',
-      attachmentSize: '1.4 MB',
-      status: 'PENDING',
-    },
-    {
-      id: 'oh2',
-      title: 'Faculty Development Seminar Poster',
-      category: 'Seminar',
-      dept: 'CITE',
-      requestedBy: 'Prof. Mary Ann',
-      requestedByRole: 'Faculty',
-      date: 'May 19, 2026',
-      time: '01:15 PM',
-      platforms: ['facebook', 'website'],
-      caption: 'Continuous learning for continuous excellence! Faculty Development Seminar on AI in Education takes place next week.',
-      previewBanner: 'FACULTY SEMINAR 2026',
-      attachment: 'seminar_program.pdf',
-      attachmentSize: '920 KB',
-      status: 'PENDING',
-    },
-    {
-      id: 'oh3',
-      title: 'CITE Research Colloquium Call for Papers',
-      category: 'Academic Notice',
-      dept: 'CITE',
-      requestedBy: 'Dr. Fernando Reyes',
-      requestedByRole: 'Research Head',
-      date: 'May 18, 2026',
-      time: '10:00 AM',
-      platforms: ['facebook', 'instagram', 'website'],
-      caption: 'Submissions are now open for the 2026 CITE Annual Research Colloquium. Share your innovations with the academic community.',
-      previewBanner: 'RESEARCH COLLOQUIUM 2026',
-      attachment: 'call_for_papers.pdf',
-      attachmentSize: '2.1 MB',
-      status: 'PENDING',
-    },
-  ]);
+  const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
+  const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
 
-  const [approvedRequests, setApprovedRequests] = useState([
-    {
-      id: 'oha1',
-      title: 'Graduation Prep Schedule 2026',
-      category: 'Announcement',
-      dept: 'CITE',
-      requestedBy: 'John Doe',
-      requestedByRole: 'Registrar Staff',
-      date: 'May 15, 2026',
-      time: '09:00 AM',
-      platforms: ['facebook', 'website'],
-      caption: 'The schedule for the 2026 Graduation Prep is out. Please check your portals.',
-      previewBanner: 'GRADUATION SCHEDULE',
-      attachment: 'grad_schedule.pdf',
-      attachmentSize: '1.1 MB',
-      status: 'APPROVED',
-    },
-  ]);
+  const loadData = async () => {
+    try {
+      const [postsRes, statsRes] = await Promise.all([
+        postsApi.list(),
+        dashboardApi.getStats()
+      ]);
+      const posts = postsRes.data.data;
+      setStats(statsRes.data.data);
 
-  const [rejectedRequests, setRejectedRequests] = useState([
-    {
-      id: 'ohr1',
-      title: 'Holiday Poster Design Draft',
-      category: 'Graphic',
-      dept: 'CITE',
-      requestedBy: 'Jane Smith',
-      requestedByRole: 'Student Designer',
-      date: 'May 12, 2026',
-      time: '04:45 PM',
-      platforms: ['facebook'],
-      caption: 'Happy Holidays from CITE Department!',
-      previewBanner: 'HOLIDAY POSTER',
-      attachment: 'holiday_poster.png',
-      attachmentSize: '3.4 MB',
-      status: 'REJECTED',
-      rejectionReason: 'Incorrect institutional logo format used in poster footer.',
-    },
-  ]);
+      const mapPost = (p: any) => ({
+        ...p,
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        category: p.category?.name || 'Category',
+        dept: p.requestor?.department || 'Department',
+        requestedBy: p.requestor?.full_name || 'Unknown',
+        requestedByRole: 'Requestor',
+        date: new Date(p.created_at).toLocaleDateString(),
+        time: new Date(p.created_at).toLocaleTimeString(),
+        platforms: p.target_platforms || [],
+        caption: p.caption_narrative || '',
+        previewBanner: (p.title || '').toUpperCase(),
+        attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+        attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+        rejectionReason: p.rejection_reason || '',
+      });
+
+      const mapped = posts.map(mapPost);
+      setRequestsList(mapped.filter((p: any) => p.status === 'PENDING_OFFICE_HEAD'));
+      setApprovedRequests(mapped.filter((p: any) => ['PENDING_VICE_PRESIDENT', 'PENDING_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const departmentOptions = ['All Departments', 'CITE', 'COBE', 'CAS', 'CED'];
 
-  // Handlers for actions
-  const handleApprove = (req: any) => {
-    alert(`Request Approved: "${req.title}"\nForwarded to IMC/QA Stage.`);
-    setSelectedRequest(null);
+  const handleApprove = async (req: any) => {
+    try {
+      await postsApi.approve(req.id, {});
+      alert(`Request Approved: "${req.title}"\nForwarded to next stage.`);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to approve request.');
+    }
   };
 
   const handleRejectClick = (req: any) => {
@@ -153,16 +116,32 @@ export default function OfficeHeadDashboard() {
     setIsRejectModalVisible(true);
   };
 
-  const confirmReject = () => {
-    alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
-    setIsRejectModalVisible(false);
-    setRequestToReject(null);
-    setSelectedRequest(null);
+  const confirmReject = async () => {
+    if (!rejectComment.trim()) {
+      alert('Please provide a reason for rejecting the request.');
+      return;
+    }
+    try {
+      await postsApi.reject(requestToReject?.id, { reason: rejectComment });
+      alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
+      setIsRejectModalVisible(false);
+      setRequestToReject(null);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to reject request.');
+    }
   };
 
-  const handleRequestRevision = (req: any) => {
-    alert(`Revision Requested for: "${req.title}"`);
-    setSelectedRequest(null);
+  const handleRequestRevision = async (req: any) => {
+    try {
+      await postsApi.returnRevision(req.id, { reason: 'Revision requested by Office Head' });
+      alert(`Revision Requested for: "${req.title}"`);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to return for revision.');
+    }
   };
 
   const getRequestsForTab = () => {
@@ -215,7 +194,7 @@ export default function OfficeHeadDashboard() {
                   </View>
                 </View>
                 <Text style={styles.metricLabel}>Pending Sign-off</Text>
-                <Text style={styles.metricCount}>3</Text>
+                <Text style={styles.metricCount}>{stats ? stats.pending : 0}</Text>
                 <Text style={styles.metricSubtext}>Requests awaiting your approval</Text>
               </Card>
 
@@ -227,7 +206,7 @@ export default function OfficeHeadDashboard() {
                   </View>
                 </View>
                 <Text style={styles.metricLabel}>Approved</Text>
-                <Text style={styles.metricCount}>18</Text>
+                <Text style={styles.metricCount}>{stats ? stats.approved : 0}</Text>
                 <Text style={styles.metricSubtext}>Departmental requests approved</Text>
               </Card>
 
@@ -239,8 +218,8 @@ export default function OfficeHeadDashboard() {
                   </View>
                 </View>
                 <Text style={styles.metricLabel}>Rejected</Text>
-                <Text style={styles.metricCount}>1</Text>
-                <Text style={styles.metricSubtext}>Requests returned for revision</Text>
+                <Text style={styles.metricCount}>{stats ? (stats.rejected) : 0}</Text>
+                <Text style={styles.metricSubtext}>Requests rejected</Text>
               </Card>
 
               {/* Card 4: Forwarded to QA */}
@@ -250,8 +229,8 @@ export default function OfficeHeadDashboard() {
                     <Ionicons name="arrow-forward-circle" size={20} color="#1E40AF" />
                   </View>
                 </View>
-                <Text style={styles.metricLabel}>Forwarded to QA</Text>
-                <Text style={styles.metricCount}>15</Text>
+                <Text style={styles.metricLabel}>Total Requests</Text>
+                <Text style={styles.metricCount}>{stats ? stats.total : 0}</Text>
                 <Text style={styles.metricSubtext}>Passed to IMC QA clearance</Text>
               </Card>
             </View>
@@ -329,11 +308,23 @@ export default function OfficeHeadDashboard() {
               </View>
 
               {filteredRequests.map((req) => (
-                <View key={req.id} style={styles.tableRow}>
+                <TouchableOpacity 
+                  key={req.id} 
+                  style={styles.tableRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedRequest(req);
+                    setModalPlatformTab('facebook');
+                  }}
+                >
                   {/* REQUEST TITLE + CATEGORY TAG */}
                   <View style={[styles.cellContainer, styles.flexTitle]}>
                     <View style={styles.thumbnailBox}>
-                      <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                      {req.thumbnailUrl ? (
+                        <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
+                      ) : (
+                        <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowTitleText}>{req.title}</Text>
@@ -381,18 +372,8 @@ export default function OfficeHeadDashboard() {
 
                   {/* ACTIONS */}
                   <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
-                    <TouchableOpacity
-                      style={styles.btnViewRow}
-                      onPress={() => {
-                        setSelectedRequest(req);
-                        setModalPlatformTab('facebook');
-                      }}
-                    >
-                      <Ionicons name="eye-outline" size={13} color={Colors.textPrimary} style={{ marginRight: 3 }} />
-                      <Text style={styles.btnViewRowText}>View</Text>
-                    </TouchableOpacity>
 
-                    {activeTab === 'dashboard' && (
+                    {activeTab === 'dashboard' ? (
                       <>
                         <TouchableOpacity
                           style={styles.btnApproveRow}
@@ -410,9 +391,15 @@ export default function OfficeHeadDashboard() {
                           <Text style={styles.btnRejectRowText}>Reject</Text>
                         </TouchableOpacity>
                       </>
+                    ) : (
+                      <View style={{ backgroundColor: activeTab === 'approved' ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                        <Text style={{ color: activeTab === 'approved' ? '#15803D' : '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+                          {activeTab === 'approved' ? 'Approved' : 'Rejected'}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -686,7 +673,7 @@ export default function OfficeHeadDashboard() {
                         ]}
                         onPress={() => setModalPlatformTab('instagram')}
                       >
-                        <Ionicons name="logo-[#E1306C]" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
+                        <Ionicons name="logo-instagram" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
                         <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActive]}>
                           Instagram
                         </Text>
@@ -720,10 +707,14 @@ export default function OfficeHeadDashboard() {
 
                       <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
 
-                      <View style={styles.socialMediaBanner}>
-                        <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                        <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                      </View>
+                      {selectedRequest.thumbnailUrl ? (
+                        <Image source={{ uri: selectedRequest.thumbnailUrl }} style={styles.socialMediaBanner} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.socialMediaBanner}>
+                          <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                          <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                        </View>
+                      )}
 
                       <View style={styles.socialFooterActions}>
                         <View style={styles.socialActionBtn}>
@@ -835,19 +826,23 @@ export default function OfficeHeadDashboard() {
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.btnModalApprove}
-                  onPress={() => handleApprove(selectedRequest)}
-                >
-                  <Text style={styles.btnModalApproveText}>Approve</Text>
-                </TouchableOpacity>
+                {activeTab === 'dashboard' && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.btnModalApprove}
+                      onPress={() => handleApprove(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalApproveText}>Approve</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.btnModalReject}
-                  onPress={() => handleRejectClick(selectedRequest)}
-                >
-                  <Text style={styles.btnModalRejectText}>Reject</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.btnModalReject}
+                      onPress={() => handleRejectClick(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalRejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -1432,6 +1427,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   socialMediaBanner: {
+    width: '100%',
     height: 180,
     backgroundColor: '#92400E',
     borderRadius: BorderRadius.md,

@@ -16,7 +16,7 @@ class AIComplianceService
 
     public function __construct()
     {
-        $this->apiKey = config('services.nvidia.api_key');
+        $this->apiKey = config('services.nvidia.api_key') ?? '';
         $this->apiUrl = config('services.nvidia.api_url', 'https://integrate.api.nvidia.com/v1');
         $this->model = config('services.nvidia.model', 'nvidia/nemotron-3-ultra-550b-a55b');
     }
@@ -64,21 +64,29 @@ class AIComplianceService
 
             $result = $this->parseComplianceResponse($content);
             
+            // Map status
+            $rawStatus = $result['overall_status'] ?? 'needs_review';
+            $statusMap = [
+                'compliant' => 'pass',
+                'needs_review' => 'review_required',
+                'non_compliant' => 'fail',
+            ];
+            $mappedStatus = $statusMap[$rawStatus] ?? 'review_required';
+
             // Save the AI check result
             $aiCheck = AIComplianceCheck::updateOrCreate(
                 ['post_request_id' => $postRequest->id],
                 [
                     'checked_by_user_id' => null, // AI check
-                    'original_caption' => $postRequest->caption_narrative,
-                    'suggested_caption' => $result['suggested_caption'] ?? null,
-                    'compliance_score' => $result['compliance_score'] ?? 0,
-                    'checks' => $result['checks'] ?? [],
-                    'overall_status' => $result['overall_status'] ?? 'needs_review',
-                    'analysis_logic' => $result['analysis_logic'] ?? '',
-                    'policy_alignment_result' => $result['policy_alignment'] ?? '',
+                    'check_results' => $result['checks'] ?? [],
+                    'violations_found' => [], // Will be updated if there are violations
+                    'suggested_rejection_reason' => $result['rejection_reason_suggestion'] ?? null,
+                    'suggested_revision_guidance' => $result['revision_guidance'] ?? null,
+                    'suggested_improved_caption' => $result['suggested_improved_caption'] ?? null,
+                    'overall_status' => $mappedStatus,
+                    'confidence_score' => $result['overall_compliance_score'] ?? ($result['compliance_score'] ?? 0),
                     'model_used' => $this->model,
-                    'tokens_used' => $tokensUsed,
-                    'processing_time_ms' => round($processingTime),
+                    'prompt_used' => $prompt,
                 ]
             );
 
@@ -161,10 +169,13 @@ PROMPT;
     {
         $category = $postRequest->category?->name ?? 'General';
         $platforms = implode(', ', $postRequest->target_platforms ?? []);
+        $department = $postRequest->requestor->department ?? 'N/A';
         
         $mediaInfo = $postRequest->media->map(function ($media) {
-            return "{$media->type}: {$media->original_filename}";
+            return "{$media->type}: {$media->original_name}";
         })->implode('; ');
+
+        $mediaAttachments = $mediaInfo ?: 'None';
 
         return <<<PROMPT
 Analyze this JMCFI post request for compliance:
@@ -173,8 +184,8 @@ POST DETAILS:
 - Title: {$postRequest->title}
 - Category: {$category}
 - Target Platforms: {$platforms}
-- Department: {$postRequest->requestor->department ?? 'N/A'}
-- Media Attachments: {$mediaInfo ?: 'None'}
+- Department: {$department}
+- Media Attachments: {$mediaAttachments}
 
 CAPTION/NARRATIVE:
 {$postRequest->caption_narrative}

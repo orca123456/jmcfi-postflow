@@ -30,7 +30,7 @@ class PostReturnedForRevisionNotification extends Notification implements Should
             ->greeting("Hello {$notifiable->first_name},")
             ->line("Your post request requires revision.")
             ->line("**Post:** {$this->postRequest->title}")
-            ->line("**Reason:** {$this->reason ?? 'No specific reason provided'}");
+            ->line("**Reason:** " . ($this->reason ?? 'No specific reason provided'));
 
         if ($this->revisionGuidance && !empty($this->revisionGuidance)) {
             $message->line('**Revision Guidance:**');
