@@ -128,6 +128,7 @@ export const getRoleDashboardPath = (role: string): string => {
     president: '/dashboard/president',
     imc_qa_checker: '/dashboard/imc-qa',
     it_publisher: '/dashboard/it-admin',
+    admin: '/dashboard/it-admin',
   };
   return map[role] ?? '/dashboard/requestor';
 };
