@@ -29,12 +29,6 @@ class RoleSeeder extends Seeder
                 'permissions' => ['view_pending_posts', 'approve_post', 'reject_post', 'return_for_revision', 'escalate_post'],
             ],
             [
-                'name' => 'president',
-                'display_name' => 'President',
-                'description' => 'Executive-level approver for high-priority or sensitive content.',
-                'permissions' => ['view_pending_posts', 'approve_post', 'reject_post', 'return_for_revision', 'final_approval'],
-            ],
-            [
                 'name' => 'imc_qa_checker',
                 'display_name' => 'IMC / QA Checker',
                 'description' => 'Quality assurance and branding compliance reviewer before publishing.',

@@ -67,7 +67,6 @@ const ROLE_OPTIONS = [
   { label: 'Content Requestor', value: 'requestor' },
   { label: 'Office Head', value: 'office_head' },
   { label: 'Vice President', value: 'vice_president' },
-  { label: 'President', value: 'president' },
   { label: 'IMC / QA Checker', value: 'imc_qa_checker' },
   { label: 'IT Admin (Publisher)', value: 'it_publisher' },
 ];
@@ -77,7 +76,6 @@ const DEPARTMENT_OPTIONS = [
   { id: 2, display_name: 'Marketing' },
   { id: 3, display_name: 'Academic Affairs' },
   { id: 4, display_name: 'Administration' },
-  { id: 5, display_name: 'Office of the President' },
   { id: 6, display_name: 'Institutional Marketing & Communications' },
 ];
 
@@ -456,7 +454,6 @@ export default function ITAdminDashboard() {
       case 'vice_president': return { label: 'VICE PRESIDENT', color: '#B45309', bgColor: '#FEF3C7' };
       case 'requestor': return { label: 'REQUESTOR', color: '#0F766E', bgColor: '#CCFBF1' };
       case 'office_head': return { label: 'OFFICE HEAD', color: '#92400E', bgColor: '#FEF3C7' };
-      case 'president': return { label: 'PRESIDENT', color: '#701A75', bgColor: '#FDF4FF' };
       case 'imc_qa_checker': return { label: 'IMC / QA', color: '#6366F1', bgColor: '#E0E7FF' };
       default: return { label: role.toUpperCase(), color: Colors.textPrimary, bgColor: '#F3F4F6' };
     }
@@ -483,7 +480,7 @@ export default function ITAdminDashboard() {
     let matchesStatus = true;
     if (requestsStatus !== 'All Status') {
       if (requestsStatus === 'Pending') {
-        matchesStatus = ['pending_office_head', 'pending_vice_president', 'pending_president', 'pending_imc_qa', 'draft'].includes(post.rawStatus);
+        matchesStatus = ['pending_office_head', 'pending_vice_president', 'pending_imc_qa', 'draft'].includes(post.rawStatus);
       } else if (requestsStatus === 'Published') {
         matchesStatus = ['published', 'approved'].includes(post.rawStatus);
       } else if (requestsStatus === 'Rejected') {

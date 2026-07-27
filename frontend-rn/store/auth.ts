@@ -127,7 +127,6 @@ export const getRoleDashboardPath = (role: string): string => {
     requestor: '/dashboard/requestor',
     office_head: '/dashboard/office-head',
     vice_president: '/dashboard/vp',
-    president: '/dashboard/president',
     imc_qa_checker: '/dashboard/imc-qa',
     it_publisher: '/dashboard/it-admin',
     admin: '/dashboard/it-admin',
@@ -140,7 +139,6 @@ export const getRoleLabel = (role: string): string => {
     requestor: 'Content Requestor',
     office_head: 'Office Head',
     vice_president: 'Vice President',
-    president: 'President',
     imc_qa_checker: 'IMC/QA Checker',
     it_publisher: 'IT Admin',
   };
@@ -152,7 +150,6 @@ export const getRoleColor = (role: string): string => {
     requestor: '#2563EB',
     office_head: '#D97706',
     vice_president: '#DC2626',
-    president: '#0F766E',
     imc_qa_checker: '#7C3AED',
     it_publisher: '#0F172A',
   };

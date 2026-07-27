@@ -113,7 +113,6 @@ const ROLES = [
   { label: 'Content Requestor', value: 'requestor', email: 'maria.delacruz@jmcfi.edu.ph' },
   { label: 'Office Head', value: 'office_head', email: 'office.head@jmcfi.edu.ph' },
   { label: 'Vice President', value: 'vp', email: 'vp@jmcfi.edu.ph' },
-  { label: 'President', value: 'president', email: 'president@jmcfi.edu.ph' },
   { label: 'IMC/QA Checker', value: 'imc_qa', email: 'imc.qa@jmcfi.edu.ph' },
   { label: 'IT Admin (Publisher)', value: 'it_publisher', email: 'it.support@jmcfi.edu.ph' },
 ];
