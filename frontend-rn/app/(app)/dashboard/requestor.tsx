@@ -169,7 +169,7 @@ export default function RequestorDashboard() {
 
   useEffect(() => {
     loadPosts();
-  }, []);
+  }, [activeTab]);
 
   const handleSaveDraft = async () => {
     if (!postTitle || !caption) {

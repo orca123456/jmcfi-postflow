@@ -95,7 +95,7 @@ export default function OfficeHeadDashboard() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeTab]);
 
   const departmentOptions = ['All Departments', 'CITE', 'COBE', 'CAS', 'CED'];
 

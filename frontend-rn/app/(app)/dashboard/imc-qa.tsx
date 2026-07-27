@@ -95,7 +95,7 @@ export default function ImcQaDashboard() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeTab]);
 
   const departmentOptions = ['All Departments', 'MARKETING', 'ATHLETICS', 'REGISTRAR', 'CAS', 'CITE', 'COBE'];
 
