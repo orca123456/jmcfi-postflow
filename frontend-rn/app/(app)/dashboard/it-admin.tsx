@@ -131,7 +131,7 @@ export default function ITAdminDashboard() {
       }
     };
     fetchUsers();
-  }, []);
+  }, [activeTab]);
 
   const [users, setUsers] = useState<any[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
