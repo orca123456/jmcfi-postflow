@@ -40,12 +40,6 @@ class RoleSeeder extends Seeder
                 'description' => 'Schedules and publishes approved content to WordPress, Facebook, and Instagram.',
                 'permissions' => ['view_ready_to_publish', 'schedule_post', 'publish_post', 'manage_publishing_queue', 'view_publishing_history'],
             ],
-            [
-                'name' => 'admin',
-                'display_name' => 'Administrator',
-                'description' => 'System administrator with full access to all features and settings.',
-                'permissions' => ['*'],
-            ],
         ];
 
         foreach ($roles as $role) {
