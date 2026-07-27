@@ -40,9 +40,7 @@ COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
 RUN chown -R application:application /app \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
-# Run Laravel optimizations
-RUN php artisan config:cache \
-    && php artisan route:cache
+# (Config caching is skipped during build because ENV variables are not available yet)
 
 # Expose port 80 (default for webdevops)
 EXPOSE 80
