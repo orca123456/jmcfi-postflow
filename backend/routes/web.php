@@ -13,10 +13,13 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
+Route::get('/{any}', function () {
+    $path = public_path('index.html');
+    if (file_exists($path)) {
+        return file_get_contents($path);
+    }
     return response()->json([
-        'message' => 'JMCFI PostFlow API',
-        'version' => '1.0.0',
+        'message' => 'JMCFI PostFlow API (Frontend not built)',
         'status' => 'running',
     ]);
-});
+})->where('any', '.*');
