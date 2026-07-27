@@ -1,13 +1,16 @@
 <?php
-require __DIR__.'/vendor/autoload.php';
-$app = require_once __DIR__.'/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
+try {
+    $dsn = "pgsql:host=aws-1-ap-northeast-2.pooler.supabase.com;port=5432;dbname=postgres;sslmode=require";
+    $pdo = new PDO($dsn, "postgres.avkzfxlqovkxygbgifqq", "Nycopaderayon@03");
+    echo "Connected successfully to pooler!\n";
+} catch (PDOException $e) {
+    echo "Connection failed: " . $e->getMessage() . "\n";
+}
 
-$posts = App\Models\PostRequest::with('approvalWorkflows')->get();
-foreach ($posts as $post) {
-    echo "Post ID: {$post->id}, Status: {$post->status}\n";
-    foreach ($post->approvalWorkflows as $wf) {
-        echo "  - WF ID: {$wf->id}, Stage: {$wf->stage}, Order: {$wf->stage_order}, Action: {$wf->action}\n";
-    }
+try {
+    $dsn2 = "pgsql:host=db.avkzfxlqovkxygbgifqq.supabase.co;port=5432;dbname=postgres;sslmode=require";
+    $pdo2 = new PDO($dsn2, "postgres", "Nycopaderayon03");
+    echo "Connected successfully to direct!\n";
+} catch (PDOException $e) {
+    echo "Connection failed direct: " . $e->getMessage() . "\n";
 }
