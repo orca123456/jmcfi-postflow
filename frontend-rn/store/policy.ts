@@ -117,7 +117,7 @@ const DEFAULT_SECTIONS: PolicySection[] = [
     steps: [
       { title: 'Content Creation', desc: 'Poster submits request (Title, Caption, Media).' },
       { title: 'Quality Check', desc: 'Verification of brand guidelines and factual accuracy.' },
-      { title: 'Approval', desc: 'Multi-level sign-off (Dept Head, VP, President if required).' },
+      { title: 'Approval', desc: 'Multi-level sign-off (Dept Head, VP).' },
       { title: 'Publishing', desc: 'Final deployment by the IT Department.' },
     ],
   },

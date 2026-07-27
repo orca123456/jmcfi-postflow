@@ -150,7 +150,7 @@ export default function RequestorDashboard() {
         steps: [
           { label: 'Submitted', state: 'completed' },
           { label: 'Dept Head', state: ['pending_office_head'].includes(p.status) ? 'active' : 'completed' },
-          { label: 'VP / Pres', state: ['pending_vice_president', 'pending_president'].includes(p.status) ? 'active' : 'upcoming' },
+          { label: 'Vice President', state: p.status === 'pending_vice_president' ? 'active' : 'upcoming' },
           { label: 'IMC QA', state: ['pending_imc_qa'].includes(p.status) ? 'active' : 'upcoming' },
           { label: 'Publisher', state: ['approved', 'scheduled', 'published'].includes(p.status) ? 'active' : 'upcoming' },
         ],
@@ -352,7 +352,7 @@ export default function RequestorDashboard() {
         { label: 'IMC QA', state: 'upcoming' },
         { label: 'Publisher', state: 'upcoming' },
       ];
-    } else if (s === 'pending_vice_president' || s === 'pending_president') {
+    } else if (s === 'pending_vice_president') {
       return [
         { label: 'Submitted', state: 'completed' },
         { label: 'Dept Head', state: 'completed' },

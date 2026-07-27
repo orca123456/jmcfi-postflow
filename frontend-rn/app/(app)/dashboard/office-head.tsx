@@ -86,7 +86,7 @@ export default function OfficeHeadDashboard() {
 
       const mapped = posts.map(mapPost);
       setRequestsList(mapped.filter((p: any) => p.status === 'PENDING_OFFICE_HEAD'));
-      setApprovedRequests(mapped.filter((p: any) => ['PENDING_VICE_PRESIDENT', 'PENDING_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      setApprovedRequests(mapped.filter((p: any) => ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
       setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
     } catch (err) {
       console.error(err);

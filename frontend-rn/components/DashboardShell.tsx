@@ -109,7 +109,6 @@ export function DashboardShell({
           --color-requestor: #2563EB;
           --color-office-head: #D97706;
           --color-vp: #DC2626;
-          --color-president: #0F766E;
           --color-imc-qa: #7C3AED;
           --color-publisher: #374151;
         }
@@ -137,7 +136,6 @@ export function DashboardShell({
           --color-requestor: #60A5FA;
           --color-office-head: #F59E0B;
           --color-vp: #F87171;
-          --color-president: #14B8A6;
           --color-imc-qa: #C084FC;
           --color-publisher: #9CA3AF;
         }
@@ -177,7 +175,6 @@ export function DashboardShell({
 
     if (
       userRole === 'office_head' ||
-      userRole === 'president' ||
       userRole === 'imc_qa_checker' ||
       userRole === 'vice_president'
     ) {
