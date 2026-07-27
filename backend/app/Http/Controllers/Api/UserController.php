@@ -102,8 +102,15 @@ class UserController extends Controller
             return response()->json(['message' => 'Cannot delete your own account'], 400);
         }
 
-        $user->delete();
-        return response()->json(null, 204);
+        try {
+            $user->delete();
+            return response()->json(null, 204);
+        } catch (\Illuminate\Database\QueryException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete this user because they are associated with existing content or approvals.'
+            ], 400);
+        }
     }
 
     /**
