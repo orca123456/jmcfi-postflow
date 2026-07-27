@@ -27,7 +27,7 @@ WORKDIR /app
 COPY backend/ ./
 
 # Ensure required Laravel directories exist and are writable before composer install
-RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions \
+RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views \
     && chmod -R 777 bootstrap/cache storage
 
 # Install Composer Dependencies
@@ -42,8 +42,7 @@ RUN chown -R application:application /app/storage /app/bootstrap/cache \
 
 # Run Laravel optimizations
 RUN php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
+    && php artisan route:cache
 
 # Expose port 80 (default for webdevops)
 EXPOSE 80
