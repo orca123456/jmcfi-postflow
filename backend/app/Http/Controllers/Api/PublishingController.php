@@ -23,7 +23,7 @@ class PublishingController extends Controller
         $user = $request->user();
 
         // 1. Validate that the user is the publisher (IT Admin)
-        if (!$user->hasRole('it_admin')) {
+        if (!$user->hasRole('it_publisher')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Only IT Admin can publish.'
@@ -101,7 +101,7 @@ class PublishingController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->hasRole('it_admin')) {
+        if (!$user->hasRole('it_publisher')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
