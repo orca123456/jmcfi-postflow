@@ -37,7 +37,7 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
 
 # Set correct permissions for Laravel
-RUN chown -R application:application /app/storage /app/bootstrap/cache \
+RUN chown -R application:application /app \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
 # Run Laravel optimizations
