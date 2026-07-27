@@ -1,12 +1,113 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Animated, Easing, KeyboardAvoidingView, Platform, ScrollView,
-  Image, useWindowDimensions
+  Image, useWindowDimensions, TextInputProps
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleDashboardPath } from '../../store/auth';
+
+// ── Floating Label Input Component ─────────────────────────────────────────
+interface FloatingLabelProps extends TextInputProps {
+  label: string;
+  secureTextEntry?: boolean;
+  rightIcon?: React.ReactNode;
+}
+
+const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
+  ({ label, value, onChangeText, secureTextEntry, rightIcon, ...props }, ref) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [isElevated, setIsElevated] = useState(!!value);
+    const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+    const handleFocus = useCallback(() => {
+      setIsFocused(true);
+      setIsElevated(true);
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: false,
+      }).start();
+    }, [animatedValue]);
+
+    const handleBlur = useCallback(() => {
+      setIsFocused(false);
+      if (!value) {
+        setIsElevated(false);
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          useNativeDriver: false,
+        }).start();
+      }
+    }, [animatedValue, value]);
+
+    // Sync animation if value is set externally
+    useEffect(() => {
+      if (value && !isElevated) {
+        setIsElevated(true);
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 0,
+          useNativeDriver: false,
+        }).start();
+      }
+    }, [value, animatedValue, isElevated]);
+
+    const labelStyle = {
+      position: 'absolute' as const,
+      left: 14,
+      top: animatedValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [14, -8],
+      }),
+      fontSize: animatedValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [16, 12],
+      }),
+      color: animatedValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['#9CA3AF', isFocused ? '#4b0082' : '#6B7280'],
+      }),
+      backgroundColor: '#fff',
+      paddingHorizontal: 4,
+      zIndex: 2,
+    };
+
+    const borderColor = isFocused ? '#4b0082' : '#D1D5DB';
+
+    return (
+      <View style={[styles.flContainer, { borderColor }]}>
+        <Animated.Text style={labelStyle}>
+          {label}
+        </Animated.Text>
+        <TextInput
+          ref={ref}
+          style={styles.flInput}
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          secureTextEntry={secureTextEntry}
+          placeholder="" // placeholder is handled by floating label
+          {...props}
+        />
+        {rightIcon && (
+          <View style={styles.flRightIcon}>
+            {rightIcon}
+          </View>
+        )}
+      </View>
+    );
+  }
+);
+
+FloatingLabelInput.displayName = 'FloatingLabelInput';
+
+// ── End Floating Label ──────────────────────────────────────────────────────
 
 const ROLES = [
   { label: 'Content Requestor', value: 'requestor', email: 'maria.delacruz@jmcfi.edu.ph' },
@@ -86,16 +187,14 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuthStore();
   
-  const [email, setEmail] = useState('it.support@jmcfi.edu.ph');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [staySignedIn, setStaySignedIn] = useState(true);
 
   const handleLogin = async () => {
     setLoading(true);
     
-    // Call the store's login function which expects email and password
     const success = await login(email, password);
     
     setLoading(false);
@@ -131,35 +230,34 @@ export default function LoginScreen() {
               <Text style={styles.subtitle}>Sign in to your account</Text>
               
               <View style={styles.field}>
-                <Text style={styles.label}>Email</Text>
-                <TextInput
-                  style={styles.input}
+                <FloatingLabelInput
+                  label="Email"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoComplete="email"
                 />
               </View>
 
               <View style={styles.field}>
-                  <Text style={styles.label}>Password</Text>
-                  <View style={styles.passwordContainer}>
-                    <TextInput
-                      style={styles.passwordInput}
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry={!showPassword}
-                    />
+                <FloatingLabelInput
+                  label="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete="password"
+                  rightIcon={
                     <TouchableOpacity 
-                      style={styles.eyeIcon} 
                       onPress={() => setShowPassword(!showPassword)}
+                      style={{ padding: 4 }}
                     >
                       <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
                     </TouchableOpacity>
-                  </View>
+                  }
+                />
               </View>
-
-
 
               <View style={styles.field}>
                 <TouchableOpacity 
@@ -171,13 +269,12 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
-
             </View>
           </View>
 
           <View style={styles.footerLink}>
             <View style={styles.listing}>
-              <Text style={styles.listingLink}>© 2026 JMCFI POSTFLOW  System TechNycDev</Text>
+              <Text style={styles.listingLink}>© 2026 JMCFI POSTFLOW System TechNycDev</Text>
             </View>
           </View>
         </View>
@@ -198,11 +295,6 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     zIndex: 9,
   },
-  boxLightWisteria: { backgroundColor: 'rgba(201, 160, 220, 0.15)', borderWidth: 2, borderColor: '#c9a0dc' },
-  boxWisteria: { backgroundColor: '#c9a0dc' },
-  boxGrape: { backgroundColor: '#6c3baa' },
-  boxIndigo: { backgroundColor: '#4b0082' },
-  boxSunglow: { backgroundColor: '#FFCC33' },
   
   header: {
     paddingBottom: 24,
@@ -246,84 +338,32 @@ const styles = StyleSheet.create({
   field: {
     paddingBottom: 24,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#4B5563',
-    marginBottom: 8,
-  },
-  input: {
-    fontSize: 15,
-    lineHeight: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 44,
+
+  // ── Floating Label Styles ──────────────────────────────────────────────
+  flContainer: {
+    position: 'relative',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 6,
     backgroundColor: '#fff',
-    color: '#1a1f36',
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 6,
-    backgroundColor: '#fff',
-  },
-  passwordInput: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 44,
-    color: '#1a1f36',
-  },
-  eyeIcon: {
-    padding: 10,
-  },
-  grid5050: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  forgotLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5469d4',
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingBottom: 24,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(60, 66, 87, 0.16)',
-    borderRadius: 3,
-    marginRight: 8,
-    alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 52,
   },
-  checkboxChecked: {
-    backgroundColor: '#5469d4',
-    borderColor: '#5469d4',
-  },
-  checkmark: {
-    width: 10,
-    height: 10,
-    backgroundColor: '#fff',
-    borderRadius: 1,
-  },
-  checkboxLabel: {
+  flInput: {
     fontSize: 16,
     color: '#1a1f36',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 6,
+    minHeight: 52,
   },
+  flRightIcon: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+
   submitButton: {
     backgroundColor: '#4b0082',
     paddingVertical: 12,
@@ -339,25 +379,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  ssoLinkContainer: {
-    alignItems: 'center',
-  },
-  ssoLink: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#5469d4',
-  },
   footerLink: {
     paddingTop: 24,
     alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#1a1f36',
-  },
-  linkText: {
-    color: '#5469d4',
-    fontWeight: '600',
   },
   listing: {
     flexDirection: 'row',

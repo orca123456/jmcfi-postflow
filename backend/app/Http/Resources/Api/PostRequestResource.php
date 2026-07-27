@@ -44,10 +44,10 @@ class PostRequestResource extends JsonResource
                     return [
                         'id' => $media->id,
                         'type' => $media->type,
-                        'original_filename' => $media->original_filename,
+                        'original_filename' => $media->original_name,
                         'url' => $media->url,
                         'mime_type' => $media->mime_type,
-                        'size' => $media->size,
+                        'size' => $media->file_size,
                         'formatted_size' => $media->formatted_size,
                         'is_featured' => $media->is_featured,
                         'sort_order' => $media->sort_order,

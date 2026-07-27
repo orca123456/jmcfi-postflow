@@ -10,6 +10,8 @@ class AIComplianceCheck extends Model
 {
     use HasFactory;
 
+    protected $table = 'ai_compliance_checks';
+
     protected $fillable = [
         'post_request_id',
         'checked_by_user_id',

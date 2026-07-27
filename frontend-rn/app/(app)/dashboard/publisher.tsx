@@ -379,7 +379,7 @@ export default function PublisherDashboard() {
               <View style={styles.policyDetailCol}>
                 {filteredSections.length > 0 ? (
                   filteredSections.map((sec) => (
-                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }]}>
+                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }] as any}>
                       <View style={[styles.previewHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10 }]}>
                         <View style={[styles.activityIconBg, { backgroundColor: sec.bg, borderColor: sec.color }]}>
                           <Ionicons name={sec.icon as any} size={14} color={sec.color} />

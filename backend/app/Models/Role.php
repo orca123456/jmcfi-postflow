@@ -22,4 +22,9 @@ class Role extends Model
             'permissions' => 'array',
         ];
     }
+
+    public function getRouteKeyName(): string
+    {
+        return 'name';
+    }
 }

@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { postsApi, dashboardApi } from '../../../services/api';
 
 export default function VPDashboard() {
   const router = useRouter();
@@ -48,135 +50,64 @@ export default function VPDashboard() {
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
-  // Mock VP pending requests list matching design screenshot
-  const [requestsList, setRequestsList] = useState([
-    {
-      id: 'req1',
-      title: 'Intramurals 2026 Opening Ceremony',
-      category: 'Event',
-      dept: 'CITE',
-      requestedBy: 'Juan Dela Cruz',
-      requestedByRole: 'Staff',
-      date: 'May 19, 2026',
-      time: '10:30 AM',
-      platforms: ['facebook', 'instagram', 'website'],
-      caption: 'The spirit of unity, excellence, and sportsmanship comes alive! Join us as we proudly open Intramurals 2026. #Intramurals2026 #JMCFI',
-      previewBanner: 'INTRAMURALS 2026 OPENING CEREMONY',
-      attachment: 'intramurals2026_banner.jpg',
-      attachmentSize: '1.2 MB',
-      status: 'PENDING',
-    },
-    {
-      id: 'req2',
-      title: 'Scholarship Program 2026',
-      category: 'Announcement',
-      dept: 'COBE',
-      requestedBy: 'Maria Santos',
-      requestedByRole: 'Faculty',
-      date: 'May 18, 2026',
-      time: '02:15 PM',
-      platforms: ['facebook', 'website'],
-      caption: 'Applications for the AY 2026-2027 Academic Scholarship Program are now open! Check out the requirements and deadline details on our official website portal.',
-      previewBanner: 'SCHOLARSHIP PROGRAM 2026',
-      attachment: 'scholarship_guidelines.pdf',
-      attachmentSize: '850 KB',
-      status: 'PENDING',
-    },
-    {
-      id: 'req3',
-      title: 'Community Outreach Activity',
-      category: 'Community',
-      dept: 'CAS',
-      requestedBy: 'Alex Rivera',
-      requestedByRole: 'Coordinator',
-      date: 'May 17, 2026',
-      time: '11:00 AM',
-      platforms: ['facebook', 'instagram'],
-      caption: 'Together we build a stronger community. CAS leads volunteerism initiative in Barangay Malagamot. Join us this coming weekend!',
-      previewBanner: 'COMMUNITY OUTREACH 2026',
-      attachment: 'outreach_photos.zip',
-      attachmentSize: '4.5 MB',
-      status: 'PENDING',
-    },
-    {
-      id: 'req4',
-      title: 'Career Fair 2026',
-      category: 'Event',
-      dept: 'COBE',
-      requestedBy: 'Grace Lee',
-      requestedByRole: 'Officer',
-      date: 'May 16, 2026',
-      time: '09:30 AM',
-      platforms: ['facebook', 'instagram', 'website'],
-      caption: 'Connect with top industry partners and secure your dream career at the annual JMCFI Career Fair 2026! Pre-registration is now open.',
-      previewBanner: 'CAREER FAIR 2026',
-      attachment: 'career_fair_poster.png',
-      attachmentSize: '2.1 MB',
-      status: 'PENDING',
-    },
-    {
-      id: 'req5',
-      title: 'CITE Week 2026 Teaser',
-      category: 'Teaser',
-      dept: 'CITE',
-      requestedBy: 'Kevin Tan',
-      requestedByRole: 'Staff',
-      date: 'May 15, 2026',
-      time: '04:45 PM',
-      platforms: ['facebook', 'instagram'],
-      caption: 'Innovation meets passion! Get ready for CITE Week 2026: Shaping the Future of Technology. Stay tuned for exciting event line-ups!',
-      previewBanner: 'CITE WEEK 2026 TEASER',
-      attachment: 'teaser_video.mp4',
-      attachmentSize: '15.8 MB',
-      status: 'PENDING',
-    },
-  ]);
+  const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
+  const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
 
-  const [approvedRequests, setApprovedRequests] = useState([
-    {
-      id: 'req6',
-      title: 'CED Orientation 2026',
-      category: 'Event',
-      dept: 'CED',
-      requestedBy: 'Sarah Connor',
-      requestedByRole: 'Dean',
-      date: 'May 10, 2026',
-      time: '08:00 AM',
-      platforms: ['facebook'],
-      caption: 'Welcome to the CED family! Orientation begins...',
-      previewBanner: 'CED ORIENTATION',
-      attachment: 'ced_orientation.pdf',
-      attachmentSize: '2.5 MB',
-      status: 'APPROVED',
-    }
-  ]);
+  const loadData = async () => {
+    try {
+      const [postsRes, statsRes] = await Promise.all([
+        postsApi.list(),
+        dashboardApi.getStats()
+      ]);
+      const posts = postsRes.data.data;
+      setStats(statsRes.data.data);
 
-  const [rejectedRequests, setRejectedRequests] = useState([
-    {
-      id: 'req7',
-      title: 'CAS Acquaintance Party',
-      category: 'Event',
-      dept: 'CAS',
-      requestedBy: 'John Doe',
-      requestedByRole: 'Student',
-      date: 'May 12, 2026',
-      time: '01:00 PM',
-      platforms: ['facebook', 'instagram'],
-      caption: 'Let us party!',
-      previewBanner: 'CAS PARTY',
-      attachment: 'cas_party.png',
-      attachmentSize: '1.1 MB',
-      status: 'REJECTED',
-      rejectionReason: 'Please revise the caption to be more formal and appropriate for a university page.',
+      const mapPost = (p: any) => ({
+        ...p,
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        category: p.category?.name || 'Category',
+        dept: p.requestor?.department || 'Department',
+        requestedBy: p.requestor?.full_name || 'Unknown',
+        requestedByRole: 'Requestor',
+        date: new Date(p.created_at).toLocaleDateString(),
+        time: new Date(p.created_at).toLocaleTimeString(),
+        platforms: p.target_platforms || [],
+        caption: p.caption_narrative || '',
+        previewBanner: (p.title || '').toUpperCase(),
+        attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+        attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+        rejectionReason: p.rejection_reason || '',
+      });
+
+      const mapped = posts.map(mapPost);
+      setRequestsList(mapped.filter((p: any) => p.status === 'PENDING_VICE_PRESIDENT'));
+      setApprovedRequests(mapped.filter((p: any) => ['PENDING_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+    } catch (err) {
+      console.error(err);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const departmentOptions = ['All Departments', 'CITE', 'COBE', 'CAS', 'CED'];
 
-  // Handler for quick actions
-  const handleApprove = (req: any) => {
-    alert(`Request Approved: "${req.title}"`);
-    setSelectedRequest(null);
+  const handleApprove = async (req: any) => {
+    try {
+      await postsApi.approve(req.id, {});
+      alert(`Request Approved: "${req.title}"\nForwarded to next stage.`);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to approve request.');
+    }
   };
 
   const handleRejectClick = (req: any) => {
@@ -185,16 +116,32 @@ export default function VPDashboard() {
     setIsRejectModalVisible(true);
   };
 
-  const confirmReject = () => {
-    alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
-    setIsRejectModalVisible(false);
-    setRequestToReject(null);
-    setSelectedRequest(null);
+  const confirmReject = async () => {
+    if (!rejectComment.trim()) {
+      alert('Please provide a reason for rejecting the request.');
+      return;
+    }
+    try {
+      await postsApi.reject(requestToReject?.id, { reason: rejectComment });
+      alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
+      setIsRejectModalVisible(false);
+      setRequestToReject(null);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to reject request.');
+    }
   };
 
-  const handleRequestRevision = (req: any) => {
-    alert(`Revision Requested for: "${req.title}"`);
-    setSelectedRequest(null);
+  const handleRequestRevision = async (req: any) => {
+    try {
+      await postsApi.returnRevision(req.id, { reason: 'Revision requested by Vice President' });
+      alert(`Revision Requested for: "${req.title}"`);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to return for revision.');
+    }
   };
 
   const getRequestsForTab = () => {
@@ -247,7 +194,7 @@ export default function VPDashboard() {
                 </View>
               </View>
               <Text style={styles.metricLabel}>For My Approval</Text>
-              <Text style={styles.metricCount}>8</Text>
+              <Text style={styles.metricCount}>{stats ? stats.pending : 0}</Text>
               <Text style={styles.metricSubtext}>Requests awaiting your approval</Text>
             </Card>
 
@@ -259,7 +206,7 @@ export default function VPDashboard() {
                 </View>
               </View>
               <Text style={styles.metricLabel}>Approved</Text>
-              <Text style={styles.metricCount}>24</Text>
+              <Text style={styles.metricCount}>{stats ? stats.approved : 0}</Text>
               <Text style={styles.metricSubtext}>Requests you approved</Text>
             </Card>
 
@@ -271,8 +218,8 @@ export default function VPDashboard() {
                 </View>
               </View>
               <Text style={styles.metricLabel}>Rejected</Text>
-              <Text style={styles.metricCount}>5</Text>
-              <Text style={styles.metricSubtext}>Requests you rejected</Text>
+              <Text style={styles.metricCount}>{stats ? (stats.rejected) : 0}</Text>
+              <Text style={styles.metricSubtext}>Requests rejected</Text>
             </Card>
 
             {/* Card 4: Published */}
@@ -282,8 +229,8 @@ export default function VPDashboard() {
                   <Ionicons name="paper-plane" size={20} color="#2563EB" />
                 </View>
               </View>
-              <Text style={styles.metricLabel}>Published</Text>
-              <Text style={styles.metricCount}>18</Text>
+              <Text style={styles.metricLabel}>Total Requests</Text>
+              <Text style={styles.metricCount}>{stats ? stats.total : 0}</Text>
                 <Text style={styles.metricSubtext}>Requests published</Text>
               </Card>
             </View>
@@ -357,11 +304,23 @@ export default function VPDashboard() {
               </View>
 
               {filteredRequests.map((req) => (
-                <View key={req.id} style={styles.tableRow}>
+                <TouchableOpacity 
+                  key={req.id} 
+                  style={styles.tableRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedRequest(req);
+                    setModalPlatformTab('facebook');
+                  }}
+                >
                   {/* REQUEST TITLE + CATEGORY TAG */}
                   <View style={[styles.cellContainer, styles.flexTitle]}>
                     <View style={styles.thumbnailBox}>
-                      <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                      {req.thumbnailUrl ? (
+                        <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
+                      ) : (
+                        <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowTitleText}>{req.title}</Text>
@@ -409,18 +368,8 @@ export default function VPDashboard() {
 
                   {/* ACTIONS */}
                   <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
-                    <TouchableOpacity
-                      style={styles.btnViewRow}
-                      onPress={() => {
-                        setSelectedRequest(req);
-                        setModalPlatformTab('facebook');
-                      }}
-                    >
-                      <Ionicons name="eye-outline" size={13} color={Colors.textPrimary} style={{ marginRight: 3 }} />
-                      <Text style={styles.btnViewRowText}>View</Text>
-                    </TouchableOpacity>
 
-                    {activeTab === 'dashboard' && (
+                    {activeTab === 'dashboard' ? (
                       <>
                         <TouchableOpacity
                           style={styles.btnApproveRow}
@@ -438,9 +387,15 @@ export default function VPDashboard() {
                           <Text style={styles.btnRejectRowText}>Reject</Text>
                         </TouchableOpacity>
                       </>
+                    ) : (
+                      <View style={{ backgroundColor: activeTab === 'approved' ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                        <Text style={{ color: activeTab === 'approved' ? '#15803D' : '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+                          {activeTab === 'approved' ? 'Approved' : 'Rejected'}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -754,10 +709,14 @@ export default function VPDashboard() {
                       <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
 
                       {/* Mockup Image Media Banner */}
-                      <View style={styles.socialMediaBanner}>
-                        <Ionicons name="sparkles" size={28} color="#FFFFFF" style={{ marginBottom: 6 }} />
-                        <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                      </View>
+                      {selectedRequest.thumbnailUrl ? (
+                        <Image source={{ uri: selectedRequest.thumbnailUrl }} style={styles.socialMediaBanner} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.socialMediaBanner}>
+                          <Ionicons name="sparkles" size={28} color="#FFFFFF" style={{ marginBottom: 6 }} />
+                          <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                        </View>
+                      )}
 
                       {/* Social Action Footer */}
                       <View style={styles.socialFooterActions}>
@@ -872,19 +831,23 @@ export default function VPDashboard() {
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.btnModalApprove}
-                  onPress={() => handleApprove(selectedRequest)}
-                >
-                  <Text style={styles.btnModalApproveText}>Approve</Text>
-                </TouchableOpacity>
+                {activeTab === 'dashboard' && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.btnModalApprove}
+                      onPress={() => handleApprove(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalApproveText}>Approve</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.btnModalReject}
-                  onPress={() => handleRejectClick(selectedRequest)}
-                >
-                  <Text style={styles.btnModalRejectText}>Reject</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.btnModalReject}
+                      onPress={() => handleRejectClick(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalRejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -1469,8 +1432,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   socialMediaBanner: {
+    width: '100%',
     height: 180,
-    backgroundColor: '#312E81',
+    backgroundColor: '#0369A1',
     borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',

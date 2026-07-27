@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,14 @@ import {
   FlatList,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
-import { dashboardApi, postsApi } from '../../../services/api';
+import { dashboardApi, postsApi, departmentsApi, rolesApi, usersApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 
@@ -61,26 +62,6 @@ const CustomStatCard: React.FC<StatCardProps> = ({
     </Card>
   );
 };
-
-// Available Roles for account creation
-const ROLE_OPTIONS = [
-  { label: 'Admin', value: 'admin' },
-  { label: 'Content Requestor', value: 'requestor' },
-  { label: 'Office Head', value: 'office_head' },
-  { label: 'Vice President', value: 'vp' },
-  { label: 'President', value: 'president' },
-  { label: 'IT / Publisher', value: 'it_publisher' },
-  { label: 'IMC / QA', value: 'imc_qa' },
-];
-
-const DEPARTMENT_OPTIONS = [
-  'ICT',
-  'Marketing',
-  'Academic Affairs',
-  'Administration',
-  'Office of the President',
-  'Institutional Marketing & Communications',
-];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -132,16 +113,74 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
 
+  // ── Dynamic data from API ─────────────────────────────────────────────
+  const [roleOptions, setRoleOptions] = useState<{ label: string; value: string }[]>([]);
+  const [rolesFullList, setRolesFullList] = useState<any[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<{ id: number; name: string; display_name: string }[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await rolesApi.list();
+      const roles = res.data?.data ?? [];
+      setRolesFullList(roles);
+      setRoleOptions(
+        roles.map((r: any) => ({
+          label: r.display_name,
+          value: r.name,
+        }))
+      );
+    } catch {
+      setRolesFullList([]);
+      setRoleOptions([]);
+    }
+  }, []);
+
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await departmentsApi.list();
+      const depts = res.data?.data ?? [];
+      setDepartmentOptions(depts);
+    } catch {
+      setDepartmentOptions([]);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await usersApi.list();
+      const fetchedUsers = res.data?.data ?? [];
+      // Transform API data for our display format
+      setUsers(
+        fetchedUsers.map((u: any) => ({
+          id: u.id?.toString() ?? '',
+          email: u.email ?? '',
+          role: Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0].name ?? u.roles[0] : (u.role ?? ''),
+          department: u.department ?? '',
+          created_at: u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '',
+        }))
+      );
+    } catch {
+      setUsers([]);
+    }
+  }, []);
+
+  const loadAllData = useCallback(async () => {
+    setIsLoadingData(true);
+    await Promise.all([fetchRoles(), fetchDepartments(), fetchUsers()]);
+    setIsLoadingData(false);
+  }, [fetchRoles, fetchDepartments, fetchUsers]);
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
   // User Management state
-  const [users, setUsers] = useState<any[]>([
-    { id: '1', email: 'admin@jmcfi.edu.ph', role: 'admin', department: 'ICT', created_at: 'Oct 12, 2023' },
-    { id: '2', email: 'v.academic@jmcfi.edu.ph', role: 'vp', department: 'Academic Affairs', created_at: 'Nov 05, 2023' },
-    { id: '3', email: 'it.support@jmcfi.edu.ph', role: 'it_publisher', department: 'ICT', created_at: 'Jan 20, 2024' },
-  ]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState('admin');
-  const [newUserDepartment, setNewUserDepartment] = useState('Marketing');
+  const [newUserDepartment, setNewUserDepartment] = useState('');
   const [isRolePickerOpen, setIsRolePickerOpen] = useState(false);
   const [isDeptPickerOpen, setIsDeptPickerOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -150,122 +189,94 @@ export default function AdminDashboard() {
   const [showPassword, setShowPassword] = useState(false);
   const [userFilter, setUserFilter] = useState('');
 
+  // Department and Role management sub-tabs
+  const [showDeptManager, setShowDeptManager] = useState(false);
+  const [showRoleManager, setShowRoleManager] = useState(false);
+  const [deptManagerName, setDeptManagerName] = useState('');
+  const [deptManagerDisplay, setDeptManagerDisplay] = useState('');
+  const [roleManagerName, setRoleManagerName] = useState('');
+  const [roleManagerDisplay, setRoleManagerDisplay] = useState('');
+
   // All Posts Pipeline state
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending_review' | 'approved' | 'revision_requested'
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [activePostActionDetails, setActivePostActionDetails] = useState<{ type: string; post: any } | null>(null);
 
-  // Mock Post data pages
-  const page1Posts = [
-    {
-      id: '1',
-      title: 'Graduation 2024 Announcement',
-      author: "Registrar's Office",
-      timeAgo: '2h ago',
-      department: 'Administration',
-      status: 'pending_review',
-      statusLabel: 'PENDING REVIEW',
-      reviewer: 'Office Head',
-      platforms: ['FB', 'PORTAL'],
-    },
-    {
-      id: '2',
-      title: 'Athletic Meet Results',
-      author: 'Sports Dept',
-      timeAgo: '1d ago',
-      department: 'Student Affairs',
-      status: 'approved',
-      statusLabel: 'APPROVED',
-      reviewer: '—',
-      platforms: ['IG'],
-    },
-    {
-      id: '3',
-      title: 'Scholarship Call for Apps',
-      author: 'Finance',
-      timeAgo: '3d ago',
-      department: 'Institutional Finance',
-      status: 'revision_requested',
-      statusLabel: 'REVISION REQUESTED',
-      reviewer: 'IMC Dept',
-      platforms: ['FB', 'WEB'],
-    },
-  ];
+  // Pipeline posts and all posts (fetched from API)
+  const [posts, setPosts] = useState<any[]>([]);
+  const [allPosts, setAllPosts] = useState<any[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsTotal, setPostsTotal] = useState(0);
+  const POSTS_PER_PAGE = 15;
 
-  const page2Posts = [
-    {
-      id: '4',
-      title: 'Enrollment Guidelines SY 2026-2027',
-      author: "Admissions Office",
-      timeAgo: '4d ago',
-      department: 'Administration',
-      status: 'pending_review',
-      statusLabel: 'PENDING REVIEW',
-      reviewer: 'Vice President',
-      platforms: ['FB', 'PORTAL', 'WEB'],
-    },
-    {
-      id: '5',
-      title: 'JMCFI Foundation Day Celebrations',
-      author: 'HR Dept',
-      timeAgo: '5d ago',
-      department: 'Human Resources',
-      status: 'approved',
-      statusLabel: 'APPROVED',
-      reviewer: '—',
-      platforms: ['FB', 'IG'],
-    },
-  ];
-
-  const allMockPosts = [...page1Posts, ...page2Posts];
-
-  useEffect(() => {
-    // Attempt real API fetch
-    dashboardApi.getStats()
-      .then(r => setStats(r.data))
-      .catch(() => {
-        setStats({
-          total_users: '1,284',
-          total_submissions: '4,592',
-          pending_review: '156',
-          approved_posts: '3,902',
-          returned_revision: '421',
-          published_posts: '3,745',
-        });
-      });
-
-    dashboardApi.getRecentActivity()
-      .then(r => setActivities(r.data ?? []))
-      .catch(() => {
-        setActivities([
-          {
-            id: 1,
-            userInitials: 'JD',
-            userName: 'John Doe',
-            action: 'approved a submission for',
-            target: 'Arts & Sciences',
-            time: '2 minutes ago',
-            platform: 'Institutional Facebook Page',
-            color: '#1E40AF',
-            bgColor: '#DBEAFE',
-          },
-          {
-            id: 2,
-            userInitials: 'MS',
-            userName: 'Mary Smith',
-            action: 'requested revision for',
-            target: 'Enrollment Update',
-            time: '15 minutes ago',
-            platform: 'JMCFI Official Portal',
-            color: '#B45309',
-            bgColor: '#FEF3C7',
-          },
-        ]);
-      });
+  const fetchPipelinePosts = useCallback(async (page: number = 1, status?: string) => {
+    setPostsLoading(true);
+    try {
+      const params: any = { per_page: POSTS_PER_PAGE, page };
+      if (status && status !== 'all') params.status = status;
+      const res = await postsApi.list(params);
+      setPosts(res.data?.data ?? []);
+      setPostsTotal(res.data?.meta?.total ?? 0);
+    } catch {
+      setPosts([]);
+      setPostsTotal(0);
+    } finally {
+      setPostsLoading(false);
+    }
   }, []);
 
-  const handleCreateAccount = () => {
+  // Fetch all posts once for platform distribution
+  const fetchAllPosts = useCallback(async () => {
+    try {
+      const res = await postsApi.list({ per_page: 100 });
+      setAllPosts(res.data?.data ?? []);
+    } catch {
+      setAllPosts([]);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    // Fetch real analytics from API
+    const fetchStats = async () => {
+      try {
+        const r = await dashboardApi.getStats();
+        if (r.data?.data) {
+          setStats(r.data.data);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch dashboard stats, using zeros:', err);
+        setStats({
+          total_users: 0,
+          total_submissions: 0,
+          pending_review: 0,
+          approved_posts: 0,
+          returned_revision: 0,
+          published_posts: 0,
+        });
+      }
+    };
+
+    const fetchActivity = async () => {
+      try {
+        const r = await dashboardApi.getRecentActivity();
+        if (r.data?.data) {
+          setActivities(r.data.data);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch recent activity:', err);
+        setActivities([]);
+      }
+    };
+
+    fetchStats();
+    fetchActivity();
+    fetchPipelinePosts(1, statusFilter);
+    fetchAllPosts();
+  }, []);
+
+  const handleCreateAccount = async () => {
     if (!newUserEmail || !newUserPassword) {
       alert('Please fill in both email and password.');
       return;
@@ -275,54 +286,174 @@ export default function AdminDashboard() {
       return;
     }
 
-    const formattedDate = new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-    });
+    try {
+      // Parse name parts from email
+      const namePart = newUserEmail.split('@')[0];
+      const nameParts = namePart.replace(/[._]/g, ' ').split(' ');
+      const firstName = nameParts[0] ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : 'User';
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].charAt(0).toUpperCase() + nameParts[nameParts.length - 1].slice(1) : 'User';
 
-    const newAccount = {
-      id: Date.now().toString(),
-      email: newUserEmail,
-      role: newUserRole,
-      department: newUserDepartment,
-      created_at: formattedDate,
-    };
+      const res = await usersApi.create({
+        employee_id: `EMP-${Date.now()}`,
+        first_name: firstName,
+        last_name: lastName,
+        email: newUserEmail,
+        password: newUserPassword,
+        department: newUserDepartment || null,
+        role: newUserRole,
+      });
 
-    setUsers([newAccount, ...users]);
-    setNewUserEmail('');
-    setNewUserPassword('');
-    setNewUserDepartment('Marketing');
-    alert('Institutional account created successfully!');
-  };
+      const created = res.data?.data ?? {};
+      setUsers(prev => [{
+        id: created.id?.toString() ?? Date.now().toString(),
+        email: created.email ?? newUserEmail,
+        role: Array.isArray(created.roles) && created.roles.length > 0 ? created.roles[0].name ?? created.roles[0] : newUserRole,
+        department: created.department ?? newUserDepartment,
+        created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      }, ...prev]);
 
-  const handleDeleteUser = (id: string) => {
-    if (confirm('Are you sure you want to delete this user account?')) {
-      setUsers(users.filter(u => u.id !== id));
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserRole('admin');
+      setNewUserDepartment('');
+      alert('Institutional account created successfully!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to create user.';
+      alert(`Error: ${msg}`);
     }
   };
 
-  const handleSaveEditedRole = (id: string) => {
-    setUsers(users.map(u => {
-      if (u.id === id) {
-        return { ...u, role: editingUserRole };
+  const handleDeleteUser = async (id: string) => {
+    if (confirm('Are you sure you want to delete this user account?')) {
+      try {
+        await usersApi.delete(id);
+        setUsers(users.filter(u => u.id !== id));
+        alert('User account deleted successfully.');
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to delete user.';
+        alert(`Error: ${msg}`);
       }
-      return u;
-    }));
-    setEditingUserId(null);
-    alert('User role updated successfully!');
+    }
+  };
+
+  const handleSaveEditedRole = async (id: string) => {
+    try {
+      await usersApi.update(id, { role: editingUserRole });
+      setUsers(users.map(u => {
+        if (u.id === id) {
+          return { ...u, role: editingUserRole };
+        }
+        return u;
+      }));
+      setEditingUserId(null);
+      alert('User role updated successfully!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to update role.';
+      alert(`Error: ${msg}`);
+    }
+  };
+
+  // ── Department & Role Management Handlers ───────────────────────────
+  const handleAddDepartment = async () => {
+    if (!deptManagerName.trim()) { alert('Please enter a department name.'); return; }
+    try {
+      const slug = deptManagerName.toLowerCase().replace(/\s+/g, '_');
+      await departmentsApi.create({ name: slug, display_name: deptManagerName.trim() });
+      setDeptManagerName('');
+      setDeptManagerDisplay('');
+      alert('Department added successfully!');
+      await fetchDepartments();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to add department.';
+      alert(`Error: ${msg}`);
+    }
+  };
+
+  const handleDeleteDepartment = async (id: number) => {
+    if (confirm('Are you sure you want to delete this department?')) {
+      try {
+        await departmentsApi.delete(id);
+        alert('Department deleted successfully.');
+        await fetchDepartments();
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to delete department.';
+        alert(`Error: ${msg}`);
+      }
+    }
+  };
+
+  const handleAddRole = async () => {
+    if (!roleManagerName.trim()) { alert('Please enter a role name.'); return; }
+    try {
+      const slug = roleManagerName.toLowerCase().replace(/\s+/g, '_');
+      await rolesApi.create({ name: slug, display_name: roleManagerName.trim() });
+      setRoleManagerName('');
+      setRoleManagerDisplay('');
+      alert('Role added successfully!');
+      await fetchRoles();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to add role.';
+      alert(`Error: ${msg}`);
+    }
+  };
+
+  const handleDeleteRole = async (name: string) => {
+    if (confirm('Are you sure you want to delete this role?')) {
+      try {
+        await rolesApi.delete(name);
+        alert('Role deleted successfully.');
+        await fetchRoles();
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to delete role.';
+        alert(`Error: ${msg}`);
+      }
+    }
   };
 
   const isLargeScreen = width > 1024;
   const isTablet = width > 768;
 
-  // Platform Distribution mock data
-  const platforms = [
-    { name: 'Facebook', percentage: 65, barColor: Colors.primary },
-    { name: 'Instagram', percentage: 15, barColor: '#B45309' },
-    { name: 'Twitter/X', percentage: 10, barColor: '#6B7280' },
-    { name: 'Portal', percentage: 10, barColor: '#3B82F6' },
-  ];
+  // Platform Distribution computed from API data
+  const getPlatformDistribution = useCallback(() => {
+    const counts: Record<string, number> = {};
+    let total = 0;
+    allPosts.forEach((post: any) => {
+      const platforms = post.target_platforms ?? [];
+      platforms.forEach((p: string) => {
+        counts[p] = (counts[p] || 0) + 1;
+        total++;
+      });
+    });
+    if (total === 0) {
+      return [
+        { name: 'Facebook', percentage: 0, barColor: Colors.primary },
+        { name: 'Instagram', percentage: 0, barColor: '#B45309' },
+        { name: 'Twitter/X', percentage: 0, barColor: '#6B7280' },
+        { name: 'Portal', percentage: 0, barColor: '#3B82F6' },
+      ];
+    }
+    const colorMap: Record<string, string> = {
+      'facebook': Colors.primary, 'fb': Colors.primary,
+      'instagram': '#B45309', 'ig': '#B45309',
+      'twitter': '#6B7280', 'x': '#6B7280',
+      'portal': '#3B82F6', 'web': '#059669',
+    };
+    const nameMap: Record<string, string> = {
+      'facebook': 'Facebook', 'fb': 'Facebook',
+      'instagram': 'Instagram', 'ig': 'Instagram',
+      'twitter': 'Twitter/X', 'x': 'Twitter/X',
+      'portal': 'Portal', 'web': 'Website',
+    };
+    return Object.entries(counts)
+      .map(([key, count]) => ({
+        name: nameMap[key.toLowerCase()] ?? key,
+        percentage: Math.round((count / total) * 100),
+        barColor: colorMap[key.toLowerCase()] ?? '#6B7280',
+      }))
+      .sort((a, b) => b.percentage - a.percentage);
+  }, [allPosts]);
+
+  const platforms = getPlatformDistribution();
 
   const getRoleBadgeDetails = (role: string) => {
     switch (role) {
@@ -349,15 +480,13 @@ export default function AdminDashboard() {
     u.email.toLowerCase().includes(userFilter.toLowerCase())
   );
 
-  // Filter & Paginate posts
-  const getFilteredPosts = () => {
-    let postsToFilter = currentPage === 1 ? page1Posts : page2Posts;
+  // Get filtered posts from API state
+  const getFilteredPosts = useCallback(() => {
     if (statusFilter !== 'all') {
-      // If filtering, we can check across all mock posts to show correct search results
-      postsToFilter = allMockPosts.filter(p => p.status === statusFilter);
+      return posts.filter(p => p.status === statusFilter);
     }
-    return postsToFilter;
-  };
+    return posts;
+  }, [posts, statusFilter]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -526,7 +655,7 @@ export default function AdminDashboard() {
       {activeTab === 'user-management' && (
         <View style={styles.userTabContainer}>
           {/* Create New Institutional Account Card */}
-          <Card style={[styles.userCard, (isRolePickerOpen || isDeptPickerOpen) && { position: 'relative', zIndex: 10, overflow: 'visible' }]}>
+          <Card style={[styles.userCard, (isRolePickerOpen || isDeptPickerOpen) && { position: 'relative', zIndex: 10, overflow: 'visible' }] as any}>
             <Text style={styles.sectionHeader}>Create New Institutional Account</Text>
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout, (isRolePickerOpen || isDeptPickerOpen) && { position: 'relative', zIndex: 20, overflow: 'visible' }]}>
               <View style={styles.formField}>
@@ -584,7 +713,7 @@ export default function AdminDashboard() {
                     fontFamily: 'inherit',
                   }}
                 >
-                  {ROLE_OPTIONS.map((opt) => (
+                  {roleOptions.map((opt: any) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -612,9 +741,10 @@ export default function AdminDashboard() {
                     fontFamily: 'inherit',
                   }}
                 >
-                  {DEPARTMENT_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
+                  <option value="">Select Department</option>
+                  {departmentOptions.map((opt: any) => (
+                    <option key={opt.id} value={opt.display_name}>
+                      {opt.display_name}
                     </option>
                   ))}
                 </select>
@@ -629,7 +759,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* System Users List Card */}
-          <Card style={[styles.userCard, editingUserId !== null && { overflow: 'visible', zIndex: 50 }]}>
+          <Card style={[styles.userCard, editingUserId !== null && { overflow: 'visible', zIndex: 50 }] as any}>
             <View style={styles.tableHeaderSection}>
               <Text style={styles.sectionHeader}>System Users</Text>
               <View style={styles.searchBar}>
@@ -679,7 +809,7 @@ export default function AdminDashboard() {
                                 fontFamily: 'inherit',
                               }}
                             >
-                              {ROLE_OPTIONS.map((opt) => (
+                              {roleOptions.map((opt: any) => (
                                 <option key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </option>
@@ -730,6 +860,111 @@ export default function AdminDashboard() {
               )}
             </View>
           </Card>
+
+          {/* ── Department Manager ── */}
+          <Card style={styles.userCard}>
+            <View style={styles.tableHeaderSection}>
+              <Text style={styles.sectionHeader}>Department Manager</Text>
+              <TouchableOpacity
+                style={[styles.filterButton, { backgroundColor: showDeptManager ? '#DC2626' : Colors.primary }]}
+                onPress={() => setShowDeptManager(!showDeptManager)}
+              >
+                <Ionicons name={showDeptManager ? 'close-outline' : 'add-outline'} size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.filterButtonText}>{showDeptManager ? 'Cancel' : 'Add Department'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showDeptManager && (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <TextInput
+                  style={[styles.formInput, { flex: 1, minWidth: 200 }]}
+                  placeholder="Department display name (e.g., Human Resources)"
+                  value={deptManagerName}
+                  onChangeText={setDeptManagerName}
+                />
+                <TouchableOpacity style={styles.submitButton} onPress={handleAddDepartment}>
+                  <Text style={styles.submitButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Department Name</Text>
+                <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
+              </View>
+              {departmentOptions.length > 0 ? (
+                departmentOptions.map((dept: any) => (
+                  <View key={dept.id} style={styles.tableRow}>
+                    <Text style={[styles.tableCellText, styles.cellFlex2]}>{dept.display_name}</Text>
+                    <View style={[styles.cellFlex1, styles.actionCell]}>
+                      <TouchableOpacity onPress={() => handleDeleteDepartment(dept.id)}>
+                        <Text style={styles.deleteActionText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyTable}>
+                  <Text style={styles.emptyTableText}>No departments found.</Text>
+                </View>
+              )}
+            </View>
+          </Card>
+
+          {/* ── Role Manager ── */}
+          <Card style={styles.userCard}>
+            <View style={styles.tableHeaderSection}>
+              <Text style={styles.sectionHeader}>Role Manager</Text>
+              <TouchableOpacity
+                style={[styles.filterButton, { backgroundColor: showRoleManager ? '#DC2626' : Colors.primary }]}
+                onPress={() => setShowRoleManager(!showRoleManager)}
+              >
+                <Ionicons name={showRoleManager ? 'close-outline' : 'add-outline'} size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.filterButtonText}>{showRoleManager ? 'Cancel' : 'Add Role'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showRoleManager && (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <TextInput
+                  style={[styles.formInput, { flex: 1, minWidth: 200 }]}
+                  placeholder="Role display name (e.g., Department Secretary)"
+                  value={roleManagerName}
+                  onChangeText={setRoleManagerName}
+                />
+                <TouchableOpacity style={styles.submitButton} onPress={handleAddRole}>
+                  <Text style={styles.submitButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Role Name</Text>
+                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Internal Key</Text>
+                <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
+              </View>
+              {roleOptions.length > 0 ? (
+                roleOptions.map((role: any, idx: number) => (
+                  <View key={role.value ?? idx} style={styles.tableRow}>
+                    <Text style={[styles.tableCellText, styles.cellFlex2]}>{role.label}</Text>
+                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{role.value}</Text>
+                    <View style={[styles.cellFlex1, styles.actionCell]}>
+                      <TouchableOpacity onPress={() => handleDeleteRole(role.value)}>
+                        <Text style={styles.deleteActionText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyTable}>
+                  <Text style={styles.emptyTableText}>No roles found.</Text>
+                </View>
+              )}
+            </View>
+          </Card>
+
         </View>
       )}
 
@@ -759,7 +994,8 @@ export default function AdminDashboard() {
                           onPress={() => {
                             setStatusFilter(statusOption);
                             setIsStatusDropdownOpen(false);
-                            setCurrentPage(1); // Reset page on filter
+                            setCurrentPage(1);
+                            fetchPipelinePosts(1, statusOption);
                           }}
                         >
                           <Text style={styles.dropdownItemText}>{getStatusLabelText(statusOption)}</Text>
@@ -802,7 +1038,7 @@ export default function AdminDashboard() {
                       <View style={[styles.cellFlex2, styles.postTitleColumn]}>
                         <Text style={styles.postTitleText}>{post.title}</Text>
                         <Text style={styles.postMetaText}>
-                          by {post.author} &bull; {post.timeAgo}
+                          by {post.requestor?.full_name ?? 'Unknown'} &bull; {new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                         </Text>
                       </View>
 
@@ -818,11 +1054,11 @@ export default function AdminDashboard() {
                       </View>
 
                       {/* Current Reviewer */}
-                      <Text style={[styles.tableCellText, styles.cellFlex1]}>{post.reviewer}</Text>
+                      <Text style={[styles.tableCellText, styles.cellFlex1]}>{post.approval_workflows?.[0]?.approver?.full_name ?? (post.status_label ?? post.status)}</Text>
 
                       {/* Target Platform Badges */}
                       <View style={[styles.cellFlex1, styles.platformBadgesRow]}>
-                        {post.platforms.map((plat, idx) => (
+                        {(post.target_platforms ?? []).map((plat: string, idx: number) => (
                           <View key={idx} style={styles.platformMiniBadge}>
                             <Text style={styles.platformMiniBadgeText}>{plat}</Text>
                           </View>
@@ -863,40 +1099,39 @@ export default function AdminDashboard() {
             {/* Pipeline Table Footer / Pagination */}
             <View style={styles.pipelineFooter}>
               <Text style={styles.footerInfoText}>
-                Showing {postsToShow.length} of 4,592 posts
+                Showing {postsToShow.length} of {postsTotal} posts
               </Text>
               
               <View style={styles.paginationRow}>
                 <TouchableOpacity
-                  style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
-                  disabled={currentPage === 1}
-                  onPress={() => setCurrentPage(1)}
+                  style={[styles.pageButton, currentPage <= 1 && styles.pageButtonDisabled]}
+                  disabled={currentPage <= 1}
+                  onPress={() => {
+                    const newPage = currentPage - 1;
+                    setCurrentPage(newPage);
+                    fetchPipelinePosts(newPage, statusFilter);
+                  }}
                 >
                   <Text style={styles.pageButtonText}>Previous</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.pageIndexButton, currentPage === 1 && styles.pageIndexButtonActive]}
-                  onPress={() => setCurrentPage(1)}
+                  style={[styles.pageIndexButton, true]}
+                  onPress={() => {}}
                 >
-                  <Text style={[styles.pageIndexButtonText, currentPage === 1 && styles.pageIndexButtonTextActive]}>
-                    1
+                  <Text style={[styles.pageIndexButtonText, true && styles.pageIndexButtonTextActive]}>
+                    {currentPage}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.pageIndexButton, currentPage === 2 && styles.pageIndexButtonActive]}
-                  onPress={() => setCurrentPage(2)}
-                >
-                  <Text style={[styles.pageIndexButtonText, currentPage === 2 && styles.pageIndexButtonTextActive]}>
-                    2
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.pageButton, currentPage === 2 && styles.pageButtonDisabled]}
-                  disabled={currentPage === 2}
-                  onPress={() => setCurrentPage(2)}
+                  style={[styles.pageButton, false]}
+                  disabled={false}
+                  onPress={() => {
+                    const newPage = currentPage + 1;
+                    setCurrentPage(newPage);
+                    fetchPipelinePosts(newPage, statusFilter);
+                  }}
                 >
                   <Text style={styles.pageButtonText}>Next</Text>
                 </TouchableOpacity>
@@ -989,8 +1224,8 @@ export default function AdminDashboard() {
 
             {/* Right settings card */}
             <View style={styles.rightColumn}>
-              <Card style={styles.configCard}>
-                <Text style={styles.configCardTitle}>Update Password</Text>
+              <Card style={styles.configCard as any}>
+                <Text style={styles.configCardTitle as any}>Update Password</Text>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
@@ -1277,7 +1512,7 @@ export default function AdminDashboard() {
               })}
 
               {/* Global Save Button Card */}
-              <Card style={[styles.formCard, { backgroundColor: '#F8FAFC' }]}>
+              <Card style={[styles.formCard, { backgroundColor: '#F8FAFC' }] as any}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                   <View style={{ flex: 1, minWidth: 200 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary }}>Apply Updates to Platform Policies</Text>
@@ -1317,8 +1552,8 @@ export default function AdminDashboard() {
 
             {/* Right Column: Policy Preview info */}
             <View style={styles.rightColumn}>
-              <Card style={styles.configCard}>
-                <Text style={styles.configCardTitle}>Policy Publishing Info</Text>
+              <Card style={styles.configCard as any}>
+                <Text style={styles.configCardTitle as any}>Policy Publishing Info</Text>
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>PREVIEW BANNER STATE</Text>
                   <View style={{ padding: 12, backgroundColor: '#EFF6FF', borderRadius: 4, borderWidth: 1, borderColor: '#DBEAFE', marginTop: 4 }}>
@@ -1369,7 +1604,7 @@ export default function AdminDashboard() {
                   {activePostActionDetails.post.title}
                 </Text>
                 <Text style={styles.modalPostMeta}>
-                  Origin: {activePostActionDetails.post.department} &bull; Author: {activePostActionDetails.post.author}
+                  Origin: {activePostActionDetails.post.department ?? (activePostActionDetails.post.requestor?.department ?? 'N/A')} &bull; Author: {activePostActionDetails.post.author ?? (activePostActionDetails.post.requestor?.full_name ?? 'Unknown')}
                 </Text>
                 
                 <View style={styles.modalDivider} />
@@ -1377,14 +1612,14 @@ export default function AdminDashboard() {
                 {activePostActionDetails.type === 'view' && (
                   <View style={styles.viewContainer}>
                     <Text style={styles.bodyBoldLabel}>Status Check:</Text>
-                    <Text style={styles.bodyValueText}>{activePostActionDetails.post.statusLabel}</Text>
+                    <Text style={styles.bodyValueText}>{activePostActionDetails.post.status_label ?? activePostActionDetails.post.status}</Text>
                     
                     <Text style={[styles.bodyBoldLabel, { marginTop: 12 }]}>Current Target Platforms:</Text>
-                    <Text style={styles.bodyValueText}>{activePostActionDetails.post.platforms.join(', ')}</Text>
+                    <Text style={styles.bodyValueText}>{(activePostActionDetails.post.target_platforms ?? []).join(', ')}</Text>
                     
-                    <Text style={[styles.bodyBoldLabel, { marginTop: 12 }]}>Post Mock Content Structure:</Text>
+                    <Text style={[styles.bodyBoldLabel, { marginTop: 12 }]}>Caption / Narrative:</Text>
                     <Text style={styles.bodyMockPostContent}>
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam convallis lectus in tortor elementum, sed facilisis ligula congue. Cras a tristique mi. Sed rhoncus interdum finibus. Phasellus eget tortor ac orci accumsan semper eu ut lorem.
+                      {activePostActionDetails.post.caption_narrative ?? "No caption provided."}
                     </Text>
                   </View>
                 )}
@@ -2260,12 +2495,6 @@ const styles = StyleSheet.create({
   splitLayout: {
     gap: Spacing.lg,
   },
-  rowLayout: {
-    flexDirection: 'row',
-  },
-  columnLayout: {
-    flexDirection: 'column',
-  },
   leftColumn: {
     flex: 1.5,
     gap: Spacing.lg,
@@ -2273,6 +2502,20 @@ const styles = StyleSheet.create({
   rightColumn: {
     flex: 1,
     gap: Spacing.lg,
+  },
+  configCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  } as any,
+  configCardTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
   },
   formCard: {
     backgroundColor: Colors.surface,

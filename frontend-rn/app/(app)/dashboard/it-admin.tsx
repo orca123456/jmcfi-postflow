@@ -16,13 +16,14 @@ import {
   Modal,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
-import { dashboardApi } from '../../../services/api';
+import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 
@@ -72,12 +73,12 @@ const ROLE_OPTIONS = [
 ];
 
 const DEPARTMENT_OPTIONS = [
-  'ICT',
-  'Marketing',
-  'Academic Affairs',
-  'Administration',
-  'Office of the President',
-  'Institutional Marketing & Communications',
+  { id: 1, display_name: 'ICT' },
+  { id: 2, display_name: 'Marketing' },
+  { id: 3, display_name: 'Academic Affairs' },
+  { id: 4, display_name: 'Administration' },
+  { id: 5, display_name: 'Office of the President' },
+  { id: 6, display_name: 'Institutional Marketing & Communications' },
 ];
 
 export default function ITAdminDashboard() {
@@ -107,61 +108,151 @@ export default function ITAdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
 
-  const [users, setUsers] = useState<any[]>([
-    { id: '1', email: 'it.support@jmcfi.edu.ph', role: 'it_publisher', department: 'ICT', created_at: 'Jan 20, 2024' },
-    { id: '2', email: 'v.academic@jmcfi.edu.ph', role: 'vice_president', department: 'Academic Affairs', created_at: 'Nov 05, 2023' },
-    { id: '3', email: 'maria.delacruz@jmcfi.edu.ph', role: 'requestor', department: 'Administration', created_at: 'Mar 10, 2024' },
-    { id: '4', email: 'office.head@jmcfi.edu.ph', role: 'office_head', department: 'Marketing', created_at: 'Feb 14, 2024' },
-    { id: '5', email: 'imc.qa@jmcfi.edu.ph', role: 'imc_qa_checker', department: 'Institutional Marketing & Communications', created_at: 'Apr 01, 2024' },
-  ]);
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const response = await dashboardApi.getStats();
+        setStats(response.data.data);
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    };
+    loadStats();
+
+    const fetchUsers = async () => {
+      try {
+        const res = await usersApi.list();
+        const mappedUsers = res.data.data.map((u: any) => ({
+          ...u,
+          role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+          created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+        }));
+        setUsers(mappedUsers);
+      } catch (e) {
+        console.error('Failed to load users:', e);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const [users, setUsers] = useState<any[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [rolesList, setRolesList] = useState(ROLE_OPTIONS);
-  const [departmentsList, setDepartmentsList] = useState(DEPARTMENT_OPTIONS);
+  const [newUserFirstName, setNewUserFirstName] = useState('');
+  const [newUserLastName, setNewUserLastName] = useState('');
+  const [rolesList, setRolesList] = useState<{label: string, value: string}[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<{id: number, display_name: string}[]>([]);
   const [newUserRole, setNewUserRole] = useState('requestor');
   const [newUserDepartment, setNewUserDepartment] = useState('Marketing');
 
+  // Inline add-role/department state
+  const [addingRole, setAddingRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [addingDept, setAddingDept] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+
+  // Confirm delete modal state
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<any>(null);
+  const [confirmDeleteUserEmail, setConfirmDeleteUserEmail] = useState('');
+
   const handleAddRole = () => {
-    const roleName = prompt('Enter new institutional role name:');
-    if (roleName && roleName.trim()) {
-      const val = roleName.trim().toLowerCase().replace(/\s+/g, '_');
-      const newOpt = { label: roleName.trim(), value: val };
-      setRolesList((prev) => [...prev, newOpt]);
-      setNewUserRole(val);
-    }
+    setAddingRole(true);
+    setNewRoleName('');
   };
 
-  const handleDeleteRole = () => {
+  useEffect(() => {
+    const fetchRolesAndDepartments = async () => {
+      try {
+        const rolesRes = await rolesApi.list();
+        const deptsRes = await departmentsApi.list();
+        
+        const fetchedRoles = rolesRes.data?.data;
+        if (fetchedRoles && fetchedRoles.length > 0) {
+          setRolesList(fetchedRoles.map((r: any) => ({ label: r.display_name, value: r.name })));
+          setNewUserRole(fetchedRoles[0].name);
+        }
+        
+        const fetchedDepts = deptsRes.data?.data;
+        if (fetchedDepts && fetchedDepts.length > 0) {
+          setDepartmentsList(fetchedDepts.map((d: any) => ({ id: d.id, display_name: d.display_name })));
+          setNewUserDepartment(fetchedDepts[0].display_name);
+        }
+      } catch (err) {
+        console.error('Failed to fetch roles/departments:', err);
+      }
+    };
+    fetchRolesAndDepartments();
+  }, []);
+
+  const handleConfirmAddRole = async () => {
+    const roleName = newRoleName.trim();
+    if (roleName) {
+      try {
+        const val = roleName.toLowerCase().replace(/\s+/g, '_');
+        await rolesApi.create({ name: val, display_name: roleName });
+        const newOpt = { label: roleName, value: val };
+        setRolesList((prev) => [...prev, newOpt]);
+        setNewUserRole(val);
+      } catch (e: any) {
+        alert('Failed to add role: ' + (e.response?.data?.message || e.message));
+      }
+    }
+    setAddingRole(false);
+    setNewRoleName('');
+  };
+
+  const handleDeleteRole = async () => {
     if (rolesList.length <= 1) {
       alert('Cannot delete the last remaining role.');
       return;
     }
-    const roleToDelete = rolesList.find((r) => r.value === newUserRole);
-    if (confirm(`Are you sure you want to remove role "${roleToDelete?.label}"?`)) {
+    try {
+      await rolesApi.delete(newUserRole);
       const updated = rolesList.filter((r) => r.value !== newUserRole);
       setRolesList(updated);
       setNewUserRole(updated[0].value);
+    } catch (e: any) {
+      alert('Failed to delete role: ' + (e.response?.data?.message || e.message));
     }
   };
 
   const handleAddDepartment = () => {
-    const deptName = prompt('Enter new department name:');
-    if (deptName && deptName.trim()) {
-      const trimmed = deptName.trim();
-      setDepartmentsList((prev) => [...prev, trimmed]);
-      setNewUserDepartment(trimmed);
-    }
+    setAddingDept(true);
+    setNewDeptName('');
   };
 
-  const handleDeleteDepartment = () => {
+  const handleConfirmAddDept = async () => {
+    const deptName = newDeptName.trim();
+    if (deptName) {
+      try {
+        const val = deptName.toLowerCase().replace(/\s+/g, '_');
+        const res = await departmentsApi.create({ name: val, display_name: deptName });
+        const newDept = res.data?.data || { id: Date.now(), display_name: deptName };
+        setDepartmentsList((prev) => [...prev, newDept]);
+        setNewUserDepartment(deptName);
+      } catch (e: any) {
+        alert('Failed to add department: ' + (e.response?.data?.message || e.message));
+      }
+    }
+    setAddingDept(false);
+    setNewDeptName('');
+  };
+
+  const handleDeleteDepartment = async () => {
     if (departmentsList.length <= 1) {
       alert('Cannot delete the last remaining department.');
       return;
     }
-    if (confirm(`Are you sure you want to remove department "${newUserDepartment}"?`)) {
-      const updated = departmentsList.filter((d) => d !== newUserDepartment);
+    const deptToDelete = departmentsList.find(d => d.display_name === newUserDepartment);
+    if (!deptToDelete) return;
+
+    try {
+      await departmentsApi.delete(deptToDelete.id);
+      const updated = departmentsList.filter((d) => d.id !== deptToDelete.id);
       setDepartmentsList(updated);
-      setNewUserDepartment(updated[0]);
+      setNewUserDepartment(updated[0].display_name);
+    } catch (e: any) {
+      alert('Failed to delete department: ' + (e.response?.data?.message || e.message));
     }
   };
   const [showPassword, setShowPassword] = useState(false);
@@ -173,30 +264,80 @@ export default function ITAdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
-  // Publishing queue items
-  const mockPublishQueue = [
-    { id: 'pub1', title: 'JMCFI Open House 2024', requestor: 'Admissions Office', department: 'Administration', status: 'ready_to_publish', platforms: ['FB', 'IG', 'WEB'], approvedBy: 'IMC/QA', approvedAt: '2h ago' },
-    { id: 'pub2', title: 'Library Expansion Update', requestor: 'Library', department: 'Academic Affairs', status: 'ready_to_publish', platforms: ['FB', 'PORTAL'], approvedBy: 'IMC/QA', approvedAt: '5h ago' },
-    { id: 'pub3', title: 'Scholarship Call for Applications', requestor: 'Finance', department: 'Finance', status: 'published', platforms: ['FB', 'WEB'], approvedBy: 'IMC/QA', approvedAt: '1d ago' },
-    { id: 'pub4', title: 'Foundation Day Celebration', requestor: 'HR Dept', department: 'Human Resources', status: 'published', platforms: ['FB', 'IG'], approvedBy: 'IMC/QA', approvedAt: '2d ago' },
-  ];
+  // Requests Table Filters
+  const [requestsSearch, setRequestsSearch] = useState('');
+  const [requestsStatus, setRequestsStatus] = useState('All Status');
+  const [requestsDept, setRequestsDept] = useState('All Departments');
+  const [requestsDate, setRequestsDate] = useState('');
 
-  // All Posts mock data
-  const allMockPosts = [
-    { id: '1', title: 'Graduation 2024 Announcement', author: "Registrar's Office", timeAgo: '2h ago', department: 'Administration', status: 'pending_review', statusLabel: 'PENDING REVIEW', reviewer: 'Office Head', platforms: ['FB', 'PORTAL'] },
-    { id: '2', title: 'Athletic Meet Results', author: 'Sports Dept', timeAgo: '1d ago', department: 'Student Affairs', status: 'approved', statusLabel: 'APPROVED', reviewer: '—', platforms: ['IG'] },
-  ];
-
-  // New Redesign Mock Data
+  // Publishing queue and Table states
+  const [mockPublishQueue, setMockPublishQueue] = useState<any[]>([]);
+  const [allMockPosts, setAllMockPosts] = useState<any[]>([]);
+  const [mockTablePosts, setMockTablePosts] = useState<any[]>([]);
   const [previewPost, setPreviewPost] = useState<any>(null);
-  const mockTablePosts = [
-    { id: 'p1', title: 'Intramurals 2026 Opening Ceremony', department: 'CITE', requestedBy: 'Juan Dela Cruz', status: 'Pending', stage: 'Department Head', stageCount: '0/4', platforms: ['FB', 'IG', 'WEB'], requestedOn: 'May 19, 2026', requestedTime: '10:30 AM', image: 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p2', title: 'Scholarship Program 2026', department: 'COBE', requestedBy: 'Maria Santos', status: 'Pending', stage: 'Vice President', stageCount: '1/4', platforms: ['FB', 'WEB'], requestedOn: 'May 19, 2026', requestedTime: '09:15 AM', image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p3', title: 'Community Outreach Activity', department: 'CAS', requestedBy: 'Ana Reyes', status: 'Draft', stage: 'Draft', stageCount: '0/4', platforms: ['IG', 'WEB'], requestedOn: 'May 18, 2026', requestedTime: '04:45 PM', image: 'https://images.unsplash.com/photo-1593113511110-3882f059e6c1?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p4', title: 'Career Fair 2026', department: 'CAS', requestedBy: 'Mark Lim', status: 'Pending', stage: 'IMC / Branding', stageCount: '3/4', platforms: ['FB', 'WEB'], requestedOn: 'May 18, 2026', requestedTime: '11:05 AM', image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p5', title: 'CITE Week 2026 Teaser', department: 'CITE', requestedBy: 'Sarah Lee', status: 'Published', stage: 'Published', stageCount: '4/4', platforms: ['FB', 'IG', 'WEB'], requestedOn: 'May 17, 2026', requestedTime: '02:15 PM', image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p6', title: 'Enrollment Announcement', department: 'REG', requestedBy: 'Lina Cruz', status: 'Published', stage: 'Published', stageCount: '4/4', platforms: ['FB', 'WEB'], requestedOn: 'May 17, 2026', requestedTime: '09:30 AM', image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=150&q=80' },
-  ];
+
+  const handlePublish = async (id: string | number) => {
+    try {
+      await publishingApi.publish(Number(id));
+      alert('Post published successfully!');
+      loadPostsData();
+    } catch (error: any) {
+      alert('Failed to publish: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const loadPostsData = async () => {
+    try {
+      const res = await postsApi.list();
+      const posts = res.data.data;
+      
+      const mappedPublishQueue = posts.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)).map((p: any) => ({
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        requestor: p.requestor?.first_name + ' ' + p.requestor?.last_name,
+        department: p.department?.name || 'Unknown',
+        status: p.status === 'APPROVED' ? 'ready_to_publish' : 'published',
+        platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
+        approvedBy: 'IMC/QA',
+        approvedAt: new Date(p.updated_at).toLocaleDateString(),
+      }));
+      setMockPublishQueue(mappedPublishQueue);
+
+      const mappedAll = posts.map((p: any) => ({
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        author: p.requestor?.first_name + ' ' + p.requestor?.last_name,
+        department: p.department?.name || 'Unknown',
+        timeAgo: new Date(p.created_at).toLocaleDateString(),
+        status: p.status.toLowerCase(),
+        statusLabel: p.status.toUpperCase().replace(/_/g, ' '),
+        reviewer: p.status,
+        platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
+      }));
+      setAllMockPosts(mappedAll);
+
+        const mappedTable = posts.map((p: any) => ({
+          id: p.id.toString(),
+          title: p.title || 'Untitled',
+          department: typeof p.requestor?.department === 'string' ? p.requestor.department : (p.requestor?.department?.name || p.requestor?.department?.display_name || 'Unknown'),
+          requestedBy: p.requestor?.full_name || 'Unknown',
+          status: p.status_label || p.status,
+          rawStatus: p.status,
+          platforms: Array.isArray(p.target_platforms) ? p.target_platforms.map((t: string) => typeof t === 'string' ? t.toLowerCase() : '') : [],
+          requestedOn: new Date(p.created_at).toLocaleDateString(),
+          requestedTime: new Date(p.created_at).toLocaleTimeString(),
+          rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : '',
+          image: p.media && p.media.length > 0 ? p.media[0].url : 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?auto=format&fit=crop&w=150&q=80',
+        }));
+      setMockTablePosts(mappedTable);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    loadPostsData();
+  }, []);
 
   const platforms = [
     { name: 'Facebook', percentage: 65, barColor: Colors.primary },
@@ -210,163 +351,100 @@ export default function ITAdminDashboard() {
   const [auditEventTypeFilter, setAuditEventTypeFilter] = useState('ALL');
   const [selectedAuditLog, setSelectedAuditLog] = useState<any | null>(null);
 
-  const mockAuditLogs = [
-    {
-      id: 'log-1',
-      timestamp: 'May 20, 2026 • 10:45:12 AM',
-      userName: 'IT Admin Support',
-      userEmail: 'it.support@jmcfi.edu.ph',
-      userRole: 'IT Admin',
-      initials: 'IT',
-      avatarBg: '#0B2545',
-      eventType: 'POLICY_UPDATE',
-      badgeBg: '#F3E8FF',
-      badgeColor: '#7C3AED',
-      description: 'Updated institutional posting policy rules to version v2.4.',
-      ipAddress: '192.168.1.104',
-      device: 'Chrome 124 / Win11',
-      severity: 'INFO',
-      severityBg: '#EFF6FF',
-      severityColor: '#1E40AF',
-      payload: '{\n  "version": "v2.4",\n  "updatedBy": "it.support@jmcfi.edu.ph",\n  "sectionsModified": ["Section 3: Branding Rules"]\n}',
-    },
-    {
-      id: 'log-2',
-      timestamp: 'May 20, 2026 • 09:30:00 AM',
-      userName: 'Dr. Ricardo Magsaysay',
-      userEmail: 'v.academic@jmcfi.edu.ph',
-      userRole: 'Vice President',
-      initials: 'RM',
-      avatarBg: '#DC2626',
-      eventType: 'CONTENT_APPROVAL',
-      badgeBg: '#ECFDF5',
-      badgeColor: '#047857',
-      description: 'Approved publication request "Intramurals 2026 Opening Ceremony"',
-      ipAddress: '192.168.1.112',
-      device: 'Safari 17 / macOS',
-      severity: 'INFO',
-      severityBg: '#EFF6FF',
-      severityColor: '#1E40AF',
-      payload: '{\n  "postId": "req1",\n  "action": "APPROVED",\n  "targetChannels": ["Facebook", "Instagram", "Website"]\n}',
-    },
-    {
-      id: 'log-3',
-      timestamp: 'May 19, 2026 • 04:15:45 PM',
-      userName: 'Prof. Mary Ann',
-      userEmail: 'office.head@jmcfi.edu.ph',
-      userRole: 'Office Head',
-      initials: 'MA',
-      avatarBg: '#D97706',
-      eventType: 'CONTENT_REJECT',
-      badgeBg: '#FEF2F2',
-      badgeColor: '#B91C1C',
-      description: 'Rejected request "Holiday Poster Design Draft" (Reason: Logo alignment)',
-      ipAddress: '192.168.1.118',
-      device: 'Edge 122 / Win11',
-      severity: 'WARNING',
-      severityBg: '#FEF3C7',
-      severityColor: '#D97706',
-      payload: '{\n  "postId": "req7",\n  "action": "REJECTED",\n  "comment": "Incorrect logo format used in footer."\n}',
-    },
-    {
-      id: 'log-4',
-      timestamp: 'May 19, 2026 • 02:00:22 PM',
-      userName: 'IT Admin Support',
-      userEmail: 'it.support@jmcfi.edu.ph',
-      userRole: 'IT Admin',
-      initials: 'IT',
-      avatarBg: '#0B2545',
-      eventType: 'USER_MODIFIED',
-      badgeBg: '#FEF3C7',
-      badgeColor: '#D97706',
-      description: 'Updated user role for "maria.delacruz@jmcfi.edu.ph" to Content Requestor',
-      ipAddress: '192.168.1.104',
-      device: 'Chrome 124 / Win11',
-      severity: 'INFO',
-      severityBg: '#EFF6FF',
-      severityColor: '#1E40AF',
-      payload: '{\n  "userId": "usr_3",\n  "previousRole": "guest",\n  "newRole": "requestor"\n}',
-    },
-    {
-      id: 'log-5',
-      timestamp: 'May 18, 2026 • 08:10:05 AM',
-      userName: 'Sarah Jenkins',
-      userEmail: 'imc.qa@jmcfi.edu.ph',
-      userRole: 'IMC QA',
-      initials: 'SJ',
-      avatarBg: '#7C3AED',
-      eventType: 'QUALITY_CLEARANCE',
-      badgeBg: '#F0FDFA',
-      badgeColor: '#0D9488',
-      description: 'Passed quality clearance check for "2024 Alumni Homecoming Gala"',
-      ipAddress: '192.168.1.125',
-      device: 'Chrome 123 / macOS',
-      severity: 'INFO',
-      severityBg: '#EFF6FF',
-      severityColor: '#1E40AF',
-      payload: '{\n  "postId": "q1",\n  "qualityChecklist": {\n    "logo": true,\n    "colors": true,\n    "caption": true\n  }\n}',
-    },
-  ];
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
-  // Analytics Mock Data
-  const analyticsOverview = {
-    totalVolume: '1,284',
-    avgVelocity: '4.2 hrs',
-    complianceRate: '98.4%',
-    activeUsers: '142',
-    departmentBreakdown: [
-      { name: 'CITE', count: 488, percentage: 38, barColor: '#1E40AF' },
-      { name: 'COBE', count: 321, percentage: 25, barColor: '#047857' },
-      { name: 'CAS', count: 231, percentage: 18, barColor: '#D97706' },
-      { name: 'CED', count: 154, percentage: 12, barColor: '#7C3AED' },
-      { name: 'Others', count: 90, percentage: 7, barColor: '#6B7280' },
-    ],
-    platformStats: [
-      { name: 'Facebook', posts: '840 posts', reach: '45.2K Reach', icon: 'logo-facebook' as const, color: '#1877F2', bgColor: '#EFF6FF' },
-      { name: 'Instagram', posts: '620 posts', reach: '28.9K Reach', icon: 'logo-instagram' as const, color: '#E1306C', bgColor: '#FDF2F8' },
-      { name: 'Website', posts: '450 posts', reach: '18.4K Reach', icon: 'globe-outline' as const, color: '#059669', bgColor: '#ECFDF5' },
-    ],
-  };
+  const [analyticsOverview, setAnalyticsOverview] = useState<any>({
+    totalVolume: '0',
+    avgVelocity: '0 hrs',
+    complianceRate: '0%',
+    activeUsers: '0',
+    departmentBreakdown: [],
+    platformStats: [],
+    contentPublished: '0',
+    pendingApproval: '0',
+    monthsData: [],
+    platformReach: { facebook: 0, instagram: 0, other: 0 }
+  });
 
   useEffect(() => {
-    dashboardApi.getStats()
-      .then(r => setStats(r.data))
-      .catch(() => setStats({
-        total_users: '1,284', total_submissions: '4,592',
-        pending_review: '156', approved_posts: '3,902',
-        returned_revision: '421', published_posts: '3,745',
-      }));
     dashboardApi.getRecentActivity()
       .then(r => setActivities(r.data ?? []))
-      .catch(() => setActivities([
-        { id: 1, userInitials: 'JD', userName: 'John Doe', action: 'approved a submission for', target: 'Arts & Sciences', time: '2 minutes ago', platform: 'Institutional Facebook Page', color: '#1E40AF', bgColor: '#DBEAFE' },
-        { id: 2, userInitials: 'MS', userName: 'Mary Smith', action: 'requested revision for', target: 'Enrollment Update', time: '15 minutes ago', platform: 'JMCFI Official Portal', color: '#B45309', bgColor: '#FEF3C7' },
-        { id: 3, userInitials: 'RG', userName: 'Rey Garcia', action: 'submitted a post for', target: 'Foundation Day', time: '1 hour ago', platform: 'Instagram', color: '#7C3AED', bgColor: '#EDE9FE' },
-      ]));
+      .catch(() => setActivities([]));
+      
+    dashboardApi.getAnalyticsOverview()
+      .then(r => {
+        if (r.data && r.data.data) {
+          setAnalyticsOverview(r.data.data);
+        }
+      })
+      .catch(err => console.error('Failed to fetch analytics:', err));
+      
+    auditLogsApi.list()
+      .then(r => {
+        if (r.data && r.data.data) {
+          setAuditLogs(r.data.data);
+        }
+      })
+      .catch(err => console.error('Failed to fetch audit logs:', err));
   }, []);
 
-  const handleCreateAccount = () => {
-    if (!newUserEmail || !newUserPassword) { alert('Please fill in both email and password.'); return; }
+  const handleCreateAccount = async () => {
+    if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { alert('Please fill in all required fields.'); return; }
     if (!newUserEmail.includes('@')) { alert('Please enter a valid email.'); return; }
-    const newAccount = {
-      id: Date.now().toString(),
-      email: newUserEmail, role: newUserRole,
-      department: newUserDepartment,
-      created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-    };
-    setUsers([newAccount, ...users]);
-    setNewUserEmail(''); setNewUserPassword('');
-    alert('Institutional account created successfully!');
+    
+    try {
+      const generatedEmpId = 'EMP-' + Math.floor(10000 + Math.random() * 90000);
+      const res = await usersApi.create({
+        employee_id: generatedEmpId,
+        first_name: newUserFirstName,
+        last_name: newUserLastName,
+        email: newUserEmail,
+        password: newUserPassword,
+        role: newUserRole,
+        department: newUserDepartment,
+      });
+      const u = res.data.data;
+      const newAccount = {
+        ...u,
+        role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+        created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      };
+      setUsers([newAccount, ...users]);
+      setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
+      alert('Institutional account created successfully!');
+    } catch (e: any) {
+      alert('Failed to create account: ' + (e.response?.data?.message || e.message));
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
-    if (confirm('Are you sure you want to delete this user account?')) setUsers(users.filter(u => u.id !== id));
+  const handleDeleteUser = async (id: any) => {
+    setConfirmDeleteUserId(id);
+    const u = users.find(u => String(u.id) === String(id));
+    setConfirmDeleteUserEmail(u?.email || '');
   };
 
-  const handleSaveEditedRole = (id: string) => {
-    setUsers(users.map(u => u.id === id ? { ...u, role: editingUserRole } : u));
-    setEditingUserId(null);
-    alert('User role updated successfully!');
+  const handleConfirmDeleteUser = async () => {
+    const id = confirmDeleteUserId;
+    try {
+      await usersApi.delete(id);
+      setUsers(users.filter(u => String(u.id) !== String(id)));
+    } catch (e: any) {
+      alert('Failed to delete user: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setConfirmDeleteUserId(null);
+      setConfirmDeleteUserEmail('');
+    }
+  };
+
+  const handleSaveEditedRole = async (id: string) => {
+    try {
+      await usersApi.update(id, { role: editingUserRole });
+      setUsers(users.map(u => u.id === id ? { ...u, role: editingUserRole } : u));
+      setEditingUserId(null);
+      alert('User role updated successfully!');
+    } catch (e: any) {
+      alert('Failed to update role.');
+    }
   };
 
   const isLargeScreen = width > 1024;
@@ -397,6 +475,29 @@ export default function ITAdminDashboard() {
   const postsToShow = statusFilter === 'all' ? allMockPosts : allMockPosts.filter(p => p.status === statusFilter);
   const publishQueueToShow = mockPublishQueue;
 
+  const filteredTablePosts = mockTablePosts.filter((post) => {
+    const matchesSearch = requestsSearch === '' || 
+                          post.title.toLowerCase().includes(requestsSearch.toLowerCase()) || 
+                          post.requestedBy.toLowerCase().includes(requestsSearch.toLowerCase());
+    
+    let matchesStatus = true;
+    if (requestsStatus !== 'All Status') {
+      if (requestsStatus === 'Pending') {
+        matchesStatus = ['pending_office_head', 'pending_vice_president', 'pending_president', 'pending_imc_qa', 'draft'].includes(post.rawStatus);
+      } else if (requestsStatus === 'Published') {
+        matchesStatus = ['published', 'approved'].includes(post.rawStatus);
+      } else if (requestsStatus === 'Rejected') {
+        matchesStatus = ['rejected', 'returned_for_revision'].includes(post.rawStatus);
+      }
+    }
+
+    const matchesDept = requestsDept === 'All Departments' || post.department === requestsDept;
+    
+    const matchesDate = requestsDate === '' || post.rawDate === requestsDate;
+    
+    return matchesSearch && matchesStatus && matchesDept && matchesDate;
+  });
+
   return (
     <DashboardShell title="IT Admin Panel" activeTab={activeTab} onTabChange={setActiveTab}>
       {/* Title block removed as requested */}
@@ -411,41 +512,41 @@ export default function ITAdminDashboard() {
               </View>
               <View>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Total Content</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>53</Text>
+                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? stats.total : 0}</Text>
                 <Text style={{ fontSize: 12, color: Colors.textMuted }}>All content requests</Text>
               </View>
             </Card>
 
             <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="logo-facebook" size={24} color="#1877F2" />
+                <Ionicons name="checkmark-circle" size={24} color="#1877F2" />
               </View>
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Facebook Posts</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>28</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Published</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Approved & Published</Text>
+                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? (stats.approved + stats.published) : 0}</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Ready or live</Text>
               </View>
             </Card>
 
             <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#fdf2f8', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="logo-instagram" size={24} color="#E1306C" />
+                <Ionicons name="time" size={24} color="#E1306C" />
               </View>
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Instagram Posts</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>21</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Published</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Pending</Text>
+                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? stats.pending : 0}</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Awaiting approval</Text>
               </View>
             </Card>
 
             <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="globe-outline" size={24} color="#16a34a" />
+                <Ionicons name="document" size={24} color="#16a34a" />
               </View>
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Website Posts</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>17</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Published</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Drafts</Text>
+                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? stats.draft : 0}</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Work in progress</Text>
               </View>
             </Card>
           </View>
@@ -458,23 +559,22 @@ export default function ITAdminDashboard() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 6, paddingHorizontal: 12, height: 36, borderWidth: 1, borderColor: '#e5e7eb' }}>
                   <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
-                  <TextInput placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160 }} />
+                  <TextInput placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
                 </View>
-                <select style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }}>
+                <select style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
                   <option>All Status</option>
                   <option>Pending</option>
                   <option>Published</option>
+                  <option>Rejected</option>
                 </select>
-                <select style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }}>
+                <select style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsDept} onChange={(e) => setRequestsDept(e.target.value)}>
                   <option>All Departments</option>
-                  <option>CITE</option>
-                  <option>CAS</option>
+                  {departmentsList.map(d => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                 </select>
-                <View style={{ flexDirection: 'row', alignItems: 'center', height: 36, borderRadius: 6, border: '1px solid #e5e7eb', paddingHorizontal: 12, backgroundColor: '#fff' }}>
-                  <Text style={{ fontSize: 13, color: '#374151', marginRight: 8 }}>May 12 - May 19, 2026</Text>
-                  <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', height: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 12, backgroundColor: '#fff' }}>
+                  <input type="date" style={{ fontSize: 13, color: '#374151', border: 'none', outline: 'none', backgroundColor: 'transparent' }} value={requestsDate} onChange={(e) => setRequestsDate(e.target.value)} />
                 </View>
-                <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 6, border: '1px solid #e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+                <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
                   <Ionicons name="options-outline" size={16} color="#374151" />
                 </TouchableOpacity>
               </View>
@@ -485,17 +585,16 @@ export default function ITAdminDashboard() {
               <View style={{ flex: 1, minWidth: 1000 }}>
                 <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
                   <Text style={{ flex: 2, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUEST TITLE</Text>
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>DEPARTMENT</Text>
+                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>DEPARTMENT</Text>
                   <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUESTED BY</Text>
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>STATUS</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>CURRENT STAGE</Text>
+                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>STATUS</Text>
                   <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>PLATFORMS</Text>
                   <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUESTED ON</Text>
                   <Text style={{ width: 120, fontSize: 11, fontWeight: '600', color: '#6b7280', textAlign: 'center' }}>ACTIONS</Text>
                 </View>
 
                 {/* Table Rows */}
-                {mockTablePosts.map((post) => (
+                {filteredTablePosts.map((post) => (
                   <View key={post.id} style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', alignItems: 'center' }}>
                     {/* TITLE */}
                     <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingRight: 16 }}>
@@ -504,7 +603,7 @@ export default function ITAdminDashboard() {
                     </View>
 
                     {/* DEPT */}
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1.5 }}>
                       <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start' }}>
                         <Text style={{ fontSize: 11, fontWeight: '500', color: '#374151' }}>{post.department}</Text>
                       </View>
@@ -516,29 +615,23 @@ export default function ITAdminDashboard() {
                     </View>
 
                     {/* STATUS */}
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1.5 }}>
                       <View style={{
-                        backgroundColor: post.status === 'Pending' ? '#fef3c7' : post.status === 'Published' ? '#dcfce7' : '#f3f4f6',
+                        backgroundColor: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#dcfce7' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
                         paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start'
                       }}>
                         <Text style={{
-                          fontSize: 11, fontWeight: '500',
-                          color: post.status === 'Pending' ? '#b45309' : post.status === 'Published' ? '#16a34a' : '#4b5563'
+                          fontSize: 11, fontWeight: '500', textTransform: 'uppercase',
+                          color: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#16a34a' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309'
                         }}>{post.status}</Text>
                       </View>
                     </View>
 
-                    {/* STAGE */}
-                    <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 24 }}>
-                      <Text style={{ fontSize: 13, color: '#374151' }}>{post.stage}</Text>
-                      <Text style={{ fontSize: 12, color: '#9ca3af' }}>{post.stageCount}</Text>
-                    </View>
-
                     {/* PLATFORMS */}
                     <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
-                      {post.platforms.includes('FB') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
-                      {post.platforms.includes('IG') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                      {post.platforms.includes('WEB') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                      {post.platforms.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
+                      {post.platforms.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
+                      {post.platforms.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
                     </View>
 
                     {/* DATE */}
@@ -552,9 +645,11 @@ export default function ITAdminDashboard() {
                       <TouchableOpacity onPress={() => setPreviewPost(post)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name="eye-outline" size={14} color="#7e22ce" />
                       </TouchableOpacity>
-                      <TouchableOpacity style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="paper-plane-outline" size={14} color="#fff" />
-                      </TouchableOpacity>
+                      {post.rawStatus === 'approved' && (
+                        <TouchableOpacity onPress={() => handlePublish(post.id)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name="paper-plane-outline" size={14} color="#fff" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 ))}
@@ -564,7 +659,7 @@ export default function ITAdminDashboard() {
 
             {/* Pagination Footer */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', flexWrap: 'wrap', gap: 12 }}>
-              <Text style={{ fontSize: 13, color: '#6b7280' }}>Showing 1 to 6 of 53 requests</Text>
+              <Text style={{ fontSize: 13, color: '#6b7280' }}>Showing {filteredTablePosts.length} requests</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <TouchableOpacity style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="chevron-back" size={16} color="#9ca3af" /></TouchableOpacity>
                 <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>1</Text></TouchableOpacity>
@@ -593,6 +688,16 @@ export default function ITAdminDashboard() {
             <Text style={styles.sectionHeader}>Create New Institutional Account</Text>
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
+                <Text style={styles.formLabel}>First Name</Text>
+                <TextInput style={styles.formInput} placeholder="Juan" value={newUserFirstName} onChangeText={setNewUserFirstName} />
+              </View>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Last Name</Text>
+                <TextInput style={styles.formInput} placeholder="Dela Cruz" value={newUserLastName} onChangeText={setNewUserLastName} />
+              </View>
+            </View>
+            <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
+              <View style={styles.formField}>
                 <Text style={styles.formLabel}>Email Address</Text>
                 <TextInput style={styles.formInput} placeholder="user@jmcfi.edu.ph" value={newUserEmail} onChangeText={setNewUserEmail} autoCapitalize="none" />
               </View>
@@ -610,7 +715,6 @@ export default function ITAdminDashboard() {
                   <Text style={[styles.formLabel, { flexShrink: 1, marginRight: 8 }]} numberOfLines={1}>Role</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <TouchableOpacity
-                      title="Add New Role"
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3 }}
                       onPress={handleAddRole}
                     >
@@ -618,7 +722,6 @@ export default function ITAdminDashboard() {
                       <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E40AF' }}>Add</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      title="Delete Selected Role"
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3 }}
                       onPress={handleDeleteRole}
                     >
@@ -634,6 +737,29 @@ export default function ITAdminDashboard() {
                 >
                   {rolesList.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
+                {addingRole && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <TextInput
+                      style={{ flex: 1, height: 34, borderWidth: 1, borderColor: '#3B82F6', borderRadius: 4, paddingHorizontal: 8, fontSize: 13, backgroundColor: '#EFF6FF' }}
+                      placeholder="New role name..."
+                      value={newRoleName}
+                      onChangeText={setNewRoleName}
+                      autoFocus
+                    />
+                    <TouchableOpacity
+                      onPress={handleConfirmAddRole}
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#1E40AF', borderRadius: 4 }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Add</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setAddingRole(false)}
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 4 }}
+                    >
+                      <Text style={{ color: '#374151', fontSize: 12 }}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               <View style={styles.formField}>
@@ -641,7 +767,6 @@ export default function ITAdminDashboard() {
                   <Text style={[styles.formLabel, { flexShrink: 1, marginRight: 8 }]} numberOfLines={1}>Department</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <TouchableOpacity
-                      title="Add New Department"
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3 }}
                       onPress={handleAddDepartment}
                     >
@@ -649,7 +774,6 @@ export default function ITAdminDashboard() {
                       <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E40AF' }}>Add</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      title="Delete Selected Department"
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3 }}
                       onPress={handleDeleteDepartment}
                     >
@@ -663,8 +787,31 @@ export default function ITAdminDashboard() {
                   onChange={(e: any) => setNewUserDepartment(e.target.value)}
                   style={{ height: 38, fontSize: 13, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', color: '#1A1A2E', paddingLeft: 10, outline: 'none', cursor: 'pointer', width: '100%' }}
                 >
-                  {departmentsList.map((d) => <option key={d} value={d}>{d}</option>)}
+                  {departmentsList.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                 </select>
+                {addingDept && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <TextInput
+                      style={{ flex: 1, height: 34, borderWidth: 1, borderColor: '#3B82F6', borderRadius: 4, paddingHorizontal: 8, fontSize: 13, backgroundColor: '#EFF6FF' }}
+                      placeholder="New department name..."
+                      value={newDeptName}
+                      onChangeText={setNewDeptName}
+                      autoFocus
+                    />
+                    <TouchableOpacity
+                      onPress={handleConfirmAddDept}
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#1E40AF', borderRadius: 4 }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Add</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setAddingDept(false)}
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 4 }}
+                    >
+                      <Text style={{ color: '#374151', fontSize: 12 }}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
             <TouchableOpacity style={styles.createBtn} onPress={handleCreateAccount}>
@@ -722,6 +869,44 @@ export default function ITAdminDashboard() {
               );
             })}
           </Card>
+
+          {/* Delete User Confirmation Modal */}
+          <Modal
+            visible={confirmDeleteUserId !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setConfirmDeleteUserId(null)}
+          >
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 24, width: 340, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 }}>
+                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <Ionicons name="trash-outline" size={24} color="#DC2626" />
+                  </View>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 }}>Delete Account?</Text>
+                  <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center' }}>
+                    <Text>Are you sure you want to delete </Text>
+                    <Text style={{ fontWeight: '600', color: '#374151' }}>{confirmDeleteUserEmail}</Text>
+                    <Text>? This action cannot be undone.</Text>
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setConfirmDeleteUserId(null)}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#F3F4F6', alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleConfirmDeleteUser}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#DC2626', alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Yes, Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       )}
 
@@ -844,13 +1029,16 @@ export default function ITAdminDashboard() {
 
       {/* ── ANALYTICS TAB ── */}
       {activeTab === 'analytics' && (() => {
-        const monthsData = [
-          { month: 'Jan', posts: 120 }, { month: 'Feb', posts: 150 }, { month: 'Mar', posts: 180 },
-          { month: 'Apr', posts: 210 }, { month: 'May', posts: 170 }, { month: 'Jun', posts: 240 },
-          { month: 'Jul', posts: 290 }, { month: 'Aug', posts: 320 }, { month: 'Sep', posts: 380 },
-          { month: 'Oct', posts: 350 }, { month: 'Nov', posts: 410 }, { month: 'Dec', posts: 450 }
-        ];
-        const maxPosts = 450;
+        const monthsData = analyticsOverview?.monthsData && analyticsOverview.monthsData.length > 0 
+          ? analyticsOverview.monthsData 
+          : [
+              { month: 'Jan', posts: 0 }, { month: 'Feb', posts: 0 }, { month: 'Mar', posts: 0 },
+              { month: 'Apr', posts: 0 }, { month: 'May', posts: 0 }, { month: 'Jun', posts: 0 },
+              { month: 'Jul', posts: 0 }, { month: 'Aug', posts: 0 }, { month: 'Sep', posts: 0 },
+              { month: 'Oct', posts: 0 }, { month: 'Nov', posts: 0 }, { month: 'Dec', posts: 0 }
+            ];
+        
+        const maxPosts = Math.max(...monthsData.map((d: any) => d.posts), 10);
         
         return (
           <View style={{ gap: Spacing.xl }}>
@@ -864,10 +1052,10 @@ export default function ITAdminDashboard() {
             {/* NEW: Mini Stat Cards Row */}
             <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 16 }}>
               {[
-                { title: 'Total Reach', value: '1.2M', trend: '+12%', icon: 'people', color: '#1877F2', bg: '#EBF4FF' },
-                { title: 'Avg. Engagement', value: '4.8%', trend: '+0.5%', icon: 'heart', color: '#E4405F', bg: '#FCEBF0' },
-                { title: 'Content Published', value: '3,270', trend: '+24%', icon: 'document-text', color: '#7C3AED', bg: '#F3E8FF' },
-                { title: 'Pending Approval', value: '18', trend: '-2', icon: 'time', color: '#F59E0B', bg: '#FEF3C7', isNegative: true }
+                { title: 'Total Reach', value: 'N/A', trend: '0%', icon: 'people', color: '#1877F2', bg: '#EBF4FF' },
+                { title: 'Avg. Engagement', value: 'N/A', trend: '0%', icon: 'heart', color: '#E4405F', bg: '#FCEBF0' },
+                { title: 'Content Published', value: analyticsOverview?.contentPublished || '0', trend: 'Active', icon: 'document-text', color: '#7C3AED', bg: '#F3E8FF' },
+                { title: 'Pending Approval', value: analyticsOverview?.pendingApproval || '0', trend: 'Action Needed', icon: 'time', color: '#F59E0B', bg: '#FEF3C7', isNegative: true }
               ].map(stat => (
                 <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                   <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -886,14 +1074,14 @@ export default function ITAdminDashboard() {
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { gap: 24 }]}>
               
               {/* Yearly Bar Chart */}
-              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }]}>
+              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
                   <View>
                     <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Publication Volume</Text>
                     <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Monthly posts created in 2026</Text>
                   </View>
                   <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                    <Text style={{ color: '#7C3AED', fontWeight: 'bold', fontSize: 12 }}>Total: 3,270</Text>
+                    <Text style={{ color: '#7C3AED', fontWeight: 'bold', fontSize: 12 }}>Total: {analyticsOverview?.totalVolume || '0'}</Text>
                   </View>
                 </View>
 
@@ -917,7 +1105,7 @@ export default function ITAdminDashboard() {
               </Card>
 
               {/* Round Data / Circular Distribution */}
-              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: '#FFFFFF', borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }]}>
+              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: '#FFFFFF', borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 20 }}>
                   <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Platform Reach</Text>
                   <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Audience distribution</Text>
@@ -941,10 +1129,9 @@ export default function ITAdminDashboard() {
                 {/* Legend */}
                 <View style={{ width: '100%', marginTop: 32, gap: 12 }}>
                   {[
-                    { name: 'Facebook', color: '#1877F2', percent: '40%' },
-                    { name: 'Instagram', color: '#E4405F', percent: '25%' },
-                    { name: 'Twitter', color: '#1DA1F2', percent: '20%' },
-                    { name: 'Other', color: '#9CA3AF', percent: '15%' }
+                    { name: 'Facebook', color: '#1877F2', percent: (analyticsOverview?.platformReach?.facebook || 0) + '%' },
+                    { name: 'Instagram', color: '#E4405F', percent: (analyticsOverview?.platformReach?.instagram || 0) + '%' },
+                    { name: 'Other', color: '#9CA3AF', percent: (analyticsOverview?.platformReach?.other || 0) + '%' }
                   ].map(platform => (
                     <View key={platform.name} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -964,12 +1151,12 @@ export default function ITAdminDashboard() {
 
       {/* ── AUDIT LOGS TAB ── */}
       {activeTab === 'audit-logs' && (() => {
-        const filteredLogs = mockAuditLogs.filter((log) => {
+        const filteredLogs = auditLogs.filter((log) => {
           const matchesQuery =
-            (log.user || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
-            (log.details || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
-            (log.action || '').toLowerCase().includes(auditSearchQuery.toLowerCase());
-          const matchesType = auditEventTypeFilter === 'ALL' || log.action === auditEventTypeFilter;
+            (log.userName || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
+            (log.description || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
+            (log.eventType || '').toLowerCase().includes(auditSearchQuery.toLowerCase());
+          const matchesType = auditEventTypeFilter === 'ALL' || log.eventType === auditEventTypeFilter;
           return matchesQuery && matchesType;
         });
 
@@ -1030,17 +1217,17 @@ export default function ITAdminDashboard() {
                     <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: '#6B7280' }}>{log.timestamp}</Text>
 
                     {/* User */}
-                    <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#111827' }}>{log.user}</Text>
+                    <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#111827' }}>{log.userName}</Text>
 
                     {/* Action */}
                     <View style={{ flex: 1.5 }}>
-                      <View style={{ alignSelf: 'flex-start', backgroundColor: log.actionBg || '#F3E8FF', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 }}>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: log.actionColor || '#7C3AED' }}>{log.action}</Text>
+                      <View style={{ alignSelf: 'flex-start', backgroundColor: log.badgeBg || '#F3E8FF', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: log.badgeColor || '#7C3AED' }}>{log.eventType}</Text>
                       </View>
                     </View>
 
                     {/* Details */}
-                    <Text style={{ flex: 4, fontSize: FontSize.xs + 1, color: '#374151', lineHeight: 20 }}>{log.details}</Text>
+                    <Text style={{ flex: 4, fontSize: FontSize.xs + 1, color: '#374151', lineHeight: 20 }}>{log.description}</Text>
                   </View>
                 ))}
               </View>
@@ -1260,6 +1447,14 @@ const styles = StyleSheet.create({
   bottomSection: { gap: Spacing.md },
   rowLayout: { flexDirection: 'row' },
   columnLayout: { flexDirection: 'column' },
+  splitLayout: { gap: Spacing.md },
+  table: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+  },
   activityCard: { flex: 2, padding: Spacing.md },
   distributionCard: { flex: 1, padding: Spacing.md },
   sectionHeader: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 12 },

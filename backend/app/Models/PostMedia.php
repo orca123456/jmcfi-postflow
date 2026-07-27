@@ -12,13 +12,13 @@ class PostMedia extends Model
 
     protected $fillable = [
         'post_request_id',
-        'file_path',
+        'type',
         'original_name',
+        'file_path',
         'mime_type',
         'file_size',
-        'type',
-        'is_featured',
         'sort_order',
+        'is_featured',
     ];
 
     protected function casts(): array
@@ -54,5 +54,10 @@ class PostMedia extends Model
             return number_format($bytes / 1024, 2) . ' KB';
         }
         return $bytes . ' bytes';
+    }
+
+    public function getUrlAttribute(): string
+    {
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path);
     }
 }

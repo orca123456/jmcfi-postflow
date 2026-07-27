@@ -25,14 +25,15 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
         $stageLabels = [
             'office_head' => 'Office Head Review',
             'vice_president' => 'Vice President Review',
-            'president' => 'President Review',
             'imc_qa' => 'IMC/QA Review',
         ];
+
+        $stageLabel = $stageLabels[$stage] ?? 'review';
 
         return (new MailMessage)
             ->subject("Approval Needed: {$this->postRequest->title}")
             ->greeting("Hello {$notifiable->first_name},")
-            ->line("A post request requires your {$stageLabels[$stage] ?? 'review'}.")
+            ->line("A post request requires your {$stageLabel}.")
             ->line("**Post:** {$this->postRequest->title}")
             ->line("**Category:** {$this->postRequest->category?->name}")
             ->line("**Requested by:** {$this->postRequest->requestor->full_name}")

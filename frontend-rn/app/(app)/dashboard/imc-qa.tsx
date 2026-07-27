@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { postsApi, dashboardApi } from '../../../services/api';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -48,103 +50,65 @@ export default function ImcQaDashboard() {
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
-  // Mock IMC QA pending requests list matching VP design structure
-  const [requestsList, setRequestsList] = useState([
-    {
-      id: 'q1',
-      title: '2024 Alumni Homecoming Gala - Early Bird Announcement',
-      category: 'Announcement',
-      dept: 'MARKETING',
-      requestedBy: 'Sarah Jenkins',
-      requestedByRole: 'Marketing Manager',
-      date: 'Oct 24, 2023',
-      time: '09:15 AM',
-      platforms: ['facebook', 'instagram', 'website'],
-      caption: 'Rekindle the spirit! Join us for the 2024 Alumni Homecoming Gala. Early bird registration is now open. #JMCFI #AlumniHomecoming',
-      previewBanner: 'ALUMNI HOMECOMING 2024',
-      attachment: 'alumni_gala_poster.jpg',
-      attachmentSize: '2.4 MB',
-      status: 'PENDING',
-    },
-    {
-      id: 'q2',
-      title: 'Founders Week Sports Festival Graphic Banner',
-      category: 'Graphic Banner',
-      dept: 'ATHLETICS',
-      requestedBy: 'Coach Marcus',
-      requestedByRole: 'Sports Coord.',
-      date: 'Oct 25, 2023',
-      time: '11:45 AM',
-      platforms: ['facebook', 'instagram'],
-      caption: 'Gear up for the most thrilling week of the semester! Registration for individual and team sports events starts this Monday. See you on the field! #FoundersWeek #SportsFest',
-      previewBanner: 'SPORTS FESTIVAL 2024',
-      attachment: 'sports_fest_banner.png',
-      attachmentSize: '3.1 MB',
-      status: 'PENDING',
-    },
-    {
-      id: 'q3',
-      title: 'Midterm Exams Schedule & Room Assignments',
-      category: 'Official Notice',
-      dept: 'REGISTRAR',
-      requestedBy: 'Dr. Aris Thorne',
-      requestedByRole: 'Head Registrar',
-      date: 'Oct 26, 2023',
-      time: '02:30 PM',
-      platforms: ['facebook', 'website'],
-      caption: 'Please be guided by the official examination schedule and room assignments for the first semester midterms. Ensure all permit clearances are settled prior. Good luck! #Midterms2023',
-      previewBanner: 'MIDTERM EXAMINATIONS',
-      attachment: 'midterms_schedule_2023.pdf',
-      attachmentSize: '1.8 MB',
-      status: 'PENDING',
-    },
-  ]);
+  const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
+  const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
 
-  const [approvedRequests, setApprovedRequests] = useState([
-    {
-      id: 'qa1',
-      title: 'Institutional Mascot Design Release',
-      category: 'Branding Asset',
-      dept: 'MARKETING',
-      requestedBy: 'Elena Cruz',
-      requestedByRole: 'Brand Designer',
-      date: 'Oct 23, 2023',
-      time: '04:00 PM',
-      platforms: ['facebook', 'instagram', 'website'],
-      caption: 'Meet our new official university mascot! Designed with pride and heritage. #JMCFI',
-      previewBanner: 'MASCOT DESIGN GUIDELINES',
-      attachment: 'mascot_brandbook.pdf',
-      attachmentSize: '5.2 MB',
-      status: 'APPROVED',
-    },
-  ]);
+  const loadData = async () => {
+    try {
+      const [postsRes, statsRes] = await Promise.all([
+        postsApi.list(),
+        dashboardApi.getStats()
+      ]);
+      const posts = postsRes.data.data;
+      setStats(statsRes.data.data);
 
-  const [rejectedRequests, setRejectedRequests] = useState([
-    {
-      id: 'qr1',
-      title: 'Unthemed Halloween Social Night Poster',
-      category: 'Event Poster',
-      dept: 'CAS',
-      requestedBy: 'Leo Martinez',
-      requestedByRole: 'Student Council',
-      date: 'Oct 21, 2023',
-      time: '05:20 PM',
-      platforms: ['facebook', 'instagram'],
-      caption: 'Come as you are for our un-themed Halloween party!',
-      previewBanner: 'HALLOWEEN SOCIAL',
-      attachment: 'halloween_draft.png',
-      attachmentSize: '1.5 MB',
-      status: 'REJECTED',
-      rejectionReason: 'Does not adhere to institutional event branding and logo placement policy.',
-    },
-  ]);
+      const mapPost = (p: any) => ({
+        ...p,
+        id: p.id.toString(),
+        title: p.title || 'Untitled',
+        category: p.category?.name || 'Category',
+        dept: p.requestor?.department || 'Department',
+        requestedBy: p.requestor?.full_name || 'Unknown',
+        requestedByRole: 'Requestor',
+        date: new Date(p.created_at).toLocaleDateString(),
+        time: new Date(p.created_at).toLocaleTimeString(),
+        platforms: p.target_platforms || [],
+        caption: p.caption_narrative || '',
+        previewBanner: (p.title || '').toUpperCase(),
+        attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+        attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+        rejectionReason: p.rejection_reason || '',
+      });
+
+      const mapped = posts.map(mapPost);
+      setRequestsList(mapped.filter((p: any) => p.status === 'PENDING_IMC_QA'));
+      setApprovedRequests(mapped.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const departmentOptions = ['All Departments', 'MARKETING', 'ATHLETICS', 'REGISTRAR', 'CAS', 'CITE', 'COBE'];
 
   // Handlers for actions
-  const handleApprove = (req: any) => {
-    alert(`QA Clearance Approved: "${req.title}"`);
-    setSelectedRequest(null);
+  const handleApprove = async (req: any) => {
+    try {
+      await postsApi.approve(req.id, {});
+      alert(`QA Clearance Approved: "${req.title}"`);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to approve request.');
+    }
   };
 
   const handleRejectClick = (req: any) => {
@@ -153,16 +117,32 @@ export default function ImcQaDashboard() {
     setIsRejectModalVisible(true);
   };
 
-  const confirmReject = () => {
-    alert(`Request Rejected by QA: "${requestToReject?.title}"\nReason: ${rejectComment}`);
-    setIsRejectModalVisible(false);
-    setRequestToReject(null);
-    setSelectedRequest(null);
+  const confirmReject = async () => {
+    if (!rejectComment.trim()) {
+      alert('Please provide a reason for rejecting the request.');
+      return;
+    }
+    try {
+      await postsApi.reject(requestToReject?.id, { reason: rejectComment });
+      alert(`Request Rejected by QA: "${requestToReject?.title}"\nReason: ${rejectComment}`);
+      setIsRejectModalVisible(false);
+      setRequestToReject(null);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to reject request.');
+    }
   };
 
-  const handleRequestRevision = (req: any) => {
-    alert(`Revision Requested for: "${req.title}"`);
-    setSelectedRequest(null);
+  const handleRequestRevision = async (req: any) => {
+    try {
+      await postsApi.returnRevision(req.id, { reason: 'Revision requested by QA' });
+      alert(`Revision Requested for: "${req.title}"`);
+      setSelectedRequest(null);
+      loadData();
+    } catch (err) {
+      alert('Failed to return for revision.');
+    }
   };
 
   const getRequestsForTab = () => {
@@ -215,7 +195,7 @@ export default function ImcQaDashboard() {
                   </View>
                 </View>
                 <Text style={styles.metricLabel}>For Quality Review</Text>
-                <Text style={styles.metricCount}>3</Text>
+                <Text style={styles.metricCount}>{stats ? stats.pending : 0}</Text>
                 <Text style={styles.metricSubtext}>Requests awaiting QA clearance</Text>
               </Card>
 
@@ -227,7 +207,7 @@ export default function ImcQaDashboard() {
                   </View>
                 </View>
                 <Text style={styles.metricLabel}>Approved</Text>
-                <Text style={styles.metricCount}>15</Text>
+                <Text style={styles.metricCount}>{stats ? stats.approved : 0}</Text>
                 <Text style={styles.metricSubtext}>Requests approved by QA</Text>
               </Card>
 
@@ -239,8 +219,8 @@ export default function ImcQaDashboard() {
                   </View>
                 </View>
                 <Text style={styles.metricLabel}>Rejected</Text>
-                <Text style={styles.metricCount}>2</Text>
-                <Text style={styles.metricSubtext}>Requests flagged for revisions</Text>
+                <Text style={styles.metricCount}>{stats ? (stats.rejected) : 0}</Text>
+                <Text style={styles.metricSubtext}>Requests rejected</Text>
               </Card>
 
               {/* Card 4: Published */}
@@ -250,8 +230,8 @@ export default function ImcQaDashboard() {
                     <Ionicons name="send" size={20} color="#0D9488" />
                   </View>
                 </View>
-                <Text style={styles.metricLabel}>Published</Text>
-                <Text style={styles.metricCount}>12</Text>
+                <Text style={styles.metricLabel}>Total Requests</Text>
+                <Text style={styles.metricCount}>{stats ? stats.total : 0}</Text>
                 <Text style={styles.metricSubtext}>Cleared & published content</Text>
               </Card>
             </View>
@@ -329,11 +309,23 @@ export default function ImcQaDashboard() {
               </View>
 
               {filteredRequests.map((req) => (
-                <View key={req.id} style={styles.tableRow}>
+                <TouchableOpacity 
+                  key={req.id} 
+                  style={styles.tableRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedRequest(req);
+                    setModalPlatformTab('facebook');
+                  }}
+                >
                   {/* REQUEST TITLE + CATEGORY TAG */}
                   <View style={[styles.cellContainer, styles.flexTitle]}>
                     <View style={styles.thumbnailBox}>
-                      <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                      {req.thumbnailUrl ? (
+                        <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
+                      ) : (
+                        <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowTitleText}>{req.title}</Text>
@@ -381,18 +373,8 @@ export default function ImcQaDashboard() {
 
                   {/* ACTIONS */}
                   <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
-                    <TouchableOpacity
-                      style={styles.btnViewRow}
-                      onPress={() => {
-                        setSelectedRequest(req);
-                        setModalPlatformTab('facebook');
-                      }}
-                    >
-                      <Ionicons name="eye-outline" size={13} color={Colors.textPrimary} style={{ marginRight: 3 }} />
-                      <Text style={styles.btnViewRowText}>View</Text>
-                    </TouchableOpacity>
 
-                    {activeTab === 'dashboard' && (
+                    {activeTab === 'dashboard' ? (
                       <>
                         <TouchableOpacity
                           style={styles.btnApproveRow}
@@ -410,9 +392,15 @@ export default function ImcQaDashboard() {
                           <Text style={styles.btnRejectRowText}>Reject</Text>
                         </TouchableOpacity>
                       </>
+                    ) : (
+                      <View style={{ backgroundColor: activeTab === 'approved' ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                        <Text style={{ color: activeTab === 'approved' ? '#15803D' : '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+                          {activeTab === 'approved' ? 'Approved' : 'Rejected'}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -686,7 +674,7 @@ export default function ImcQaDashboard() {
                         ]}
                         onPress={() => setModalPlatformTab('instagram')}
                       >
-                        <Ionicons name="logo-[#E1306C]" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
+                        <Ionicons name="logo-instagram" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
                         <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActive]}>
                           Instagram
                         </Text>
@@ -720,10 +708,14 @@ export default function ImcQaDashboard() {
 
                       <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
 
-                      <View style={styles.socialMediaBanner}>
-                        <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                        <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                      </View>
+                      {selectedRequest.thumbnailUrl ? (
+                        <Image source={{ uri: selectedRequest.thumbnailUrl }} style={styles.socialMediaBanner} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.socialMediaBanner}>
+                          <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                          <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                        </View>
+                      )}
 
                       <View style={styles.socialFooterActions}>
                         <View style={styles.socialActionBtn}>
@@ -835,19 +827,23 @@ export default function ImcQaDashboard() {
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.btnModalApprove}
-                  onPress={() => handleApprove(selectedRequest)}
-                >
-                  <Text style={styles.btnModalApproveText}>Approve</Text>
-                </TouchableOpacity>
+                {activeTab === 'dashboard' && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.btnModalApprove}
+                      onPress={() => handleApprove(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalApproveText}>Approve</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.btnModalReject}
-                  onPress={() => handleRejectClick(selectedRequest)}
-                >
-                  <Text style={styles.btnModalRejectText}>Reject</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.btnModalReject}
+                      onPress={() => handleRejectClick(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalRejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -1432,6 +1428,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   socialMediaBanner: {
+    width: '100%',
     height: 180,
     backgroundColor: '#1E3A8A',
     borderRadius: BorderRadius.md,

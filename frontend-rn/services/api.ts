@@ -57,6 +57,9 @@ export const authApi = {
 export const postsApi = {
   list: (params?: object) => api.get('/posts', { params }),
   create: (data: object) => api.post('/posts', data),
+  createWithFiles: (formData: FormData) => api.post('/posts', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   get: (id: number) => api.get(`/posts/${id}`),
   update: (id: number, data: object) => api.put(`/posts/${id}`, data),
   delete: (id: number) => api.delete(`/posts/${id}`),
@@ -69,8 +72,9 @@ export const postsApi = {
 
 // ── Dashboard endpoints ────────────────────────────────────────────────────
 export const dashboardApi = {
-  getStats: () => api.get('/dashboard/stats'),
+  getStats: () => api.get('/posts/dashboard/stats'),
   getRecentActivity: () => api.get('/dashboard/recent-activity'),
+  getAnalyticsOverview: () => api.get('/dashboard/analytics'),
 };
 
 // ── Publishing endpoints ───────────────────────────────────────────────────
@@ -85,6 +89,36 @@ export const publishingApi = {
 export const policyApi = {
   get: () => api.get('/policy-settings'),
   update: (data: object) => api.post('/policy-settings', data),
+};
+
+// ── Users endpoints ────────────────────────────────────────────────────────
+export const usersApi = {
+  list: () => api.get('/users'),
+  create: (data: object) => api.post('/users', data),
+  update: (id: string | number, data: object) => api.put(`/users/${id}`, data),
+  delete: (id: string | number) => api.delete(`/users/${id}`),
+};
+
+// ── Departments endpoints ───────────────────────────────────────────────────
+export const departmentsApi = {
+  list: () => api.get('/departments'),
+  create: (data: { name: string; display_name: string; description?: string }) =>
+    api.post('/departments', data),
+  update: (id: number, data: object) => api.put(`/departments/${id}`, data),
+  delete: (id: number) => api.delete(`/departments/${id}`),
+};
+
+// ── Roles management endpoints ──────────────────────────────────────────────
+export const rolesApi = {
+  list: () => api.get('/roles/list'),
+  create: (data: { name: string; display_name: string; description?: string }) =>
+    api.post('/roles/list', data),
+  delete: (id: number | string) => api.delete(`/roles/list/${id}`),
+};
+
+// ── Audit Logs endpoints ────────────────────────────────────────────────────
+export const auditLogsApi = {
+  list: (params?: object) => api.get('/audit-logs', { params }),
 };
 
 export default api;

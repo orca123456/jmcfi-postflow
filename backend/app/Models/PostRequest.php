@@ -13,6 +13,18 @@ class PostRequest extends Model
 {
     use HasFactory;
 
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PENDING_OFFICE_HEAD = 'pending_office_head';
+    public const STATUS_PENDING_VICE_PRESIDENT = 'pending_vice_president';
+    public const STATUS_PENDING_PRESIDENT = 'pending_president';
+    public const STATUS_PENDING_IMC_QA = 'pending_imc_qa';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_RETURNED_FOR_REVISION = 'returned_for_revision';
+    public const STATUS_SCHEDULED = 'scheduled';
+    public const STATUS_PUBLISHED = 'published';
+    public const STATUS_ARCHIVED = 'archived';
+
     protected $fillable = [
         'title',
         'slug',
@@ -67,7 +79,6 @@ class PostRequest extends Model
         return [
             'office_head' => 'Office Head',
             'vice_president' => 'Vice President',
-            'president' => 'President',
             'imc_qa' => 'IMC/QA Checker',
             'it_publisher' => 'IT Publisher',
         ];
@@ -100,14 +111,15 @@ class PostRequest extends Model
 
     public function approvalWorkflows(): HasMany
     {
-        return $this->hasMany(ApprovalWorkflow::class)->orderBy('stage');
+        return $this->hasMany(ApprovalWorkflow::class)->orderBy('stage_order');
     }
 
     public function currentApprovalStage(): ?ApprovalWorkflow
     {
         return $this->approvalWorkflows()
             ->where('action', 'pending')
-            ->orderBy('stage')
+            // No need for a second orderBy since relation already handles it, but we can be explicit
+            ->orderBy('stage_order')
             ->first();
     }
 
@@ -128,7 +140,21 @@ class PostRequest extends Model
 
     public function getStatusLabelAttribute(): string
     {
-        return self::statuses()[$this->status] ?? $this->status;
+        $baseLabel = self::statuses()[$this->status] ?? $this->status;
+        
+        if ($this->status === 'returned_for_revision' || $this->status === 'rejected') {
+            $latestRejection = $this->approvalWorkflows()
+                ->whereIn('action', ['rejected', 'returned_for_revision'])
+                ->latest('acted_at')
+                ->first();
+            
+            if ($latestRejection) {
+                $stageLabel = ApprovalWorkflow::stages()[$latestRejection->stage] ?? $latestRejection->stage;
+                return "Rejected by {$stageLabel}";
+            }
+        }
+        
+        return $baseLabel;
     }
 
     public function getCurrentStageLabelAttribute(): ?string
@@ -148,9 +174,13 @@ class PostRequest extends Model
     public function canBeApprovedBy(User $user): bool
     {
         $currentStage = $this->currentApprovalStage();
+        \Log::info("canBeApprovedBy called for Post ID: {$this->id} by User ID: {$user->id}");
         if (!$currentStage) {
+            \Log::info("No current stage found!");
             return false;
         }
+
+        \Log::info("Current stage is: {$currentStage->stage}");
 
         $requiredRole = match ($currentStage->stage) {
             'office_head' => 'office_head',
@@ -161,7 +191,10 @@ class PostRequest extends Model
             default => null,
         };
 
-        return $requiredRole && $user->hasRole($requiredRole);
+        $hasRole = $requiredRole && $user->hasRole($requiredRole);
+        \Log::info("Required role: {$requiredRole}, Has role: " . ($hasRole ? 'Yes' : 'No'));
+
+        return $hasRole;
     }
 
     public function getNextStage(): ?string

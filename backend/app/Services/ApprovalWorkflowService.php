@@ -8,6 +8,7 @@ use App\Notifications\PostApprovedNotification;
 use App\Notifications\PostRejectedNotification;
 use App\Notifications\PostReturnedForRevisionNotification;
 use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Exceptions\RoleDoesNotExist;
 
 class ApprovalWorkflowService
 {
@@ -16,19 +17,20 @@ class ApprovalWorkflowService
         $stages = [
             ['stage' => 'office_head', 'order' => 1],
             ['stage' => 'vice_president', 'order' => 2],
-            ['stage' => 'president', 'order' => 3],
-            ['stage' => 'imc_qa', 'order' => 4],
+            ['stage' => 'imc_qa', 'order' => 3],
         ];
 
         foreach ($stages as $index => $stage) {
             $approver = $this->getApproverForStage($stage['stage']);
             
-            $postRequest->approvalWorkflows()->create([
-                'stage' => $stage['stage'],
-                'approver_id' => $approver?->id,
-                'action' => $index === 0 ? 'pending' : 'pending',
-                'stage_order' => $stage['order'],
-            ]);
+            if ($approver) {
+                $postRequest->approvalWorkflows()->create([
+                    'stage' => $stage['stage'],
+                    'approver_id' => $approver->id,
+                    'action' => $index === 0 ? 'pending' : 'pending',
+                    'stage_order' => $stage['order'],
+                ]);
+            }
         }
     }
 
@@ -37,7 +39,6 @@ class ApprovalWorkflowService
         $roleMap = [
             'office_head' => 'office_head',
             'vice_president' => 'vice_president',
-            'president' => 'president',
             'imc_qa' => 'imc_qa_checker',
             'it_publisher' => 'it_publisher',
         ];
@@ -48,10 +49,15 @@ class ApprovalWorkflowService
             return null;
         }
 
-        // Get the first active user with this role
-        return User::role($role)
-            ->where('status', 'active')
-            ->first();
+        try {
+            // Get the first active user with this role
+            return User::role($role)
+                ->where('status', 'active')
+                ->first();
+        } catch (RoleDoesNotExist $e) {
+            Log::warning("Role '{$role}' does not exist in the database. Skipping approver assignment for stage: {$stage}");
+            return null;
+        }
     }
 
     public function notifyApprovers(PostRequest $postRequest): void
@@ -84,12 +90,16 @@ class ApprovalWorkflowService
 
     public function notifyITPublisher(PostRequest $postRequest): void
     {
-        $publisher = User::role('it_publisher')
-            ->where('status', 'active')
-            ->first();
+        try {
+            $publisher = User::role('it_publisher')
+                ->where('status', 'active')
+                ->first();
 
-        if ($publisher) {
-            $publisher->notify(new \App\Notifications\PostReadyForPublishingNotification($postRequest));
+            if ($publisher) {
+                $publisher->notify(new \App\Notifications\PostReadyForPublishingNotification($postRequest));
+            }
+        } catch (RoleDoesNotExist $e) {
+            Log::warning("Role 'it_publisher' does not exist in the database. Skipping publisher notification.");
         }
     }
 

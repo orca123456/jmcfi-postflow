@@ -19,8 +19,7 @@ class WorkflowService
         $stages = [
             ['stage' => 'office_head', 'stage_order' => 1],
             ['stage' => 'vice_president', 'stage_order' => 2],
-            ['stage' => 'president', 'stage_order' => 3],
-            ['stage' => 'imc_qa', 'stage_order' => 4],
+            ['stage' => 'imc_qa', 'stage_order' => 3],
         ];
 
         foreach ($stages as $index => $stage) {
@@ -42,7 +41,6 @@ class WorkflowService
         $roleMap = [
             'office_head' => 'office_head',
             'vice_president' => 'vice_president',
-            'president' => 'president',
             'imc_qa' => 'imc_qa_checker',
         ];
 
@@ -111,9 +109,8 @@ class WorkflowService
         return match ($stage) {
             'office_head' => 1,
             'vice_president' => 2,
-            'president' => 3,
-            'imc_qa' => 4,
-            default => 5,
+            'imc_qa' => 3,
+            default => 4,
         };
     }
 
@@ -122,7 +119,6 @@ class WorkflowService
         $stages = [
             'office_head' => 'Office Head',
             'vice_president' => 'Vice President',
-            'president' => 'President',
             'imc_qa' => 'IMC/QA Checker',
         ];
 
