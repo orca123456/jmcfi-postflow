@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
                 'department' => 'ICT',
                 'position' => 'System Administrator',
                 'status' => 'active',
-                'roles' => ['admin'],
+                'roles' => ['it_publisher'],
             ],
         ];
 
