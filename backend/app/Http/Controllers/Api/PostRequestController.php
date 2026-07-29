@@ -16,6 +16,7 @@ use App\Services\AuditLogService;
 use App\Services\ApprovalWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -171,6 +172,8 @@ class PostRequestController extends Controller
                 $this->workflowService->notifyApprovers($post);
             }
 
+            $this->clearDashboardCache();
+
             return response()->json([
                 'data' => new PostRequestResource($post->load([
                     'category', 'requestor', 'media', 'approvalWorkflows.approver'
@@ -258,6 +261,8 @@ class PostRequestController extends Controller
                 $this->aiService->checkCompliance($postRequest);
             }
 
+            $this->clearDashboardCache();
+
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
                     'category', 'requestor', 'media', 'approvalWorkflows.approver'
@@ -280,6 +285,8 @@ class PostRequestController extends Controller
 
         $postRequest->delete();
 
+        $this->clearDashboardCache();
+
         return response()->json(['message' => 'Post deleted successfully']);
     }
 
@@ -301,6 +308,8 @@ class PostRequestController extends Controller
             $this->workflowService->initializeWorkflow($postRequest);
             $this->aiService->checkCompliance($postRequest);
             $this->workflowService->notifyApprovers($postRequest);
+
+            $this->clearDashboardCache();
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
@@ -358,6 +367,8 @@ class PostRequestController extends Controller
             // Record audit trail
             AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $postRequest->title, 'INFO', ['post_id' => $postRequest->id, 'remarks' => $request->remarks], $request);
 
+            $this->clearDashboardCache();
+
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
                     'category', 'requestor', 'media', 'approvalWorkflows.approver'
@@ -413,6 +424,8 @@ class PostRequestController extends Controller
             AuditLogService::log('CONTENT_REJECT', 'Rejected post: ' . $postRequest->title, 'WARNING', ['post_id' => $postRequest->id, 'reason' => $reason], $request);
             $this->workflowService->notifyRequestor($postRequest, 'rejected', $reason);
 
+            $this->clearDashboardCache();
+
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
                     'category', 'requestor', 'media', 'approvalWorkflows.approver'
@@ -457,6 +470,8 @@ class PostRequestController extends Controller
             // Record audit trail
             AuditLogService::log('CONTENT_REVISION', 'Returned post for revision: ' . $postRequest->title, 'WARNING', ['post_id' => $postRequest->id, 'reason' => $reason], $request);
             $this->workflowService->notifyRequestor($postRequest, 'returned_for_revision', $reason);
+
+            $this->clearDashboardCache();
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
@@ -608,5 +623,26 @@ class PostRequestController extends Controller
                 'user_role' => $user->getRoleNames()->first(),
             ],
         ]);
+    }
+
+    /**
+     * Invalidate all dashboard-related Redis caches so fresh data is served on next request.
+     */
+    private function clearDashboardCache(): void
+    {
+        Cache::forget('dashboard_recent_activity');
+        Cache::forget('dashboard_analytics');
+        // Stats caches are per-user, so we clear by prefix pattern (flush all dashboard_stats_*)
+        // Redis: we can use tags if configured, otherwise iterate known roles or just flush by prefix
+        // Laravel's Cache::forget doesn't support wildcards, so we'll use the Redis facade directly
+        try {
+            $keys = \Illuminate\Support\Facades\Redis::keys('dashboard_stats_*');
+            foreach ($keys as $key) {
+                \Illuminate\Support\Facades\Redis::del($key);
+            }
+        } catch (\Exception $e) {
+            // If Redis is unavailable or keys() fails, fall back gracefully
+            logger()->warning('Failed to flush dashboard_stats_* cache keys: ' . $e->getMessage());
+        }
     }
 }

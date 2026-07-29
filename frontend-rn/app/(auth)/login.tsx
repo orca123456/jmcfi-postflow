@@ -184,7 +184,7 @@ const AnimatedBackground = () => {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, error, clearError } = useAuthStore();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -204,6 +204,16 @@ export default function LoginScreen() {
         router.replace(getRoleDashboardPath(user.role) as any);
       }
     }
+  };
+
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    if (error) clearError();
+  };
+
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    if (error) clearError();
   };
 
   return (
@@ -232,7 +242,7 @@ export default function LoginScreen() {
                 <FloatingLabelInput
                   label="Email"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={handleEmailChange}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
@@ -243,12 +253,12 @@ export default function LoginScreen() {
                 <FloatingLabelInput
                   label="Password"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={handlePasswordChange}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoComplete="password"
                   rightIcon={
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
                       style={{ padding: 4 }}
                     >
@@ -258,9 +268,17 @@ export default function LoginScreen() {
                 />
               </View>
 
+              {/* ⚠️ Error Trigger Warning — shown when login fails */}
+              {error && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
               <View style={styles.field}>
-                <TouchableOpacity 
-                  style={styles.submitButton}
+                <TouchableOpacity
+                  style={[styles.submitButton, loading && styles.submitButtonDisabled]}
                   onPress={handleLogin}
                   disabled={loading}
                 >
@@ -363,6 +381,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
   submitButton: {
     backgroundColor: '#4b0082',
     paddingVertical: 12,
@@ -372,6 +407,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitText: {
     color: '#fff',
