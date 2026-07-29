@@ -74,17 +74,28 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
+            'first_name' => 'sometimes|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:20',
+            'position' => 'nullable|string|max:255',
+            'department' => 'nullable|string|max:255',
             'role' => 'sometimes|string|exists:roles,name',
             'status' => 'sometimes|string|in:active,inactive',
+            'password' => 'sometimes|string|min:8|confirmed',
         ]);
+
+        $user->fill($validated);
+
+        if ($request->has('password')) {
+            $user->password = $validated['password'];
+        }
+
+        $user->save();
 
         if ($request->has('role')) {
             $user->syncRoles([$validated['role']]);
-        }
-
-        if ($request->has('status')) {
-            $user->status = $validated['status'];
-            $user->save();
         }
 
         return response()->json([

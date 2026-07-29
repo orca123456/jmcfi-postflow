@@ -4,7 +4,7 @@
  * This dashboard merges admin oversight + publishing capabilities.
  * It re-uses the full admin panel implementation with the role rebadged as "IT Admin".
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   ScrollView,
   Image,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,6 +72,15 @@ const ROLE_OPTIONS = [
   { label: 'IT Admin (Publisher)', value: 'it_publisher' },
 ];
 
+// Profile Settings modal role options — restricted to exactly 5 assignable roles
+const PROFILE_ROLE_OPTIONS = [
+  { label: 'Content Requestor', value: 'requestor' },
+  { label: 'Office Head', value: 'office_head' },
+  { label: 'Vice President', value: 'vice_president' },
+  { label: 'IMC / QA Checker', value: 'imc_qa_checker' },
+  { label: 'IT Admin (Publisher)', value: 'it_publisher' },
+];
+
 const DEPARTMENT_OPTIONS = [
   { id: 1, display_name: 'ICT' },
   { id: 2, display_name: 'Marketing' },
@@ -103,37 +113,155 @@ export default function ITAdminDashboard() {
     if (lastUpdatedDate) setEditableLastUpdatedDate(lastUpdatedDate);
   }, [policySections, effectiveDate, lastUpdatedDate]);
 
+  // ── Loading state ──
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
 
+  // ── Animated spinner rotation ──
+  const spinAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const response = await dashboardApi.getStats();
-        setStats(response.data.data);
-      } catch (err) {
-        console.error('Failed to load stats:', err);
-      }
-    };
-    loadStats();
+    if (!isInitialLoading) return;
+    const animation = Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: false,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [isInitialLoading, spinAnim]);
+  const spinInterpolation = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
-    const fetchUsers = async () => {
-      try {
-        const res = await usersApi.list();
-        const mappedUsers = res.data.data.map((u: any) => ({
+  // ── Process posts into the three component state arrays ──
+  function processPostsData(posts: any[]) {
+    const mappedPublishQueue = posts.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)).map((p: any) => ({
+      id: p.id.toString(),
+      title: p.title || 'Untitled',
+      requestor: p.requestor?.first_name + ' ' + p.requestor?.last_name,
+      department: p.department?.name || 'Unknown',
+      status: p.status === 'APPROVED' ? 'ready_to_publish' : 'published',
+      platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
+      approvedBy: 'IMC/QA',
+      approvedAt: new Date(p.updated_at).toLocaleDateString(),
+    }));
+    setMockPublishQueue(mappedPublishQueue);
+
+    const mappedAll = posts.map((p: any) => ({
+      id: p.id.toString(),
+      title: p.title || 'Untitled',
+      author: p.requestor?.first_name + ' ' + p.requestor?.last_name,
+      department: p.department?.name || 'Unknown',
+      timeAgo: new Date(p.created_at).toLocaleDateString(),
+      status: p.status.toLowerCase(),
+      statusLabel: p.status.toUpperCase().replace(/_/g, ' '),
+      reviewer: p.status,
+      platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
+    }));
+    setAllMockPosts(mappedAll);
+
+    const mappedTable = posts.map((p: any) => ({
+      id: p.id.toString(),
+      title: p.title || 'Untitled',
+      department: typeof p.requestor?.department === 'string' ? p.requestor.department : (p.requestor?.department?.name || p.requestor?.department?.display_name || 'Unknown'),
+      requestedBy: p.requestor?.full_name || 'Unknown',
+      status: p.status_label || p.status,
+      rawStatus: p.status,
+      platforms: Array.isArray(p.target_platforms) ? p.target_platforms.map((t: string) => typeof t === 'string' ? t.toLowerCase() : '') : [],
+      requestedOn: new Date(p.created_at).toLocaleDateString(),
+      requestedTime: new Date(p.created_at).toLocaleTimeString(),
+      rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : '',
+      image: p.media && p.media.length > 0 ? p.media[0].url : 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?auto=format&fit=crop&w=150&q=80',
+      rawPost: p,
+    }));
+    setMockTablePosts(mappedTable);
+  }
+
+  // ── Master data loader: all mount-time fetches in parallel via Promise.allSettled ──
+  useEffect(() => {
+    const loadAllData = async () => {
+      setIsInitialLoading(true);
+
+      // Fire all requests in parallel — a timeout on one won't block the others
+      const results = await Promise.allSettled([
+        dashboardApi.getStats(),
+        usersApi.list().catch(() => ({ data: { data: [] } })),
+        rolesApi.list().catch(() => ({ data: { data: [] } })),
+        departmentsApi.list().catch(() => ({ data: { data: [] } })),
+        postsApi.list().catch(() => ({ data: { data: [] } })),
+        dashboardApi.getRecentActivity().catch(() => ({ data: [] })),
+        dashboardApi.getAnalyticsOverview().catch(() => ({ data: { data: null } })),
+        auditLogsApi.list().catch(() => ({ data: { data: [] } })),
+      ]);
+
+      // 1. Stats (index 0)
+      if (results[0].status === 'fulfilled') {
+        setStats(results[0].value.data.data);
+      } else {
+        console.error('Failed to load stats:', results[0].reason);
+      }
+
+      // 2. Users (index 1) — always fetch on mount for user management tab
+      if (results[1].status === 'fulfilled') {
+        const raw = results[1].value.data.data;
+        const mappedUsers = (raw || []).map((u: any) => ({
           ...u,
           role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
           created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
         }));
         setUsers(mappedUsers);
-      } catch (e) {
-        console.error('Failed to load users:', e);
       }
-    };
-    fetchUsers();
-  }, [activeTab]);
 
-  const [users, setUsers] = useState<any[]>([]);
+      // 3. Roles (index 2)
+      if (results[2].status === 'fulfilled') {
+        const fetchedRoles = results[2].value.data?.data;
+        if (fetchedRoles && fetchedRoles.length > 0) {
+          setRolesList(fetchedRoles.map((r: any) => ({ label: r.display_name, value: r.name })));
+          setNewUserRole(fetchedRoles[0].name);
+        }
+      }
+
+      // 4. Departments (index 3)
+      if (results[3].status === 'fulfilled') {
+        const fetchedDepts = results[3].value.data?.data;
+        if (fetchedDepts && fetchedDepts.length > 0) {
+          setDepartmentsList(fetchedDepts.map((d: any) => ({ id: d.id, display_name: d.display_name })));
+          setNewUserDepartment(fetchedDepts[0].display_name);
+        }
+      }
+
+      // 5. Posts (index 4) — for all content requests tab
+      if (results[4].status === 'fulfilled') {
+        const posts = results[4].value.data.data;
+        processPostsData(posts);
+      }
+
+      // 6. Recent activity (index 5)
+      if (results[5].status === 'fulfilled') {
+        setActivities(results[5].value.data ?? []);
+      }
+
+      // 7. Analytics (index 6)
+      if (results[6].status === 'fulfilled' && results[6].value.data?.data) {
+        setAnalyticsOverview(results[6].value.data.data);
+      }
+
+      // 8. Audit logs (index 7)
+      if (results[7].status === 'fulfilled' && results[7].value.data?.data) {
+        setAuditLogs(results[7].value.data.data);
+      }
+
+      setIsInitialLoading(false);
+    };
+
+    loadAllData();
+  }, []); // Only runs once on mount, not on every tab change
+
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
@@ -158,30 +286,6 @@ export default function ITAdminDashboard() {
     setNewRoleName('');
   };
 
-  useEffect(() => {
-    const fetchRolesAndDepartments = async () => {
-      try {
-        const rolesRes = await rolesApi.list();
-        const deptsRes = await departmentsApi.list();
-        
-        const fetchedRoles = rolesRes.data?.data;
-        if (fetchedRoles && fetchedRoles.length > 0) {
-          setRolesList(fetchedRoles.map((r: any) => ({ label: r.display_name, value: r.name })));
-          setNewUserRole(fetchedRoles[0].name);
-        }
-        
-        const fetchedDepts = deptsRes.data?.data;
-        if (fetchedDepts && fetchedDepts.length > 0) {
-          setDepartmentsList(fetchedDepts.map((d: any) => ({ id: d.id, display_name: d.display_name })));
-          setNewUserDepartment(fetchedDepts[0].display_name);
-        }
-      } catch (err) {
-        console.error('Failed to fetch roles/departments:', err);
-      }
-    };
-    fetchRolesAndDepartments();
-  }, []);
-
   const handleConfirmAddRole = async () => {
     const roleName = newRoleName.trim();
     if (roleName) {
@@ -192,7 +296,7 @@ export default function ITAdminDashboard() {
         setRolesList((prev) => [...prev, newOpt]);
         setNewUserRole(val);
       } catch (e: any) {
-        alert('Failed to add role: ' + (e.response?.data?.message || e.message));
+        showToast('Failed to add role: ' + (e.response?.data?.message || e.message), 'error');
       }
     }
     setAddingRole(false);
@@ -201,7 +305,7 @@ export default function ITAdminDashboard() {
 
   const handleDeleteRole = async () => {
     if (rolesList.length <= 1) {
-      alert('Cannot delete the last remaining role.');
+      showToast('Cannot delete the last remaining role.', 'warning');
       return;
     }
     try {
@@ -210,7 +314,7 @@ export default function ITAdminDashboard() {
       setRolesList(updated);
       setNewUserRole(updated[0].value);
     } catch (e: any) {
-      alert('Failed to delete role: ' + (e.response?.data?.message || e.message));
+      showToast('Failed to delete role: ' + (e.response?.data?.message || e.message), 'error');
     }
   };
 
@@ -229,7 +333,7 @@ export default function ITAdminDashboard() {
         setDepartmentsList((prev) => [...prev, newDept]);
         setNewUserDepartment(deptName);
       } catch (e: any) {
-        alert('Failed to add department: ' + (e.response?.data?.message || e.message));
+        showToast('Failed to add department: ' + (e.response?.data?.message || e.message), 'error');
       }
     }
     setAddingDept(false);
@@ -238,7 +342,7 @@ export default function ITAdminDashboard() {
 
   const handleDeleteDepartment = async () => {
     if (departmentsList.length <= 1) {
-      alert('Cannot delete the last remaining department.');
+      showToast('Cannot delete the last remaining department.', 'warning');
       return;
     }
     const deptToDelete = departmentsList.find(d => d.display_name === newUserDepartment);
@@ -250,13 +354,47 @@ export default function ITAdminDashboard() {
       setDepartmentsList(updated);
       setNewUserDepartment(updated[0].display_name);
     } catch (e: any) {
-      alert('Failed to delete department: ' + (e.response?.data?.message || e.message));
+      showToast('Failed to delete department: ' + (e.response?.data?.message || e.message), 'error');
     }
   };
   const [showPassword, setShowPassword] = useState(false);
   const [userFilter, setUserFilter] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingUserRole, setEditingUserRole] = useState<string>('requestor');
+
+  // ── Profile Modal State ──
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [profileFirstName, setProfileFirstName] = useState('');
+  const [profileLastName, setProfileLastName] = useState('');
+  const [profileMiddleName, setProfileMiddleName] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profilePosition, setProfilePosition] = useState('');
+  const [profileDepartment, setProfileDepartment] = useState('');
+  const [profileRole, setProfileRole] = useState('');
+  const [profileStatus, setProfileStatus] = useState('active');
+  const [profilePassword, setProfilePassword] = useState('');
+  const [profilePasswordConfirmation, setProfilePasswordConfirmation] = useState('');
+  const [showProfilePassword, setShowProfilePassword] = useState(false);
+  const [showProfilePasswordConfirm, setShowProfilePasswordConfirm] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // ── Custom Toast State ──
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning'; visible: boolean }>({ message: '', type: 'success', visible: false });
+  let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    if (toastTimer) clearTimeout(toastTimer);
+    setToast({ message, type, visible: true });
+    toastTimer = setTimeout(() => {
+      setToast({ message: '', type: 'success', visible: false });
+    }, 4000);
+  };
+
+  const hideToast = () => {
+    if (toastTimer) clearTimeout(toastTimer);
+    setToast({ message: '', type: 'success', visible: false });
+  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -277,65 +415,21 @@ export default function ITAdminDashboard() {
   const handlePublish = async (id: string | number) => {
     try {
       await publishingApi.publish(Number(id));
-      alert('Post published successfully!');
+      showToast('Post published successfully!', 'success');
       loadPostsData();
     } catch (error: any) {
-      alert('Failed to publish: ' + (error.response?.data?.message || error.message));
+      showToast('Failed to publish: ' + (error.response?.data?.message || error.message), 'error');
     }
   };
 
   const loadPostsData = async () => {
     try {
       const res = await postsApi.list();
-      const posts = res.data.data;
-      
-      const mappedPublishQueue = posts.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)).map((p: any) => ({
-        id: p.id.toString(),
-        title: p.title || 'Untitled',
-        requestor: p.requestor?.first_name + ' ' + p.requestor?.last_name,
-        department: p.department?.name || 'Unknown',
-        status: p.status === 'APPROVED' ? 'ready_to_publish' : 'published',
-        platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
-        approvedBy: 'IMC/QA',
-        approvedAt: new Date(p.updated_at).toLocaleDateString(),
-      }));
-      setMockPublishQueue(mappedPublishQueue);
-
-      const mappedAll = posts.map((p: any) => ({
-        id: p.id.toString(),
-        title: p.title || 'Untitled',
-        author: p.requestor?.first_name + ' ' + p.requestor?.last_name,
-        department: p.department?.name || 'Unknown',
-        timeAgo: new Date(p.created_at).toLocaleDateString(),
-        status: p.status.toLowerCase(),
-        statusLabel: p.status.toUpperCase().replace(/_/g, ' '),
-        reviewer: p.status,
-        platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
-      }));
-      setAllMockPosts(mappedAll);
-
-        const mappedTable = posts.map((p: any) => ({
-          id: p.id.toString(),
-          title: p.title || 'Untitled',
-          department: typeof p.requestor?.department === 'string' ? p.requestor.department : (p.requestor?.department?.name || p.requestor?.department?.display_name || 'Unknown'),
-          requestedBy: p.requestor?.full_name || 'Unknown',
-          status: p.status_label || p.status,
-          rawStatus: p.status,
-          platforms: Array.isArray(p.target_platforms) ? p.target_platforms.map((t: string) => typeof t === 'string' ? t.toLowerCase() : '') : [],
-          requestedOn: new Date(p.created_at).toLocaleDateString(),
-          requestedTime: new Date(p.created_at).toLocaleTimeString(),
-          rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : '',
-          image: p.media && p.media.length > 0 ? p.media[0].url : 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?auto=format&fit=crop&w=150&q=80',
-        }));
-      setMockTablePosts(mappedTable);
+      processPostsData(res.data.data);
     } catch (err) {
       console.error(err);
     }
   };
-
-  useEffect(() => {
-    loadPostsData();
-  }, []);
 
   const platforms = [
     { name: 'Facebook', percentage: 65, barColor: Colors.primary },
@@ -364,31 +458,9 @@ export default function ITAdminDashboard() {
     platformReach: { facebook: 0, instagram: 0, other: 0 }
   });
 
-  useEffect(() => {
-    dashboardApi.getRecentActivity()
-      .then(r => setActivities(r.data ?? []))
-      .catch(() => setActivities([]));
-      
-    dashboardApi.getAnalyticsOverview()
-      .then(r => {
-        if (r.data && r.data.data) {
-          setAnalyticsOverview(r.data.data);
-        }
-      })
-      .catch(err => console.error('Failed to fetch analytics:', err));
-      
-    auditLogsApi.list()
-      .then(r => {
-        if (r.data && r.data.data) {
-          setAuditLogs(r.data.data);
-        }
-      })
-      .catch(err => console.error('Failed to fetch audit logs:', err));
-  }, []);
-
   const handleCreateAccount = async () => {
-    if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { alert('Please fill in all required fields.'); return; }
-    if (!newUserEmail.includes('@')) { alert('Please enter a valid email.'); return; }
+    if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { showToast('Please fill in all required fields.', 'warning'); return; }
+    if (!newUserEmail.includes('@')) { showToast('Please enter a valid email.', 'warning'); return; }
     
     try {
       const generatedEmpId = 'EMP-' + Math.floor(10000 + Math.random() * 90000);
@@ -409,9 +481,9 @@ export default function ITAdminDashboard() {
       };
       setUsers([newAccount, ...users]);
       setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
-      alert('Institutional account created successfully!');
+      showToast('Institutional account created successfully!', 'success');
     } catch (e: any) {
-      alert('Failed to create account: ' + (e.response?.data?.message || e.message));
+      showToast('Failed to create account: ' + (e.response?.data?.message || e.message), 'error');
     }
   };
 
@@ -427,7 +499,7 @@ export default function ITAdminDashboard() {
       await usersApi.delete(id);
       setUsers(users.filter(u => String(u.id) !== String(id)));
     } catch (e: any) {
-      alert('Failed to delete user: ' + (e.response?.data?.message || e.message));
+      showToast('Failed to delete user: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
       setConfirmDeleteUserId(null);
       setConfirmDeleteUserEmail('');
@@ -439,9 +511,83 @@ export default function ITAdminDashboard() {
       await usersApi.update(id, { role: editingUserRole });
       setUsers(users.map(u => u.id === id ? { ...u, role: editingUserRole } : u));
       setEditingUserId(null);
-      alert('User role updated successfully!');
+      showToast('User role updated successfully!', 'success');
     } catch (e: any) {
-      alert('Failed to update role.');
+      showToast('Failed to update role.', 'error');
+    }
+  };
+
+  // ── Profile Modal Handlers ──
+  const handleOpenProfile = (u: any) => {
+    setSelectedUser(u);
+    setProfileFirstName(u.first_name || '');
+    setProfileMiddleName(u.middle_name || '');
+    setProfileLastName(u.last_name || '');
+    setProfileEmail(u.email || '');
+    setProfilePhone(u.phone || '');
+    setProfilePosition(u.position || '');
+    setProfileDepartment(u.department || '');
+    setProfileRole(u.role || 'requestor');
+    setProfileStatus(u.status || 'active');
+    setProfilePassword('');
+    setProfilePasswordConfirmation('');
+  };
+
+  const handleCloseProfile = () => {
+    setSelectedUser(null);
+    setProfilePassword('');
+    setProfilePasswordConfirmation('');
+  };
+
+  const handleSaveProfile = async () => {
+    if (!selectedUser) return;
+    setSavingProfile(true);
+    try {
+      const payload: any = {
+        first_name: profileFirstName,
+        last_name: profileLastName,
+        email: profileEmail,
+        department: profileDepartment,
+        role: profileRole,
+        status: profileStatus,
+      };
+      if (profileMiddleName) payload.middle_name = profileMiddleName;
+      if (profilePhone) payload.phone = profilePhone;
+      if (profilePosition) payload.position = profilePosition;
+
+      if (profilePassword) {
+        if (profilePassword.length < 8) {
+          showToast('Password must be at least 8 characters.', 'warning');
+          setSavingProfile(false);
+          return;
+        }
+        if (profilePassword !== profilePasswordConfirmation) {
+          showToast('Password confirmation does not match.', 'warning');
+          setSavingProfile(false);
+          return;
+        }
+        payload.password = profilePassword;
+        payload.password_confirmation = profilePasswordConfirmation;
+      }
+
+      const res = await usersApi.update(selectedUser.id, payload);
+      const updatedUser = res.data.data;
+      // Refresh user list in-place
+      setUsers(users.map(u => String(u.id) === String(selectedUser.id) ? {
+        ...u,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        email: updatedUser.email,
+        department: updatedUser.department,
+        role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
+        status: updatedUser.status,
+      } : u));
+      showToast('Profile updated successfully!', 'success');
+      handleCloseProfile();
+    } catch (e: any) {
+      showToast('Failed to update profile: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -499,8 +645,54 @@ export default function ITAdminDashboard() {
     <DashboardShell title="IT Admin Panel" activeTab={activeTab} onTabChange={setActiveTab}>
       {/* Title block removed as requested */}
 
+      {/* ── GLOBAL TOAST NOTIFICATION ── */}
+      {toast.visible && (
+        <View style={styles.toastContainer}>
+          <View style={[
+            styles.toastInner,
+            toast.type === 'success' && styles.toastSuccess,
+            toast.type === 'error' && styles.toastError,
+            toast.type === 'warning' && styles.toastWarning,
+          ]}>
+          <View style={styles.toastContent}>
+            <Ionicons
+              name={
+                toast.type === 'success' ? 'checkmark-circle' :
+                toast.type === 'error' ? 'alert-circle' :
+                'warning'
+              }
+              size={20}
+              color={
+                toast.type === 'success' ? '#16A34A' :
+                toast.type === 'error' ? '#DC2626' :
+                '#D97706'
+              }
+              style={{ marginRight: 10 }}
+            />
+            <Text style={[
+              styles.toastText,
+              toast.type === 'success' && { color: '#16A34A' },
+              toast.type === 'error' && { color: '#DC2626' },
+              toast.type === 'warning' && { color: '#D97706' },
+            ]}>{toast.message}</Text>
+          </View>
+          <TouchableOpacity onPress={hideToast} style={styles.toastClose}>
+            <Ionicons name="close" size={18} color="#6B7280" />
+          </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* ── LOADING SKELETON ── */}
+      {isInitialLoading && (
+        <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+          <Animated.View style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 4, borderColor: '#E5E7EB', borderTopColor: Colors.primary, marginBottom: 16, transform: [{ rotate: spinInterpolation }] }} />
+          <Text style={{ fontSize: 14, color: Colors.textSecondary }}>Loading dashboard data…</Text>
+        </View>
+      )}
+
       {/* ── OVERVIEW TAB ── */}
-      {activeTab === 'overview' && (
+      {activeTab === 'overview' && !isInitialLoading && (
         <>
           <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 16, marginBottom: 24 }}>
             <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -592,7 +784,7 @@ export default function ITAdminDashboard() {
 
                 {/* Table Rows */}
                 {filteredTablePosts.map((post) => (
-                  <View key={post.id} style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', alignItems: 'center' }}>
+                  <TouchableOpacity key={post.id} activeOpacity={0.7} onPress={() => setPreviewPost(post)} style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', alignItems: 'center', cursor: 'pointer' }}>
                     {/* TITLE */}
                     <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingRight: 16 }}>
                       <Image source={{ uri: post.image }} style={{ width: 48, height: 32, borderRadius: 4, marginRight: 12 }} />
@@ -638,17 +830,15 @@ export default function ITAdminDashboard() {
                     </View>
 
                     {/* ACTIONS */}
-                    <View style={{ width: 120, flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
-                      <TouchableOpacity onPress={() => setPreviewPost(post)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="eye-outline" size={14} color="#7e22ce" />
+                    <View style={{ width: 48, flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation?.(); handlePublish(post.id); }}
+                        style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Ionicons name="paper-plane-outline" size={14} color="#fff" />
                       </TouchableOpacity>
-                      {post.rawStatus === 'approved' && (
-                        <TouchableOpacity onPress={() => handlePublish(post.id)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}>
-                          <Ionicons name="paper-plane-outline" size={14} color="#fff" />
-                        </TouchableOpacity>
-                      )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
 
               </View>
@@ -825,44 +1015,34 @@ export default function ITAdminDashboard() {
             {filteredUsers.map((u) => {
               const badge = getRoleBadgeDetails(u.role);
               return (
-                <View key={u.id} style={styles.userRow}>
+                <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => handleOpenProfile(u)} activeOpacity={0.7}>
                   <View style={styles.userInfo}>
                     <View style={[styles.userAvatar, { backgroundColor: badge.bgColor }]}>
-                      <Text style={[styles.userAvatarText, { color: badge.color }]}>{u.email.substring(0, 2).toUpperCase()}</Text>
+                      <Text style={[styles.userAvatarText, { color: badge.color }]}>
+                        {u.first_name ? (u.first_name[0] + (u.last_name?.[0] || '')).toUpperCase() : u.email.substring(0, 2).toUpperCase()}
+                      </Text>
                     </View>
-                    <View>
-                      <Text style={styles.userEmail}>{u.email}</Text>
-                      <Text style={styles.userMeta}>{u.department} • {u.created_at}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.userEmail}>
+                        {u.first_name ? `${u.first_name} ${u.last_name}` : u.email}
+                      </Text>
+                      <Text style={styles.userMeta}>
+                        {u.department ? `${u.department} • ` : ''}{u.role ? getRoleBadgeDetails(u.role).label : ''} • {u.created_at}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.userActions}>
-                    {editingUserId === u.id ? (
-                      <View style={styles.inlineEditRow}>
-                        <select value={editingUserRole} onChange={(e: any) => setEditingUserRole(e.target.value)} style={{ height: 32, fontSize: 12, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', paddingLeft: 6, outline: 'none', cursor: 'pointer' }}>
-                          {ROLE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                        <TouchableOpacity style={styles.saveBtn} onPress={() => handleSaveEditedRole(u.id)}>
-                          <Text style={styles.saveBtnText}>Save</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingUserId(null)}>
-                          <Text style={styles.cancelBtnText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <>
-                        <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
-                          <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
-                        </View>
-                        <TouchableOpacity style={styles.editBtn} onPress={() => { setEditingUserId(u.id); setEditingUserRole(u.role); }}>
-                          <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteUser(u.id)}>
-                          <Ionicons name="trash-outline" size={15} color="#DC2626" />
-                        </TouchableOpacity>
-                      </>
-                    )}
+                    <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
+                      <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); setEditingUserId(u.id); setEditingUserRole(u.role); }}>
+                      <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={(e: any) => { e.stopPropagation?.(); handleDeleteUser(u.id); }}>
+                      <Ionicons name="trash-outline" size={15} color="#DC2626" />
+                    </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </Card>
@@ -899,6 +1079,194 @@ export default function ITAdminDashboard() {
                     style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#DC2626', alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Yes, Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ── Profile Settings Modal (Wide Layout, No Scroll) ── */}
+          <Modal
+            visible={selectedUser !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={handleCloseProfile}
+          >
+            <View style={styles.profileModalOverlay}>
+              <View style={[styles.wideModalCard, { width: width > 900 ? 860 : width > 600 ? '92%' : '94%', maxHeight: width > 600 ? '88%' : '90%' }]}>
+                {/* ── Header ── */}
+                <View style={styles.wideModalHeader}>
+                  <View style={[styles.wideModalAvatar, { backgroundColor: selectedUser ? getRoleBadgeDetails(selectedUser.role).bgColor : '#F3F4F6' }]}>
+                    <Text style={[styles.wideModalAvatarText, { color: selectedUser ? getRoleBadgeDetails(selectedUser.role).color : '#374151' }]}>
+                      {selectedUser
+                        ? (selectedUser.first_name
+                          ? (selectedUser.first_name[0] + (selectedUser.last_name?.[0] || '')).toUpperCase()
+                          : selectedUser.email.substring(0, 2).toUpperCase())
+                        : '?'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.wideModalTitle}>
+                      {selectedUser?.first_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser?.email}
+                    </Text>
+                    <Text style={styles.wideModalSubtitle}>
+                      {selectedUser ? getRoleBadgeDetails(selectedUser.role).label : ''} &nbsp;•&nbsp; ID: {selectedUser?.employee_id || 'N/A'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={handleCloseProfile} style={styles.wideModalCloseBtn}>
+                    <Ionicons name="close" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* ── Two-Column Body (no scroll) ── */}
+                <View style={[styles.wideModalBody, width <= 600 && { flexDirection: 'column', overflow: 'auto' }]}>
+                  {/* ── LEFT COLUMN ── */}
+                  <View style={[styles.wideModalColumn, width <= 600 && { borderRightWidth: 0 }]}>
+                    {/* Personal Information */}
+                    <View style={styles.wideModalSection}>
+                      <Text style={styles.wideSectionTitle}>Personal Information</Text>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldHalf}>
+                          <Text style={styles.wideFieldLabel}>First Name</Text>
+                          <TextInput style={styles.wideFieldInput} value={profileFirstName} onChangeText={setProfileFirstName} placeholder="First name" />
+                        </View>
+                        <View style={styles.wideFieldHalf}>
+                          <Text style={styles.wideFieldLabel}>Last Name</Text>
+                          <TextInput style={styles.wideFieldInput} value={profileLastName} onChangeText={setProfileLastName} placeholder="Last name" />
+                        </View>
+                      </View>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldHalf}>
+                          <Text style={styles.wideFieldLabel}>Middle Name</Text>
+                          <TextInput style={styles.wideFieldInput} value={profileMiddleName} onChangeText={setProfileMiddleName} placeholder="(Optional)" />
+                        </View>
+                        <View style={styles.wideFieldHalf}>
+                          <Text style={styles.wideFieldLabel}>Phone</Text>
+                          <TextInput style={styles.wideFieldInput} value={profilePhone} onChangeText={setProfilePhone} placeholder="(Optional)" />
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Contact & Work */}
+                    <View style={styles.wideModalSection}>
+                      <Text style={styles.wideSectionTitle}>Contact & Work</Text>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldFull}>
+                          <Text style={styles.wideFieldLabel}>Email Address</Text>
+                          <TextInput style={styles.wideFieldInput} value={profileEmail} onChangeText={setProfileEmail} autoCapitalize="none" keyboardType="email-address" />
+                        </View>
+                      </View>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldHalf}>
+                          <Text style={styles.wideFieldLabel}>Department</Text>
+                          <select
+                            value={profileDepartment}
+                            onChange={(e: any) => setProfileDepartment(e.target.value)}
+                            style={styles.wideFieldSelect}
+                          >
+                            {departmentsList.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
+                          </select>
+                        </View>
+                        <View style={styles.wideFieldHalf}>
+                          <Text style={styles.wideFieldLabel}>Position</Text>
+                          <TextInput style={styles.wideFieldInput} value={profilePosition} onChangeText={setProfilePosition} placeholder="(Optional)" />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* ── RIGHT COLUMN ── */}
+                  <View style={[styles.wideModalColumn, styles.wideModalColumnRight, width <= 600 && { borderLeftWidth: 0, paddingTop: 0 }]}>
+                    {/* Account Settings */}
+                    <View style={styles.wideModalSection}>
+                      <Text style={styles.wideSectionTitle}>Account Settings</Text>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldFull}>
+                          <Text style={styles.wideFieldLabel}>Role</Text>
+                          <select
+                            value={profileRole}
+                            onChange={(e: any) => setProfileRole(e.target.value)}
+                            style={styles.wideFieldSelect}
+                          >
+                            {PROFILE_ROLE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                          </select>
+                        </View>
+                      </View>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldFull}>
+                          <Text style={styles.wideFieldLabel}>Status</Text>
+                          <View style={styles.wideStatusRow}>
+                            <TouchableOpacity
+                              style={[styles.wideStatusToggle, profileStatus === 'active' && styles.wideStatusActive]}
+                              onPress={() => setProfileStatus('active')}
+                            >
+                              <View style={[styles.wideStatusDot, { backgroundColor: '#16A34A' }]} />
+                              <Text style={[styles.wideStatusText, profileStatus === 'active' && { color: '#fff' }]}>Active</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.wideStatusToggle, profileStatus === 'inactive' && styles.wideStatusInactive]}
+                              onPress={() => setProfileStatus('inactive')}
+                            >
+                              <View style={[styles.wideStatusDot, { backgroundColor: '#DC2626' }]} />
+                              <Text style={[styles.wideStatusText, profileStatus === 'inactive' && { color: '#fff' }]}>Inactive</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Change Password */}
+                    <View style={styles.wideModalSection}>
+                      <Text style={styles.wideSectionTitle}>Change Password</Text>
+                      <Text style={styles.wideFormHint}>Leave blank to keep current</Text>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldFull}>
+                          <Text style={styles.wideFieldLabel}>New Password</Text>
+                          <View style={styles.widePasswordWrapper}>
+                            <TextInput
+                              style={styles.widePasswordInput}
+                              secureTextEntry={!showProfilePassword}
+                              value={profilePassword}
+                              onChangeText={setProfilePassword}
+                              placeholder="Min. 8 characters"
+                              autoCapitalize="none"
+                            />
+                            <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePassword(!showProfilePassword)}>
+                              <Ionicons name={showProfilePassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.wideFieldRow}>
+                        <View style={styles.wideFieldFull}>
+                          <Text style={styles.wideFieldLabel}>Confirm Password</Text>
+                          <View style={styles.widePasswordWrapper}>
+                            <TextInput
+                              style={styles.widePasswordInput}
+                              secureTextEntry={!showProfilePasswordConfirm}
+                              value={profilePasswordConfirmation}
+                              onChangeText={setProfilePasswordConfirmation}
+                              placeholder="Re-enter password"
+                              autoCapitalize="none"
+                            />
+                            <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePasswordConfirm(!showProfilePasswordConfirm)}>
+                              <Ionicons name={showProfilePasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* ── Footer Actions ── */}
+                <View style={styles.wideModalFooter}>
+                  <TouchableOpacity style={styles.wideCancelBtn} onPress={handleCloseProfile}>
+                    <Text style={styles.wideCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.wideSaveBtn, savingProfile && { opacity: 0.6 }]} onPress={handleSaveProfile} disabled={savingProfile}>
+                    <Ionicons name="save-outline" size={16} color="#fff" />
+                    <Text style={styles.wideSaveBtnText}>{savingProfile ? 'Saving...' : 'Save Changes'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1190,7 +1558,7 @@ export default function ITAdminDashboard() {
                   </View>
 
                   {/* Export Button */}
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => alert('Exporting audit log records as CSV...')}>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => showToast('Exporting audit log records as CSV...', 'success')}>
                     <Ionicons name="download-outline" size={16} color="#374151" style={{ marginRight: 8 }} />
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Export CSV</Text>
                   </TouchableOpacity>
@@ -1297,13 +1665,13 @@ export default function ITAdminDashboard() {
         </Modal>
       )}
 
-      {/* ── PUBLISHED POST PREVIEW MODAL ── */}
+      {/* ── POST PREVIEW MODAL ── */}
       <Modal visible={!!previewPost} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 720, backgroundColor: '#fff', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Published Post Preview</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Content Request Preview</Text>
               <TouchableOpacity onPress={() => setPreviewPost(null)}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
@@ -1330,68 +1698,84 @@ export default function ITAdminDashboard() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Published By</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '500', color: '#111827' }}>IMC / Branding</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Published Date</Text>
+                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested On</Text>
                   <Text style={{ fontSize: 12, color: '#374151' }}>{previewPost?.requestedOn} {previewPost?.requestedTime}</Text>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Platforms</Text>
                   <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {previewPost?.platforms?.includes('FB') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
-                    {previewPost?.platforms?.includes('IG') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                    {previewPost?.platforms?.includes('WEB') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                    {previewPost?.platforms?.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
+                    {previewPost?.platforms?.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
+                    {previewPost?.platforms?.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
                   </View>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Status</Text>
-                  <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#16a34a' }}>Published</Text>
+                  <View style={{
+                    backgroundColor: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#dcfce7' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#16a34a' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309' }}>
+                      {previewPost?.status}
+                    </Text>
                   </View>
                 </View>
               </View>
             </View>
 
-            {/* Timeline and AI Summary */}
+            {/* Caption / Description / Approval Timeline */}
             <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Caption</Text>
-                <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>The spirit of unity, excellence, and sportsmanship comes alive! Join us as we proudly open Intramurals 2026.</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Caption / Narrative</Text>
+                <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
+                  {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
+                </Text>
 
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Description</Text>
-                <Text style={{ fontSize: 13, color: '#374151' }}>This event marks the beginning of a week-long celebration of talent, teamwork, and determination. Let's cheer for our students as they compete with pride and passion!</Text>
+                {previewPost?.rawPost?.description && (
+                  <>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Description</Text>
+                    <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
+                  </>
+                )}
+
+                {previewPost?.rawPost?.rejection_reason && (
+                  <>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Rejection Reason</Text>
+                    <Text style={{ fontSize: 13, color: '#dc2626' }}>{previewPost?.rawPost?.rejection_reason}</Text>
+                  </>
+                )}
               </View>
 
               <View style={{ flex: 1, gap: 16 }}>
                 <View>
                   <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 12 }}>Approval Timeline</Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ height: 2, backgroundColor: '#7e22ce', position: 'absolute', top: 5, left: 10, right: 10 }} />
-                    <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#7e22ce' }} />
-                      <Text style={{ fontSize: 10, color: '#374151', textAlign: 'center' }}>Department{'\n'}Head</Text>
+                  {(previewPost?.rawPost?.approval_workflows && previewPost?.rawPost?.approval_workflows.length > 0) ? (
+                    <View style={{ gap: 8 }}>
+                      {previewPost.rawPost.approval_workflows.map((wf: any, i: number) => (
+                        <View key={wf.id || i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name={wf.action === 'approved' || wf.action === 'published' ? 'checkmark' : wf.action === 'rejected' || wf.action === 'returned' ? 'close' : 'time-outline'} size={12} color={wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#9ca3af'} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#111827' }}>{wf.stage_label || wf.stage}</Text>
+                            <Text style={{ fontSize: 10, color: '#6b7280' }}>
+                              {wf.approver?.full_name || 'Unknown'} {wf.acted_at ? '• ' + new Date(wf.acted_at).toLocaleDateString() : ''}
+                            </Text>
+                          </View>
+                          <View style={{ backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '600', color: wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#6b7280' }}>
+                              {wf.action_label || wf.action?.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
                     </View>
-                    <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#7e22ce' }} />
-                      <Text style={{ fontSize: 10, color: '#374151', textAlign: 'center' }}>Executive{'\n'}(VP)</Text>
-                    </View>
-                    <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#7e22ce' }} />
-                      <Text style={{ fontSize: 10, color: '#374151', textAlign: 'center' }}>IMC / Branding</Text>
-                    </View>
-                    <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#7e22ce' }} />
-                      <Text style={{ fontSize: 10, fontWeight: '600', color: '#111827', textAlign: 'center' }}>Published</Text>
-                    </View>
-                  </View>
+                  ) : (
+                    <Text style={{ fontSize: 12, color: '#9ca3af' }}>No approval workflow data available.</Text>
+                  )}
                 </View>
-
-
               </View>
             </View>
 
@@ -1575,4 +1959,98 @@ const styles = StyleSheet.create({
   settingsFormInputDisabled: { backgroundColor: '#F9FAFB', color: Colors.textSecondary },
   saveDetailsBtn: { backgroundColor: '#0F172A', margin: Spacing.lg, paddingVertical: 12, borderRadius: 4, alignItems: 'center' },
   saveDetailsBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: '700' },
+
+  // ── Profile Modal Styles (Wide Layout, No Scroll) ──
+  profileModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  wideModalCard: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 32, elevation: 16, display: 'flex', flexDirection: 'column' },
+  wideModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#0F172A', paddingHorizontal: 24, paddingVertical: 18 },
+  wideModalAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  wideModalAvatarText: { fontSize: 15, fontWeight: '800' },
+  wideModalTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  wideModalSubtitle: { fontSize: 11, fontWeight: '500', color: '#9CA3AF', marginTop: 1 },
+  wideModalCloseBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
+  wideModalBody: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6, overflow: 'hidden' },
+  wideModalColumn: { flex: 1, paddingHorizontal: 10 },
+  wideModalColumnRight: { borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: 16 },
+  wideModalSection: { marginBottom: 18 },
+  wideSectionTitle: { fontSize: 12, fontWeight: '700', color: '#374151', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  wideFieldRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  wideFieldHalf: { flex: 1, minWidth: 0 },
+  wideFieldFull: { flex: 1 },
+  wideFieldLabel: { fontSize: 10, fontWeight: '700', color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
+  wideFieldInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', backgroundColor: '#F9FAFB', outlineStyle: 'none' },
+  wideFieldSelect: { height: 36, fontSize: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', color: '#111827', paddingLeft: 8, width: '100%', outlineStyle: 'none' },
+  wideFormHint: { fontSize: 10, color: '#9CA3AF', marginBottom: 10, marginTop: -4 },
+  widePasswordWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, backgroundColor: '#F9FAFB', alignItems: 'center' },
+  widePasswordInput: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', outlineStyle: 'none' },
+  widePasswordToggle: { padding: 6 },
+  wideStatusRow: { flexDirection: 'row', gap: 8 },
+  wideStatusToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  wideStatusActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  wideStatusInactive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  wideStatusDot: { width: 7, height: 7, borderRadius: 3.5 },
+  wideStatusText: { fontSize: 11, fontWeight: '600', color: '#374151' },
+  wideModalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingHorizontal: 24, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', marginTop: 4 },
+  wideCancelBtn: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, backgroundColor: '#F3F4F6' },
+  wideCancelBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  wideSaveBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, backgroundColor: '#0F172A' },
+  wideSaveBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+
+  // ── Toast Notification Styles ──
+  toastContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 99999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 16,
+    paddingHorizontal: 20,
+  },
+  toastInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minWidth: 340,
+    maxWidth: 520,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  toastSuccess: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  toastError: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  toastWarning: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  toastText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  toastClose: {
+    padding: 4,
+    marginLeft: 12,
+  },
 });
