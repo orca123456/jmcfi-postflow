@@ -58,6 +58,12 @@ class PostMedia extends Model
 
     public function getUrlAttribute(): string
     {
+        $disk = config('filesystems.default');
+
+        if ($disk === 's3' || $disk === 'b2') {
+            return \Illuminate\Support\Facades\Storage::disk($disk)->url($this->file_path);
+        }
+
         // 1. If RENDER_EXTERNAL_URL is set (Render production), use it as base
         $renderUrl = config('app.render_external_url');
         if ($renderUrl) {

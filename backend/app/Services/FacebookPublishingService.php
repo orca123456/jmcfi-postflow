@@ -35,7 +35,9 @@ class FacebookPublishingService
             return ['id' => 'mock_fb_post_12345'];
         }
 
-        if ($mediaPath && !file_exists($mediaPath)) {
+        $isUrl = $mediaPath ? filter_var($mediaPath, FILTER_VALIDATE_URL) : false;
+
+        if ($mediaPath && !$isUrl && !file_exists($mediaPath)) {
             throw new Exception("Media file not found on the server. If the server restarted, uploaded files may have been lost. Please re-upload the image.");
         }
 
@@ -50,9 +52,14 @@ class FacebookPublishingService
 
         try {
             if ($mediaPath) {
-                $response = Http::withoutVerifying()
-                    ->attach('source', file_get_contents($mediaPath), basename($mediaPath))
-                    ->post($endpoint, $payload);
+                if ($isUrl) {
+                    $payload['url'] = $mediaPath;
+                    $response = Http::withoutVerifying()->post($endpoint, $payload);
+                } else {
+                    $response = Http::withoutVerifying()
+                        ->attach('source', file_get_contents($mediaPath), basename($mediaPath))
+                        ->post($endpoint, $payload);
+                }
             } else {
                 $response = Http::withoutVerifying()->post($endpoint, $payload);
             }

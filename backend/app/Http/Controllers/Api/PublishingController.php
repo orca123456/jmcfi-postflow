@@ -54,7 +54,12 @@ class PublishingController extends Controller
                 $media = $post->media()->first();
                 $mediaPath = null;
                 if ($media && $media->file_path) {
-                    $mediaPath = \Illuminate\Support\Facades\Storage::disk('public')->path($media->file_path);
+                    $disk = config('filesystems.default');
+                    if ($disk === 's3' || $disk === 'b2') {
+                        $mediaPath = $media->url;
+                    } else {
+                        $mediaPath = \Illuminate\Support\Facades\Storage::disk('public')->path($media->file_path);
+                    }
                 }
 
                 $message = $post->caption_narrative ?? '';

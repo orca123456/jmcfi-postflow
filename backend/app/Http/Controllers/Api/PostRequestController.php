@@ -125,7 +125,7 @@ class PostRequestController extends Controller
             // Handle media uploads
             if ($request->hasFile('media')) {
                 foreach ($request->file('media') as $index => $file) {
-                    $path = $file->store('post-media/' . $post->id, 'public');
+                    $path = $file->store('post-media/' . $post->id, config('filesystems.default'));
                     PostMedia::create([
                         'post_request_id' => $post->id,
                         'type' => $this->getMediaType($file->getMimeType()),
@@ -142,7 +142,7 @@ class PostRequestController extends Controller
             // Handle supporting documents
             if ($request->hasFile('supporting_docs')) {
                 foreach ($request->file('supporting_docs') as $index => $file) {
-                    $path = $file->store('post-supporting-docs/' . $post->id, 'public');
+                    $path = $file->store('post-supporting-docs/' . $post->id, config('filesystems.default'));
                     PostMedia::create([
                         'post_request_id' => $post->id,
                         'type' => 'document',
@@ -226,14 +226,14 @@ class PostRequestController extends Controller
                 // Delete old media not in keep list
                 $keepIds = $request->input('keep_media_ids', []);
                 $postRequest->media()->whereNotIn('id', $keepIds)->each(function ($media) {
-                    Storage::disk('public')->delete($media->path);
+                    Storage::disk(config('filesystems.default'))->delete($media->path);
                     $media->delete();
                 });
 
                 // Add new media
                 $existingCount = $postRequest->media()->whereIn('id', $keepIds)->count();
                 foreach ($request->file('media') as $index => $file) {
-                    $path = $file->store('post-media/' . $postRequest->id, 'public');
+                    $path = $file->store('post-media/' . $postRequest->id, config('filesystems.default'));
                     PostMedia::create([
                         'post_request_id' => $postRequest->id,
                         'type' => $this->getMediaType($file->getMimeType()),
@@ -280,7 +280,7 @@ class PostRequestController extends Controller
 
         // Delete media files
         foreach ($postRequest->media as $media) {
-            Storage::disk('public')->delete($media->path);
+            Storage::disk(config('filesystems.default'))->delete($media->path);
         }
 
         $postRequest->delete();
