@@ -1417,7 +1417,7 @@ export default function ITAdminDashboard() {
                 </View>
 
                 {/* ── Two-Column Body (no scroll) ── */}
-                <View style={[styles.wideModalBody, width <= 600 && { flexDirection: 'column', overflow: 'auto' }]}>
+                <View style={[styles.wideModalBody, width <= 600 && { flexDirection: 'column', overflow: 'scroll' } as any]}>
                   {/* ── LEFT COLUMN ── */}
                   <View style={[styles.wideModalColumn, width <= 600 && { borderRightWidth: 0 }]}>
                     {/* Personal Information */}
@@ -1581,13 +1581,13 @@ export default function ITAdminDashboard() {
                 <Text style={styles.sectionHeader}>Platform Tokens</Text>
                 <Text style={styles.policyNote}>Manage API tokens for Facebook, Instagram, and WordPress integration.</Text>
               </View>
-              {tokenLastUpdated && tokenLastUpdated !== 'Never' && (
+              {(tokenLastUpdated && tokenLastUpdated !== 'Never') ? (
                 <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
                   <Text style={{ fontSize: 11, color: '#1e40af', fontWeight: '500' }}>
                     Last updated: {new Date(tokenLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </Card>
           <Card style={styles.userCard}>
@@ -1615,7 +1615,7 @@ export default function ITAdminDashboard() {
                         fontSize: 14,
                         color: '#111827',
                         outlineStyle: 'none',
-                      }}
+                      } as any}
                       placeholder={field.placeholder}
                       placeholderTextColor="#9ca3af"
                       value={(tokenFields as any)[field.key]}
@@ -1673,7 +1673,7 @@ export default function ITAdminDashboard() {
                         fontSize: 14,
                         color: '#111827',
                         outlineStyle: 'none',
-                      }}
+                      } as any}
                       placeholder={field.placeholder}
                       placeholderTextColor="#9ca3af"
                       value={(tokenFields as any)[field.key]}
@@ -1732,7 +1732,7 @@ export default function ITAdminDashboard() {
                         fontSize: 14,
                         color: '#111827',
                         outlineStyle: 'none',
-                      }}
+                      } as any}
                       placeholder={field.placeholder}
                       placeholderTextColor="#9ca3af"
                       value={(tokenFields as any)[field.key]}
@@ -1781,7 +1781,7 @@ export default function ITAdminDashboard() {
                   <View style={styles.bulletDot} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.bulletTitle}>{bullet.title}</Text>
-                    {bullet.description && <Text style={styles.bulletDesc}>{bullet.description}</Text>}
+                    {bullet.description ? <Text style={styles.bulletDesc}>{bullet.description}</Text> : null}
                   </View>
                 </View>
               ))}
@@ -1954,7 +1954,7 @@ export default function ITAdminDashboard() {
                   <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#F3F4F6', borderStyle: 'dashed' }} />
                   <View style={{ position: 'absolute', top: 110, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#F3F4F6', borderStyle: 'dashed' }} />
                   
-                  {monthsData.map((item, index) => {
+                  {monthsData.map((item: any, index: number) => {
                     const heightPercent = (item.posts / maxPosts) * 100;
                     return (
                       <View key={item.month} style={{ alignItems: 'center', width: '7%', gap: 8 }}>
@@ -2248,19 +2248,19 @@ export default function ITAdminDashboard() {
                   {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
                 </Text>
 
-                {previewPost?.rawPost?.description && (
+                {previewPost?.rawPost?.description ? (
                   <>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Description</Text>
                     <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
                   </>
-                )}
+                ) : null}
 
-                {previewPost?.rawPost?.rejection_reason && (
+                {previewPost?.rawPost?.rejection_reason ? (
                   <>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Rejection Reason</Text>
                     <Text style={{ fontSize: 13, color: '#dc2626' }}>{previewPost?.rawPost?.rejection_reason}</Text>
                   </>
-                )}
+                ) : null}
               </View>
 
               <View style={{ flex: 1, gap: 16 }}>
@@ -2493,11 +2493,11 @@ const styles = StyleSheet.create({
   wideFieldHalf: { flex: 1, minWidth: 0 },
   wideFieldFull: { flex: 1 },
   wideFieldLabel: { fontSize: 10, fontWeight: '700', color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
-  wideFieldInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', backgroundColor: '#F9FAFB', outlineStyle: 'none' },
-  wideFieldSelect: { height: 36, fontSize: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', color: '#111827', paddingLeft: 8, width: '100%', outlineStyle: 'none' },
+  wideFieldInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', backgroundColor: '#F9FAFB', outlineStyle: 'none' } as any,
+  wideFieldSelect: { height: 36, fontSize: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', color: '#111827', paddingLeft: 8, width: '100%', outlineStyle: 'none' } as any,
   wideFormHint: { fontSize: 10, color: '#9CA3AF', marginBottom: 10, marginTop: -4 },
   widePasswordWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, backgroundColor: '#F9FAFB', alignItems: 'center' },
-  widePasswordInput: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', outlineStyle: 'none' },
+  widePasswordInput: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', outlineStyle: 'none' } as any,
   widePasswordToggle: { padding: 6 },
   wideStatusRow: { flexDirection: 'row', gap: 8 },
   wideStatusToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },

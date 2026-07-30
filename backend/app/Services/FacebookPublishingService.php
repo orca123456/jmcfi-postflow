@@ -14,8 +14,8 @@ class FacebookPublishingService
 
     public function __construct()
     {
-        $this->pageId = env('FACEBOOK_PAGE_ID', '');
-        $this->accessToken = env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
+        $this->pageId = \App\Models\SystemSetting::where('key', 'facebook_page_id')->value('value') ?? env('FACEBOOK_PAGE_ID', '');
+        $this->accessToken = \App\Models\SystemSetting::where('key', 'facebook_access_token')->value('value') ?? env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
         $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');
     }
 
