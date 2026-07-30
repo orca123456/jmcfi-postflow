@@ -53,6 +53,17 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
   logout: () => api.post('/auth/logout'),
   getUser: () => api.get('/auth/user'),
+  updateProfile: (data: object) => api.put('/auth/profile', data),
+  changePassword: (current_password: string, new_password: string, new_password_confirmation: string) =>
+    api.put('/auth/password', { current_password, new_password, new_password_confirmation }),
+  uploadPhoto: (file: File) => {
+    const form = new FormData();
+    form.append('photo', file);
+    return api.post('/auth/profile-photo', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  removePhoto: () => api.delete('/auth/profile-photo'),
 };
 
 // ── Posts endpoints ────────────────────────────────────────────────────────
@@ -108,6 +119,14 @@ export const departmentsApi = {
     api.post('/departments', data),
   update: (id: number, data: object) => api.put(`/departments/${id}`, data),
   delete: (id: number) => api.delete(`/departments/${id}`),
+  uploadLogo: (id: number, file: File) => {
+    const form = new FormData();
+    form.append('logo', file);
+    return api.post(`/departments/${id}/logo`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  removeLogo: (id: number) => api.delete(`/departments/${id}/logo`),
 };
 
 // ── Roles management endpoints ──────────────────────────────────────────────
@@ -121,6 +140,12 @@ export const rolesApi = {
 // ── Audit Logs endpoints ────────────────────────────────────────────────────
 export const auditLogsApi = {
   list: (params?: object) => api.get('/audit-logs', { params }),
+};
+
+// ── Token Settings endpoints ────────────────────────────────────────────────
+export const tokenSettingsApi = {
+  get: () => api.get('/token-settings'),
+  update: (data: object) => api.post('/token-settings', data),
 };
 
 export default api;

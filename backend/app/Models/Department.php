@@ -14,6 +14,7 @@ class Department extends Model
         'name',
         'display_name',
         'description',
+        'logo_path',
         'is_active',
     ];
 
@@ -22,5 +23,15 @@ class Department extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    protected $appends = ['logo_url'];
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        if (!$this->logo_path) {
+            return null;
+        }
+        return asset('storage/' . $this->logo_path);
     }
 }

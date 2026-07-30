@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../store/auth';
@@ -17,6 +18,19 @@ export default function RootLayout() {
 
   useEffect(() => {
     loadFromStorage();
+    
+    // Hide default password reveal icon on Edge/IE to prevent overlapping with our custom icon
+    if (Platform.OS === 'web') {
+      const style = document.createElement('style');
+      style.type = 'text/css';
+      style.innerHTML = `
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear {
+          display: none;
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }, [loadFromStorage]);
 
   if (!fontsLoaded && !fontError) {

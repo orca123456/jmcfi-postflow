@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\RoleController;
 
 use App\Http\Controllers\Api\PolicySettingController;
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\TokenSettingController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -27,6 +28,8 @@ Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth
 Route::get('/auth/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
 Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->middleware('auth:sanctum');
 Route::put('/auth/password', [AuthController::class, 'updatePassword'])->middleware('auth:sanctum');
+Route::post('/auth/profile-photo', [AuthController::class, 'uploadPhoto'])->middleware('auth:sanctum');
+Route::delete('/auth/profile-photo', [AuthController::class, 'removePhoto'])->middleware('auth:sanctum');
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -72,11 +75,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);
     Route::post('policy-settings', [PolicySettingController::class, 'updateSettings']);
 
+    // Token Settings
+    Route::get('token-settings', [TokenSettingController::class, 'getTokens']);
+    Route::post('token-settings', [TokenSettingController::class, 'updateTokens']);
+
     // Departments
     Route::get('departments', [DepartmentController::class, 'index']);
     Route::post('departments', [DepartmentController::class, 'store']);
     Route::put('departments/{department}', [DepartmentController::class, 'update']);
     Route::delete('departments/{department}', [DepartmentController::class, 'destroy']);
+    Route::post('departments/{department}/logo', [DepartmentController::class, 'uploadLogo']);
+    Route::delete('departments/{department}/logo', [DepartmentController::class, 'removeLogo']);
 
     // Roles
     Route::get('roles/list', [RoleController::class, 'index']);

@@ -128,4 +128,37 @@ class AuthController extends Controller
             'message' => 'Password updated successfully',
         ]);
     }
+
+    public function uploadPhoto(Request $request): JsonResponse
+    {
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ]);
+
+        $user = $request->user();
+
+        if ($user->photo_path && \Storage::disk('public')->exists($user->photo_path)) {
+            \Storage::disk('public')->delete($user->photo_path);
+        }
+
+        $path = $request->file('photo')->store('profile-photos', 'public');
+        $user->update(['photo_path' => $path]);
+
+        return response()->json([
+            'message' => 'Photo uploaded.',
+            'photo_url' => asset('storage/' . $path),
+        ]);
+    }
+
+    public function removePhoto(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->photo_path && \Storage::disk('public')->exists($user->photo_path)) {
+            \Storage::disk('public')->delete($user->photo_path);
+        }
+        $user->update(['photo_path' => null]);
+
+        return response()->json(['message' => 'Photo removed.']);
+    }
 }

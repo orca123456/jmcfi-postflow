@@ -17,7 +17,7 @@ import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
-import { postsApi, dashboardApi } from '../../../services/api';
+import { postsApi, dashboardApi, authApi } from '../../../services/api';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -54,6 +54,46 @@ export default function ImcQaDashboard() {
   const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
+
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [acctFullName, setAcctFullName] = useState('');
+  const [acctCurrentPw, setAcctCurrentPw] = useState('');
+  const [acctNewPw, setAcctNewPw] = useState('');
+  const [acctConfirmPw, setAcctConfirmPw] = useState('');
+  const [savingAcct, setSavingAcct] = useState(false);
+
+  useEffect(() => { if (user) setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim()); }, [user]);
+
+  const handleUploadPhoto = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const f = e.target.files?.[0]; if (!f) return;
+        setUploadingPhoto(true);
+        try { const r = await authApi.uploadPhoto(f); setProfilePhotoUrl(r.data.photo_url); } catch {} finally { setUploadingPhoto(false); }
+      };
+      input.click();
+    }
+  };
+  const handleRemovePhoto = async () => {
+    setUploadingPhoto(true);
+    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch {} finally { setUploadingPhoto(false); }
+  };
+  const handleSaveDetails = async () => {
+    const p = acctFullName.trim().split(' ');
+    setSavingAcct(true);
+    try { await authApi.updateProfile({ first_name: p[0] || '', last_name: p.slice(1).join(' ') || '' }); alert('Profile updated!'); } catch {}
+    finally { setSavingAcct(false); }
+  };
+  const handleChangePw = async () => {
+    if (!acctCurrentPw || !acctNewPw) { alert('Fill all fields.'); return; }
+    if (acctNewPw.length < 8) { alert('At least 8 characters.'); return; }
+    if (acctNewPw !== acctConfirmPw) { alert('Passwords do not match.'); return; }
+    setSavingAcct(true);
+    try { await authApi.changePassword(acctCurrentPw, acctNewPw, acctConfirmPw); alert('Password changed!'); setAcctCurrentPw(''); setAcctNewPw(''); setAcctConfirmPw(''); }
+    catch {} finally { setSavingAcct(false); }
+  };
 
   const loadData = async () => {
     try {
@@ -533,54 +573,47 @@ export default function ImcQaDashboard() {
                 {/* Profile Picture Upload Section */}
                 <View style={styles.profilePicUploadContainer}>
                   <View style={styles.profilePicLarge}>
-                    <Text style={styles.profilePicLargeText}>
-                      {user?.name ? user.name.substring(0, 2).toUpperCase() : 'QA'}
-                    </Text>
+                    {profilePhotoUrl ? (
+                      <Image source={{ uri: profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
+                    ) : (
+                      <Text style={styles.profilePicLargeText}>
+                        {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'QA'}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.profilePicActionCol}>
                     <Text style={styles.profilePicTitle}>Profile Picture</Text>
-                    <Text style={styles.profilePicSubtitle}>
-                      PNG or JPG formats supported. Max 2MB file size.
-                    </Text>
+                    <Text style={styles.profilePicSubtitle}>PNG or JPG formats supported. Max 2MB file size.</Text>
                     <View style={styles.profilePicButtonsRow}>
-                      <TouchableOpacity style={styles.profilePicUploadBtn} onPress={() => alert('Profile picture upload clicked.')}>
-                        <Text style={styles.profilePicUploadBtnText}>Upload New Photo</Text>
+                      <TouchableOpacity style={styles.profilePicUploadBtn} onPress={handleUploadPhoto} disabled={uploadingPhoto}>
+                        <Text style={styles.profilePicUploadBtnText}>{uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.profilePicRemoveBtn} onPress={() => alert('Profile picture removed.')}>
-                        <Text style={styles.profilePicRemoveBtnText}>Remove</Text>
-                      </TouchableOpacity>
+                      {profilePhotoUrl && (
+                        <TouchableOpacity style={styles.profilePicRemoveBtn} onPress={handleRemovePhoto} disabled={uploadingPhoto}>
+                          <Text style={styles.profilePicRemoveBtnText}>Remove</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>FULL NAME</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    defaultValue={user?.name ?? 'IMC Quality Lead'}
-                  />
+                  <TextInput style={styles.textInput} value={acctFullName} onChangeText={setAcctFullName} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                  <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
-                    value={user?.email ?? 'imc_qa@jmcfi.edu.ph'}
-                    editable={false}
-                  />
+                  <TextInput style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]} value={user?.email ?? ''} editable={false} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT / ROLE</Text>
-                  <TextInput
-                    style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
-                    value="Institutional Marketing & Communication QA"
-                    editable={false}
-                  />
+                  <TextInput style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]} value={user?.department || ''} editable={false} />
                 </View>
 
-                <TouchableOpacity style={[styles.btnViewRow, { backgroundColor: '#1E40AF', paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start', borderRadius: 6 }]} onPress={() => alert('Profile settings saved successfully!')}>
-                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>Save Details</Text>
+                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center' }} onPress={handleSaveDetails} disabled={savingAcct}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Saving...' : 'Save Details'}</Text>
                 </TouchableOpacity>
               </Card>
             </View>
@@ -592,33 +625,21 @@ export default function ImcQaDashboard() {
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    secureTextEntry={true}
-                    placeholder="Enter current password"
-                  />
+                  <TextInput style={styles.textInput} secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} placeholder="Enter current password" />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>NEW PASSWORD</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    secureTextEntry={true}
-                    placeholder="Enter new password"
-                  />
+                  <TextInput style={styles.textInput} secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} placeholder="Enter new password" />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    secureTextEntry={true}
-                    placeholder="Confirm new password"
-                  />
+                  <TextInput style={styles.textInput} secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
                 </View>
 
-                <TouchableOpacity style={[styles.btnViewRow, { backgroundColor: '#1E40AF', paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start', borderRadius: 6, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
-                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>Change Password</Text>
+                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleChangePw} disabled={savingAcct}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Changing...' : 'Change Password'}</Text>
                 </TouchableOpacity>
               </Card>
             </View>
@@ -709,7 +730,7 @@ export default function ImcQaDashboard() {
                       <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
 
                       {selectedRequest.thumbnailUrl ? (
-                        <Image source={{ uri: selectedRequest.thumbnailUrl }} style={styles.socialMediaBanner} resizeMode="cover" />
+                        <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
                       ) : (
                         <View style={styles.socialMediaBanner}>
                           <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -1429,13 +1450,13 @@ const styles = StyleSheet.create({
   },
   socialMediaBanner: {
     width: '100%',
-    height: 180,
-    backgroundColor: '#1E3A8A',
+    maxHeight: 400,
+    backgroundColor: '#F9FAFB',
     borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.md,
     marginBottom: 12,
+    overflow: 'hidden',
   },
   socialMediaBannerText: {
     fontSize: FontSize.sm,
