@@ -17,6 +17,15 @@ Route::get('/test-posts', function() {
     return \App\Http\Resources\Api\PostRequestResource::collection(\App\Models\PostRequest::with('media')->get());
 });
 
+Route::get('/test-s3', function() {
+    try {
+        $result = \Illuminate\Support\Facades\Storage::disk('s3')->put('test.txt', 'Hello S3');
+        return "Upload success: " . ($result ? 'true' : 'false');
+    } catch (\Exception $e) {
+        return "Exception: " . $e->getMessage();
+    }
+});
+
 Route::get('/{any}', function () {
     $path = public_path('index.html');
     if (file_exists($path)) {
