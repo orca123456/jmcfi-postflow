@@ -1,0 +1,1 @@
+<?php require 'vendor/autoload.php'; \ = require_once 'bootstrap/app.php'; \ = \->make(Illuminate\Contracts\Console\Kernel::class); \->bootstrap(); \ = Illuminate\Http\UploadedFile::fake()->image('test.jpg'); \ = \->storeAs('test-dir', 'test.jpg', 's3'); var_dump(\);
