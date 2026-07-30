@@ -58,4 +58,34 @@ class DepartmentController extends Controller
         $department->delete();
         return response()->json(null, 204);
     }
+
+    public function uploadLogo(Request $request, Department $department): JsonResponse
+    {
+        $request->validate([
+            'logo' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ]);
+
+        // Delete old logo if exists
+        if ($department->logo_path && \Storage::disk('public')->exists($department->logo_path)) {
+            \Storage::disk('public')->delete($department->logo_path);
+        }
+
+        $path = $request->file('logo')->store('department-logos', 'public');
+        $department->update(['logo_path' => $path]);
+
+        return response()->json([
+            'data' => $department,
+            'logo_url' => asset('storage/' . $path),
+        ]);
+    }
+
+    public function removeLogo(Department $department): JsonResponse
+    {
+        if ($department->logo_path && \Storage::disk('public')->exists($department->logo_path)) {
+            \Storage::disk('public')->delete($department->logo_path);
+        }
+        $department->update(['logo_path' => null]);
+
+        return response()->json(['message' => 'Logo removed.']);
+    }
 }

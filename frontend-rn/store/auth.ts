@@ -6,9 +6,13 @@ import { authApi } from '../services/api';
 export interface AuthUser {
   id: number;
   name: string;
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
   role: string;
   department?: string;
+  photo_url?: string;
 }
 
 interface AuthStore {
@@ -154,4 +158,22 @@ export const getRoleColor = (role: string): string => {
     it_publisher: '#0F172A',
   };
   return colors[role] ?? '#6B7280';
+};
+
+export const getAvatarColors = (name: string): { bg: string, text: string } => {
+  const palette = [
+    { bg: '#E3F2FD', text: '#1565C0' }, // Light Blue
+    { bg: '#F3E8FF', text: '#6B21A8' }, // Light Purple
+    { bg: '#FFF3E0', text: '#E65100' }, // Light Orange
+    { bg: '#E8F5E9', text: '#2E7D32' }, // Light Green
+    { bg: '#FFEBEE', text: '#C62828' }, // Light Red
+    { bg: '#FCE4EC', text: '#C2185B' }, // Light Pink
+    { bg: '#E0F7FA', text: '#00838F' }, // Light Cyan
+  ];
+  if (!name) return palette[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return palette[Math.abs(hash) % palette.length];
 };

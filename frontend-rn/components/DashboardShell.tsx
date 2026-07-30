@@ -11,19 +11,26 @@ import {
   Platform,
   Animated,
   TouchableWithoutFeedback,
+  ImageBackground,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore, getRoleLabel, getRoleColor } from '../store/auth';
+import { useAuthStore, getRoleLabel, getRoleColor, getRoleDashboardPath, getAvatarColors } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../constants/theme';
 import { ChatBot } from './ChatBot';
+import { departmentsApi } from '../services/api';
+import { authApi } from '../services/api';
 
 interface DashboardShellProps {
   title: string;
   children: React.ReactNode;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  departmentName?: string;
+  departmentLogo?: string;
+  userPhotoUrl?: string | null;
+  backgroundImage?: any;
 }
 
 export function DashboardShell({
@@ -31,6 +38,10 @@ export function DashboardShell({
   children,
   activeTab,
   onTabChange,
+  departmentName,
+  departmentLogo,
+  userPhotoUrl,
+  backgroundImage,
 }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,6 +52,37 @@ export function DashboardShell({
   const [isHamburgerHovered, setIsHamburgerHovered] = React.useState(false);
   const [sidebarOpenedByHover, setSidebarOpenedByHover] = React.useState(false);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
+
+  // Auto-fetch department logo for the current user
+  const [autoDeptLogo, setAutoDeptLogo] = React.useState<string | undefined>(undefined);
+  React.useEffect(() => {
+    const deptName = user?.department;
+    if (!deptName) return;
+    departmentsApi.list().then(res => {
+      const depts = res.data?.data || [];
+      const match = depts.find((d: any) =>
+        d.display_name === deptName || d.name === deptName
+      );
+      if (match?.logo_url) {
+        setAutoDeptLogo(match.logo_url);
+      }
+    }).catch(() => {});
+  }, [user?.department]);
+
+  // Auto-fetch user photo from API (in case it was uploaded after login)
+  const [apiUserPhoto, setApiUserPhoto] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!user) return;
+    authApi.getUser().then(res => {
+      const photo = res.data?.user?.photo_url || res.data?.photo_url;
+      if (photo && photo !== '') setApiUserPhoto(photo);
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const finalDeptLogo = departmentLogo || autoDeptLogo;
+  const finalDeptName = departmentName || user?.department || 'JMCFI';
+  const photoFromUser = (user as any)?.photo_url;
+  const finalPhotoUrl = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
 
   const MIN_WIDTH = 64;
   const MAX_WIDTH = 240;
@@ -160,6 +202,7 @@ export function DashboardShell({
   const isDesktop = width > 768;
   const roleColor = getRoleColor(user?.role ?? '');
   const userRole = user?.role ?? 'requestor';
+  const avatarColors = getAvatarColors(user?.name ?? 'Esther Howard');
 
   const getSidebarNavItems = () => {
     if (userRole === 'requestor') {
@@ -193,7 +236,9 @@ export function DashboardShell({
         { id: 'overview', label: 'Overview', icon: 'grid-outline' as const, active: active === 'overview' },
         { id: 'user-management', label: 'User Management', icon: 'people-outline' as const, active: active === 'user-management' },
         { id: 'analytics', label: 'Analytics', icon: 'bar-chart-outline' as const, active: active === 'analytics' },
+        { id: 'account-settings', label: 'Account', icon: 'settings-outline' as const, active: active === 'account-settings' },
         { id: 'audit-logs', label: 'Audit Logs', icon: 'shield-checkmark-outline' as const, active: active === 'audit-logs' },
+        { id: 'tokens', label: 'Tokens', icon: 'key-outline' as const, active: active === 'tokens' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
     }
@@ -228,12 +273,21 @@ export function DashboardShell({
           >
             <Ionicons name="menu-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Image 
-            source={require('../assets/images/jmc_logo.png')} 
-            style={{ width: 28, height: 28, borderRadius: 14 }} 
-            resizeMode="contain"
-          />
-          <Text style={styles.logoText}>JMCFI PostFLow</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (user?.role) {
+                router.push(getRoleDashboardPath(user.role) as any);
+              }
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          >
+            <Image 
+              source={require('../assets/images/jmc_logo.png')} 
+              style={{ width: 28, height: 28, borderRadius: 14 }} 
+              resizeMode="contain"
+            />
+            <Text style={styles.logoText}>JMCFI PostFLow</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.headerRight}>
           {/* DARK MODE TOGGLE */}
@@ -259,10 +313,14 @@ export function DashboardShell({
               style={styles.profileTrigger} 
               onPress={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
             >
-              <View style={[styles.avatarCircleMini, { backgroundColor: roleColor || '#FFC72C' }]}>
-                <Text style={styles.avatarTextMini}>
-                  {user?.name?.substring(0, 2).toUpperCase() ?? 'EH'}
-                </Text>
+              <View style={[styles.avatarCircleMini, !finalPhotoUrl && { backgroundColor: avatarColors.bg }]}>
+                {finalPhotoUrl ? (
+                  <Image source={{ uri: finalPhotoUrl }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" />
+                ) : (
+                  <Text style={[styles.avatarTextMini, { color: avatarColors.text }]}>
+                    {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
+                  </Text>
+                )}
               </View>
               {isDesktop && (
                 <View style={styles.triggerTextContainer}>
@@ -277,10 +335,14 @@ export function DashboardShell({
               <View style={styles.dropdownContainer}>
                 {/* Header Info */}
                 <View style={styles.dropdownHeader}>
-                  <View style={[styles.avatarCircleLarge, { backgroundColor: roleColor || Colors.primary }]}>
-                    <Text style={styles.avatarTextLarge}>
-                      {user?.name?.substring(0, 2).toUpperCase() ?? 'EH'}
-                    </Text>
+                  <View style={[styles.avatarCircleLarge, !finalPhotoUrl && { backgroundColor: avatarColors.bg }]}>
+                    {finalPhotoUrl ? (
+                      <Image source={{ uri: finalPhotoUrl }} style={{ width: 48, height: 48, borderRadius: 24 }} resizeMode="cover" />
+                    ) : (
+                      <Text style={[styles.avatarTextLarge, { color: avatarColors.text }]}>
+                        {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.headerTextContainer}>
                     <Text style={styles.dropdownNameText}>{user?.name ?? 'Esther Howard'}</Text>
@@ -366,12 +428,12 @@ export function DashboardShell({
               <View>
                 <View style={styles.sidebarHeaderContainer}>
                   <Image
-                    source={require('../assets/images/jmc_logo.png')}
+                    source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
                     style={{ width: 36, height: 36, borderRadius: 18 }}
                     resizeMode="contain"
                   />
                   <View style={styles.sidebarHeader}>
-                    <Text style={styles.sidebarTitle}>COBE</Text>
+                    <Text style={styles.sidebarTitle}>{finalDeptName}</Text>
                   </View>
                 </View>
 
@@ -436,13 +498,30 @@ export function DashboardShell({
 
         {/* Content Wrapper — full width always since sidebar overlays */}
         <View style={styles.contentWrapper}>
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            {children}
-          </ScrollView>
+          {backgroundImage ? (
+            <ImageBackground 
+              source={backgroundImage} 
+              style={{ flex: 1, width: '100%', height: '100%', backgroundColor: 'rgba(255, 255, 255, 0.85)' }} 
+              imageStyle={{ opacity: 0.15 }}
+              resizeMode="cover"
+            >
+              <ScrollView
+                style={styles.content}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+              >
+                {children}
+              </ScrollView>
+            </ImageBackground>
+          ) : (
+            <ScrollView
+              style={styles.content}
+              contentContainerStyle={styles.contentContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          )}
         </View>
       </View>
 
@@ -554,7 +633,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#FFC72C',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

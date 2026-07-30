@@ -15,11 +15,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
-import { useAuthStore } from '../../../store/auth';
+import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
-import { postsApi } from '../../../services/api';
+import { postsApi, authApi } from '../../../services/api';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -72,6 +72,68 @@ export default function RequestorDashboard() {
 
   // Rejected Posts State
   const [rejectedPosts, setRejectedPosts] = useState<any[]>([]);
+
+  // Avatar colors for the profile section
+  const avatarColors = getAvatarColors(user?.name ?? 'Esther Howard');
+
+  // Profile photo
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [acctFullName, setAcctFullName] = useState('');
+  const [acctCurrentPw, setAcctCurrentPw] = useState('');
+  const [acctNewPw, setAcctNewPw] = useState('');
+  const [acctConfirmPw, setAcctConfirmPw] = useState('');
+  const [savingAcct, setSavingAcct] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim());
+      if (user.photo_url) setProfilePhotoUrl(user.photo_url);
+    }
+    // Fetch latest user details on mount to ensure photo_url is up to date
+    authApi.getUser().then(res => {
+       const photo = res.data?.user?.photo_url || res.data?.photo_url;
+       if (photo) setProfilePhotoUrl(photo);
+    }).catch(() => {});
+  }, [user]);
+
+  const handleUploadPhoto = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        setUploadingPhoto(true);
+        try { const res = await authApi.uploadPhoto(file); setProfilePhotoUrl(res.data.photo_url); } catch (e: any) { alert('Upload failed.'); }
+        finally { setUploadingPhoto(false); }
+      };
+      input.click();
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setUploadingPhoto(true);
+    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch (e: any) { alert('Remove failed.'); }
+    finally { setUploadingPhoto(false); }
+  };
+
+  const handleSaveDetails = async () => {
+    const parts = acctFullName.trim().split(' ');
+    const first_name = parts[0] || ''; const last_name = parts.slice(1).join(' ') || '';
+    setSavingAcct(true);
+    try { await authApi.updateProfile({ first_name, last_name }); alert('Profile updated!'); } catch (e: any) { alert('Failed.'); }
+    finally { setSavingAcct(false); }
+  };
+
+  const handleChangePw = async () => {
+    if (!acctCurrentPw || !acctNewPw) { alert('Fill all fields.'); return; }
+    if (acctNewPw.length < 8) { alert('At least 8 characters.'); return; }
+    if (acctNewPw !== acctConfirmPw) { alert('Passwords do not match.'); return; }
+    setSavingAcct(true);
+    try { await authApi.changePassword(acctCurrentPw, acctNewPw, acctConfirmPw); alert('Password changed!'); setAcctCurrentPw(''); setAcctNewPw(''); setAcctConfirmPw(''); }
+    catch (e: any) { alert('Failed: ' + (e.response?.data?.message || e.message)); }
+    finally { setSavingAcct(false); }
+  };
 
   // Handlers for Drafts and Rejected
   const handleEditDraft = (draft: any) => {
@@ -400,6 +462,7 @@ export default function RequestorDashboard() {
       title="Content Approval System"
       activeTab={activeTab}
       onTabChange={setActiveTab}
+      backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
     >
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
       {activeTab === 'dashboard' && (
@@ -1015,7 +1078,7 @@ export default function RequestorDashboard() {
 
               {/* Stepper Visualization */}
               <View style={styles.stepperContainer}>
-                {post.steps.map((step, index) =>
+                {post.steps.map((step: any, index: number) =>
                   renderStep(step, index, index === post.steps.length - 1)
                 )}
               </View>
@@ -1081,55 +1144,48 @@ export default function RequestorDashboard() {
 
                 {/* Profile Picture Upload Section */}
                 <View style={styles.profilePicUploadContainer}>
-                  <View style={styles.profilePicLarge}>
-                    <Text style={styles.profilePicLargeText}>
-                      {user?.name?.substring(0, 2).toUpperCase() ?? 'MA'}
-                    </Text>
+                  <View style={[styles.profilePicLarge, { backgroundColor: avatarColors.bg }]}>
+                    {profilePhotoUrl ? (
+                      <Image source={{ uri: profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
+                    ) : (
+                      <Text style={[styles.profilePicLargeText, { color: avatarColors.text }]}>
+                        {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'MA'}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.profilePicActionCol}>
                     <Text style={styles.profilePicTitle}>Profile Picture</Text>
-                    <Text style={styles.profilePicSubtitle}>
-                      PNG or JPG formats supported. Max 2MB file size.
-                    </Text>
+                    <Text style={styles.profilePicSubtitle}>PNG or JPG formats supported. Max 2MB file size.</Text>
                     <View style={styles.profilePicButtonsRow}>
-                      <TouchableOpacity style={styles.profilePicUploadBtn} onPress={() => alert('Profile picture upload clicked.')}>
-                        <Text style={styles.profilePicUploadBtnText}>Upload New Photo</Text>
+                      <TouchableOpacity style={styles.profilePicUploadBtn} onPress={handleUploadPhoto} disabled={uploadingPhoto}>
+                        <Text style={styles.profilePicUploadBtnText}>{uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.profilePicRemoveBtn} onPress={() => alert('Profile picture removed.')}>
-                        <Text style={styles.profilePicRemoveBtnText}>Remove</Text>
-                      </TouchableOpacity>
+                      {profilePhotoUrl && (
+                        <TouchableOpacity style={styles.profilePicRemoveBtn} onPress={handleRemovePhoto} disabled={uploadingPhoto}>
+                          <Text style={styles.profilePicRemoveBtnText}>Remove</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>FULL NAME</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    defaultValue={user?.name ?? 'MARIA.DELACRUZ User'}
-                  />
+                  <TextInput style={styles.textInput} value={acctFullName} onChangeText={setAcctFullName} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                  <TextInput
-                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
-                    value={user?.email ?? 'maria.delacruz@jmcfi.edu.ph'}
-                    editable={false}
-                  />
+                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.email ?? ''} editable={false} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                  <TextInput
-                    style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]}
-                    value="College of Computing Studies"
-                    editable={false}
-                  />
+                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.department || ''} editable={false} />
                 </View>
 
-                <TouchableOpacity style={styles.submitButton} onPress={() => alert('Profile settings saved successfully!')}>
-                  <Text style={styles.submitButtonText}>Save Details</Text>
+                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleSaveDetails} disabled={savingAcct}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Saving...' : 'Save Details'}</Text>
                 </TouchableOpacity>
               </Card>
             </View>
@@ -1141,33 +1197,21 @@ export default function RequestorDashboard() {
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    secureTextEntry={true}
-                    placeholder="Enter current password"
-                  />
+                  <TextInput style={styles.textInput} secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} placeholder="Enter current password" />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>NEW PASSWORD</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    secureTextEntry={true}
-                    placeholder="Enter new password"
-                  />
+                  <TextInput style={styles.textInput} secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} placeholder="Enter new password" />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    secureTextEntry={true}
-                    placeholder="Confirm new password"
-                  />
+                  <TextInput style={styles.textInput} secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
                 </View>
 
-                <TouchableOpacity style={[styles.submitButton, { backgroundColor: Colors.primary, marginTop: 10 }]} onPress={() => alert('Password updated successfully!')}>
-                  <Text style={styles.submitButtonText}>Change Password</Text>
+                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleChangePw} disabled={savingAcct}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Changing...' : 'Change Password'}</Text>
                 </TouchableOpacity>
               </Card>
             </View>
@@ -1586,6 +1630,46 @@ export default function RequestorDashboard() {
                     renderStep(step, index, index === arr.length - 1)
                   )}
                 </View>
+
+                <View style={styles.modalDivider} />
+
+                <Text style={styles.detailsHeader}>Request Details</Text>
+                
+                <View style={styles.detailsSection}>
+                  <Text style={styles.detailsLabel}>Caption / Narrative</Text>
+                  <Text style={styles.detailsText}>{selectedRow.caption_narrative || 'No caption provided.'}</Text>
+                </View>
+
+                {selectedRow.target_platforms && selectedRow.target_platforms.length > 0 && (
+                  <View style={styles.detailsSection}>
+                    <Text style={styles.detailsLabel}>Target Platforms</Text>
+                    <View style={styles.platformsContainer}>
+                      {selectedRow.target_platforms.map((plat: string) => (
+                        <View key={plat} style={styles.platformBadge}>
+                          <Text style={styles.platformBadgeText}>{plat}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {selectedRow.media && selectedRow.media.length > 0 && (
+                  <View style={styles.detailsSection}>
+                    <Text style={styles.detailsLabel}>Media Attachments</Text>
+                    <View style={styles.mediaGallery}>
+                      {selectedRow.media.map((m: any, idx: number) => (
+                        m.type === 'image' || m.type === 'video' ? (
+                          <Image key={idx} source={{ uri: m.url }} style={styles.mediaThumbnail} resizeMode="cover" />
+                        ) : (
+                          <View key={idx} style={styles.mediaDocPlaceholder}>
+                            <Ionicons name="document-text-outline" size={24} color={Colors.textSecondary} />
+                            <Text style={styles.mediaDocText} numberOfLines={1}>{m.original_filename || 'Document'}</Text>
+                          </View>
+                        )
+                      ))}
+                    </View>
+                  </View>
+                )}
               </ScrollView>
 
               <View style={styles.modalFooter}>
@@ -1647,7 +1731,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 150,
     padding: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderLeftWidth: 4,
@@ -1678,7 +1762,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   tableCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -1707,7 +1791,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   table: {
     borderWidth: 1,
@@ -1717,7 +1801,7 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -1810,7 +1894,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   pageIndexBtn: {
     width: 28,
@@ -1820,7 +1904,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   pageIndexBtnActive: {
     backgroundColor: Colors.primary,
@@ -1880,7 +1964,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   draftButtonText: {
     fontSize: FontSize.sm,
@@ -1919,7 +2003,7 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   formCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -1927,7 +2011,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   configCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -1971,7 +2055,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   inlineFieldsRow: {
     gap: Spacing.md,
@@ -1985,7 +2069,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   dropdownSelectorText: {
     fontSize: FontSize.sm,
@@ -1997,7 +2081,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginTop: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 8,
@@ -2024,7 +2108,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 12,
     fontSize: FontSize.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     minHeight: 120,
     textAlignVertical: 'top',
   },
@@ -2102,7 +2186,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   platformLeft: {
     flexDirection: 'row',
@@ -2129,7 +2213,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   checkboxChecked: {
     backgroundColor: Colors.primary,
@@ -2149,7 +2233,7 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 36,
     fontSize: FontSize.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   inputFieldIcon: {
     position: 'absolute',
@@ -2183,7 +2267,7 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   previewToggleBtnActive: {
     backgroundColor: Colors.primary,
@@ -2202,7 +2286,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     paddingBottom: Spacing.sm,
   },
   mockPostHeader: {
@@ -2271,7 +2355,7 @@ const styles = StyleSheet.create({
 
   // Approval Queue Tab Styles
   queueCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2381,7 +2465,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 28,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   queueActionBtnText: {
     fontSize: FontSize.xs,
@@ -2400,7 +2484,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -2435,8 +2519,77 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     marginVertical: Spacing.sm,
   },
+  detailsHeader: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  detailsSection: {
+    marginBottom: Spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  detailsLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  detailsText: {
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
+  },
+  platformsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  platformBadge: {
+    backgroundColor: Colors.border,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  platformBadgeText: {
+    fontSize: FontSize.xs,
+    color: Colors.textPrimary,
+    textTransform: 'capitalize',
+  },
+  mediaGallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mediaThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  mediaDocPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+  },
+  mediaDocText: {
+    fontSize: 9,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
+    paddingHorizontal: 2,
+  },
   commentItem: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
@@ -2612,7 +2765,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 12,
     gap: 10,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     marginBottom: 10,
   },
   platformProgressSubtext: {
@@ -2637,13 +2790,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     paddingHorizontal: 8,
   },
   // Policy Dashboard Styles
   policySidebar: {
     width: 220,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2676,7 +2829,7 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   policySectionCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderLeftWidth: 4,
@@ -2769,7 +2922,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   policyEmptyState: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,

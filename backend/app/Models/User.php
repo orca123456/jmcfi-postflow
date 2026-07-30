@@ -24,7 +24,10 @@ class User extends Authenticatable implements MustVerifyEmail
         'department',
         'position',
         'status',
+        'photo_path',
     ];
+
+    protected $appends = ['full_name', 'photo_url'];
 
     protected $hidden = [
         'password',
@@ -47,6 +50,14 @@ class User extends Authenticatable implements MustVerifyEmail
         }
         $parts[] = $this->last_name;
         return implode(' ', $parts);
+    }
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (!$this->photo_path) {
+            return null;
+        }
+        return asset('storage/' . $this->photo_path);
     }
 
     public function getDisplayNameAttribute(): string

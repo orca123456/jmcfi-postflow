@@ -25,7 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
-import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi } from '../../../services/api';
+import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 
@@ -231,7 +231,7 @@ export default function ITAdminDashboard() {
       if (results[3].status === 'fulfilled') {
         const fetchedDepts = results[3].value.data?.data;
         if (fetchedDepts && fetchedDepts.length > 0) {
-          setDepartmentsList(fetchedDepts.map((d: any) => ({ id: d.id, display_name: d.display_name })));
+          setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
           setNewUserDepartment(fetchedDepts[0].display_name);
         }
       }
@@ -268,7 +268,7 @@ export default function ITAdminDashboard() {
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
   const [rolesList, setRolesList] = useState<{label: string, value: string}[]>([]);
-  const [departmentsList, setDepartmentsList] = useState<{id: number, display_name: string}[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [newUserRole, setNewUserRole] = useState('requestor');
   const [newUserDepartment, setNewUserDepartment] = useState('Marketing');
 
@@ -380,6 +380,90 @@ export default function ITAdminDashboard() {
   const [showProfilePasswordConfirm, setShowProfilePasswordConfirm] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // ── Profile Photo State ──
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handleUploadProfilePhoto = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingPhoto(true);
+        try {
+          const res = await authApi.uploadPhoto(file);
+          setProfilePhotoUrl(res.data.photo_url);
+          showToast('Photo updated!', 'success');
+        } catch (e: any) {
+          showToast('Upload failed.', 'error');
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      input.click();
+    }
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    setUploadingPhoto(true);
+    try {
+      await authApi.removePhoto();
+      setProfilePhotoUrl(null);
+      showToast('Photo removed.', 'success');
+    } catch (e: any) {
+      showToast('Remove failed.', 'error');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // ── Account Settings State ──
+  const [acctFullName, setAcctFullName] = useState('');
+  const [acctCurrentPw, setAcctCurrentPw] = useState('');
+  const [acctNewPw, setAcctNewPw] = useState('');
+  const [acctConfirmPw, setAcctConfirmPw] = useState('');
+  const [savingAcctDetails, setSavingAcctDetails] = useState(false);
+  const [savingAcctPw, setSavingAcctPw] = useState(false);
+
+  useEffect(() => {
+    if (user && activeTab === 'account-settings') {
+      setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim());
+    }
+  }, [user, activeTab]);
+
+  const handleSaveAcctDetails = async () => {
+    const [first_name, ...lastParts] = acctFullName.trim().split(' ');
+    const last_name = lastParts.join(' ') || first_name;
+    setSavingAcctDetails(true);
+    try {
+      await authApi.updateProfile({ first_name: first_name || last_name, last_name });
+      showToast('Profile updated!', 'success');
+    } catch (e: any) {
+      showToast('Failed: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingAcctDetails(false);
+    }
+  };
+
+  const handleChangeAcctPassword = async () => {
+    if (!acctCurrentPw || !acctNewPw) { showToast('Fill all password fields.', 'warning'); return; }
+    if (acctNewPw.length < 8) { showToast('Password must be at least 8 characters.', 'warning'); return; }
+    if (acctNewPw !== acctConfirmPw) { showToast('Passwords do not match.', 'warning'); return; }
+    setSavingAcctPw(true);
+    try {
+      await authApi.changePassword(acctCurrentPw, acctNewPw, acctConfirmPw);
+      showToast('Password changed!', 'success');
+      setAcctCurrentPw(''); setAcctNewPw(''); setAcctConfirmPw('');
+    } catch (e: any) {
+      showToast('Failed: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingAcctPw(false);
+    }
+  };
+
   // ── Custom Toast State ── (Now uses Global Alert)
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     Alert.alert(type.charAt(0).toUpperCase() + type.slice(1), message);
@@ -400,6 +484,165 @@ export default function ITAdminDashboard() {
   const [allMockPosts, setAllMockPosts] = useState<any[]>([]);
   const [mockTablePosts, setMockTablePosts] = useState<any[]>([]);
   const [previewPost, setPreviewPost] = useState<any>(null);
+  const [previewImgSize, setPreviewImgSize] = useState<{ width: number; height: number } | null>(null);
+
+  // Fetch image dimensions when preview opens (Facebook-style dynamic sizing)
+  useEffect(() => {
+    if (previewPost?.image) {
+      setPreviewImgSize(null);
+      Image.getSize(
+        previewPost.image,
+        (w, h) => setPreviewImgSize({ width: w, height: h }),
+        () => setPreviewImgSize(null) // fallback on error
+      );
+    } else {
+      setPreviewImgSize(null);
+    }
+  }, [previewPost?.image]);
+
+  // ── Token Management State ──
+  const [tokenFields, setTokenFields] = useState({
+    facebook_page_id: '',
+    facebook_access_token: '',
+    instagram_business_account_id: '',
+    instagram_access_token: '',
+    wordpress_url: '',
+    wordpress_username: '',
+    wordpress_app_password: '',
+  });
+  const [tokenLastUpdated, setTokenLastUpdated] = useState('');
+  const [savingTokens, setSavingTokens] = useState(false);
+  const [showTokenField, setShowTokenField] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (activeTab === 'tokens') {
+      tokenSettingsApi.get()
+        .then(res => {
+          const t = res.data.tokens || {};
+          setTokenFields(prev => ({
+            ...prev,
+            facebook_page_id: t.facebook_page_id || '',
+            facebook_access_token: t.facebook_access_token || '',
+            instagram_business_account_id: t.instagram_business_account_id || '',
+            instagram_access_token: t.instagram_access_token || '',
+            wordpress_url: t.wordpress_url || '',
+            wordpress_username: t.wordpress_username || '',
+            wordpress_app_password: t.wordpress_app_password || '',
+          }));
+          setTokenLastUpdated(res.data.last_updated || 'Never');
+        })
+        .catch(() => {});
+    }
+  }, [activeTab]);
+
+  const handleSaveTokens = async () => {
+    setSavingTokens(true);
+    try {
+      const res = await tokenSettingsApi.update(tokenFields);
+      showToast('Tokens saved successfully!', 'success');
+      setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
+    } catch (e: any) {
+      showToast('Failed to save tokens: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingTokens(false);
+    }
+  };
+
+  const handleSavePlatformTokens = async (platform: 'facebook' | 'instagram' | 'wordpress') => {
+    const platformFields: Record<string, string[]> = {
+      facebook: ['facebook_page_id', 'facebook_access_token'],
+      instagram: ['instagram_business_account_id', 'instagram_access_token'],
+      wordpress: ['wordpress_url', 'wordpress_username', 'wordpress_app_password'],
+    };
+    const keys = platformFields[platform];
+    const payload: Record<string, string> = {};
+    keys.forEach(k => { payload[k] = (tokenFields as any)[k] || ''; });
+
+    setSavingTokens(true);
+    try {
+      const res = await tokenSettingsApi.update(payload);
+      showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens saved!`, 'success');
+      setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
+    } catch (e: any) {
+      showToast('Failed to save: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingTokens(false);
+    }
+  };
+
+  const toggleTokenVisibility = (key: string) => {
+    setShowTokenField(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // ── Department Logo State ──
+  const [deptLogos, setDeptLogos] = useState<Record<number, string>>({});
+  const [uploadingLogoId, setUploadingLogoId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (departmentsList.length > 0) {
+      const logos: Record<number, string> = {};
+      (departmentsList as any[]).forEach((d: any) => {
+        if (d.logo_path) {
+          logos[d.id] = d.logo_url || `http://localhost:8000/storage/${d.logo_path}`;
+        }
+      });
+      setDeptLogos(logos);
+    }
+  }, [departmentsList]);
+
+  // Direct lookup helper — use deptLogos first, fallback to departmentsList
+  const getDeptLogo = (deptId: number) => {
+    if (deptLogos[deptId]) return deptLogos[deptId];
+    const d = departmentsList.find((x: any) => x.id === deptId);
+    return d?.logo_url || null;
+  };
+
+  const handleUploadLogo = async (deptId: number) => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingLogoId(deptId);
+        try {
+          const res = await departmentsApi.uploadLogo(deptId, file);
+          const url = res.data.logo_url;
+          setDeptLogos(prev => ({ ...prev, [deptId]: url }));
+          setDepartmentsList(prev => prev.map((d: any) =>
+            d.id === deptId ? { ...d, logo_path: res.data.data?.logo_path, logo_url: url } : d
+          ));
+          showToast('Logo uploaded!', 'success');
+        } catch (e: any) {
+          showToast('Upload failed: ' + (e.response?.data?.message || e.message), 'error');
+        } finally {
+          setUploadingLogoId(null);
+        }
+      };
+      input.click();
+    }
+  };
+
+  const handleRemoveLogo = async (deptId: number) => {
+    setUploadingLogoId(deptId);
+    try {
+      await departmentsApi.removeLogo(deptId);
+      setDeptLogos(prev => {
+        const next = { ...prev };
+        delete next[deptId];
+        return next;
+      });
+      setDepartmentsList(prev => prev.map((d: any) =>
+        d.id === deptId ? { ...d, logo_path: null, logo_url: null } : d
+      ));
+      showToast('Logo removed.', 'success');
+    } catch (e: any) {
+      showToast('Remove failed.', 'error');
+    } finally {
+      setUploadingLogoId(null);
+    }
+  };
 
   const handlePublish = async (id: string | number) => {
     try {
@@ -631,7 +874,19 @@ export default function ITAdminDashboard() {
   });
 
   return (
-    <DashboardShell title="IT Admin Panel" activeTab={activeTab} onTabChange={setActiveTab}>
+    <DashboardShell
+      title="IT Admin Panel"
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      departmentName={user?.department}
+      userPhotoUrl={profilePhotoUrl}
+      departmentLogo={(() => {
+        const dept = departmentsList.find((d: any) =>
+          d.display_name === user?.department || d.name === user?.department
+        );
+        return dept ? deptLogos[dept.id] : undefined;
+      })()}
+    >
       {/* Title block removed as requested */}
 
       {/* GLOBAL TOAST NOTIFICATION DELETED - NOW USING GLOBAL ALERT MODAL */}
@@ -960,6 +1215,54 @@ export default function ITAdminDashboard() {
             </TouchableOpacity>
           </Card>
 
+          {/* Department Logos Card */}
+          <Card style={styles.userCard}>
+            <Text style={styles.sectionHeader}>Department Logos</Text>
+            <Text style={styles.policyNote}>Upload a logo for each department. Used across the platform.</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 16 }}>
+              {departmentsList.map((dept: any) => (
+                <View key={dept.id} style={{
+                  width: 140,
+                  backgroundColor: '#f9fafb',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                  overflow: 'hidden',
+                }}>
+                  <TouchableOpacity
+                    onPress={() => handleUploadLogo(dept.id)}
+                    disabled={uploadingLogoId === dept.id}
+                    style={{
+                      height: 100,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: getDeptLogo(dept.id) ? 'transparent' : '#f3f4f6',
+                    }}
+                  >
+                    {uploadingLogoId === dept.id ? (
+                      <Text style={{ fontSize: 12, color: Colors.primary }}>Uploading...</Text>
+                    ) : getDeptLogo(dept.id) ? (
+                      <Image source={{ uri: getDeptLogo(dept.id)! }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                    ) : (
+                      <View style={{ alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="cloud-upload-outline" size={28} color="#9ca3af" />
+                        <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>Tap to upload</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <View style={{ padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{dept.display_name}</Text>
+                    {getDeptLogo(dept.id) && (
+                      <TouchableOpacity onPress={() => handleRemoveLogo(dept.id)}>
+                        <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
+
           <Card style={styles.userCard}>
             <View style={styles.userListHeader}>
               <Text style={styles.sectionHeader}>Institutional Accounts ({filteredUsers.length})</Text>
@@ -967,14 +1270,23 @@ export default function ITAdminDashboard() {
             </View>
             {filteredUsers.map((u) => {
               const badge = getRoleBadgeDetails(u.role);
+              // Find matching department logo
+              const userDept = departmentsList.find((d: any) =>
+                d.display_name === u.department || d.name === u.department
+              );
+              const deptLogoUrl = userDept ? getDeptLogo(userDept.id) : null;
               return (
                 <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => handleOpenProfile(u)} activeOpacity={0.7}>
                   <View style={styles.userInfo}>
-                    <View style={[styles.userAvatar, { backgroundColor: badge.bgColor }]}>
-                      <Text style={[styles.userAvatarText, { color: badge.color }]}>
-                        {u.first_name ? (u.first_name[0] + (u.last_name?.[0] || '')).toUpperCase() : u.email.substring(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
+                    {deptLogoUrl ? (
+                      <Image source={{ uri: deptLogoUrl }} style={{ width: 36, height: 36, borderRadius: 18 }} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.userAvatar, { backgroundColor: badge.bgColor }]}>
+                        <Text style={[styles.userAvatarText, { color: badge.color }]}>
+                          {u.first_name ? (u.first_name[0] + (u.last_name?.[0] || '')).toUpperCase() : u.email.substring(0, 2).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.userEmail}>
                         {u.first_name ? `${u.first_name} ${u.last_name}` : u.email}
@@ -985,15 +1297,48 @@ export default function ITAdminDashboard() {
                     </View>
                   </View>
                   <View style={styles.userActions}>
-                    <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
-                      <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); setEditingUserId(u.id); setEditingUserRole(u.role); }}>
-                      <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={(e: any) => { e.stopPropagation?.(); handleDeleteUser(u.id); }}>
-                      <Ionicons name="trash-outline" size={15} color="#DC2626" />
-                    </TouchableOpacity>
+                    {editingUserId === u.id ? (
+                      <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <select
+                            value={editingUserRole}
+                            onChange={(e) => setEditingUserRole(e.target.value)}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: 6,
+                              border: '1px solid #d1d5db',
+                              fontSize: 12,
+                              backgroundColor: '#fff',
+                              color: '#111827',
+                              outline: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {ROLE_OPTIONS.map(r => (
+                              <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                          </select>
+                          <TouchableOpacity onPress={() => handleSaveEditedRole(u.id)} style={{ padding: 6, backgroundColor: '#16a34a', borderRadius: 6 }}>
+                            <Ionicons name="checkmark" size={14} color="#fff" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => setEditingUserId(null)} style={{ padding: 6, backgroundColor: '#ef4444', borderRadius: 6 }}>
+                            <Ionicons name="close" size={14} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
+                          <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                        </View>
+                        <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); setEditingUserId(u.id); setEditingUserRole(u.role); }}>
+                          <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteBtn} onPress={(e: any) => { e.stopPropagation?.(); handleDeleteUser(u.id); }}>
+                          <Ionicons name="trash-outline" size={15} color="#DC2626" />
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -1228,6 +1573,200 @@ export default function ITAdminDashboard() {
         </View>
       )}
 
+      {activeTab === 'tokens' && (
+        <View style={{ gap: 20 }}>
+          <Card style={styles.userCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <View>
+                <Text style={styles.sectionHeader}>Platform Tokens</Text>
+                <Text style={styles.policyNote}>Manage API tokens for Facebook, Instagram, and WordPress integration.</Text>
+              </View>
+              {tokenLastUpdated && tokenLastUpdated !== 'Never' && (
+                <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                  <Text style={{ fontSize: 11, color: '#1e40af', fontWeight: '500' }}>
+                    Last updated: {new Date(tokenLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Card>
+          <Card style={styles.userCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <Ionicons name="logo-facebook" size={24} color="#1877F2" />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Facebook</Text>
+            </View>
+            <View style={{ gap: 14 }}>
+              {[
+                { key: 'facebook_page_id', label: 'Page ID', icon: 'id-card-outline' as const, placeholder: 'e.g. 344674548722841' },
+                { key: 'facebook_access_token', label: 'Access Token', icon: 'lock-closed-outline' as const, placeholder: 'Enter your Facebook page access token', sensitive: true },
+              ].map(field => (
+                <View key={field.key} style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'uppercase' }}>{field.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#f9fafb',
+                        borderWidth: 1,
+                        borderColor: '#e5e7eb',
+                        borderRadius: 8,
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        fontSize: 14,
+                        color: '#111827',
+                        outlineStyle: 'none',
+                      }}
+                      placeholder={field.placeholder}
+                      placeholderTextColor="#9ca3af"
+                      value={(tokenFields as any)[field.key]}
+                      secureTextEntry={field.sensitive && !showTokenField[field.key]}
+                      onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
+                    />
+                    {field.sensitive ? (
+                      <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={{ padding: 8 }}>
+                        <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6b7280" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={() => handleSavePlatformTokens('facebook')}
+              disabled={savingTokens}
+              style={{
+                marginTop: 16,
+                backgroundColor: '#1877F2',
+                paddingVertical: 11,
+                borderRadius: 8,
+                alignItems: 'center',
+                opacity: savingTokens ? 0.7 : 1,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                {savingTokens ? 'Saving...' : 'Save Facebook Tokens'}
+              </Text>
+            </TouchableOpacity>
+          </Card>
+          <Card style={styles.userCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <Ionicons name="logo-instagram" size={24} color="#E1306C" />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Instagram</Text>
+            </View>
+            <View style={{ gap: 14 }}>
+              {[
+                { key: 'instagram_business_account_id', label: 'Business Account ID', icon: 'id-card-outline' as const, placeholder: 'e.g. 17841405822304' },
+                { key: 'instagram_access_token', label: 'Access Token', icon: 'lock-closed-outline' as const, placeholder: 'Enter your Instagram access token', sensitive: true },
+              ].map(field => (
+                <View key={field.key} style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'uppercase' }}>{field.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#f9fafb',
+                        borderWidth: 1,
+                        borderColor: '#e5e7eb',
+                        borderRadius: 8,
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        fontSize: 14,
+                        color: '#111827',
+                        outlineStyle: 'none',
+                      }}
+                      placeholder={field.placeholder}
+                      placeholderTextColor="#9ca3af"
+                      value={(tokenFields as any)[field.key]}
+                      secureTextEntry={field.sensitive && !showTokenField[field.key]}
+                      onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
+                    />
+                    {field.sensitive ? (
+                      <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={{ padding: 8 }}>
+                        <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6b7280" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={() => handleSavePlatformTokens('instagram')}
+              disabled={savingTokens}
+              style={{
+                marginTop: 16,
+                backgroundColor: '#E1306C',
+                paddingVertical: 11,
+                borderRadius: 8,
+                alignItems: 'center',
+                opacity: savingTokens ? 0.7 : 1,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                {savingTokens ? 'Saving...' : 'Save Instagram Tokens'}
+              </Text>
+            </TouchableOpacity>
+          </Card>
+          <Card style={styles.userCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <Ionicons name="globe-outline" size={24} color="#3B82F6" />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>WordPress</Text>
+            </View>
+            <View style={{ gap: 14 }}>
+              {[
+                { key: 'wordpress_url', label: 'Site URL', icon: 'link-outline' as const, placeholder: 'https://your-school.edu/wp-json/wp/v2' },
+                { key: 'wordpress_username', label: 'Username', icon: 'person-outline' as const, placeholder: 'WordPress username' },
+                { key: 'wordpress_app_password', label: 'Application Password', icon: 'lock-closed-outline' as const, placeholder: 'Enter WordPress app password', sensitive: true },
+              ].map(field => (
+                <View key={field.key} style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'uppercase' }}>{field.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#f9fafb',
+                        borderWidth: 1,
+                        borderColor: '#e5e7eb',
+                        borderRadius: 8,
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        fontSize: 14,
+                        color: '#111827',
+                        outlineStyle: 'none',
+                      }}
+                      placeholder={field.placeholder}
+                      placeholderTextColor="#9ca3af"
+                      value={(tokenFields as any)[field.key]}
+                      secureTextEntry={field.sensitive && !showTokenField[field.key]}
+                      onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
+                    />
+                    {field.sensitive ? (
+                      <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={{ padding: 8 }}>
+                        <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6b7280" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={() => handleSavePlatformTokens('wordpress')}
+              disabled={savingTokens}
+              style={{
+                marginTop: 16,
+                backgroundColor: '#3B82F6',
+                paddingVertical: 11,
+                borderRadius: 8,
+                alignItems: 'center',
+                opacity: savingTokens ? 0.7 : 1,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                {savingTokens ? 'Saving...' : 'Save WordPress Tokens'}
+              </Text>
+            </TouchableOpacity>
+          </Card>
+        </View>
+      )}
 
       {/* ── POLICY RULES TAB ── */}
       {activeTab === 'policy-rules' && (
@@ -1271,31 +1810,37 @@ export default function ITAdminDashboard() {
 
               <View style={styles.profilePictureRow}>
                 <View style={styles.profileAvatarLarge}>
-                  <Text style={styles.profileAvatarTextLarge}>{user?.name?.substring(0, 2).toUpperCase() || 'IT'}</Text>
+                  {profilePhotoUrl ? (
+                    <Image source={{ uri: profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
+                  ) : (
+                    <Text style={styles.profileAvatarTextLarge}>{user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'IT'}</Text>
+                  )}
                 </View>
                 <View style={styles.profilePictureInfo}>
                   <Text style={styles.profilePictureTitle}>Profile Picture</Text>
                   <Text style={styles.profilePictureDesc}>PNG or JPG formats supported. Max 2MB file size.</Text>
                   <View style={styles.profilePictureActions}>
-                    <TouchableOpacity style={styles.uploadBtn}>
-                      <Text style={styles.uploadBtnText}>Upload New Photo</Text>
+                    <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadProfilePhoto} disabled={uploadingPhoto}>
+                      <Text style={styles.uploadBtnText}>{uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.removeBtn}>
-                      <Text style={styles.removeBtnText}>Remove</Text>
-                    </TouchableOpacity>
+                    {profilePhotoUrl && (
+                      <TouchableOpacity style={styles.removeBtn} onPress={handleRemoveProfilePhoto} disabled={uploadingPhoto}>
+                        <Text style={styles.removeBtnText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
 
               <View style={styles.settingsFormGroup}>
                 <Text style={styles.settingsFormLabel}>FULL NAME</Text>
-                <TextInput style={styles.settingsFormInput} defaultValue={user?.name || ''} />
+                <TextInput style={styles.settingsFormInput} value={acctFullName} onChangeText={setAcctFullName} />
               </View>
 
               <View style={styles.settingsFormGroup}>
                 <Text style={styles.settingsFormLabel}>EMAIL ADDRESS</Text>
                 <TextInput
-                  defaultValue={user?.email || ''}
+                  value={user?.email || ''}
                   editable={false}
                   style={[styles.settingsFormInput, styles.settingsFormInputDisabled]}
                 />
@@ -1304,14 +1849,14 @@ export default function ITAdminDashboard() {
               <View style={styles.settingsFormGroup}>
                 <Text style={styles.settingsFormLabel}>DEPARTMENT</Text>
                 <TextInput
-                  defaultValue="College of Computing Studies"
+                  value={user?.department || ''}
                   editable={false}
                   style={[styles.settingsFormInput, styles.settingsFormInputDisabled]}
                 />
               </View>
 
-              <TouchableOpacity style={styles.saveDetailsBtn}>
-                <Text style={styles.saveDetailsBtnText}>Save Details</Text>
+              <TouchableOpacity style={styles.saveDetailsBtn} onPress={handleSaveAcctDetails} disabled={savingAcctDetails}>
+                <Text style={styles.saveDetailsBtnText}>{savingAcctDetails ? 'Saving...' : 'Save Details'}</Text>
               </TouchableOpacity>
             </Card>
 
@@ -1324,21 +1869,21 @@ export default function ITAdminDashboard() {
 
               <View style={styles.settingsFormGroup}>
                 <Text style={styles.settingsFormLabel}>CURRENT PASSWORD</Text>
-                <TextInput style={styles.settingsFormInput} placeholder="Enter current password" secureTextEntry />
+                <TextInput style={styles.settingsFormInput} placeholder="Enter current password" secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} />
               </View>
 
               <View style={styles.settingsFormGroup}>
                 <Text style={styles.settingsFormLabel}>NEW PASSWORD</Text>
-                <TextInput style={styles.settingsFormInput} placeholder="Enter new password" secureTextEntry />
+                <TextInput style={styles.settingsFormInput} placeholder="Enter new password" secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} />
               </View>
 
               <View style={styles.settingsFormGroup}>
                 <Text style={styles.settingsFormLabel}>CONFIRM PASSWORD</Text>
-                <TextInput style={styles.settingsFormInput} placeholder="Confirm new password" secureTextEntry />
+                <TextInput style={styles.settingsFormInput} placeholder="Confirm new password" secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} />
               </View>
 
-              <TouchableOpacity style={styles.saveDetailsBtn}>
-                <Text style={styles.saveDetailsBtnText}>Change Password</Text>
+              <TouchableOpacity style={styles.saveDetailsBtn} onPress={handleChangeAcctPassword} disabled={savingAcctPw}>
+                <Text style={styles.saveDetailsBtnText}>{savingAcctPw ? 'Changing...' : 'Change Password'}</Text>
               </TouchableOpacity>
             </Card>
           </View>
@@ -1632,11 +2177,28 @@ export default function ITAdminDashboard() {
 
             {/* Top Area */}
             <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
-              <View style={{ flex: 1.5 }}>
-                <Image source={{ uri: previewPost?.image }} style={{ width: '100%', height: 200, borderRadius: 8 }} />
+              <View style={{ flex: 1.5, alignItems: 'center', justifyContent: 'center' }}>
+                <Image
+                  source={{ uri: previewPost?.image }}
+                  resizeMode="contain"
+                  style={{
+                    width: '100%',
+                    maxHeight: 400,
+                    aspectRatio: previewImgSize ? previewImgSize.width / previewImgSize.height : undefined,
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: 8,
+                  }}
+                />
               </View>
               <View style={{ flex: 1, gap: 12 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{previewPost?.title}</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
+                  <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.primary }}>
+                    Request posted on {previewPost?.requestedOn} at {previewPost?.requestedTime}
+                  </Text>
+                </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Department</Text>
