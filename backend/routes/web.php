@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::get('/test-posts', function() {
+    return \App\Http\Resources\Api\PostRequestResource::collection(\App\Models\PostRequest::with('media')->get());
+});
+
 Route::get('/{any}', function () {
     $path = public_path('index.html');
     if (file_exists($path)) {
@@ -22,4 +26,4 @@ Route::get('/{any}', function () {
         'message' => 'JMCFI PostFlow API (Frontend not built)',
         'status' => 'running',
     ]);
-})->where('any', '.*');
+})->where('any', '^(?!api|storage).*$');
