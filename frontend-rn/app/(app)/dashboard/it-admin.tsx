@@ -18,6 +18,7 @@ import {
   Image,
   Platform,
   Animated,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -379,21 +380,9 @@ export default function ITAdminDashboard() {
   const [showProfilePasswordConfirm, setShowProfilePasswordConfirm] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // ── Custom Toast State ──
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning'; visible: boolean }>({ message: '', type: 'success', visible: false });
-  let toastTimer: ReturnType<typeof setTimeout> | null = null;
-
+  // ── Custom Toast State ── (Now uses Global Alert)
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
-    if (toastTimer) clearTimeout(toastTimer);
-    setToast({ message, type, visible: true });
-    toastTimer = setTimeout(() => {
-      setToast({ message: '', type: 'success', visible: false });
-    }, 4000);
-  };
-
-  const hideToast = () => {
-    if (toastTimer) clearTimeout(toastTimer);
-    setToast({ message: '', type: 'success', visible: false });
+    Alert.alert(type.charAt(0).toUpperCase() + type.slice(1), message);
   };
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -645,43 +634,7 @@ export default function ITAdminDashboard() {
     <DashboardShell title="IT Admin Panel" activeTab={activeTab} onTabChange={setActiveTab}>
       {/* Title block removed as requested */}
 
-      {/* ── GLOBAL TOAST NOTIFICATION ── */}
-      {toast.visible && (
-        <View style={styles.toastContainer}>
-          <View style={[
-            styles.toastInner,
-            toast.type === 'success' && styles.toastSuccess,
-            toast.type === 'error' && styles.toastError,
-            toast.type === 'warning' && styles.toastWarning,
-          ]}>
-          <View style={styles.toastContent}>
-            <Ionicons
-              name={
-                toast.type === 'success' ? 'checkmark-circle' :
-                toast.type === 'error' ? 'alert-circle' :
-                'warning'
-              }
-              size={20}
-              color={
-                toast.type === 'success' ? '#16A34A' :
-                toast.type === 'error' ? '#DC2626' :
-                '#D97706'
-              }
-              style={{ marginRight: 10 }}
-            />
-            <Text style={[
-              styles.toastText,
-              toast.type === 'success' && { color: '#16A34A' },
-              toast.type === 'error' && { color: '#DC2626' },
-              toast.type === 'warning' && { color: '#D97706' },
-            ]}>{toast.message}</Text>
-          </View>
-          <TouchableOpacity onPress={hideToast} style={styles.toastClose}>
-            <Ionicons name="close" size={18} color="#6B7280" />
-          </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      {/* GLOBAL TOAST NOTIFICATION DELETED - NOW USING GLOBAL ALERT MODAL */}
 
       {/* ── LOADING SKELETON ── */}
       {isInitialLoading && (
