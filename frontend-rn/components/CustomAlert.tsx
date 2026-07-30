@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { Colors, BorderRadius } from '../constants/theme';
 
 export function CustomAlertProvider({ children }: { children: React.ReactNode }) {
@@ -9,15 +9,30 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
   });
 
   useEffect(() => {
+    let originalWindowAlert: any = null;
+    let originalAlertAlert: any = null;
+
     if (Platform.OS === 'web') {
-      const originalAlert = window.alert;
+      originalWindowAlert = window.alert;
       window.alert = (message: any) => {
         setAlertConfig({ message: String(message), visible: true });
       };
-      return () => {
-        window.alert = originalAlert;
-      };
     }
+
+    originalAlertAlert = Alert.alert;
+    Alert.alert = (title: string, message?: string) => {
+      const fullMessage = message ? `${title}\n\n${message}` : title;
+      setAlertConfig({ message: fullMessage, visible: true });
+    };
+
+    return () => {
+      if (Platform.OS === 'web' && originalWindowAlert) {
+        window.alert = originalWindowAlert;
+      }
+      if (originalAlertAlert) {
+        Alert.alert = originalAlertAlert;
+      }
+    };
   }, []);
 
   return (
