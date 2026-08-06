@@ -25,6 +25,7 @@ interface AuthStore {
   logout: () => Promise<void>;
   loadFromStorage: () => Promise<void>;
   clearError: () => void;
+  setUser: (user: AuthUser) => Promise<void>;
 }
 
 // Cross-platform storage helpers
@@ -123,6 +124,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  setUser: async (user: AuthUser) => {
+    await storage.set('auth_user', JSON.stringify(user));
+    set({ user });
+  },
 }));
 
 // Role helper

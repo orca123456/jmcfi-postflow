@@ -36,8 +36,8 @@ class RoleSeeder extends Seeder
             ],
             [
                 'name' => 'it_publisher',
-                'display_name' => 'IT Publisher / System Operator',
-                'description' => 'Schedules and publishes approved content to WordPress, Facebook, and Instagram.',
+                'display_name' => 'IT Admin / Publisher',
+                'description' => 'System administrator who manages users, tokens, and schedules/publishes approved content.',
                 'permissions' => ['view_ready_to_publish', 'schedule_post', 'publish_post', 'manage_publishing_queue', 'view_publishing_history'],
             ],
         ];

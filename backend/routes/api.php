@@ -4,7 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PostRequestController;
-// use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
@@ -45,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck']);
 
     // Categories
-    // Route::apiResource('categories', CategoryController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    Route::get('categories', [CategoryController::class, 'index']);
 
     // Users (Admin only)
     Route::get('users/roles', [UserController::class, 'getRoles']);

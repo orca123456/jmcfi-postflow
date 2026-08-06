@@ -59,23 +59,24 @@ class PostMedia extends Model
     public function getUrlAttribute(): string
     {
         $disk = config('filesystems.default');
+        $normalizedPath = str_replace('\\', '/', $this->file_path);
 
         if ($disk === 's3' || $disk === 'b2') {
-            return \Illuminate\Support\Facades\Storage::disk($disk)->url($this->file_path);
+            return \Illuminate\Support\Facades\Storage::disk($disk)->url($normalizedPath);
         }
 
         // 1. If RENDER_EXTERNAL_URL is set (Render production), use it as base
         $renderUrl = config('app.render_external_url');
         if ($renderUrl) {
-            return rtrim($renderUrl, '/') . '/storage/' . $this->file_path;
+            return rtrim($renderUrl, '/') . '/storage/' . $normalizedPath;
         }
 
         // 2. Use the configured public disk URL
-        $diskUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path);
+        $diskUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($normalizedPath);
 
         // Fallback: if APP_URL is still localhost but real host differs (e.g. Render w/o RENDER_EXTERNAL_URL)
         if (str_contains($diskUrl, 'localhost') && request()->getHost() !== 'localhost') {
-            return request()->getSchemeAndHttpHost() . '/storage/' . $this->file_path;
+            return request()->getSchemeAndHttpHost() . '/storage/' . $normalizedPath;
         }
 
         return $diskUrl;
