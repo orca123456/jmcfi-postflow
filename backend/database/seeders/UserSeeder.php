@@ -17,7 +17,7 @@ class UserSeeder extends Seeder
                 'middle_name' => '',
                 'last_name' => 'Administrator',
                 'email' => 'admin@jmc.edu.ph',
-                'password' => Hash::make('password123'),
+                'password' => 'password123',
                 'phone' => '+639000000001',
                 'department' => 'ICT',
                 'position' => 'System Administrator',

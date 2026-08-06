@@ -19,7 +19,10 @@ import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
-import { postsApi, authApi } from '../../../services/api';
+import { FormattedText } from '../../../components/ui/FormattedText';
+import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
+import { postsApi, authApi, categoriesApi } from '../../../services/api';
+import DashboardSkeleton from '../../../components/DashboardSkeleton';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -36,9 +39,19 @@ export default function RequestorDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Form State (New Request)
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [draftToDelete, setDraftToDelete] = useState<string | null>(null);
   const [postTitle, setPostTitle] = useState('');
-  const [category, setCategory] = useState('Academic Announcement');
-  const [department, setDepartment] = useState('College of Computing Studies');
+  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [apiCategories, setApiCategories] = useState<{ id: number; name: string }[]>([]);
+  const [department, setDepartment] = useState(user?.department || 'ICT');
+  
+  useEffect(() => {
+    if (user?.department) {
+      setDepartment(user.department);
+    }
+  }, [user]);
   const [caption, setCaption] = useState('');
   const [platforms, setPlatforms] = useState({
     facebook: false,
@@ -56,6 +69,7 @@ export default function RequestorDashboard() {
 
   // Preview States
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Dashboard Page State
   const [dashboardPage, setDashboardPage] = useState(1);
@@ -63,6 +77,7 @@ export default function RequestorDashboard() {
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
@@ -84,6 +99,7 @@ export default function RequestorDashboard() {
   const [acctNewPw, setAcctNewPw] = useState('');
   const [acctConfirmPw, setAcctConfirmPw] = useState('');
   const [savingAcct, setSavingAcct] = useState(false);
+  const [savingAcctPw, setSavingAcctPw] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -121,7 +137,13 @@ export default function RequestorDashboard() {
     const parts = acctFullName.trim().split(' ');
     const first_name = parts[0] || ''; const last_name = parts.slice(1).join(' ') || '';
     setSavingAcct(true);
-    try { await authApi.updateProfile({ first_name, last_name }); alert('Profile updated!'); } catch (e: any) { alert('Failed.'); }
+    try { 
+      await authApi.updateProfile({ first_name, last_name }); 
+      if (user) {
+        await useAuthStore.getState().setUser({ ...user, first_name, last_name, name: `${first_name} ${last_name}` });
+      }
+      alert('Profile updated!'); 
+    } catch (e: any) { alert('Failed.'); }
     finally { setSavingAcct(false); }
   };
 
@@ -129,46 +151,99 @@ export default function RequestorDashboard() {
     if (!acctCurrentPw || !acctNewPw) { alert('Fill all fields.'); return; }
     if (acctNewPw.length < 8) { alert('At least 8 characters.'); return; }
     if (acctNewPw !== acctConfirmPw) { alert('Passwords do not match.'); return; }
-    setSavingAcct(true);
+    setSavingAcctPw(true);
     try { await authApi.changePassword(acctCurrentPw, acctNewPw, acctConfirmPw); alert('Password changed!'); setAcctCurrentPw(''); setAcctNewPw(''); setAcctConfirmPw(''); }
     catch (e: any) { alert('Failed: ' + (e.response?.data?.message || e.message)); }
-    finally { setSavingAcct(false); }
+    finally { setSavingAcctPw(false); }
+  };
+
+  // Helpers for Drafts and Rejected
+  const parsePlatforms = (raw: any): { facebook: boolean; instagram: boolean; portal: boolean } => {
+    let arr: string[] = [];
+    if (Array.isArray(raw)) {
+      arr = raw;
+    } else if (typeof raw === 'string' && raw.length > 0) {
+      arr = raw.split(',').map(s => s.trim());
+    }
+    return {
+      facebook: arr.includes('facebook'),
+      instagram: arr.includes('instagram'),
+      portal: arr.includes('portal'),
+    };
   };
 
   // Handlers for Drafts and Rejected
   const handleEditDraft = (draft: any) => {
+    setEditingPostId(draft.id);
     setPostTitle(draft.title || '');
-    setCategory(draft.category || 'Academic Announcement');
-    setDepartment(draft.department || 'College of Computing Studies');
-    setCaption(draft.caption || '');
-    if (draft.platforms) setPlatforms(draft.platforms);
+    const matchedCat = apiCategories.find(c => c.name === draft.category);
+    if (matchedCat) { setCategory(matchedCat.name); setCategoryId(matchedCat.id); }
+    setCaption(draft.caption_narrative || draft.caption || '');
+    setPlatforms(parsePlatforms(draft.platforms));
     if (draft.publishDate) setPublishDate(draft.publishDate);
     setActiveTab('request');
     alert(`Draft "${draft.title}" loaded into request form. You can now edit and submit!`);
   };
 
   const handleDeleteDraft = (id: string) => {
-    setDrafts(prev => prev.filter(d => d.id !== id));
+    setDraftToDelete(id);
+  };
+
+  const executeDeleteDraft = async () => {
+    if (!draftToDelete) return;
+    const idToDelete = draftToDelete;
+    setDraftToDelete(null); // close modal immediately
+    try {
+      await postsApi.delete(Number(idToDelete));
+    } catch (err: any) {
+      // If the record doesn't exist (404), treat as already deleted and continue
+      if (err?.response?.status !== 404) {
+        alert('Failed to delete draft: ' + (err?.response?.data?.message || err.message));
+        return;
+      }
+    }
+    // Remove from UI list regardless of outcome
+    setDrafts(prev => prev.filter(d => d.id !== idToDelete));
+    loadPosts();
     alert('Draft deleted successfully.');
   };
 
   const handleCreateNewFromRejected = (post: any) => {
     setPostTitle(post.title ? `${post.title} (Revised)` : '');
-    setCategory(post.category || 'Academic Announcement');
-    setDepartment(post.department || 'College of Computing Studies');
-    setCaption(post.caption || '');
-    if (post.platforms) setPlatforms(post.platforms);
+    const matchedCat = apiCategories.find(c => c.name === post.category);
+    if (matchedCat) { setCategory(matchedCat.name); setCategoryId(matchedCat.id); }
+    setCaption(post.caption_narrative || post.caption || '');
+    setPlatforms(parsePlatforms(post.platforms));
     setActiveTab('request');
     alert(`Created new request form pre-filled with data from "${post.title}". Please revise according to approver comments.`);
   };
 
+  // Fetch categories from API on mount
+  useEffect(() => {
+    categoriesApi.list().then((res: any) => {
+      const cats = res.data?.data || [];
+      setApiCategories(cats);
+      if (cats.length > 0 && !categoryId) {
+        setCategory(cats[0].name);
+        setCategoryId(cats[0].id);
+      }
+    }).catch(() => {
+      // fallback to static options if API fails
+      const fallback = [
+        { id: 1, name: 'Announcement' },
+        { id: 2, name: 'News' },
+        { id: 3, name: 'Event' },
+        { id: 4, name: 'Advisory' },
+        { id: 5, name: 'Blog' },
+      ];
+      setApiCategories(fallback);
+      setCategory(fallback[0].name);
+      setCategoryId(fallback[0].id);
+    });
+  }, []);
+
   // Categories & Departments options
-  const categoryOptions = [
-    'Academic Announcement',
-    'Campus Event',
-    'Sports Update',
-    'Policy Update',
-  ];
+  const categoryOptions = apiCategories.length > 0 ? apiCategories.map(c => c.name) : ['Announcement', 'News', 'Event', 'Advisory', 'Blog'];
 
   const departmentOptions = [
     'College of Computing Studies',
@@ -181,7 +256,10 @@ export default function RequestorDashboard() {
   const [mockRequests, setMockRequests] = useState<any[]>([]);
   const [mockQueuePosts, setMockQueuePosts] = useState<any[]>([]);
 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
   const loadPosts = async () => {
+    setIsInitialLoading(true);
     try {
       const res = await postsApi.list();
       const posts = res.data.data;
@@ -190,7 +268,8 @@ export default function RequestorDashboard() {
         ...p,
         id: p.id.toString(),
         title: p.title || 'Untitled',
-        platforms: p.target_platforms ? p.target_platforms.join(', ') : '',
+        caption: p.caption_narrative || '',
+        platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
         category: p.category?.name || 'Category',
         department: p.requestor?.department || 'Department',
         date: new Date(p.created_at).toLocaleDateString(),
@@ -220,12 +299,14 @@ export default function RequestorDashboard() {
       });
 
       const mapped = posts.map(mapPost);
-      setMockRequests(mapped);
+      setMockRequests(mapped.filter((p: any) => p.status !== 'DRAFT'));
       setMockQueuePosts(mapped.filter((p: any) => p.status !== 'DRAFT'));
       setDrafts(mapped.filter((p: any) => p.status === 'DRAFT'));
       setRejectedPosts(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
     } catch (err) {
       console.error('Failed to load posts', err);
+    } finally {
+      setIsInitialLoading(false);
     }
   };
 
@@ -240,13 +321,23 @@ export default function RequestorDashboard() {
     }
     try {
       const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
-      await postsApi.create({
+      const payload = {
         title: postTitle,
         caption_narrative: caption,
-        target_platforms: selectedPlatforms,
+        category_id: categoryId,
+        target_platforms: selectedPlatforms.length > 0 ? selectedPlatforms : undefined,
         is_draft: true,
-      });
-      alert('Content request saved as draft!');
+      };
+
+      if (editingPostId) {
+        await postsApi.update(Number(editingPostId), payload);
+        alert('Draft updated successfully!');
+      } else {
+        await postsApi.create(payload);
+        alert('Content request saved as draft!');
+      }
+      
+      setEditingPostId(null);
       loadPosts();
       setActiveTab('dashboard');
     } catch (err: any) {
@@ -275,6 +366,7 @@ export default function RequestorDashboard() {
       const payload: any = {
         title: postTitle,
         caption_narrative: caption,
+        category_id: categoryId,
         target_platforms: selectedPlatforms,
         is_draft: false,
       };
@@ -290,6 +382,7 @@ export default function RequestorDashboard() {
         const formData = new FormData();
         formData.append('title', payload.title);
         formData.append('caption_narrative', payload.caption_narrative);
+        if (payload.category_id) formData.append('category_id', String(payload.category_id));
         payload.target_platforms.forEach((p: string) => {
           formData.append('target_platforms[]', p);
         });
@@ -322,15 +415,25 @@ export default function RequestorDashboard() {
           }
         });
         
-        res = await postsApi.createWithFiles(formData);
+        if (editingPostId) {
+          res = await postsApi.updateWithFiles(Number(editingPostId), formData);
+        } else {
+          res = await postsApi.createWithFiles(formData);
+        }
       } else {
-        res = await postsApi.create(payload);
+        if (editingPostId) {
+          res = await postsApi.update(Number(editingPostId), payload);
+        } else {
+          res = await postsApi.create(payload);
+        }
       }
       
-      // The backend store endpoint already submits the post if is_draft is false.
-      // Calling submit again is redundant and causes a 403 error.
+      if (editingPostId) {
+        await postsApi.submit(Number(editingPostId));
+      }
       
       alert('Content request submitted successfully for review!');
+      setEditingPostId(null);
       setPostTitle('');
       setCaption('');
       setPublishDate('');
@@ -464,8 +567,11 @@ export default function RequestorDashboard() {
       onTabChange={setActiveTab}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
     >
+      {/* ── LOADING SKELETON ── */}
+      {isInitialLoading && <DashboardSkeleton />}
+
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>
@@ -515,7 +621,12 @@ export default function RequestorDashboard() {
                   <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
                       {req.thumbnailUrl ? (
-                        <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 4 }} resizeMode="cover" />
+                        <Image
+                          source={{ uri: req.thumbnailUrl }}
+                          style={{ width: '100%', height: '100%', borderRadius: 4 }}
+                          resizeMode="cover"
+                          onError={() => {}}
+                        />
                       ) : (
                         <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
                       )}
@@ -583,7 +694,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- CREATE NEW REQUEST TAB ----------------- */}
-      {(activeTab === 'post-requests' || activeTab === 'request') && (
+      {(activeTab === 'post-requests' || activeTab === 'request') && !isInitialLoading && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
             <View style={styles.breadcrumbColumn}>
@@ -610,8 +721,8 @@ export default function RequestorDashboard() {
           {/* Form Layout Split */}
           <View style={{ gap: Spacing.lg }}>
             {/* ROW 1 */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              <View style={styles.leftColumn}>
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
+              <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
                 {/* Basic Information Card */}
                 <Card style={[styles.formCard, { flex: 1 }, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
                   <View style={styles.cardHeader}>
@@ -647,51 +758,28 @@ export default function RequestorDashboard() {
 
                       {isCategoryDropdownOpen && (
                         <View style={styles.dropdownMenu}>
-                          {categoryOptions.map((opt, idx) => (
+                          {apiCategories.map((cat, idx) => (
                             <TouchableOpacity
-                              key={idx}
+                              key={cat.id}
                               style={styles.dropdownItem}
                               onPress={() => {
-                                setCategory(opt);
+                                setCategory(cat.name);
+                                setCategoryId(cat.id);
                                 setIsCategoryDropdownOpen(false);
                               }}
                             >
-                              <Text style={styles.dropdownItemText}>{opt}</Text>
+                              <Text style={styles.dropdownItemText}>{cat.name}</Text>
                             </TouchableOpacity>
                           ))}
                         </View>
                       )}
                     </View>
 
-                    <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isDeptDropdownOpen ? 60 : 1 }]}>
+                    <View style={[styles.fieldGroup, { flex: 1 }]}>
                       <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                      <TouchableOpacity
-                        style={styles.dropdownSelector}
-                        onPress={() => {
-                          setIsDeptDropdownOpen(!isDeptDropdownOpen);
-                          setIsCategoryDropdownOpen(false);
-                        }}
-                      >
+                      <View style={styles.dropdownSelector}>
                         <Text style={styles.dropdownSelectorText}>{department}</Text>
-                        <Ionicons name="chevron-down-outline" size={16} color={Colors.textSecondary} />
-                      </TouchableOpacity>
-
-                      {isDeptDropdownOpen && (
-                        <View style={styles.dropdownMenu}>
-                          {departmentOptions.map((opt, idx) => (
-                            <TouchableOpacity
-                              key={idx}
-                              style={styles.dropdownItem}
-                              onPress={() => {
-                                setDepartment(opt);
-                                setIsDeptDropdownOpen(false);
-                              }}
-                            >
-                              <Text style={styles.dropdownItemText}>{opt}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
+                      </View>
                     </View>
                   </View>
                 </Card>
@@ -748,8 +836,8 @@ export default function RequestorDashboard() {
             </View>
 
             {/* ROW 2 */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              <View style={styles.leftColumn}>
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
+              <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
                 <Card style={[styles.formCard, { flex: 1 }] as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -975,9 +1063,12 @@ export default function RequestorDashboard() {
               <View style={styles.rightColumn}>
                 <Card style={[styles.formCard, { flex: 1 }] as any}>
                   <View style={styles.cardHeader}>
-                    <View style={styles.headerIconWrapper}>
-                      <Ionicons name="eye" size={18} color={Colors.textPrimary} />
-                    </View>
+                    <TouchableOpacity 
+                      style={[styles.headerIconWrapper, { backgroundColor: Colors.primary }]}
+                      onPress={() => setIsPreviewModalOpen(true)}
+                    >
+                      <Ionicons name="eye" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
                     <Text style={styles.cardTitle}>Live Preview</Text>
                   </View>
                   
@@ -1000,10 +1091,10 @@ export default function RequestorDashboard() {
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.previewMockupFrame}>
+                  <View style={[styles.previewMockupFrame, previewMode === 'mobile' ? { maxWidth: 360, alignSelf: 'center', width: '100%' } : { width: '100%' }]}>
                     <View style={styles.mockPostHeader}>
-                      <View style={styles.mockPostAvatarCircle}>
-                        <Ionicons name="business" size={14} color="#FFFFFF" />
+                      <View style={[styles.mockPostAvatarCircle, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+                        <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.mockPostAuthorName}>JMCFI Institutional</Text>
@@ -1019,7 +1110,7 @@ export default function RequestorDashboard() {
                     </View>
 
                     {mediaFiles && mediaFiles.length > 0 ? (
-                      <View style={{ width: '100%', aspectRatio: 4/3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', marginTop: 8 }}>
+                      <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4/3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
                         <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       </View>
                     ) : (
@@ -1051,7 +1142,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- APPROVAL QUEUE TAB ----------------- */}
-      {activeTab === 'approval-queue' && (
+      {activeTab === 'approval-queue' && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           <View style={styles.titleSection}>
             <Text style={styles.welcomeTitle}>Content Approval Tracking Queue</Text>
@@ -1117,7 +1208,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && (
+      {activeTab === 'account-settings' && !isInitialLoading && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
             <View style={styles.breadcrumbColumn}>
@@ -1210,8 +1301,8 @@ export default function RequestorDashboard() {
                   <TextInput style={styles.textInput} secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
                 </View>
 
-                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleChangePw} disabled={savingAcct}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Changing...' : 'Change Password'}</Text>
+                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleChangePw} disabled={savingAcctPw}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcctPw ? 'Changing...' : 'Change Password'}</Text>
                 </TouchableOpacity>
               </Card>
             </View>
@@ -1220,131 +1311,12 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- POLICY & RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && (() => {
-        const filteredSections = policySections.filter(sec => {
-          const query = policySearchQuery.toLowerCase();
-          if (!query) return true;
-          const titleMatch = sec.title.toLowerCase().includes(query);
-          const contentMatch = sec.content?.toLowerCase().includes(query);
-          const bulletsMatch = sec.bullets?.some(b => b.title.toLowerCase().includes(query) || b.desc.toLowerCase().includes(query));
-          const stepsMatch = sec.steps?.some(s => s.title.toLowerCase().includes(query) || s.desc.toLowerCase().includes(query));
-          return titleMatch || contentMatch || bulletsMatch || stepsMatch;
-        });
-
-        return (
-          <View style={styles.dashboardContainer}>
-            {/* Header row */}
-            <View style={styles.dashboardHeaderRow}>
-              <View>
-                <Text style={styles.welcomeTitle}>School Website Posting Policy</Text>
-                <Text style={styles.welcomeSubtitle}>
-                  Effective Date: {effectiveDate} &bull; Last Updated: {lastUpdatedDate}
-                </Text>
-              </View>
-              
-              <View style={[styles.inputIconWrapper, { minWidth: 260 }]}>
-                <TextInput
-                  style={styles.textInputWithIcon}
-                  placeholder="Search policy guidelines..."
-                  value={policySearchQuery}
-                  onChangeText={setPolicySearchQuery}
-                />
-                <Ionicons name="search" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
-              </View>
-            </View>
-
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              {/* Left quick navigation index - desktop only */}
-              {isLargeScreen && (
-                <View style={styles.policySidebar}>
-                  <Text style={styles.policySidebarTitle}>POLICY SECTIONS</Text>
-                  {filteredSections.map((sec) => (
-                    <TouchableOpacity
-                      key={sec.id}
-                      style={[styles.policySidebarItem, { backgroundColor: Colors.surface }]}
-                      onPress={() => alert(`Navigating to section: ${sec.title}`)}
-                    >
-                      <View style={[styles.bulletPoint, { backgroundColor: sec.color }]} />
-                      <Text style={styles.policySidebarLabel} numberOfLines={1}>{sec.title.substring(3)}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Main content guidelines */}
-              <View style={styles.policyDetailCol}>
-                {filteredSections.length > 0 ? (
-                  filteredSections.map((sec) => (
-                    <Card key={sec.id} style={[styles.policySectionCard, { borderLeftColor: sec.color }] as any}>
-                      <View style={styles.cardHeader}>
-                        <View style={[styles.headerIconWrapper, { backgroundColor: sec.bg }]}>
-                          <Ionicons name={sec.icon as any} size={16} color={sec.color} />
-                        </View>
-                        <Text style={styles.cardTitle}>{sec.title}</Text>
-                      </View>
-
-                      {sec.content && (
-                        <Text style={styles.policyCardBodyText}>{sec.content}</Text>
-                      )}
-
-                      {sec.bullets && (
-                        <View style={styles.policyBulletsList}>
-                          {sec.bullets.map((bullet, idx) => (
-                            <View key={idx} style={styles.policyBulletItem}>
-                              <Ionicons
-                                name={sec.id === 'sec-4' ? 'close-circle' : 'checkmark-circle'}
-                                size={18}
-                                color={sec.color}
-                                style={{ marginTop: 1 }}
-                              />
-                              <View style={styles.policyBulletTextCol}>
-                                <Text style={styles.policyBulletTitle}>{bullet.title}</Text>
-                                <Text style={styles.policyBulletDesc}>{bullet.desc}</Text>
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {sec.steps && (
-                        <View style={styles.policyFlowTimeline}>
-                          {sec.steps.map((step, idx) => (
-                            <View key={idx} style={styles.policyFlowItem}>
-                              <View style={styles.policyFlowLeft}>
-                                <View style={styles.policyFlowDot}>
-                                  <Text style={styles.policyFlowDotText}>{idx + 1}</Text>
-                                </View>
-                                {sec.steps && idx < sec.steps.length - 1 && <View style={styles.policyFlowLine} />}
-                              </View>
-                              <View style={styles.policyFlowContent}>
-                                <Text style={styles.policyFlowTitle}>{step.title}</Text>
-                                <Text style={styles.policyFlowDesc}>{step.desc}</Text>
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {sec.contact && (
-                        <Text style={styles.policyContactText}>{sec.contact}</Text>
-                      )}
-                    </Card>
-                  ))
-                ) : (
-                  <View style={styles.policyEmptyState}>
-                    <Ionicons name="search-outline" size={36} color={Colors.textMuted} />
-                    <Text style={styles.postTitleText}>No policy guidelines found</Text>
-                    <Text style={styles.welcomeSubtitle}>Try adjusting your search criteria.</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-        );
-      })()}
+      {activeTab === 'policy-rules' && !isInitialLoading && (
+        <PolicyRulesView accentColor="#0B2545" />
+      )}
 
       {/* ----------------- DRAFTS TAB ----------------- */}
-      {(activeTab === 'draft' || activeTab === 'drafts') && (
+      {(activeTab === 'draft' || activeTab === 'drafts') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>
@@ -1353,13 +1325,6 @@ export default function RequestorDashboard() {
                 Manage your saved post request drafts. You can edit, update, or submit them for approval.
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.createRequestBtnGold}
-              onPress={() => setActiveTab('request')}
-            >
-              <Ionicons name="add-circle-outline" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-              <Text style={styles.createRequestBtnGoldText}>+ Create New Request</Text>
-            </TouchableOpacity>
           </View>
 
           {drafts.length === 0 ? (
@@ -1437,7 +1402,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- REJECTED TAB ----------------- */}
-      {(activeTab === 'rejected' || activeTab === 'rejected-requests') && (
+      {(activeTab === 'rejected' || activeTab === 'rejected-requests') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View style={{ flex: 1 }}>
@@ -1546,7 +1511,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* Other Placeholder tabs */}
-      {activeTab !== 'dashboard' && activeTab !== 'request' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'draft' && activeTab !== 'drafts' && activeTab !== 'rejected' && activeTab !== 'rejected-requests' && (
+      {activeTab !== 'dashboard' && activeTab !== 'request' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'draft' && activeTab !== 'drafts' && activeTab !== 'rejected' && activeTab !== 'rejected-requests' && !isInitialLoading && (
         <Card style={styles.formCard}>
           <Text style={styles.cardTitle}>{activeTab.replace(/-/g, ' ').toUpperCase()}</Text>
           <Text style={styles.mainPageSubtitle}>This section is currently under development.</Text>
@@ -1659,7 +1624,9 @@ export default function RequestorDashboard() {
                     <View style={styles.mediaGallery}>
                       {selectedRow.media.map((m: any, idx: number) => (
                         m.type === 'image' || m.type === 'video' ? (
-                          <Image key={idx} source={{ uri: m.url }} style={styles.mediaThumbnail} resizeMode="cover" />
+                          <TouchableOpacity key={idx} onPress={() => setFullScreenImage(m.url)}>
+                            <Image source={{ uri: m.url }} style={styles.mediaThumbnail} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View key={idx} style={styles.mediaDocPlaceholder}>
                             <Ionicons name="document-text-outline" size={24} color={Colors.textSecondary} />
@@ -1684,6 +1651,140 @@ export default function RequestorDashboard() {
           </View>
         </Modal>
       )}
+
+      {/* Live Preview Floating Window */}
+      {isPreviewModalOpen && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setIsPreviewModalOpen(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 400 : 800, padding: 0, backgroundColor: 'transparent', shadowColor: 'transparent', elevation: 0 }]}>
+              
+              <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: '#ffffff', maxHeight: '90%' }]}>
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                  <View style={styles.mockPostHeader}>
+                  <View style={[styles.mockPostAvatarCircle, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+                    <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.mockPostAuthorName}>JMCFI Institutional</Text>
+                    <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setIsPreviewModalOpen(false)}>
+                    <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.mockPostContentArea}>
+                  <Text style={styles.mockPostCaptionText}>
+                    {caption ? caption : 'Upload media to see your content preview here...'}
+                  </Text>
+                </View>
+
+                {mediaFiles && mediaFiles.length > 0 ? (
+                  <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4/3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                    <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </View>
+                ) : (
+                  <View style={styles.mockPostMediaPlaceholder}>
+                    <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                    <Text style={styles.mockPostMediaPlaceholderText}>
+                      Upload media to see your content preview here...
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.mockPostActionsRow}>
+                  <View style={styles.mockActionGroup}>
+                    <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+                  </View>
+                  <View style={styles.mockActionGroup}>
+                    <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+                  </View>
+                  <View style={styles.mockActionGroup}>
+                    <Ionicons name="arrow-redo-outline" size={18} color={Colors.textSecondary} />
+                  </View>
+                </View>
+                </ScrollView>
+              </View>
+
+            </View>
+          </View>
+        </Modal>
+      )}
+      {/* ── DELETE DRAFT CONFIRMATION MODAL ── */}
+      <Modal
+        visible={!!draftToDelete}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDraftToDelete(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 400 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete Draft</Text>
+              <TouchableOpacity onPress={() => setDraftToDelete(null)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: Spacing.lg }}>
+              <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md }}>
+                  <Ionicons name="trash-outline" size={32} color="#DC2626" />
+                </View>
+                <Text style={{ fontSize: FontSize.md, fontWeight: 'bold', color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
+                  Are you sure you want to delete this draft?
+                </Text>
+                <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' }}>
+                  This action cannot be undone. The draft will be permanently removed from your saved requests.
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 6, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', backgroundColor: '#ffffff' }}
+                  onPress={() => setDraftToDelete(null)}
+                >
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: Colors.textPrimary }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 6, backgroundColor: '#DC2626', alignItems: 'center' }}
+                  onPress={executeDeleteDraft}
+                >
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: '#FFFFFF' }}>Yes, Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Full Screen Image Modal */}
+      {fullScreenImage && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setFullScreenImage(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }} 
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Ionicons name="close" size={32} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Image 
+              source={{ uri: fullScreenImage }} 
+              style={{ width: '90%', height: '90%' }} 
+              resizeMode="contain" 
+            />
+          </View>
+        </Modal>
+      )}
+
     </DashboardShell>
   );
 }
@@ -1731,7 +1832,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 150,
     padding: Spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderLeftWidth: 4,
@@ -1762,7 +1863,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   tableCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -1791,7 +1892,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   table: {
     borderWidth: 1,
@@ -1801,7 +1902,7 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: '#ffffff',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -1894,7 +1995,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   pageIndexBtn: {
     width: 28,
@@ -1904,7 +2005,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   pageIndexBtnActive: {
     backgroundColor: Colors.primary,
@@ -1964,7 +2065,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   draftButtonText: {
     fontSize: FontSize.sm,
@@ -2003,7 +2104,7 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   formCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2011,7 +2112,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   configCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2055,7 +2156,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   inlineFieldsRow: {
     gap: Spacing.md,
@@ -2069,7 +2170,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#FFFFFF',
   },
   dropdownSelectorText: {
     fontSize: FontSize.sm,
@@ -2081,7 +2182,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginTop: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 8,
@@ -2108,7 +2209,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 12,
     fontSize: FontSize.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     minHeight: 120,
     textAlignVertical: 'top',
   },
@@ -2186,7 +2287,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   platformLeft: {
     flexDirection: 'row',
@@ -2213,7 +2314,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   checkboxChecked: {
     backgroundColor: Colors.primary,
@@ -2233,7 +2334,7 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 36,
     fontSize: FontSize.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   inputFieldIcon: {
     position: 'absolute',
@@ -2267,7 +2368,7 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   previewToggleBtnActive: {
     backgroundColor: Colors.primary,
@@ -2286,7 +2387,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     paddingBottom: Spacing.sm,
   },
   mockPostHeader: {
@@ -2355,7 +2456,7 @@ const styles = StyleSheet.create({
 
   // Approval Queue Tab Styles
   queueCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2465,7 +2566,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   queueActionBtnText: {
     fontSize: FontSize.xs,
@@ -2484,7 +2585,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -2527,7 +2628,7 @@ const styles = StyleSheet.create({
   },
   detailsSection: {
     marginBottom: Spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: '#F9FAFB',
     padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
@@ -2579,7 +2680,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
   },
   mediaDocText: {
     fontSize: 9,
@@ -2589,7 +2690,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   commentItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
@@ -2765,7 +2866,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 12,
     gap: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     marginBottom: 10,
   },
   platformProgressSubtext: {
@@ -2790,13 +2891,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 8,
   },
   // Policy Dashboard Styles
   policySidebar: {
     width: 220,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2829,7 +2930,7 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   policySectionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderLeftWidth: 4,
@@ -2922,7 +3023,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   policyEmptyState: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,

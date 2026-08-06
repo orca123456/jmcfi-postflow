@@ -23,11 +23,14 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
+import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { FormattedText } from '../../../components/ui/FormattedText';
+import { RichTextEditor } from '../../../components/ui/RichTextEditor';
 
 interface StatCardProps {
   label: string;
@@ -90,10 +93,11 @@ const DEPARTMENT_OPTIONS = [
   { id: 6, display_name: 'Institutional Marketing & Communications' },
 ];
 
+
 export default function ITAdminDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
 
   // Tab state: 'overview' | 'user-management' | 'all-posts' | 'approval-queue' | 'policy-rules' | 'account-settings'
   const [activeTab, setActiveTab] = useState('overview');
@@ -106,6 +110,8 @@ export default function ITAdminDashboard() {
   const [editableEffectiveDate, setEditableEffectiveDate] = useState('');
   const [editableLastUpdatedDate, setEditableLastUpdatedDate] = useState('');
   const [editableSections, setEditableSections] = useState<any[]>([]);
+  const [policySearchQuery, setPolicySearchQuery] = useState('');
+  const [isEditingPolicyMode, setIsEditingPolicyMode] = useState(false);
 
   useEffect(() => { fetchPolicy(); }, []);
   useEffect(() => {
@@ -119,6 +125,10 @@ export default function ITAdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+
+  const handleAction = (type: string, title: string) => {
+    alert(`IT Action: "${type}" executed for post:\n"${title}"`);
+  };
 
   // ── Animated spinner rotation ──
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -141,18 +151,6 @@ export default function ITAdminDashboard() {
 
   // ── Process posts into the three component state arrays ──
   function processPostsData(posts: any[]) {
-    const mappedPublishQueue = posts.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)).map((p: any) => ({
-      id: p.id.toString(),
-      title: p.title || 'Untitled',
-      requestor: p.requestor?.first_name + ' ' + p.requestor?.last_name,
-      department: p.department?.name || 'Unknown',
-      status: p.status === 'APPROVED' ? 'ready_to_publish' : 'published',
-      platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
-      approvedBy: 'IMC/QA',
-      approvedAt: new Date(p.updated_at).toLocaleDateString(),
-    }));
-    setMockPublishQueue(mappedPublishQueue);
-
     const mappedAll = posts.map((p: any) => ({
       id: p.id.toString(),
       title: p.title || 'Untitled',
@@ -435,11 +433,20 @@ export default function ITAdminDashboard() {
   }, [user, activeTab]);
 
   const handleSaveAcctDetails = async () => {
-    const [first_name, ...lastParts] = acctFullName.trim().split(' ');
-    const last_name = lastParts.join(' ') || first_name;
+    const parts = acctFullName.trim().split(' ');
+    const first_name = parts[0] || '';
+    const last_name = parts.slice(1).join(' ') || '';
     setSavingAcctDetails(true);
     try {
-      await authApi.updateProfile({ first_name: first_name || last_name, last_name });
+      await authApi.updateProfile({ first_name, last_name });
+      if (user) {
+        await setUser({
+          ...user,
+          first_name: first_name || last_name,
+          last_name: last_name,
+          name: `${first_name || last_name} ${last_name}`.trim()
+        });
+      }
       showToast('Profile updated!', 'success');
     } catch (e: any) {
       showToast('Failed: ' + (e.response?.data?.message || e.message), 'error');
@@ -479,12 +486,13 @@ export default function ITAdminDashboard() {
   const [requestsDept, setRequestsDept] = useState('All Departments');
   const [requestsDate, setRequestsDate] = useState('');
 
-  // Publishing queue and Table states
-  const [mockPublishQueue, setMockPublishQueue] = useState<any[]>([]);
+
   const [allMockPosts, setAllMockPosts] = useState<any[]>([]);
   const [mockTablePosts, setMockTablePosts] = useState<any[]>([]);
   const [previewPost, setPreviewPost] = useState<any>(null);
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [previewImgSize, setPreviewImgSize] = useState<{ width: number; height: number } | null>(null);
+
 
   // Fetch image dimensions when preview opens (Facebook-style dynamic sizing)
   useEffect(() => {
@@ -815,6 +823,20 @@ export default function ITAdminDashboard() {
         status: updatedUser.status,
       } : u));
       showToast('Profile updated successfully!', 'success');
+      
+      // If the edited user is the currently logged-in user, sync global state
+      if (user && String(selectedUser.id) === String(user.id)) {
+        await setUser({
+          ...user,
+          first_name: updatedUser.first_name,
+          last_name: updatedUser.last_name,
+          name: `${updatedUser.first_name} ${updatedUser.last_name}`.trim(),
+          email: updatedUser.email,
+          department: updatedUser.department,
+          role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
+        });
+      }
+      
       handleCloseProfile();
     } catch (e: any) {
       showToast('Failed to update profile: ' + (e.response?.data?.message || e.message), 'error');
@@ -848,7 +870,6 @@ export default function ITAdminDashboard() {
 
   const filteredUsers = users.filter(u => u.email.toLowerCase().includes(userFilter.toLowerCase()));
   const postsToShow = statusFilter === 'all' ? allMockPosts : allMockPosts.filter(p => p.status === statusFilter);
-  const publishQueueToShow = mockPublishQueue;
 
   const filteredTablePosts = mockTablePosts.filter((post) => {
     const matchesSearch = requestsSearch === '' || 
@@ -863,6 +884,8 @@ export default function ITAdminDashboard() {
         matchesStatus = ['published', 'approved'].includes(post.rawStatus);
       } else if (requestsStatus === 'Rejected') {
         matchesStatus = ['rejected', 'returned_for_revision'].includes(post.rawStatus);
+      } else if (requestsStatus === 'Drafts') {
+        matchesStatus = post.rawStatus === 'draft';
       }
     }
 
@@ -873,11 +896,21 @@ export default function ITAdminDashboard() {
     return matchesSearch && matchesStatus && matchesDept && matchesDate;
   });
 
+  const computedStats = React.useMemo(() => {
+    return {
+      total: mockTablePosts.length,
+      published: mockTablePosts.filter((p: any) => ['published', 'approved'].includes(p.rawStatus)).length,
+      pending: mockTablePosts.filter((p: any) => ['pending_office_head', 'pending_vice_president', 'pending_imc_qa'].includes(p.rawStatus)).length,
+      draft: mockTablePosts.filter((p: any) => p.rawStatus === 'draft').length,
+    };
+  }, [mockTablePosts]);
+
   return (
     <DashboardShell
       title="IT Admin Panel"
       activeTab={activeTab}
       onTabChange={setActiveTab}
+      backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       departmentName={user?.department}
       userPhotoUrl={profilePhotoUrl}
       departmentLogo={(() => {
@@ -893,59 +926,64 @@ export default function ITAdminDashboard() {
 
       {/* ── LOADING SKELETON ── */}
       {isInitialLoading && (
-        <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <Animated.View style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 4, borderColor: '#E5E7EB', borderTopColor: Colors.primary, marginBottom: 16, transform: [{ rotate: spinInterpolation }] }} />
-          <Text style={{ fontSize: 14, color: Colors.textSecondary }}>Loading dashboard data…</Text>
-        </View>
+        <DashboardSkeleton />
       )}
 
       {/* ── OVERVIEW TAB ── */}
       {activeTab === 'overview' && !isInitialLoading && (
         <>
-          <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 16, marginBottom: 24 }}>
-            <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="document-text" size={24} color="#7e22ce" />
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Total Content</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? stats.total : 0}</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>All content requests</Text>
-              </View>
-            </Card>
+          <View style={{ flexDirection: 'row', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
+            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.7}>
+              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'All Status' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="document-text" size={24} color="#7e22ce" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Total Content</Text>
+                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.total}</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>All content requests</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
 
-            <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="checkmark-circle" size={24} color="#1877F2" />
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Approved & Published</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? (stats.approved + stats.published) : 0}</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Ready or live</Text>
-              </View>
-            </Card>
+            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('Published')} activeOpacity={0.7}>
+              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Published' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={24} color="#1877F2" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Approved & Published</Text>
+                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.published}</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>Ready or live</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
 
-            <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#fdf2f8', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="time" size={24} color="#E1306C" />
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Pending</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? stats.pending : 0}</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Awaiting approval</Text>
-              </View>
-            </Card>
+            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('Pending')} activeOpacity={0.7}>
+              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Pending' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#fdf2f8', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="time" size={24} color="#E1306C" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Pending</Text>
+                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.pending}</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>Awaiting approval</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
 
-            <Card style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="document" size={24} color="#16a34a" />
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Drafts</Text>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{stats ? stats.draft : 0}</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Work in progress</Text>
-              </View>
-            </Card>
+            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('Drafts')} activeOpacity={0.7}>
+              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Drafts' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="document" size={24} color="#16a34a" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Drafts</Text>
+                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.draft}</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>Work in progress</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
           </View>
 
           {/* ── ALL CONTENT REQUESTS TABLE ── */}
@@ -1077,7 +1115,7 @@ export default function ITAdminDashboard() {
       )}
 
       {/* ── USER MANAGEMENT TAB ── */}
-      {activeTab === 'user-management' && (
+      {activeTab === 'user-management' && !isInitialLoading && (
         <View style={styles.userTabContainer}>
           <Card style={styles.userCard}>
             <Text style={styles.sectionHeader}>Create New Institutional Account</Text>
@@ -1573,7 +1611,7 @@ export default function ITAdminDashboard() {
         </View>
       )}
 
-      {activeTab === 'tokens' && (
+      {activeTab === 'tokens' && !isInitialLoading && (
         <View style={{ gap: 20 }}>
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1769,29 +1807,258 @@ export default function ITAdminDashboard() {
       )}
 
       {/* ── POLICY RULES TAB ── */}
-      {activeTab === 'policy-rules' && (
-        <Card style={styles.userCard}>
-          <Text style={styles.sectionHeader}>Policy Rules</Text>
-          <Text style={styles.policyNote}>Manage and update institutional posting policy rules.</Text>
-          {editableSections.map((section, sIdx) => (
-            <View key={sIdx} style={styles.policySection}>
-              <Text style={styles.policySectionTitle}>{section.title}</Text>
-              {section.bullets?.map((bullet: any, bIdx: number) => (
-                <View key={bIdx} style={styles.policyBullet}>
-                  <View style={styles.bulletDot} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.bulletTitle}>{bullet.title}</Text>
-                    {bullet.description ? <Text style={styles.bulletDesc}>{bullet.description}</Text> : null}
-                  </View>
+      {activeTab === 'policy-rules' && !isInitialLoading && (
+        <View style={styles.policyRulesContainer}>
+          {/* Header Row */}
+          <View style={styles.policyHeaderRow}>
+            {isEditingPolicyMode ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 260, flexWrap: 'wrap' }}>
+                <View style={styles.editingModeBadge}>
+                  <Ionicons name="pencil" size={14} color="#7C3AED" />
+                  <Text style={styles.editingModeBadgeText}>Editing Mode</Text>
                 </View>
-              ))}
+                <Text style={styles.editingModeSubText}>Make changes to the policy rules. Don't forget to save your changes.</Text>
+              </View>
+            ) : (
+              <View style={{ flex: 1, minWidth: 260 }}>
+                <Text style={styles.policyMainTitle}>POLICY RULES</Text>
+                <Text style={styles.policySubTitle}>Guidelines for publishing official school website content.</Text>
+              </View>
+            )}
+
+            <View style={styles.policyHeaderActions}>
+              {isEditingPolicyMode ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.cancelEditBtn}
+                    onPress={() => {
+                      if (policySections) setEditableSections(JSON.parse(JSON.stringify(policySections)));
+                      setIsEditingPolicyMode(false);
+                    }}
+                  >
+                    <Ionicons name="arrow-back" size={15} color="#7C3AED" />
+                    <Text style={styles.cancelEditBtnText}>CANCEL EDIT</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.saveChangesBtn}
+                    onPress={async () => {
+                      const success = await updatePolicy(editableEffectiveDate, editableLastUpdatedDate, editableSections);
+                      if (success) {
+                        setIsEditingPolicyMode(false);
+                        Alert.alert('Success', 'Policy rules saved successfully!');
+                      }
+                    }}
+                  >
+                    <Ionicons name="save-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.saveChangesBtnText}>SAVE CHANGES</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={styles.editRulesBtn}
+                  onPress={() => setIsEditingPolicyMode(true)}
+                >
+                  <Ionicons name="create-outline" size={16} color="#7C3AED" />
+                  <Text style={styles.editRulesBtnText}>EDIT RULES</Text>
+                </TouchableOpacity>
+              )}
+
+              <View style={styles.policySearchBox}>
+                <TextInput
+                  placeholder="Search policy rules..."
+                  placeholderTextColor="#9CA3AF"
+                  value={policySearchQuery}
+                  onChangeText={setPolicySearchQuery}
+                  style={styles.policySearchInput}
+                />
+                <Ionicons name="search" size={16} color="#6B7280" />
+              </View>
             </View>
-          ))}
-        </Card>
+          </View>
+
+          {/* Render Sections matching Mockup */}
+          {editableSections
+            .filter((section) => {
+              if (!policySearchQuery.trim()) return true;
+              const query = policySearchQuery.toLowerCase();
+              const titleMatch = section.title?.toLowerCase().includes(query);
+              const contentMatch = section.content?.toLowerCase().includes(query);
+              const bulletMatch = section.bullets?.some((b: any) =>
+                b.title?.toLowerCase().includes(query) || (b.desc || b.description)?.toLowerCase().includes(query)
+              );
+              return titleMatch || contentMatch || bulletMatch;
+            })
+            .map((section, sIdx) => {
+              // Parse number and clean title
+              const numMatch = section.title?.match(/^(\d+)\.\s*(.*)$/);
+              const secNumber = numMatch ? numMatch[1] : `${sIdx + 1}`;
+              const secCleanTitle = numMatch ? numMatch[2] : section.title;
+
+              let badgeBg = '#0B2545';
+              let cardIconName: any = 'checkmark';
+              let cardIconBg = '#F3E8FF';
+              let cardIconColor = '#7C3AED';
+              let cardAccentColor = '#7C3AED';
+
+              if (secNumber === '2') {
+                badgeBg = '#7C3AED';
+                cardIconName = 'checkmark';
+                cardIconBg = '#F3E8FF';
+                cardIconColor = '#7C3AED';
+                cardAccentColor = '#7C3AED';
+              } else if (secNumber === '3') {
+                badgeBg = '#16A34A';
+                cardIconName = 'checkmark';
+                cardIconBg = '#DCFCE7';
+                cardIconColor = '#16A34A';
+                cardAccentColor = '#16A34A';
+              } else if (secNumber === '4') {
+                badgeBg = '#DC2626';
+                cardIconName = 'close';
+                cardIconBg = '#FEE2E2';
+                cardIconColor = '#DC2626';
+                cardAccentColor = '#DC2626';
+              } else if (secNumber === '5') {
+                badgeBg = '#0B2545';
+                cardIconName = 'copy-outline';
+                cardIconBg = '#FEF3C7';
+                cardIconColor = '#D97706';
+                cardAccentColor = '#D97706';
+              }
+
+              return (
+                <View key={section.id || sIdx} style={styles.policySectionBlock}>
+                  {/* Numbered Section Header */}
+                  <View style={styles.policySectionHeaderRow}>
+                    <View style={[styles.policyNumberBadge, { backgroundColor: badgeBg }]}>
+                      <Text style={styles.policyNumberBadgeText}>{secNumber}</Text>
+                    </View>
+                    <Text style={styles.policySectionTitleText}>{secCleanTitle}</Text>
+                  </View>
+
+                  {/* Section Content Rendering */}
+                  {secNumber === '1' ? (
+                    <Card style={styles.policyStatementCard}>
+                      <View style={[styles.policyCardIconSquare, { backgroundColor: '#EFF6FF' }]}>
+                        <Ionicons name="book-outline" size={18} color="#2563EB" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12, marginBottom: 4 }}>
+                          <Text style={styles.policyStatementTitle}>Policy statement</Text>
+                        </View>
+                        {isEditingPolicyMode ? (
+                          <RichTextEditor
+                            value={section.content || ''}
+                            onChange={(val) => {
+                              const updated = [...editableSections];
+                              updated[sIdx] = { ...updated[sIdx], content: val };
+                              setEditableSections(updated);
+                            }}
+                          />
+                        ) : (
+                          <FormattedText style={styles.policyStatementBody}>
+                            {section.content || 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors (“Posters”). The goal is to ensure a cohesive, safe, and professionally branded digital presence.'}
+                          </FormattedText>
+                        )}
+                      </View>
+                    </Card>
+                  ) : (section.bullets && section.bullets.length > 0) || (section.steps && section.steps.length > 0) ? (
+                    <View style={styles.policyGridRow}>
+                      {(section.bullets || section.steps || [])
+                        .filter((b: any) => {
+                          if (!policySearchQuery.trim()) return true;
+                          const query = policySearchQuery.toLowerCase();
+                          return b.title?.toLowerCase().includes(query) || (b.desc || b.description)?.toLowerCase().includes(query);
+                        })
+                        .map((bullet: any, bIdx: number) => (
+                          <Card key={bIdx} style={styles.policyGridCard}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <View style={[styles.policyCardIconSquare, { backgroundColor: cardIconBg }]}>
+                                <Ionicons name={cardIconName} size={16} color={cardIconColor} />
+                              </View>
+                              {isEditingPolicyMode ? (
+                                <View style={{ width: '100%', flex: 1 }}>
+                                  <RichTextEditor
+                                    value={bullet.title || ''}
+                                    minHeight={100}
+                                    onChange={(val) => {
+                                      const updated = [...editableSections];
+                                      updated[sIdx] = { ...updated[sIdx] };
+                                      if (updated[sIdx].bullets) {
+                                        updated[sIdx].bullets = [...updated[sIdx].bullets!];
+                                        updated[sIdx].bullets[bIdx] = { ...updated[sIdx].bullets![bIdx], title: val };
+                                      } else if (updated[sIdx].steps) {
+                                        updated[sIdx].steps = [...updated[sIdx].steps!];
+                                        updated[sIdx].steps[bIdx] = { ...updated[sIdx].steps![bIdx], title: val };
+                                      }
+                                      setEditableSections(updated);
+                                    }}
+                                  />
+                                </View>
+                              ) : (
+                                <FormattedText style={styles.policyCardTitle}>{bullet.title}</FormattedText>
+                              )}
+                            </View>
+                            {!isEditingPolicyMode && <View style={[styles.policyCardAccentBar, { backgroundColor: cardAccentColor }]} />}
+
+                            {isEditingPolicyMode ? (
+                              <View style={{ gap: 6, marginTop: 4 }}>
+                                <RichTextEditor
+                                  value={bullet.desc || bullet.description || ''}
+                                  onChange={(val) => {
+                                    const updated = [...editableSections];
+                                    updated[sIdx] = { ...updated[sIdx] };
+                                    if (updated[sIdx].bullets) {
+                                      updated[sIdx].bullets = [...updated[sIdx].bullets!];
+                                      updated[sIdx].bullets[bIdx] = { ...updated[sIdx].bullets![bIdx] };
+                                      if (updated[sIdx].bullets[bIdx].desc !== undefined) {
+                                        updated[sIdx].bullets[bIdx].desc = val;
+                                      } else {
+                                        updated[sIdx].bullets[bIdx].description = val;
+                                      }
+                                    } else if (updated[sIdx].steps) {
+                                      updated[sIdx].steps = [...updated[sIdx].steps!];
+                                      updated[sIdx].steps[bIdx] = { ...updated[sIdx].steps![bIdx], desc: val };
+                                    }
+                                    setEditableSections(updated);
+                                  }}
+                                />
+                              </View>
+                            ) : (
+                              <FormattedText style={styles.policyCardDesc}>{bullet.desc || bullet.description}</FormattedText>
+                            )}
+                          </Card>
+                        ))}
+                    </View>
+                  ) : (
+                    <View style={styles.policySimpleContentBox}>
+                      {isEditingPolicyMode ? (
+                        <View style={{ gap: 6 }}>
+                          <RichTextEditor
+                            value={section.content || ''}
+                            onChange={(val) => {
+                              const updated = [...editableSections];
+                              updated[sIdx] = { ...updated[sIdx], content: val };
+                              setEditableSections(updated);
+                            }}
+                          />
+                        </View>
+                      ) : (
+                        <FormattedText style={styles.policySimpleContentText}>
+                          {section.content || 'Respect copyright laws. Use licensed or original content only and give proper attribution.'}
+                        </FormattedText>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+        </View>
       )}
 
       {/* ── ACCOUNT SETTINGS TAB ── */}
-      {activeTab === 'account-settings' && (
+      {activeTab === 'account-settings' && !isInitialLoading && (
         <View style={styles.settingsContainer}>
           <View style={styles.settingsHeaderContainer}>
             <Text style={styles.settingsBreadcrumb}>SETTINGS &gt; ACCOUNT SETTINGS</Text>
@@ -1891,7 +2158,7 @@ export default function ITAdminDashboard() {
       )}
 
       {/* ── ANALYTICS TAB ── */}
-      {activeTab === 'analytics' && (() => {
+      {activeTab === 'analytics' && !isInitialLoading && (() => {
         const monthsData = analyticsOverview?.monthsData && analyticsOverview.monthsData.length > 0 
           ? analyticsOverview.monthsData 
           : [
@@ -1920,7 +2187,7 @@ export default function ITAdminDashboard() {
                 { title: 'Content Published', value: analyticsOverview?.contentPublished || '0', trend: 'Active', icon: 'document-text', color: '#7C3AED', bg: '#F3E8FF' },
                 { title: 'Pending Approval', value: analyticsOverview?.pendingApproval || '0', trend: 'Action Needed', icon: 'time', color: '#F59E0B', bg: '#FEF3C7', isNegative: true }
               ].map(stat => (
-                <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#ffffff', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                   <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name={stat.icon as any} size={24} color={stat.color} />
                   </View>
@@ -1937,7 +2204,7 @@ export default function ITAdminDashboard() {
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { gap: 24 }]}>
               
               {/* Yearly Bar Chart */}
-              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
+              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: '#ffffff', borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
                   <View>
                     <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Publication Volume</Text>
@@ -1968,7 +2235,7 @@ export default function ITAdminDashboard() {
               </Card>
 
               {/* Round Data / Circular Distribution */}
-              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: '#FFFFFF', borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
+              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: '#ffffff', borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 20 }}>
                   <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Platform Reach</Text>
                   <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Audience distribution</Text>
@@ -2013,7 +2280,7 @@ export default function ITAdminDashboard() {
       })()}
 
       {/* ── AUDIT LOGS TAB ── */}
-      {activeTab === 'audit-logs' && (() => {
+      {activeTab === 'audit-logs' && !isInitialLoading && (() => {
         const filteredLogs = auditLogs.filter((log) => {
           const matchesQuery =
             (log.userName || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
@@ -2056,7 +2323,7 @@ export default function ITAdminDashboard() {
                   </View>
 
                   {/* Export Button */}
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => showToast('Exporting audit log records as CSV...', 'success')}>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => showToast('Exporting audit log records as CSV...', 'success')}>
                     <Ionicons name="download-outline" size={16} color="#374151" style={{ marginRight: 8 }} />
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Export CSV</Text>
                   </TouchableOpacity>
@@ -2103,7 +2370,7 @@ export default function ITAdminDashboard() {
       {selectedAuditLog && (
         <Modal visible={!!selectedAuditLog} transparent animationType="fade">
           <View style={{ flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-            <View style={{ width: '100%', maxWidth: 580, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
+            <View style={{ width: '100%', maxWidth: 580, backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
                 <Text style={{ fontSize: FontSize.md + 1, fontWeight: 'bold', color: '#111827' }}>Audit Log Entry Inspection</Text>
                 <TouchableOpacity onPress={() => setSelectedAuditLog(null)}>
@@ -2154,7 +2421,7 @@ export default function ITAdminDashboard() {
               </ScrollView>
 
               <View style={{ paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', backgroundColor: '#FAFAFA', alignItems: 'flex-end' }}>
-                <TouchableOpacity onPress={() => setSelectedAuditLog(null)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#FFFFFF' }}>
+                <TouchableOpacity onPress={() => setSelectedAuditLog(null)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#ffffff' }}>
                   <Text style={{ fontSize: FontSize.xs + 1, fontWeight: 'medium', color: '#374151' }}>Close</Text>
                 </TouchableOpacity>
               </View>
@@ -2166,7 +2433,7 @@ export default function ITAdminDashboard() {
       {/* ── POST PREVIEW MODAL ── */}
       <Modal visible={!!previewPost} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ width: '100%', maxWidth: 720, backgroundColor: '#fff', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
+          <View style={{ width: '100%', maxWidth: 720, maxHeight: '90%', backgroundColor: '#fff', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Content Request Preview</Text>
@@ -2175,20 +2442,23 @@ export default function ITAdminDashboard() {
               </TouchableOpacity>
             </View>
 
+            <ScrollView showsVerticalScrollIndicator={false}>
             {/* Top Area */}
             <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
               <View style={{ flex: 1.5, alignItems: 'center', justifyContent: 'center' }}>
-                <Image
-                  source={{ uri: previewPost?.image }}
-                  resizeMode="contain"
-                  style={{
-                    width: '100%',
-                    maxHeight: 400,
-                    aspectRatio: previewImgSize ? previewImgSize.width / previewImgSize.height : undefined,
-                    backgroundColor: '#f3f4f6',
-                    borderRadius: 8,
-                  }}
-                />
+                <TouchableOpacity onPress={() => previewPost?.image && setFullScreenImage(previewPost.image)} activeOpacity={0.8} style={{ width: '100%' }}>
+                  <Image
+                    source={{ uri: previewPost?.image }}
+                    resizeMode="contain"
+                    style={{
+                      width: '100%',
+                      maxHeight: 400,
+                      aspectRatio: previewImgSize ? previewImgSize.width / previewImgSize.height : undefined,
+                      backgroundColor: '#f3f4f6',
+                      borderRadius: 8,
+                    }}
+                  />
+                </TouchableOpacity>
               </View>
               <View style={{ flex: 1, gap: 12 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{previewPost?.title}</Text>
@@ -2293,6 +2563,7 @@ export default function ITAdminDashboard() {
                 </View>
               </View>
             </View>
+            </ScrollView>
 
             {/* Footer Buttons */}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
@@ -2304,6 +2575,30 @@ export default function ITAdminDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Full Screen Image Modal */}
+      {fullScreenImage && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setFullScreenImage(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }} 
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Ionicons name="close" size={32} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Image 
+              source={{ uri: fullScreenImage }} 
+              style={{ width: '90%', height: '90%' }} 
+              resizeMode="contain" 
+            />
+          </View>
+        </Modal>
+      )}
     </DashboardShell>
   );
 }
@@ -2383,8 +2678,8 @@ const styles = StyleSheet.create({
   formColumnLayout: { flexDirection: 'column' },
   formField: { flex: 1, minWidth: 180, gap: 6, justifyContent: 'flex-end' },
   formLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textSecondary },
-  formInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm, backgroundColor: Colors.surface },
-  passwordInputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: Colors.surface, alignItems: 'center' },
+  formInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm, backgroundColor: '#ffffff' },
+  passwordInputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: '#ffffff', alignItems: 'center' },
   passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm },
   passwordToggle: { padding: 8 },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0F172A', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignSelf: 'flex-start' },
@@ -2411,7 +2706,7 @@ const styles = StyleSheet.create({
   postListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   statusFilterBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   statusFilterText: { fontSize: FontSize.sm, color: Colors.textPrimary },
-  statusDropdown: { position: 'absolute', top: 38, right: 0, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, zIndex: 100, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+  statusDropdown: { position: 'absolute', top: 38, right: 0, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, zIndex: 100, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
   statusDropdownItem: { paddingHorizontal: 14, paddingVertical: 10 },
   statusDropdownText: { fontSize: FontSize.sm, color: Colors.textPrimary },
   postRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
@@ -2456,6 +2751,39 @@ const styles = StyleSheet.create({
   settingsColumnRight: { flex: 1, minWidth: 280, padding: 0, overflow: 'hidden', height: 'auto', alignSelf: 'flex-start' },
   settingsCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.lg },
   settingsCardTitle: { fontSize: FontSize.md, fontWeight: 'bold', color: Colors.textPrimary },
+  configCardTitle: {
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+  },
+
+  // Publishing Queue styles
+  dashboardContainer: { gap: Spacing.xl },
+  dashboardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 },
+  welcomeTitle: { fontSize: 24, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  welcomeSubtitle: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 4 },
+  periodBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: Colors.border },
+  readyBadgeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#BBF7D0', gap: 8 },
+  readyBadgeLabel: { fontSize: 11, fontWeight: FontWeight.bold, color: '#166534' },
+  readyBadgeCount: { fontSize: 16, fontWeight: FontWeight.bold, color: '#16A34A' },
+  tableCard: { padding: 0, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
+  tableHeaderRow: { flexDirection: 'row', backgroundColor: '#F8FAFC', paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
+  tableHeaderCell: { fontSize: 11, fontWeight: FontWeight.bold, color: Colors.textSecondary },
+  cellFlex1: { flex: 1 },
+  cellFlex2: { flex: 2 },
+  alignCenter: { textAlign: 'center' as const, justifyContent: 'center' as const },
+  alignRight: { textAlign: 'right' as const, justifyContent: 'flex-end' as const },
+  thumbnailBg: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  qualityScoreBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  qualityScoreText: { fontSize: 11, fontWeight: FontWeight.bold, color: '#B45309' },
+  dateInputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: Colors.surface, flex: 1 },
+  dateTextInput: { flex: 1, fontSize: 11, paddingHorizontal: 8, paddingVertical: 6 },
+  queueFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#F8FAFC', borderTopWidth: 1, borderTopColor: Colors.border },
+  statusLegend: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  statusLegendTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textSecondary },
+  statusLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDotLabel: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  footerActionBtnText: { fontSize: 11, fontWeight: FontWeight.bold, color: Colors.primary },
   settingsDivider: { height: 1, backgroundColor: Colors.border },
   profilePictureRow: { flexDirection: 'row', gap: Spacing.lg, padding: Spacing.lg, alignItems: 'center' },
   profileAvatarLarge: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' },
@@ -2568,4 +2896,291 @@ const styles = StyleSheet.create({
     padding: 4,
     marginLeft: 12,
   },
+
+  // Policy Rules Redesign Styles
+  wideModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  policyRulesContainer: {
+    gap: 24,
+  },
+  policyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  policyMainTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#111827',
+    letterSpacing: 0.5,
+  },
+  policySubTitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  policyHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  editRulesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#7C3AED',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  editRulesBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#7C3AED',
+    letterSpacing: 0.5,
+  },
+  policySearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    height: 38,
+    minWidth: 220,
+  },
+  policySearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#111827',
+    outlineStyle: 'none',
+  } as any,
+  policySectionBlock: {
+    gap: 14,
+  },
+  policySectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  policyNumberBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  policyNumberBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  policySectionTitleText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  policyStatementCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  policyStatementTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  policyStatementBody: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  policyGridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  policyGridCard: {
+    flex: 1,
+    minWidth: 220,
+    padding: 18,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 10,
+  },
+  policyCardIconSquare: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  policyCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  policyCardAccentBar: {
+    height: 3,
+    width: 24,
+    borderRadius: 1.5,
+    marginTop: -4,
+  },
+  policyCardDesc: {
+    fontSize: 12,
+    color: '#4B5563',
+    lineHeight: 18,
+  },
+  policySimpleContentBox: {
+    padding: 14,
+  },
+  policySimpleContentText: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+
+  // Editing Mode Styles
+  editingModeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  editingModeBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#7C3AED',
+  },
+  editingModeSubText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  cancelEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#7C3AED',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  cancelEditBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#7C3AED',
+    letterSpacing: 0.5,
+  },
+  saveChangesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#7C3AED',
+  },
+  saveChangesBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  policyMiniToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  toolbarFormatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+  },
+  toolbarFormatBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  toolbarDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 4,
+  },
+  toolbarIconBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  toolbarTextBtn: {
+    fontSize: 12,
+    color: '#374151',
+  },
+  policyInlineTitleInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    borderBottomWidth: 1,
+    borderBottomColor: '#7C3AED',
+    paddingVertical: 2,
+    outlineStyle: 'none',
+  } as any,
+  policyInlineInputGrid: {
+    fontSize: 12,
+    color: '#374151',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 6,
+    padding: 8,
+    minHeight: 60,
+    backgroundColor: '#FFFFFF',
+    textAlignVertical: 'top',
+    outlineStyle: 'none',
+  } as any,
+  policyInlineInputMultiline: {
+    fontSize: 13,
+    color: '#374151',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 6,
+    padding: 10,
+    minHeight: 80,
+    backgroundColor: '#FFFFFF',
+    textAlignVertical: 'top',
+    outlineStyle: 'none',
+    marginTop: 8,
+  } as any,
 });

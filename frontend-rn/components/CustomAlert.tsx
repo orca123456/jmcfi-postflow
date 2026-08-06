@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   },
   alertMessage: {
     fontSize: 14,
-    color: Colors.text,
+    color: Colors.textPrimary,
     marginBottom: 24,
     lineHeight: 20,
   },

@@ -57,7 +57,8 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!$this->photo_path) {
             return null;
         }
-        return asset('storage/' . $this->photo_path);
+        $normalizedPath = str_replace('\\', '/', $this->photo_path);
+        return asset('storage/' . $normalizedPath);
     }
 
     public function getDisplayNameAttribute(): string

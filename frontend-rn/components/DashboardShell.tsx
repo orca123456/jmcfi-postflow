@@ -429,7 +429,7 @@ export function DashboardShell({
                 <View style={styles.sidebarHeaderContainer}>
                   <Image
                     source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
-                    style={{ width: 36, height: 36, borderRadius: 18 }}
+                    style={{ width: 52, height: 52, borderRadius: 26 }}
                     resizeMode="contain"
                   />
                   <View style={styles.sidebarHeader}>
@@ -771,7 +771,7 @@ const styles = StyleSheet.create({
   sidebarHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 6,
     gap: 16,
     marginBottom: Spacing.sm,
   },

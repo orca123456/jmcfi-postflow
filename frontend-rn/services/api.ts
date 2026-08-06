@@ -20,7 +20,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  timeout: 15000,
+  timeout: 60000,
 });
 
 // Attach Bearer token to every request
@@ -73,6 +73,12 @@ export const postsApi = {
   createWithFiles: (formData: FormData) => api.post('/posts', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  updateWithFiles: (id: number, formData: FormData) => {
+    formData.append('_method', 'PUT');
+    return api.post(`/posts/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   get: (id: number) => api.get(`/posts/${id}`),
   update: (id: number, data: object) => api.put(`/posts/${id}`, data),
   delete: (id: number) => api.delete(`/posts/${id}`),
@@ -81,6 +87,11 @@ export const postsApi = {
   reject: (id: number, data: object) => api.post(`/posts/${id}/reject`, data),
   returnRevision: (id: number, data: object) => api.post(`/posts/${id}/return-revision`, data),
   aiCheck: (id: number) => api.post(`/posts/${id}/ai-check`),
+};
+
+// ── Categories endpoints ───────────────────────────────────────────────────
+export const categoriesApi = {
+  list: () => api.get('/categories'),
 };
 
 // ── Dashboard endpoints ────────────────────────────────────────────────────

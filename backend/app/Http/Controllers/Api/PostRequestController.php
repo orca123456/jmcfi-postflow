@@ -109,11 +109,15 @@ class PostRequestController extends Controller
     public function store(StorePostRequest $request): JsonResponse
     {
         return DB::transaction(function () use ($request) {
+            $categoryId = $request->category_id;
+            if (!$categoryId) {
+                $categoryId = \App\Models\PostCategory::where('is_active', true)->value('id');
+            }
             $post = PostRequest::create([
                 'title' => $request->title,
                 'slug' => Str::slug($request->title) . '-' . Str::random(6),
                 'caption_narrative' => $request->caption_narrative,
-                'category_id' => $request->category_id,
+                'category_id' => $categoryId,
                 'department_id' => $request->user()->id,
                 'requestor_id' => $request->user()->id,
                 'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
@@ -527,14 +531,33 @@ class PostRequestController extends Controller
 
         $totalSubmissions = (clone $query)->count();
         $draftCount = (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count();
-        $pendingCount = (clone $query)->whereIn('status', [
-            PostRequest::STATUS_PENDING_OFFICE_HEAD,
-            PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-            PostRequest::STATUS_PENDING_PRESIDENT,
-            PostRequest::STATUS_PENDING_IMC_QA,
-        ])->count();
-        $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
-        $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
+        
+        $stageMap = [
+            'office_head' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
+            'vice_president' => PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+            'president' => PostRequest::STATUS_PENDING_PRESIDENT,
+            'imc_qa_checker' => PostRequest::STATUS_PENDING_IMC_QA,
+        ];
+
+        if (isset($stageMap[$role])) {
+            $pendingCount = (clone $query)->where('status', $stageMap[$role])->count();
+            $approvedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
+                $aw->where('approver_id', $user->id)->where('action', 'approved');
+            })->count();
+            $rejectedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
+                $aw->where('approver_id', $user->id)->whereIn('action', ['rejected', 'returned_for_revision']);
+            })->count();
+        } else {
+            $pendingCount = (clone $query)->whereIn('status', [
+                PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+                PostRequest::STATUS_PENDING_PRESIDENT,
+                PostRequest::STATUS_PENDING_IMC_QA,
+            ])->count();
+            $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
+            $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
+        }
+
         $returnedCount = (clone $query)->where('status', PostRequest::STATUS_RETURNED_FOR_REVISION)->count();
         $scheduledCount = (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count();
         $publishedCount = (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count();

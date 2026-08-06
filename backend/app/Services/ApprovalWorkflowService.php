@@ -51,11 +51,11 @@ class ApprovalWorkflowService
 
         try {
             // Get the first active user with this role
-            return User::role($role)
-                ->where('status', 'active')
-                ->first();
-        } catch (RoleDoesNotExist $e) {
-            Log::warning("Role '{$role}' does not exist in the database. Skipping approver assignment for stage: {$stage}");
+            return User::whereHas('roles', function ($query) use ($role) {
+                $query->where('name', $role);
+            })->where('status', 'active')->first();
+        } catch (\Exception $e) {
+            Log::warning("Failed to get approver for stage: {$stage}. Error: " . $e->getMessage());
             return null;
         }
     }
@@ -91,9 +91,9 @@ class ApprovalWorkflowService
     public function notifyITPublisher(PostRequest $postRequest): void
     {
         try {
-            $publisher = User::role('it_publisher')
-                ->where('status', 'active')
-                ->first();
+            $publisher = User::whereHas('roles', function ($query) {
+                $query->where('name', 'it_publisher');
+            })->where('status', 'active')->first();
 
             if ($publisher) {
                 $publisher->notify(new \App\Notifications\PostReadyForPublishingNotification($postRequest));
