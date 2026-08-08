@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
@@ -48,7 +49,6 @@ export default function OfficeHeadDashboard() {
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
 
-  // Reject Modal State
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
@@ -56,8 +56,21 @@ export default function OfficeHeadDashboard() {
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
+
+  const { data: postsQueryRes, isLoading: postsLoading, refetch: refetchPosts } = useQuery({
+    queryKey: ['posts'],
+    queryFn: () => postsApi.list(),
+    refetchInterval: 10000, // 10 seconds auto-polling
+  });
+
+  const { data: statsQueryRes, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => dashboardApi.getStats(),
+    refetchInterval: 10000,
+  });
+
+  const isInitialLoading = postsLoading || statsLoading;
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -106,15 +119,10 @@ export default function OfficeHeadDashboard() {
     catch {} finally { setSavingAcct(false); }
   };
 
-  const loadData = async () => {
-    setIsInitialLoading(true);
-    try {
-      const [postsRes, statsRes] = await Promise.all([
-        postsApi.list(),
-        dashboardApi.getStats()
-      ]);
-      const posts = postsRes.data.data;
-      setStats(statsRes.data.data);
+  useEffect(() => {
+    if (postsQueryRes && statsQueryRes) {
+      const posts = postsQueryRes.data.data;
+      setStats(statsQueryRes.data.data);
 
       const mapPost = (p: any) => ({
         ...p,
@@ -155,16 +163,13 @@ export default function OfficeHeadDashboard() {
       setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status)));
       setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
       setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
-    } catch (err) {
-      console.error('Failed to load data', err);
-    } finally {
-      setIsInitialLoading(false);
     }
-  };
+  }, [postsQueryRes, statsQueryRes, user?.department]);
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
+  const loadData = () => {
+    refetchPosts();
+    refetchStats();
+  };
 
   const departmentOptions = ['All Departments', 'CITE', 'COBE', 'CAS', 'CED'];
 
