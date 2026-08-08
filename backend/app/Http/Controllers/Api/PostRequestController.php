@@ -507,6 +507,21 @@ class PostRequestController extends Controller
         ]);
     }
 
+    public function runDraftAiCheck(Request $request): JsonResponse
+    {
+        $request->validate([
+            'title' => 'nullable|string',
+            'caption_narrative' => 'required|string',
+        ]);
+
+        $result = $this->aiService->checkDraftCompliance($request->title ?? 'Draft', $request->caption_narrative);
+        
+        return response()->json([
+            'data' => $result,
+            'message' => 'AI draft compliance check completed',
+        ]);
+    }
+
     public function getDashboardStats(Request $request): JsonResponse
     {
         $user = $request->user();

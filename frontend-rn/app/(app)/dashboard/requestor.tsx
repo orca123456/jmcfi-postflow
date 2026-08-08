@@ -450,12 +450,28 @@ export default function RequestorDashboard() {
     }
   };
 
-  const handleCheckPolicy = () => {
+  const [isCheckingPolicy, setIsCheckingPolicy] = useState(false);
+
+  const handleCheckPolicy = async () => {
     if (!caption) {
       alert('Please write a caption first.');
       return;
     }
-    alert('Checking policy alignment...\n\nResult: 100% Alignment! The post conforms to JMCFI institutional guidelines.');
+    
+    setIsCheckingPolicy(true);
+    try {
+      const response = await postsApi.aiCheckDraft({ title: postTitle, caption_narrative: caption });
+      const data = response.data.data;
+      if (data.overall_status === 'error') {
+         alert('AI Analysis failed: ' + data.analysis_logic);
+      } else {
+         alert(`Policy Alignment Score: ${data.compliance_score}%\nStatus: ${data.overall_status}\n\nAnalysis:\n${data.analysis_logic}`);
+      }
+    } catch (e: any) {
+      alert('Failed to check policy alignment: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setIsCheckingPolicy(false);
+    }
   };
 
   const togglePlatform = (key: 'facebook' | 'instagram' | 'portal') => {
@@ -877,9 +893,9 @@ export default function RequestorDashboard() {
                       <Text style={styles.characterCounter}>
                         {caption.length} / 2200 characters
                       </Text>
-                      <TouchableOpacity style={styles.checkPolicyBtn} onPress={handleCheckPolicy}>
+                      <TouchableOpacity style={[styles.checkPolicyBtn, isCheckingPolicy && { opacity: 0.7 }]} onPress={handleCheckPolicy} disabled={isCheckingPolicy}>
                         <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
-                        <Text style={styles.checkPolicyBtnText}>Check Policy Alignment</Text>
+                        <Text style={styles.checkPolicyBtnText}>{isCheckingPolicy ? 'Checking...' : 'Check Policy Alignment'}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

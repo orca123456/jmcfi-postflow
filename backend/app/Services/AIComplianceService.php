@@ -16,9 +16,9 @@ class AIComplianceService
 
     public function __construct()
     {
-        $this->apiKey = config('services.nvidia.api_key') ?? '';
-        $this->apiUrl = config('services.nvidia.api_url', 'https://integrate.api.nvidia.com/v1');
-        $this->model = config('services.nvidia.model', 'nvidia/nemotron-3-ultra-550b-a55b');
+        $this->apiKey = env('DEEPSEEK_API_KEY', '');
+        $this->apiUrl = env('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1');
+        $this->model = env('DEEPSEEK_MODEL', 'deepseek-chat');
     }
 
     public function checkCompliance(PostRequest $postRequest): array
@@ -121,6 +121,83 @@ class AIComplianceService
             // Return fallback result
             return [
                 'ai_check_id' => null,
+                'compliance_score' => 0,
+                'overall_status' => 'error',
+                'checks' => [],
+                'suggested_caption' => null,
+                'analysis_logic' => 'AI service unavailable: ' . $e->getMessage(),
+                'policy_alignment' => '',
+                'tokens_used' => 0,
+                'processing_time_ms' => 0,
+            ];
+        }
+    }
+
+    public function checkDraftCompliance(string $title, string $caption): array
+    {
+        $startTime = microtime(true);
+        
+        try {
+            $prompt = <<<PROMPT
+Analyze this JMCFI post draft for compliance:
+
+POST DETAILS:
+- Title: {$title}
+- Category: General
+- Target Platforms: N/A
+- Department: N/A
+- Media Attachments: None
+
+CAPTION/NARRATIVE:
+{$caption}
+
+Provide compliance analysis as JSON with the exact structure specified in system prompt.
+PROMPT;
+            
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(120)->post("{$this->apiUrl}/chat/completions", [
+                'model' => $this->model,
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $this->getSystemPrompt(),
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => $prompt,
+                    ],
+                ],
+                'temperature' => 0.3,
+                'max_tokens' => 2048,
+                'top_p' => 0.9,
+            ]);
+
+            if (!$response->successful()) {
+                throw new \Exception('AI service unavailable: ' . $response->status());
+            }
+
+            $data = $response->json();
+            $content = $data['choices'][0]['message']['content'] ?? '';
+            $tokensUsed = $data['usage']['total_tokens'] ?? 0;
+            $processingTime = (microtime(true) - $startTime) * 1000;
+
+            $result = $this->parseComplianceResponse($content);
+            
+            return [
+                'compliance_score' => $result['overall_compliance_score'] ?? ($result['compliance_score'] ?? 0),
+                'overall_status' => $result['overall_status'] ?? 'needs_review',
+                'checks' => $result['checks'] ?? [],
+                'suggested_caption' => $result['suggested_caption'] ?? null,
+                'analysis_logic' => $result['analysis_logic'] ?? '',
+                'policy_alignment' => $result['policy_alignment'] ?? '',
+                'tokens_used' => $tokensUsed,
+                'processing_time_ms' => round($processingTime),
+            ];
+
+        } catch (\Exception $e) {
+            return [
                 'compliance_score' => 0,
                 'overall_status' => 'error',
                 'checks' => [],
