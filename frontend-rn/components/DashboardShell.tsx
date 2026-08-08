@@ -244,6 +244,7 @@ export function DashboardShell({
         { id: 'account-settings', label: 'Account', icon: 'settings-outline' as const, active: active === 'account-settings' },
         { id: 'audit-logs', label: 'Audit Logs', icon: 'shield-checkmark-outline' as const, active: active === 'audit-logs' },
         { id: 'tokens', label: 'Tokens', icon: 'key-outline' as const, active: active === 'tokens' },
+        { id: 'email-settings', label: 'Email Settings', icon: 'mail-outline' as const, active: active === 'email-settings' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
     }

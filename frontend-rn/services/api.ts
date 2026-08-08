@@ -160,4 +160,11 @@ export const tokenSettingsApi = {
   update: (data: object) => api.post('/token-settings', data),
 };
 
+// ── Email Settings endpoints ────────────────────────────────────────────────
+export const emailSettingsApi = {
+  get: () => api.get('/email-settings'),
+  update: (data: object) => api.post('/email-settings', data),
+  test: () => api.post('/email-settings/test'),
+};
+
 export default api;
