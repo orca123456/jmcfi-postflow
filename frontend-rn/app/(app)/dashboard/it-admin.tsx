@@ -26,7 +26,7 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
-import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi } from '../../../services/api';
+import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
@@ -627,6 +627,71 @@ export default function ITAdminDashboard() {
 
   const toggleTokenVisibility = (key: string) => {
     setShowTokenField(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // ── Email Settings State ──
+  const [emailFields, setEmailFields] = useState({
+    mail_mailer: 'log',
+    mail_host: 'smtp.gmail.com',
+    mail_port: '587',
+    mail_username: '',
+    mail_password: '',
+    mail_encryption: 'tls',
+    mail_from_address: '',
+    mail_from_name: 'JMCFI PostFlow',
+  });
+  const [emailPasswordSet, setEmailPasswordSet] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'email-settings') {
+      (emailSettingsApi as any).get()
+        .then((res: any) => {
+          const s = res.data.settings || {};
+          setEmailFields(prev => ({
+            ...prev,
+            mail_mailer: s.mail_mailer || 'log',
+            mail_host: s.mail_host || 'smtp.gmail.com',
+            mail_port: s.mail_port || '587',
+            mail_username: s.mail_username || '',
+            mail_encryption: s.mail_encryption || 'tls',
+            mail_from_address: s.mail_from_address || '',
+            mail_from_name: s.mail_from_name || 'JMCFI PostFlow',
+          }));
+          setEmailPasswordSet(!!s.mail_password_set);
+        })
+        .catch(() => {});
+    }
+  }, [activeTab]);
+
+  const handleSaveEmailSettings = async () => {
+    setSavingEmail(true);
+    try {
+      await (emailSettingsApi as any).update(emailFields);
+      showToast('Email settings saved successfully!', 'success');
+      if (emailFields.mail_password) {
+        setEmailPasswordSet(true);
+        setEmailFields(prev => ({ ...prev, mail_password: '' }));
+      }
+    } catch (e: any) {
+      showToast('Failed to save: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    try {
+      const res = await (emailSettingsApi as any).test();
+      showToast(res.data.message || 'Test email sent!', 'success');
+    } catch (e: any) {
+      showToast('Test failed: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setTestingEmail(false);
+    }
   };
 
   // ── Department Logo State ──
@@ -1850,6 +1915,217 @@ export default function ITAdminDashboard() {
         </View>
       )}
 
+      {/* ── EMAIL SETTINGS TAB ── */}
+      {activeTab === 'email-settings' && !isInitialLoading && (
+        <View style={{ gap: 20 }}>
+          {/* Header */}
+          <Card style={styles.userCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="mail" size={22} color="#2563EB" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionHeader, { marginBottom: 2 }]}>Email Notification Settings</Text>
+                <Text style={styles.policyNote}>Configure the SMTP server used to send approval, publishing, and alert emails to users and admins.</Text>
+              </View>
+            </View>
+            {/* Live Mode Toggle */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                onPress={() => setEmailFields(prev => ({ ...prev, mail_mailer: 'smtp' }))}
+                style={{
+                  flex: 1, paddingVertical: 10, borderRadius: 10,
+                  backgroundColor: emailFields.mail_mailer === 'smtp' ? '#2563EB' : '#F1F5F9',
+                  alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Ionicons name="send" size={15} color={emailFields.mail_mailer === 'smtp' ? '#fff' : '#64748B'} />
+                <Text style={{ color: emailFields.mail_mailer === 'smtp' ? '#fff' : '#64748B', fontWeight: '700', fontSize: 13 }}>Live (SMTP)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setEmailFields(prev => ({ ...prev, mail_mailer: 'log' }))}
+                style={{
+                  flex: 1, paddingVertical: 10, borderRadius: 10,
+                  backgroundColor: emailFields.mail_mailer === 'log' ? '#7C3AED' : '#F1F5F9',
+                  alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Ionicons name="bug" size={15} color={emailFields.mail_mailer === 'log' ? '#fff' : '#64748B'} />
+                <Text style={{ color: emailFields.mail_mailer === 'log' ? '#fff' : '#64748B', fontWeight: '700', fontSize: 13 }}>Log Only (Testing)</Text>
+              </TouchableOpacity>
+            </View>
+            {emailFields.mail_mailer === 'log' && (
+              <View style={{ marginTop: 10, backgroundColor: '#FFF7ED', borderRadius: 8, padding: 10, flexDirection: 'row', gap: 8 }}>
+                <Ionicons name="information-circle" size={16} color="#D97706" />
+                <Text style={{ color: '#92400E', fontSize: 12, flex: 1 }}>Log mode is active — emails will be written to the server log file instead of being sent. Switch to Live (SMTP) to send real emails.</Text>
+              </View>
+            )}
+            {emailFields.mail_mailer === 'smtp' && (
+              <View style={{ marginTop: 10, backgroundColor: '#ECFDF5', borderRadius: 8, padding: 10, flexDirection: 'row', gap: 8 }}>
+                <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                <Text style={{ color: '#065F46', fontSize: 12, flex: 1 }}>Live mode — real emails will be sent through Gmail SMTP using the credentials below.</Text>
+              </View>
+            )}
+          </Card>
+
+          {/* SMTP Configuration */}
+          <Card style={styles.userCard}>
+            <Text style={[styles.sectionHeader, { marginBottom: 4 }]}>Gmail SMTP Configuration</Text>
+            <Text style={[styles.policyNote, { marginBottom: 16 }]}>
+              Use your school Gmail account to send emails. You need to generate an App Password from{' '}
+              <Text style={{ color: '#2563EB' }}>Google Account → Security → App Passwords</Text>.
+            </Text>
+
+            {/* Host + Port Row */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+              <View style={{ flex: 2 }}>
+                <Text style={styles.fieldLabel}>SMTP Host</Text>
+                <TextInput
+                  style={styles.input}
+                  value={emailFields.mail_host}
+                  onChangeText={v => setEmailFields(p => ({ ...p, mail_host: v }))}
+                  placeholder="smtp.gmail.com"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Port</Text>
+                <TextInput
+                  style={styles.input}
+                  value={emailFields.mail_port}
+                  onChangeText={v => setEmailFields(p => ({ ...p, mail_port: v }))}
+                  placeholder="587"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* Encryption */}
+            <Text style={[styles.fieldLabel, { marginBottom: 6 }]}>Encryption</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              {['tls', 'ssl', ''].map(enc => (
+                <TouchableOpacity
+                  key={enc || 'none'}
+                  onPress={() => setEmailFields(p => ({ ...p, mail_encryption: enc }))}
+                  style={{
+                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8,
+                    backgroundColor: emailFields.mail_encryption === enc ? '#2563EB' : '#F1F5F9',
+                  }}
+                >
+                  <Text style={{ color: emailFields.mail_encryption === enc ? '#fff' : '#64748B', fontSize: 13, fontWeight: '600' }}>
+                    {enc === '' ? 'None' : enc.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Username */}
+            <Text style={styles.fieldLabel}>Gmail Username (Email Address)</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 14 }]}
+              value={emailFields.mail_username}
+              onChangeText={v => setEmailFields(p => ({ ...p, mail_username: v }))}
+              placeholder="your-school-email@gmail.com"
+              placeholderTextColor="#94A3B8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            {/* Password */}
+            <Text style={styles.fieldLabel}>
+              Gmail App Password{' '}
+              {emailPasswordSet && <Text style={{ color: '#059669', fontSize: 11 }}>✓ Password is set</Text>}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <TextInput
+                style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }]}
+                value={emailFields.mail_password}
+                onChangeText={v => setEmailFields(p => ({ ...p, mail_password: v }))}
+                placeholder={emailPasswordSet ? '••••••••••••••• (Leave blank to keep current)' : 'Enter Gmail App Password'}
+                placeholderTextColor="#94A3B8"
+                secureTextEntry={!showEmailPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                onPress={() => setShowEmailPassword(p => !p)}
+                style={{ backgroundColor: '#F1F5F9', padding: 12, borderWidth: 1, borderColor: '#E2E8F0', borderLeftWidth: 0, borderTopRightRadius: 8, borderBottomRightRadius: 8 }}
+              >
+                <Ionicons name={showEmailPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ color: '#94A3B8', fontSize: 11, marginBottom: 14 }}>
+              Not your regular Gmail password — generate an App Password from Google Account → Security.
+            </Text>
+          </Card>
+
+          {/* From Address */}
+          <Card style={styles.userCard}>
+            <Text style={[styles.sectionHeader, { marginBottom: 4 }]}>Sender Identity</Text>
+            <Text style={[styles.policyNote, { marginBottom: 14 }]}>The name and email address that recipients will see in their inbox.</Text>
+
+            <Text style={styles.fieldLabel}>From Name</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 14 }]}
+              value={emailFields.mail_from_name}
+              onChangeText={v => setEmailFields(p => ({ ...p, mail_from_name: v }))}
+              placeholder="JMCFI PostFlow"
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.fieldLabel}>From Email Address</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 14 }]}
+              value={emailFields.mail_from_address}
+              onChangeText={v => setEmailFields(p => ({ ...p, mail_from_address: v }))}
+              placeholder="postflow@jmc.edu.ph"
+              placeholderTextColor="#94A3B8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </Card>
+
+          {/* Action Buttons */}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity
+              onPress={handleTestEmail}
+              disabled={testingEmail || emailFields.mail_mailer === 'log'}
+              style={{
+                flex: 1, paddingVertical: 13, borderRadius: 10,
+                backgroundColor: emailFields.mail_mailer === 'log' ? '#E2E8F0' : '#EFF6FF',
+                alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
+                opacity: testingEmail ? 0.7 : 1,
+              }}
+            >
+              <Ionicons name="send-outline" size={16} color={emailFields.mail_mailer === 'log' ? '#94A3B8' : '#2563EB'} />
+              <Text style={{ color: emailFields.mail_mailer === 'log' ? '#94A3B8' : '#2563EB', fontSize: 13, fontWeight: '700' }}>
+                {testingEmail ? 'Sending...' : 'Send Test Email'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSaveEmailSettings}
+              disabled={savingEmail}
+              style={{
+                flex: 1, paddingVertical: 13, borderRadius: 10,
+                backgroundColor: '#2563EB',
+                alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
+                opacity: savingEmail ? 0.7 : 1,
+              }}
+            >
+              <Ionicons name="save-outline" size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                {savingEmail ? 'Saving...' : 'Save Settings'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {emailFields.mail_mailer === 'log' && (
+            <Text style={{ textAlign: 'center', color: '#94A3B8', fontSize: 11 }}>
+              Switch to Live (SMTP) mode above to enable the Send Test Email button.
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* ── POLICY RULES TAB ── */}
       {activeTab === 'policy-rules' && !isInitialLoading && (
         <View style={styles.policyRulesContainer}>
@@ -2723,6 +2999,8 @@ const styles = StyleSheet.create({
   formField: { flex: 1, minWidth: 180, gap: 6, justifyContent: 'flex-end' },
   formLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textSecondary },
   formInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm, backgroundColor: '#ffffff' },
+  fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textSecondary, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: FontSize.sm, backgroundColor: '#ffffff' },
   passwordInputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: '#ffffff', alignItems: 'center' },
   passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm },
   passwordToggle: { padding: 8 },

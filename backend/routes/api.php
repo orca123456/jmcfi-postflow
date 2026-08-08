@@ -97,4 +97,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::post('ai/check/{post}', [AIComplianceController::class, 'checkCompliance']);
     // Route::post('ai/generate-rejection-reason/{post}', [AIComplianceController::class, 'generateRejectionReason']);
     // Route::post('ai/improve-caption/{post}', [AIComplianceController::class, 'improveCaption']);
+
+    // Email Settings (Admin only)
+    Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings']);
+    Route::post('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'updateSettings']);
+    Route::post('email-settings/test', [App\Http\Controllers\Api\EmailSettingController::class, 'sendTestEmail']);
 });
