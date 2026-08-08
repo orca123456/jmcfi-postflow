@@ -631,7 +631,7 @@ export default function ITAdminDashboard() {
 
   // ── Email Settings State ──
   const [emailFields, setEmailFields] = useState({
-    mail_mailer: 'log',
+    mail_mailer: 'smtp', // Hardcoded to real SMTP
     mail_host: 'smtp.gmail.com',
     mail_port: '587',
     mail_username: '',
@@ -652,7 +652,7 @@ export default function ITAdminDashboard() {
           const s = res.data.settings || {};
           setEmailFields(prev => ({
             ...prev,
-            mail_mailer: s.mail_mailer || 'log',
+            mail_mailer: 'smtp', // Always smtp
             mail_host: s.mail_host || 'smtp.gmail.com',
             mail_port: s.mail_port || '587',
             mail_username: s.mail_username || '',
@@ -1929,43 +1929,6 @@ export default function ITAdminDashboard() {
                 <Text style={styles.policyNote}>Configure the SMTP server used to send approval, publishing, and alert emails to users and admins.</Text>
               </View>
             </View>
-            {/* Live Mode Toggle */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-              <TouchableOpacity
-                onPress={() => setEmailFields(prev => ({ ...prev, mail_mailer: 'smtp' }))}
-                style={{
-                  flex: 1, paddingVertical: 10, borderRadius: 10,
-                  backgroundColor: emailFields.mail_mailer === 'smtp' ? '#2563EB' : '#F1F5F9',
-                  alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
-                }}
-              >
-                <Ionicons name="send" size={15} color={emailFields.mail_mailer === 'smtp' ? '#fff' : '#64748B'} />
-                <Text style={{ color: emailFields.mail_mailer === 'smtp' ? '#fff' : '#64748B', fontWeight: '700', fontSize: 13 }}>Live (SMTP)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setEmailFields(prev => ({ ...prev, mail_mailer: 'log' }))}
-                style={{
-                  flex: 1, paddingVertical: 10, borderRadius: 10,
-                  backgroundColor: emailFields.mail_mailer === 'log' ? '#7C3AED' : '#F1F5F9',
-                  alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
-                }}
-              >
-                <Ionicons name="bug" size={15} color={emailFields.mail_mailer === 'log' ? '#fff' : '#64748B'} />
-                <Text style={{ color: emailFields.mail_mailer === 'log' ? '#fff' : '#64748B', fontWeight: '700', fontSize: 13 }}>Log Only (Testing)</Text>
-              </TouchableOpacity>
-            </View>
-            {emailFields.mail_mailer === 'log' && (
-              <View style={{ marginTop: 10, backgroundColor: '#FFF7ED', borderRadius: 8, padding: 10, flexDirection: 'row', gap: 8 }}>
-                <Ionicons name="information-circle" size={16} color="#D97706" />
-                <Text style={{ color: '#92400E', fontSize: 12, flex: 1 }}>Log mode is active — emails will be written to the server log file instead of being sent. Switch to Live (SMTP) to send real emails.</Text>
-              </View>
-            )}
-            {emailFields.mail_mailer === 'smtp' && (
-              <View style={{ marginTop: 10, backgroundColor: '#ECFDF5', borderRadius: 8, padding: 10, flexDirection: 'row', gap: 8 }}>
-                <Ionicons name="checkmark-circle" size={16} color="#059669" />
-                <Text style={{ color: '#065F46', fontSize: 12, flex: 1 }}>Live mode — real emails will be sent through Gmail SMTP using the credentials below.</Text>
-              </View>
-            )}
           </Card>
 
           {/* SMTP Configuration */}
@@ -2089,16 +2052,16 @@ export default function ITAdminDashboard() {
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity
               onPress={handleTestEmail}
-              disabled={testingEmail || emailFields.mail_mailer === 'log'}
+              disabled={testingEmail}
               style={{
                 flex: 1, paddingVertical: 13, borderRadius: 10,
-                backgroundColor: emailFields.mail_mailer === 'log' ? '#E2E8F0' : '#EFF6FF',
+                backgroundColor: '#EFF6FF',
                 alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
                 opacity: testingEmail ? 0.7 : 1,
               }}
             >
-              <Ionicons name="send-outline" size={16} color={emailFields.mail_mailer === 'log' ? '#94A3B8' : '#2563EB'} />
-              <Text style={{ color: emailFields.mail_mailer === 'log' ? '#94A3B8' : '#2563EB', fontSize: 13, fontWeight: '700' }}>
+              <Ionicons name="send-outline" size={16} color="#2563EB" />
+              <Text style={{ color: '#2563EB', fontSize: 13, fontWeight: '700' }}>
                 {testingEmail ? 'Sending...' : 'Send Test Email'}
               </Text>
             </TouchableOpacity>
@@ -2118,11 +2081,6 @@ export default function ITAdminDashboard() {
               </Text>
             </TouchableOpacity>
           </View>
-          {emailFields.mail_mailer === 'log' && (
-            <Text style={{ textAlign: 'center', color: '#94A3B8', fontSize: 11 }}>
-              Switch to Live (SMTP) mode above to enable the Send Test Email button.
-            </Text>
-          )}
         </View>
       )}
 
