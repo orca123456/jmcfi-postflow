@@ -591,23 +591,18 @@ class PostRequestController extends Controller
 
         $query = PostRequest::query();
 
-        if (in_array($role, ['content_requestor', 'requestor'])) {
+        if ($role === 'requestor') {
             $query->where('requestor_id', $user->id);
-        } elseif (in_array($role, ['vice_president', 'imc_qa_checker', 'president'])) {
-            $query->where(function ($q) use ($user) {
-                $q->whereNotIn('status', ['draft', 'returned_for_revision', 'rejected'])
-                  ->orWhereHas('approvalWorkflows', function ($aw) use ($user) {
-                      $aw->where('approver_id', $user->id)
-                         ->whereIn('action', ['rejected', 'returned_for_revision']);
-                  });
-            });
-        } elseif ($role === 'office_head') {
-            $query->whereNotIn('status', ['draft']);
-        } elseif (in_array($role, ['it_admin', 'it_publisher'])) {
-            $query->whereIn('status', [
-                PostRequest::STATUS_APPROVED,
-                PostRequest::STATUS_SCHEDULED,
-            ]);
+        } elseif ($role === 'approver') {
+            if (in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication'])) {
+                $query->whereNotIn('status', ['draft']);
+            } else {
+                $query->whereHas('requestor', function ($q) use ($user) {
+                    $q->where('department', $user->department);
+                })->whereNotIn('status', ['draft']);
+            }
+        } elseif ($role === 'admin') {
+            // Admin sees all
         }
         // Admin sees all
 
@@ -620,18 +615,19 @@ class PostRequestController extends Controller
         $totalSubmissions = (clone $query)->count();
         $draftCount = (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count();
         
-        $stageMap = [
-            'office_head' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
-            'vice_president' => PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-            'president' => PostRequest::STATUS_PENDING_PRESIDENT,
-            'imc_qa_checker' => PostRequest::STATUS_PENDING_IMC_QA,
-        ];
-
-        if (isset($stageMap[$role])) {
-            $pendingCount = (clone $query)->where('status', $stageMap[$role])->count();
+        if ($role === 'approver') {
+            if ($user->department === 'Vice President of Academic Affairs') {
+                $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT)->count();
+            } elseif ($user->department === 'Institutional Marketing Communication') {
+                $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_IMC_QA)->count();
+            } else {
+                $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD)->count();
+            }
+            
             $approvedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
                 $aw->where('approver_id', $user->id)->where('action', 'approved');
             })->count();
+            
             $rejectedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
                 $aw->where('approver_id', $user->id)->whereIn('action', ['rejected', 'returned_for_revision']);
             })->count();
