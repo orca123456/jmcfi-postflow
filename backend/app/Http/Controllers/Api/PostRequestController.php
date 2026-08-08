@@ -78,9 +78,30 @@ class PostRequestController extends Controller
             $role = $user->getRoleNames()->first();
 
             if ($role === 'approver') {
-                if (in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication'])) {
-                    // VPAA and IMC can see all college department requests (not restricted to their own)
-                    $query->whereNotIn('status', ['draft']);
+                if ($user->department === 'Vice President of Academic Affairs') {
+                    // VPAA should only see posts that have reached them or passed them
+                    $query->whereIn('status', [
+                        PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+                        PostRequest::STATUS_PENDING_PRESIDENT,
+                        PostRequest::STATUS_PENDING_IMC_QA,
+                        PostRequest::STATUS_APPROVED,
+                        PostRequest::STATUS_SCHEDULED,
+                        PostRequest::STATUS_PUBLISHED,
+                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_REJECTED,
+                        PostRequest::STATUS_RETURNED_FOR_REVISION
+                    ]);
+                } elseif ($user->department === 'Institutional Marketing Communication') {
+                    // IMC should only see posts that have reached them or passed them
+                    $query->whereIn('status', [
+                        PostRequest::STATUS_PENDING_IMC_QA,
+                        PostRequest::STATUS_APPROVED,
+                        PostRequest::STATUS_SCHEDULED,
+                        PostRequest::STATUS_PUBLISHED,
+                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_REJECTED,
+                        PostRequest::STATUS_RETURNED_FOR_REVISION
+                    ]);
                 } else {
                     // Regular department head approvers only show posts from the same department
                     $query->whereHas('requestor', function ($q) use ($user) {
@@ -341,6 +362,16 @@ class PostRequestController extends Controller
         $user = $request->user();
 
         if (!$postRequest->canBeApprovedBy($user)) {
+            $currentStage = $postRequest->currentApprovalStage();
+            if ($currentStage) {
+                if ($currentStage->stage === 'office_head' && $user->department === 'Vice President of Academic Affairs') {
+                    return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
+                }
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && $user->department === 'Institutional Marketing Communication') {
+                    $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
+                    return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
+                }
+            }
             return response()->json(['message' => 'Unauthorized to approve this post'], 403);
         }
 
@@ -409,6 +440,16 @@ class PostRequestController extends Controller
         $user = $request->user();
 
         if (!$postRequest->canBeApprovedBy($user)) {
+            $currentStage = $postRequest->currentApprovalStage();
+            if ($currentStage) {
+                if ($currentStage->stage === 'office_head' && $user->department === 'Vice President of Academic Affairs') {
+                    return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
+                }
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && $user->department === 'Institutional Marketing Communication') {
+                    $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
+                    return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
+                }
+            }
             return response()->json(['message' => 'Unauthorized to reject this post'], 403);
         }
 
@@ -466,6 +507,16 @@ class PostRequestController extends Controller
         $user = $request->user();
 
         if (!$postRequest->canBeApprovedBy($user)) {
+            $currentStage = $postRequest->currentApprovalStage();
+            if ($currentStage) {
+                if ($currentStage->stage === 'office_head' && $user->department === 'Vice President of Academic Affairs') {
+                    return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
+                }
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && $user->department === 'Institutional Marketing Communication') {
+                    $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
+                    return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
+                }
+            }
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
