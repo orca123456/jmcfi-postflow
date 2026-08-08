@@ -19,7 +19,6 @@ import {
   Platform,
   Animated,
   Alert,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
