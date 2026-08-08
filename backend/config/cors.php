@@ -28,7 +28,11 @@ return [
         'http://127.0.0.1:8000',
     ],
 
-    'allowed_origins_patterns' => ['#^http://localhost(:\d+)?$#', '#^http://127\.0\.0\.1(:\d+)?$#'],
+    'allowed_origins_patterns' => [
+        '#^http://localhost(:\d+)?$#', 
+        '#^http://127\.0\.0\.1(:\d+)?$#',
+        '#^http://192\.168\.\d+\.\d+(:\d+)?$#' // Allow local network devices
+    ],
 
     'allowed_headers' => ['*'],
 
