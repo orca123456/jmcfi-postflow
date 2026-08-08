@@ -93,7 +93,7 @@ const DEFAULT_SECTIONS: PolicySection[] = [
       { title: 'Academic Misconduct', desc: 'Cheating guides, answer keys, or plagiarism.' },
       { title: 'Inappropriate Material', desc: 'Bullying, hate speech, explicit content, or harassment.' },
       { title: 'Commercial/Political', desc: 'Unauthorized ads, personal fundraising, or political endorsements.' },
-      { title: 'Privacy Breach', desc: 'Publishing student grades, private addresses, or administrative records.' },
+      { title: 'Privacy Breach', desc: 'Publishing student grades, private addresses, or administrative data.' },
     ],
   },
   {
@@ -102,6 +102,7 @@ const DEFAULT_SECTIONS: PolicySection[] = [
     icon: 'copy-outline',
     bg: '#FEF3C7',
     color: '#D97706',
+    content: 'Respect copyright laws. Use licensed or original content only and give proper attribution.',
     bullets: [
       { title: 'Ownership rights', desc: 'Posters must own the rights to content or have written permission.' },
       { title: 'Student Work', desc: 'Showcasing student work requires proper consent (see Section 3).' },

@@ -21,7 +21,7 @@ class ApprovalWorkflowService
         ];
 
         foreach ($stages as $index => $stage) {
-            $approver = $this->getApproverForStage($stage['stage']);
+            $approver = $this->getApproverForStage($stage['stage'], $postRequest);
             
             if ($approver) {
                 $postRequest->approvalWorkflows()->create([
@@ -34,28 +34,39 @@ class ApprovalWorkflowService
         }
     }
 
-    public function getApproverForStage(string $stage): ?User
+    public function getApproverForStage(string $stage, ?PostRequest $postRequest = null): ?User
     {
-        $roleMap = [
-            'office_head' => 'office_head',
-            'vice_president' => 'vice_president',
-            'imc_qa' => 'imc_qa_checker',
-            'it_publisher' => 'it_publisher',
+        $departmentMap = [
+            'vice_president' => 'Vice President of Academic Affairs',
+            'imc_qa' => 'Institutional Marketing Communication',
         ];
 
-        $role = $roleMap[$stage] ?? null;
-        
-        if (!$role) {
-            return null;
-        }
-
         try {
-            // Get the first active user with this role
-            return User::role($role)
-                ->where('status', 'active')
-                ->first();
-        } catch (RoleDoesNotExist $e) {
-            Log::warning("Role '{$role}' does not exist in the database. Skipping approver assignment for stage: {$stage}");
+            if ($stage === 'office_head') {
+                // For office_head stage, find an approver in the same department as the requestor
+                $requestorDept = $postRequest?->requestor?->department;
+                if (!$requestorDept) {
+                    return null;
+                }
+                return User::whereHas('roles', function ($query) {
+                    $query->where('name', 'approver');
+                })->where('department', $requestorDept)
+                  ->where('status', 'active')
+                  ->first();
+            }
+
+            $department = $departmentMap[$stage] ?? null;
+            if (!$department) {
+                return null;
+            }
+
+            return User::whereHas('roles', function ($query) {
+                $query->where('name', 'approver');
+            })->where('department', $department)
+              ->where('status', 'active')
+              ->first();
+        } catch (\Exception $e) {
+            Log::warning("Failed to get approver for stage: {$stage}. Error: " . $e->getMessage());
             return null;
         }
     }
@@ -91,15 +102,17 @@ class ApprovalWorkflowService
     public function notifyITPublisher(PostRequest $postRequest): void
     {
         try {
-            $publisher = User::role('it_publisher')
-                ->where('status', 'active')
-                ->first();
+            $publisher = User::whereHas('roles', function ($query) {
+                $query->where('name', 'admin');
+            })->where('department', 'Information Technology Office')
+              ->where('status', 'active')
+              ->first();
 
             if ($publisher) {
                 $publisher->notify(new \App\Notifications\PostReadyForPublishingNotification($postRequest));
             }
-        } catch (RoleDoesNotExist $e) {
-            Log::warning("Role 'it_publisher' does not exist in the database. Skipping publisher notification.");
+        } catch (\Exception $e) {
+            Log::warning("Failed to notify IT publisher. Error: " . $e->getMessage());
         }
     }
 

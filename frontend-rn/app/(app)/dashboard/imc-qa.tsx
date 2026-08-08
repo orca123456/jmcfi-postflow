@@ -9,14 +9,17 @@ import {
   ScrollView,
   Modal,
   Image,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
+import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
+import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, dashboardApi, authApi } from '../../../services/api';
 
 export default function ImcQaDashboard() {
@@ -53,6 +56,7 @@ export default function ImcQaDashboard() {
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
@@ -81,9 +85,16 @@ export default function ImcQaDashboard() {
     try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch {} finally { setUploadingPhoto(false); }
   };
   const handleSaveDetails = async () => {
-    const p = acctFullName.trim().split(' ');
+    const parts = acctFullName.trim().split(' ');
+    const first_name = parts[0] || ''; const last_name = parts.slice(1).join(' ') || '';
     setSavingAcct(true);
-    try { await authApi.updateProfile({ first_name: p[0] || '', last_name: p.slice(1).join(' ') || '' }); alert('Profile updated!'); } catch {}
+    try { 
+      await authApi.updateProfile({ first_name, last_name }); 
+      if (user) {
+        await useAuthStore.getState().setUser({ ...user, first_name, last_name, name: `${first_name} ${last_name}` });
+      }
+      alert('Profile updated!'); 
+    } catch (e: any) { alert('Failed.'); }
     finally { setSavingAcct(false); }
   };
   const handleChangePw = async () => {
@@ -96,6 +107,7 @@ export default function ImcQaDashboard() {
   };
 
   const loadData = async () => {
+    setIsInitialLoading(true);
     try {
       const [postsRes, statsRes] = await Promise.all([
         postsApi.list(),
@@ -129,7 +141,9 @@ export default function ImcQaDashboard() {
       setApprovedRequests(mapped.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
       setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load data', err);
+    } finally {
+      setIsInitialLoading(false);
     }
   };
 
@@ -201,6 +215,13 @@ export default function ImcQaDashboard() {
     return matchesDept && matchesSearch;
   });
 
+  const computedStats = React.useMemo(() => ({
+    pending: requestsList.length,
+    approved: approvedRequests.length,
+    rejected: rejectedRequests.length,
+    total: requestsList.length + approvedRequests.length + rejectedRequests.length
+  }), [requestsList, approvedRequests, rejectedRequests]);
+
   const isLargeScreen = width > 1024;
 
   return (
@@ -208,9 +229,13 @@ export default function ImcQaDashboard() {
       title="IMC/QA — Institutional Quality Review"
       activeTab={activeTab}
       onTabChange={setActiveTab}
+      backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
     >
+      {/* ── LOADING SKELETON ── */}
+      {isInitialLoading && <DashboardSkeleton />}
+
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected') && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
@@ -225,55 +250,63 @@ export default function ImcQaDashboard() {
           )}
 
           {/* Metric Summary Cards Row */}
-          {activeTab === 'dashboard' && (
+          {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
             <View style={styles.metricsGrid}>
               {/* Card 1: For Quality Review */}
-              <Card style={styles.metricCard}>
-                <View style={styles.metricCardHeader}>
-                  <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
-                    <Ionicons name="shield-checkmark" size={20} color="#1E40AF" />
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
+                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                  <View style={styles.metricCardHeader}>
+                    <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
+                      <Ionicons name="shield-checkmark" size={20} color="#1E40AF" />
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.metricLabel}>For Quality Review</Text>
-                <Text style={styles.metricCount}>{stats ? stats.pending : 0}</Text>
-                <Text style={styles.metricSubtext}>Requests awaiting QA clearance</Text>
-              </Card>
+                  <Text style={styles.metricLabel}>For Quality Review</Text>
+                  <Text style={styles.metricCount}>{computedStats.pending}</Text>
+                  <Text style={styles.metricSubtext}>Requests awaiting QA clearance</Text>
+                </Card>
+              </TouchableOpacity>
 
               {/* Card 2: Approved */}
-              <Card style={styles.metricCard}>
-                <View style={styles.metricCardHeader}>
-                  <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
-                    <Ionicons name="checkmark-circle" size={20} color="#047857" />
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
+                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                  <View style={styles.metricCardHeader}>
+                    <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
+                      <Ionicons name="checkmark-circle" size={20} color="#047857" />
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.metricLabel}>Approved</Text>
-                <Text style={styles.metricCount}>{stats ? stats.approved : 0}</Text>
-                <Text style={styles.metricSubtext}>Requests approved by QA</Text>
-              </Card>
+                  <Text style={styles.metricLabel}>Approved</Text>
+                  <Text style={styles.metricCount}>{computedStats.approved}</Text>
+                  <Text style={styles.metricSubtext}>Requests approved by QA</Text>
+                </Card>
+              </TouchableOpacity>
 
               {/* Card 3: Rejected */}
-              <Card style={styles.metricCard}>
-                <View style={styles.metricCardHeader}>
-                  <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
-                    <Ionicons name="close-circle" size={20} color="#B91C1C" />
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
+                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                  <View style={styles.metricCardHeader}>
+                    <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
+                      <Ionicons name="close-circle" size={20} color="#B91C1C" />
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.metricLabel}>Rejected</Text>
-                <Text style={styles.metricCount}>{stats ? (stats.rejected) : 0}</Text>
-                <Text style={styles.metricSubtext}>Requests rejected</Text>
-              </Card>
+                  <Text style={styles.metricLabel}>Rejected</Text>
+                  <Text style={styles.metricCount}>{computedStats.rejected}</Text>
+                  <Text style={styles.metricSubtext}>Requests rejected</Text>
+                </Card>
+              </TouchableOpacity>
 
-              {/* Card 4: Published */}
-              <Card style={styles.metricCard}>
-                <View style={styles.metricCardHeader}>
-                  <View style={[styles.metricIconBg, { backgroundColor: '#F0FDFA' }]}>
-                    <Ionicons name="send" size={20} color="#0D9488" />
+              {/* Card 4: Total Requests */}
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
+                <Card style={styles.metricCard}>
+                  <View style={styles.metricCardHeader}>
+                    <View style={[styles.metricIconBg, { backgroundColor: '#F0FDFA' }]}>
+                      <Ionicons name="send" size={20} color="#0D9488" />
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.metricLabel}>Total Requests</Text>
-                <Text style={styles.metricCount}>{stats ? stats.total : 0}</Text>
-                <Text style={styles.metricSubtext}>Cleared & published content</Text>
-              </Card>
+                  <Text style={styles.metricLabel}>Total Requests</Text>
+                  <Text style={styles.metricCount}>{computedStats.total}</Text>
+                  <Text style={styles.metricSubtext}>All requests</Text>
+                </Card>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -474,83 +507,12 @@ export default function ImcQaDashboard() {
       )}
 
       {/* ----------------- POLICY RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && (() => {
-        const filteredSections = policySections.filter((sec) => {
-          const query = policySearchQuery.toLowerCase();
-          if (!query) return true;
-          return (
-            sec.title.toLowerCase().includes(query) ||
-            sec.content?.toLowerCase().includes(query) ||
-            sec.bullets?.some(
-              (b) =>
-                b.title.toLowerCase().includes(query) ||
-                b.desc.toLowerCase().includes(query)
-            )
-          );
-        });
-
-        return (
-          <View style={styles.dashboardContainer}>
-            <View style={styles.dashboardHeaderRow}>
-              <View>
-                <Text style={styles.greetingTitle}>School Website Posting Policy</Text>
-                <Text style={styles.greetingSubtitle}>
-                  Effective Date: {effectiveDate} &bull; Last Updated: {lastUpdatedDate}
-                </Text>
-              </View>
-
-              <View style={[styles.searchBox, { minWidth: 260 }]}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search policy guidelines..."
-                  value={policySearchQuery}
-                  onChangeText={setPolicySearchQuery}
-                />
-                <Ionicons name="search" size={16} color={Colors.textSecondary} />
-              </View>
-            </View>
-
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              {isLargeScreen && (
-                <View style={styles.policySidebar}>
-                  <Text style={styles.policySidebarTitle}>POLICY SECTIONS</Text>
-                  {policySections.map((sec) => (
-                    <TouchableOpacity
-                      key={sec.id}
-                      style={styles.policySidebarItem}
-                      onPress={() => alert(`Navigating to ${sec.title}`)}
-                    >
-                      <Text style={styles.policySidebarItemText}>{sec.title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              <View style={styles.policyContentArea}>
-                {filteredSections.map((sec) => (
-                  <Card key={sec.id} style={styles.policyCard}>
-                    <Text style={styles.policyCardTitle}>{sec.title}</Text>
-                    {sec.content && <Text style={styles.policyContentText}>{sec.content}</Text>}
-                    {sec.bullets && (
-                      <View style={{ gap: 8, marginTop: 8 }}>
-                        {sec.bullets.map((bullet, bIdx) => (
-                          <View key={bIdx} style={styles.bulletRow}>
-                            <Text style={styles.bulletTitle}>{bullet.title}: </Text>
-                            <Text style={styles.bulletDesc}>{bullet.desc}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </Card>
-                ))}
-              </View>
-            </View>
-          </View>
-        );
-      })()}
+      {activeTab === 'policy-rules' && !isInitialLoading && (
+        <PolicyRulesView accentColor="#1E40AF" />
+      )}
 
       {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && (
+      {activeTab === 'account-settings' && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>
@@ -716,43 +678,96 @@ export default function ImcQaDashboard() {
                     </View>
 
                     {/* Interactive Mockup Container */}
-                    <View style={styles.socialMockupCard}>
-                      <View style={styles.socialHeader}>
-                        <View style={styles.socialAvatar}>
-                          <Ionicons name="school" size={18} color="#FFFFFF" />
+                    {modalPlatformTab === 'facebook' && (
+                      <View style={styles.socialMockupCard}>
+                        <View style={styles.socialHeader}>
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF' }]} resizeMode="contain" />
+                          <View>
+                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation, Inc.</Text>
+                            <Text style={styles.socialTimeText}>Sponsored &bull; Public</Text>
+                          </View>
                         </View>
-                        <View>
-                          <Text style={styles.socialAuthorName}>Jose Maria College Foundation, Inc.</Text>
-                          <Text style={styles.socialTimeText}>Sponsored &bull; Public</Text>
+
+                        <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
+
+                        {selectedRequest.thumbnailUrl ? (
+                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                        ) : (
+                          <View style={styles.socialMediaBanner}>
+                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                            <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                          </View>
+                        )}
+
+                        <View style={styles.socialFooterActions}>
+                          <View style={styles.socialActionBtn}>
+                            <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
+                            <Text style={styles.socialActionText}>Like</Text>
+                          </View>
+                          <View style={styles.socialActionBtn}>
+                            <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
+                            <Text style={styles.socialActionText}>Comment</Text>
+                          </View>
+                          <View style={styles.socialActionBtn}>
+                            <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
+                            <Text style={styles.socialActionText}>Share</Text>
+                          </View>
                         </View>
                       </View>
+                    )}
 
-                      <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
+                    {modalPlatformTab === 'instagram' && (
+                      <View style={styles.socialMockupCard}>
+                        <View style={styles.socialHeader}>
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>jmcfi_official</Text>
+                          </View>
+                          <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                        </View>
 
-                      {selectedRequest.thumbnailUrl ? (
-                        <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
-                      ) : (
-                        <View style={styles.socialMediaBanner}>
-                          <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                          <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                        </View>
-                      )}
+                        {selectedRequest.thumbnailUrl ? (
+                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                        ) : (
+                          <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
+                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                            <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                          </View>
+                        )}
 
-                      <View style={styles.socialFooterActions}>
-                        <View style={styles.socialActionBtn}>
-                          <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
-                          <Text style={styles.socialActionText}>Like</Text>
-                        </View>
-                        <View style={styles.socialActionBtn}>
-                          <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
-                          <Text style={styles.socialActionText}>Comment</Text>
-                        </View>
-                        <View style={styles.socialActionBtn}>
-                          <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
-                          <Text style={styles.socialActionText}>Share</Text>
+                        <View style={{ padding: 12 }}>
+                          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+                            <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
+                            <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
+                            <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
+                          </View>
+                          <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
+                          <Text style={styles.socialCaptionText}>
+                            <Text style={{ fontWeight: 'bold' }}>jmcfi_official </Text>
+                            {selectedRequest.caption}
+                          </Text>
                         </View>
                       </View>
-                    </View>
+                    )}
+
+                    {modalPlatformTab === 'website' && (
+                      <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
+                        {selectedRequest.thumbnailUrl ? (
+                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                        ) : (
+                          <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
+                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                            <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                          </View>
+                        )}
+                        <View style={{ padding: 16 }}>
+                          <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
+                          <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedRequest.title}</Text>
+                          <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedRequest.date}</Text>
+                          <Text style={[styles.socialCaptionText, { fontSize: 14, lineHeight: 22 }]}>{selectedRequest.caption}</Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
 
                   {/* Right Side: Request Details Metadata */}
@@ -1014,7 +1029,7 @@ const styles = StyleSheet.create({
     minWidth: 200,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#F3F4F6',
   },
@@ -1047,7 +1062,7 @@ const styles = StyleSheet.create({
 
   // Main Table Card
   tableCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
@@ -1212,7 +1227,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderRadius: BorderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1327,7 +1342,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 780,
     maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1417,7 +1432,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
   },
   socialHeader: {
     flexDirection: 'row',
@@ -1581,7 +1596,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
   },
   btnModalCloseText: {
     fontSize: FontSize.xs + 1,
@@ -1766,7 +1781,7 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     color: '#111827',
   },
 });

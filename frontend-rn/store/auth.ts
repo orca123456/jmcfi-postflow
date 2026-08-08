@@ -12,6 +12,7 @@ export interface AuthUser {
   email: string;
   role: string;
   department?: string;
+  position?: string;
   photo_url?: string;
 }
 
@@ -25,6 +26,7 @@ interface AuthStore {
   logout: () => Promise<void>;
   loadFromStorage: () => Promise<void>;
   clearError: () => void;
+  setUser: (user: AuthUser) => Promise<void>;
 }
 
 // Cross-platform storage helpers
@@ -68,8 +70,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           // Normalize role names from DB to frontend expectations
           const roleMap: Record<string, string> = {
             'content_requestor': 'requestor',
-            'it_admin': 'it_publisher',
-            'admin': 'it_publisher',
+            'it_admin': 'admin',
+            'it_publisher': 'admin',
+            'office_head': 'approver',
+            'vice_president': 'approver',
+            'imc_qa_checker': 'approver',
           };
           const rawRole = user.roles[0];
           user.role = roleMap[rawRole] ?? rawRole;
@@ -111,8 +116,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         // Normalize role names for backward compatibility with stored data
         const roleMap: Record<string, string> = {
           'content_requestor': 'requestor',
-          'it_admin': 'it_publisher',
-          'admin': 'it_publisher',
+          'it_admin': 'admin',
+          'it_publisher': 'admin',
+          'office_head': 'approver',
+          'vice_president': 'approver',
+          'imc_qa_checker': 'approver',
         };
         if (user.role) {
           user.role = roleMap[user.role] ?? user.role;
@@ -123,24 +131,34 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  setUser: async (user: AuthUser) => {
+    await storage.set('auth_user', JSON.stringify(user));
+    set({ user });
+  },
 }));
 
 // Role helper
 export const getRoleDashboardPath = (role: string): string => {
   const map: Record<string, string> = {
     requestor: '/dashboard/requestor',
+    approver: '/dashboard/office-head',
+    admin: '/dashboard/it-admin',
+    // Legacy fallbacks
     office_head: '/dashboard/office-head',
     vice_president: '/dashboard/vp',
     imc_qa_checker: '/dashboard/imc-qa',
     it_publisher: '/dashboard/it-admin',
-    admin: '/dashboard/it-admin',
   };
   return map[role] ?? '/dashboard/requestor';
 };
 
 export const getRoleLabel = (role: string): string => {
   const labels: Record<string, string> = {
-    requestor: 'Content Requestor',
+    requestor: 'Requestor',
+    approver: 'Approver',
+    admin: 'Administrator',
+    // Legacy
     office_head: 'Office Head',
     vice_president: 'Vice President',
     imc_qa_checker: 'IMC/QA Checker',
@@ -152,6 +170,9 @@ export const getRoleLabel = (role: string): string => {
 export const getRoleColor = (role: string): string => {
   const colors: Record<string, string> = {
     requestor: '#2563EB',
+    approver: '#D97706',
+    admin: '#0F172A',
+    // Legacy
     office_head: '#D97706',
     vice_president: '#DC2626',
     imc_qa_checker: '#7C3AED',

@@ -9,9 +9,12 @@ use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
+    // Only these 3 roles are allowed in the system
+    const ALLOWED_ROLES = ['requestor', 'approver', 'admin'];
+
     public function index(): JsonResponse
     {
-        $roles = Role::orderBy('display_name')->get();
+        $roles = Role::whereIn('name', self::ALLOWED_ROLES)->orderBy('display_name')->get();
         return response()->json([
             'data' => $roles->map(fn($r) => [
                 'id' => $r->id,
@@ -25,30 +28,11 @@ class RoleController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:100|unique:roles,name',
-            'display_name' => 'required|string|max:200',
-            'description' => 'nullable|string|max:500',
-        ]);
-
-        $role = Role::create([
-            'name' => $validated['name'],
-            'guard_name' => 'web',
-            'display_name' => $validated['display_name'],
-            'description' => $validated['description'] ?? null,
-            'permissions' => [],
-        ]);
-
-        return response()->json([
-            'data' => $role,
-        ], 201);
+        return response()->json(['message' => 'Roles are fixed and cannot be added.'], 403);
     }
 
     public function destroy(Role $role): JsonResponse
     {
-
-
-        $role->delete();
-        return response()->json(null, 204);
+        return response()->json(['message' => 'Roles are fixed and cannot be deleted.'], 403);
     }
 }

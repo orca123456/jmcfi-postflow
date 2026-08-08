@@ -37,8 +37,28 @@ class UserController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8',
             'department' => 'nullable|string|max:255',
+            'position' => 'nullable|string|max:255',
             'role' => 'required|string|exists:roles,name',
         ]);
+
+        // Auto-set position based on role + department
+        $dept = $validated['department'] ?? null;
+        $role = $validated['role'];
+        $FIXED_DEPTS = ['Information Technology Office', 'Vice President of Academic Affairs', 'Institutional Marketing Communication'];
+        $position = $validated['position'] ?? null;
+        if (!$position) {
+            if ($role === 'approver') {
+                if ($dept === 'Institutional Marketing Communication') {
+                    $position = 'QA / Branding Checker';
+                } elseif ($dept === 'Vice President of Academic Affairs') {
+                    $position = 'Vice President';
+                } elseif ($dept && !in_array($dept, $FIXED_DEPTS)) {
+                    $position = 'Department Head';
+                }
+            } elseif ($role === 'admin') {
+                $position = 'IT Administrator';
+            }
+        }
 
         $user = User::create([
             'employee_id' => $validated['employee_id'],
@@ -46,8 +66,9 @@ class UserController extends Controller
             'middle_name' => $validated['middle_name'] ?? null,
             'last_name' => $validated['last_name'],
             'email' => $validated['email'],
-            'password' => $validated['password'], // Hashed automatically by model's 'hashed' cast
-            'department' => $validated['department'] ?? null,
+            'password' => $validated['password'],
+            'department' => $dept,
+            'position' => $position,
             'status' => 'active',
         ]);
 
@@ -109,7 +130,7 @@ class UserController extends Controller
     public function destroy(User $user): JsonResponse
     {
         // Don't allow user to delete themselves
-        if (auth()->id() === $user->id) {
+        if (request()->user()->id === $user->id) {
             return response()->json(['message' => 'Cannot delete your own account'], 400);
         }
 

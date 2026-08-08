@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Log;
 
 class PostRequest extends Model
 {
@@ -174,27 +175,37 @@ class PostRequest extends Model
     public function canBeApprovedBy(User $user): bool
     {
         $currentStage = $this->currentApprovalStage();
-        \Log::info("canBeApprovedBy called for Post ID: {$this->id} by User ID: {$user->id}");
+        Log::info("canBeApprovedBy called for Post ID: {$this->id} by User ID: {$user->id}");
         if (!$currentStage) {
-            \Log::info("No current stage found!");
+            Log::info("No current stage found!");
             return false;
         }
 
-        \Log::info("Current stage is: {$currentStage->stage}");
+        Log::info("Current stage is: {$currentStage->stage}");
 
-        $requiredRole = match ($currentStage->stage) {
-            'office_head' => 'office_head',
-            'vice_president' => 'vice_president',
-            'president' => 'president',
-            'imc_qa' => 'imc_qa_checker',
-            'it_publisher' => 'it_publisher',
-            default => null,
+        // Admin can always approve
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        // Must have the 'approver' role
+        if (!$user->hasRole('approver')) {
+            Log::info("User does not have 'approver' role");
+            return false;
+        }
+
+        // Match approval stage to the user's department
+        $canApprove = match ($currentStage->stage) {
+            'office_head' => !in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication', 'Information Technology Office'])
+                && $user->department === $this->requestor?->department,
+            'vice_president' => $user->department === 'Vice President of Academic Affairs',
+            'imc_qa' => $user->department === 'Institutional Marketing Communication',
+            default => false,
         };
 
-        $hasRole = $requiredRole && $user->hasRole($requiredRole);
-        \Log::info("Required role: {$requiredRole}, Has role: " . ($hasRole ? 'Yes' : 'No'));
+        Log::info("User department: {$user->department}, Can approve: " . ($canApprove ? 'Yes' : 'No'));
 
-        return $hasRole;
+        return $canApprove;
     }
 
     public function getNextStage(): ?string

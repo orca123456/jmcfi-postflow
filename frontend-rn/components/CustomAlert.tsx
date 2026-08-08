@@ -48,8 +48,8 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
           <View style={styles.alertBox}>
             <Text style={styles.alertTitle}>JMCFI PostFlow</Text>
             <Text style={styles.alertMessage}>{alertConfig.message}</Text>
-            <TouchableOpacity 
-              style={styles.okButton} 
+            <TouchableOpacity
+              style={styles.okButton}
               onPress={() => setAlertConfig({ ...alertConfig, visible: false })}
             >
               <Text style={styles.okButtonText}>OK</Text>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   },
   alertMessage: {
     fontSize: 14,
-    color: Colors.text,
+    color: Colors.textPrimary,
     marginBottom: 24,
     lineHeight: 20,
   },

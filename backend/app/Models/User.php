@@ -27,7 +27,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'photo_path',
     ];
 
-    protected $appends = ['full_name', 'photo_url'];
+    protected $appends = ['full_name', 'photo_url', 'department_logo_url'];
 
     protected $hidden = [
         'password',
@@ -57,7 +57,19 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!$this->photo_path) {
             return null;
         }
-        return asset('storage/' . $this->photo_path);
+        $normalizedPath = str_replace('\\', '/', $this->photo_path);
+        return asset('storage/' . $normalizedPath);
+    }
+
+    public function getDepartmentLogoUrlAttribute(): ?string
+    {
+        if (!$this->department) {
+            return null;
+        }
+        $dept = \App\Models\Department::where('name', $this->department)
+                                      ->orWhere('display_name', $this->department)
+                                      ->first();
+        return $dept ? $dept->logo_url : null;
     }
 
     public function getDisplayNameAttribute(): string
