@@ -138,20 +138,22 @@ export default function OfficeHeadDashboard() {
 
       const mapped = posts.map(mapPost);
       
-      const userDept = user?.department || '';
-      let pendingStatus = 'PENDING_OFFICE_HEAD';
-      if (userDept === 'Vice President of Academic Affairs') pendingStatus = 'PENDING_VICE_PRESIDENT';
-      else if (userDept === 'Institutional Marketing Communication') pendingStatus = 'PENDING_IMC_QA';
+      let pendingStatuses: string[] = [];
+      let approvedStatuses: string[] = [];
 
-      if (userDept === 'Vice President of Academic Affairs' || userDept === 'Institutional Marketing Communication') {
-        // Global Approvers can see the entire active pipeline across all departments
-        setRequestsList(mapped.filter((p: any) => ['PENDING_OFFICE_HEAD', 'PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA'].includes(p.status)));
+      if (user?.department === 'Vice President of Academic Affairs') {
+        pendingStatuses = ['PENDING_OFFICE_HEAD', 'PENDING_VICE_PRESIDENT'];
+        approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
+      } else if (user?.department === 'Institutional Marketing Communication') {
+        pendingStatuses = ['PENDING_IMC_QA'];
+        approvedStatuses = ['APPROVED', 'SCHEDULED', 'PUBLISHED'];
       } else {
-        // Regular Dept Heads only see posts currently waiting for their approval
-        setRequestsList(mapped.filter((p: any) => p.status === pendingStatus));
+        pendingStatuses = ['PENDING_OFFICE_HEAD'];
+        approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
       }
 
-      setApprovedRequests(mapped.filter((p: any) => ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status)));
+      setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
       setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
     } catch (err) {
       console.error('Failed to load data', err);
