@@ -437,11 +437,14 @@ export function DashboardShell({
                     style={{ width: 40, height: 40, borderRadius: 20 }}
                     resizeMode="contain"
                   />
-                  {(isSidebarOpen || sidebarOpenedByHover) && (
-                    <View style={styles.sidebarHeader}>
-                      <Text style={[styles.sidebarTitle, { textAlign: 'center' }]} numberOfLines={2} adjustsFontSizeToFit>{finalDeptName}</Text>
-                    </View>
-                  )}
+                  <Animated.View style={[styles.sidebarHeader, {
+                    opacity: sidebarWidthAnim.interpolate({
+                      inputRange: [MIN_WIDTH, MAX_WIDTH],
+                      outputRange: [0, 1]
+                    })
+                  }]}>
+                    <Text style={[styles.sidebarTitle, { textAlign: 'left' }]} numberOfLines={2} adjustsFontSizeToFit>{finalDeptName}</Text>
+                  </Animated.View>
                 </View>
 
                 <View style={styles.sidebarDivider} />
@@ -811,7 +814,7 @@ const styles = StyleSheet.create({
   sidebarHeader: {
     flex: 1, // Fill remaining space
     justifyContent: 'center',
-    alignItems: 'center', // Center text horizontally within the remaining space
+    alignItems: 'flex-start',
   },
   sidebarTitle: {
     fontSize: 14, // Explicitly not too big
