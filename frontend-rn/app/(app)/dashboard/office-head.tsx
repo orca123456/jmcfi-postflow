@@ -56,7 +56,12 @@ export default function OfficeHeadDashboard() {
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<any>({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    total: 0
+  });
 
   const { data: postsQueryRes, isLoading: postsLoading, refetch: refetchPosts } = useQuery({
     queryKey: ['posts'],
@@ -120,8 +125,11 @@ export default function OfficeHeadDashboard() {
   };
 
   useEffect(() => {
-    if (postsQueryRes && statsQueryRes) {
-      const posts = postsQueryRes.data.data;
+    if (postsQueryRes?.data?.data && statsQueryRes?.data?.data) {
+      let posts = postsQueryRes.data.data;
+      if (posts && !Array.isArray(posts) && posts.data) {
+        posts = posts.data;
+      }
       setStats(statsQueryRes.data.data);
 
       const mapPost = (p: any) => ({
