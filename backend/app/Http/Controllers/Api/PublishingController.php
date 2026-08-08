@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PostRequest;
+use App\Models\User;
+use App\Notifications\PostPublishedSuccessNotification;
+use App\Notifications\PostPublishingFailedNotification;
 use App\Services\FacebookPublishingService;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Exception;
 
 class PublishingController extends Controller
@@ -76,25 +80,44 @@ class PublishingController extends Controller
                 "Published request \"{$post->title}\" to selected platforms.",
                 'INFO',
                 [
-                    'postId' => $post->id,
+                    'postId'    => $post->id,
                     'platforms' => $platforms,
-                    'results' => $publishResults
+                    'results'   => $publishResults
                 ]
             );
 
             DB::commit();
 
+            // Notify IT Admins of manual publish success
+            $itAdmins = User::whereHas('roles', fn($q) => $q->where('name', 'admin'))
+                ->where('status', 'active')->get();
+            if ($itAdmins->isNotEmpty()) {
+                Notification::send($itAdmins, new PostPublishedSuccessNotification($post, $publishResults));
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Post published successfully.',
-                'data' => [
-                    'post' => $post,
+                'data'    => [
+                    'post'    => $post,
                     'results' => $publishResults
                 ]
             ]);
 
         } catch (Exception $e) {
             DB::rollBack();
+
+            // Notify IT Admins of failure
+            try {
+                $itAdmins = User::whereHas('roles', fn($q) => $q->where('name', 'admin'))
+                    ->where('status', 'active')->get();
+                if ($itAdmins->isNotEmpty()) {
+                    Notification::send($itAdmins, new PostPublishingFailedNotification($post, $e->getMessage()));
+                }
+            } catch (Exception $notifyEx) {
+                \Illuminate\Support\Facades\Log::error('Failed to send failure notification: ' . $notifyEx->getMessage());
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to publish post: ' . $e->getMessage()

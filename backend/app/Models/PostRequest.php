@@ -24,6 +24,7 @@ class PostRequest extends Model
     public const STATUS_RETURNED_FOR_REVISION = 'returned_for_revision';
     public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_PUBLISHED = 'published';
+    public const STATUS_PUBLISH_FAILED = 'publish_failed';
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
