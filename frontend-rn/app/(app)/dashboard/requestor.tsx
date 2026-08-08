@@ -73,6 +73,8 @@ export default function RequestorDashboard() {
 
   // Dashboard Page State
   const [dashboardPage, setDashboardPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
@@ -597,11 +599,17 @@ export default function RequestorDashboard() {
             <View style={styles.tableHeaderArea}>
               <Text style={styles.tableCardTitle}>Recent Post Requests</Text>
               <View style={styles.tableHeaderActions}>
-                <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => alert('Sorting requests...')}>
-                  <Ionicons name="filter" size={16} color={Colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => alert('Exporting requests...')}>
-                  <Ionicons name="download" size={16} color={Colors.textSecondary} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 200, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                  <Ionicons name="search" size={16} color={Colors.textSecondary} />
+                  <TextInput
+                    style={{ flex: 1, marginLeft: 8, fontSize: 14, color: '#111827', ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
+                    placeholder="Search requests..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                </View>
+                <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
+                  <Ionicons name={sortOrder === 'desc' ? 'filter' : 'filter-outline'} size={16} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -616,7 +624,14 @@ export default function RequestorDashboard() {
                 <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
               </View>
 
-              {mockRequests.map((req) => (
+              {mockRequests
+                .filter(req => (req.title && req.title.toLowerCase().includes(searchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(searchQuery.toLowerCase())))
+                .sort((a, b) => {
+                  const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                  const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                  return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+                })
+                .map((req) => (
                 <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedRow(req)}>
                   <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
