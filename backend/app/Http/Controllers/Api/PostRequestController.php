@@ -57,34 +57,45 @@ class PostRequestController extends Controller
         if ($request->has('pending_approval') && $request->pending_approval) {
             $user = $request->user();
             $role = $user->getRoleNames()->first();
-            $stageMap = [
-                'office_head' => 'pending_office_head',
-                'vice_president' => 'pending_vice_president',
-                'president' => 'pending_president',
-                'imc_qa_checker' => 'pending_imc_qa',
-            ];
-            if (isset($stageMap[$role])) {
-                $query->where('status', $stageMap[$role]);
+            if ($role === 'approver') {
+                if ($user->department === 'Vice President of Academic Affairs') {
+                    $query->where('status', 'pending_vice_president');
+                } elseif ($user->department === 'Institutional Marketing Communication') {
+                    $query->where('status', 'pending_imc_qa');
+                } else {
+                    $query->where('status', 'pending_office_head')
+                          ->whereHas('requestor', function ($q) use ($user) {
+                              $q->where('department', $user->department);
+                          });
+                }
             }
         }
 
-        // Hide rejected/returned posts from VP and IMC, only Admin and Requestor see them
+        // For the new 'approver' role: always filter posts to their department only (unless viewing own requests)
         if (!$request->has('my_requests')) {
             $user = $request->user();
             $role = $user->getRoleNames()->first();
-            
-            if (in_array($role, ['vice_president', 'imc_qa_checker', 'president'])) {
-                $query->where(function ($q) use ($user) {
-                    $q->whereNotIn('status', ['draft', 'returned_for_revision', 'rejected'])
-                      ->orWhereHas('approvalWorkflows', function ($aw) use ($user) {
-                          $aw->where('approver_id', $user->id)
-                             ->whereIn('action', ['rejected', 'returned_for_revision']);
-                      });
+
+            if ($role === 'approver') {
+                if (in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication'])) {
+                    // VPAA and IMC can see all college department requests (not restricted to their own)
+                    $query->whereNotIn('status', ['draft']);
+                } else {
+                    // Regular department head approvers only show posts from the same department
+                    $query->whereHas('requestor', function ($q) use ($user) {
+                        $q->where('department', $user->department);
+                    })->whereNotIn('status', ['draft']);
+                }
+            } elseif ($role === 'requestor') {
+                // Requestors should only see requests from their own department when browsing general posts
+                $query->whereHas('requestor', function ($q) use ($user) {
+                    $q->where('department', $user->department);
                 });
-            } elseif ($role === 'office_head') {
-                $query->whereNotIn('status', ['draft']);
+            } elseif ($role === 'admin') {
+                // Admin sees everything — no filter
             }
         }
+
 
         // Sort
         $sortBy = $request->get('sort_by', 'created_at');
@@ -109,11 +120,15 @@ class PostRequestController extends Controller
     public function store(StorePostRequest $request): JsonResponse
     {
         return DB::transaction(function () use ($request) {
+            $categoryId = $request->category_id;
+            if (!$categoryId) {
+                $categoryId = \App\Models\PostCategory::where('is_active', true)->value('id');
+            }
             $post = PostRequest::create([
                 'title' => $request->title,
                 'slug' => Str::slug($request->title) . '-' . Str::random(6),
                 'caption_narrative' => $request->caption_narrative,
-                'category_id' => $request->category_id,
+                'category_id' => $categoryId,
                 'department_id' => $request->user()->id,
                 'requestor_id' => $request->user()->id,
                 'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
@@ -527,14 +542,33 @@ class PostRequestController extends Controller
 
         $totalSubmissions = (clone $query)->count();
         $draftCount = (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count();
-        $pendingCount = (clone $query)->whereIn('status', [
-            PostRequest::STATUS_PENDING_OFFICE_HEAD,
-            PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-            PostRequest::STATUS_PENDING_PRESIDENT,
-            PostRequest::STATUS_PENDING_IMC_QA,
-        ])->count();
-        $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
-        $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
+        
+        $stageMap = [
+            'office_head' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
+            'vice_president' => PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+            'president' => PostRequest::STATUS_PENDING_PRESIDENT,
+            'imc_qa_checker' => PostRequest::STATUS_PENDING_IMC_QA,
+        ];
+
+        if (isset($stageMap[$role])) {
+            $pendingCount = (clone $query)->where('status', $stageMap[$role])->count();
+            $approvedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
+                $aw->where('approver_id', $user->id)->where('action', 'approved');
+            })->count();
+            $rejectedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
+                $aw->where('approver_id', $user->id)->whereIn('action', ['rejected', 'returned_for_revision']);
+            })->count();
+        } else {
+            $pendingCount = (clone $query)->whereIn('status', [
+                PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+                PostRequest::STATUS_PENDING_PRESIDENT,
+                PostRequest::STATUS_PENDING_IMC_QA,
+            ])->count();
+            $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
+            $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
+        }
+
         $returnedCount = (clone $query)->where('status', PostRequest::STATUS_RETURNED_FOR_REVISION)->count();
         $scheduledCount = (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count();
         $publishedCount = (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count();
@@ -581,27 +615,33 @@ class PostRequestController extends Controller
         return response()->json(['data' => $stats]);
     }
 
-    private function canView(PostRequest $post, $user): bool
+    private function canView(PostRequest $post, \App\Models\User $user): bool
     {
         // Requestor can view their own
         if ($post->requestor_id === $user->id) {
             return true;
         }
 
-        // Approvers can view posts in their stage or later
         $role = $user->getRoleNames()->first();
-        $stageMap = [
-            'office_head' => ['pending_office_head', 'pending_vice_president', 'pending_president', 'pending_imc_qa', 'approved', 'scheduled', 'published'],
-            'vice_president' => ['pending_vice_president', 'pending_president', 'pending_imc_qa', 'approved', 'scheduled', 'published'],
-            'president' => ['pending_president', 'pending_imc_qa', 'approved', 'scheduled', 'published'],
-            'imc_qa_checker' => ['pending_imc_qa', 'approved', 'scheduled', 'published'],
-            'it_publisher' => ['approved', 'scheduled', 'published'],
-            'admin' => true, // admin sees all
-        ];
 
+        // Admin sees everything
         if ($role === 'admin') return true;
-        
-        return in_array($post->status, $stageMap[$role] ?? []);
+
+        // Approvers: VP and IMC can see all non-draft posts; dept heads can see their own department's posts
+        if ($role === 'approver') {
+            if (in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication'])) {
+                return $post->status !== 'draft';
+            }
+            // Regular dept head: can see posts from their own department
+            return $post->requestor?->department === $user->department && $post->status !== 'draft';
+        }
+
+        // Requestors: can see posts from their own department
+        if ($role === 'requestor') {
+            return $post->requestor?->department === $user->department;
+        }
+
+        return false;
     }
 
     private function getMediaType(string $mimeType): string
@@ -611,7 +651,7 @@ class PostRequestController extends Controller
         return 'document';
     }
 
-    private function recordAuditTrail(PostRequest $post, string $event, $user, ?string $remarks = null): void
+    private function recordAuditTrail(PostRequest $post, string $event, \App\Models\User $user, ?string $remarks = null): void
     {
         $post->auditTrails()->create([
             'user_id' => $user->id,
@@ -632,17 +672,15 @@ class PostRequestController extends Controller
     {
         Cache::forget('dashboard_recent_activity');
         Cache::forget('dashboard_analytics');
-        // Stats caches are per-user, so we clear by prefix pattern (flush all dashboard_stats_*)
-        // Redis: we can use tags if configured, otherwise iterate known roles or just flush by prefix
-        // Laravel's Cache::forget doesn't support wildcards, so we'll use the Redis facade directly
+        // Clear per-user dashboard stats caches using known key patterns
         try {
-            $keys = \Illuminate\Support\Facades\Redis::keys('dashboard_stats_*');
-            foreach ($keys as $key) {
-                \Illuminate\Support\Facades\Redis::del($key);
+            $userIds = \App\Models\User::pluck('id');
+            foreach ($userIds as $userId) {
+                Cache::forget("dashboard_stats_{$userId}");
             }
         } catch (\Exception $e) {
-            // If Redis is unavailable or keys() fails, fall back gracefully
-            logger()->warning('Failed to flush dashboard_stats_* cache keys: ' . $e->getMessage());
+            // If cache clearing fails, log and continue gracefully
+            logger()->warning('Failed to flush dashboard cache: ' . $e->getMessage());
         }
     }
 }

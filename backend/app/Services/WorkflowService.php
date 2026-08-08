@@ -16,23 +16,15 @@ class WorkflowService
 {
     public function initializeWorkflow(PostRequest $postRequest): void
     {
-        $stages = [
-            ['stage' => 'office_head', 'stage_order' => 1],
-            ['stage' => 'vice_president', 'stage_order' => 2],
-            ['stage' => 'imc_qa', 'stage_order' => 3],
-        ];
-
-        foreach ($stages as $index => $stage) {
-            $approver = $this->getApproverForStage($stage['stage']);
-            if ($approver) {
-                ApprovalWorkflow::create([
-                    'post_request_id' => $postRequest->id,
-                    'stage' => $stage['stage'],
-                    'approver_id' => $approver->id,
-                    'action' => 'pending',
-                    'stage_order' => $stage['stage_order'],
-                ]);
-            }
+        $approver = $this->getApproverForStage('office_head');
+        if ($approver) {
+            ApprovalWorkflow::create([
+                'post_request_id' => $postRequest->id,
+                'stage' => 'office_head',
+                'approver_id' => $approver->id,
+                'action' => 'pending',
+                'stage_order' => 1,
+            ]);
         }
     }
 
@@ -48,7 +40,9 @@ class WorkflowService
         if (!$role) return null;
 
         // Get first active user with this role
-        return User::role($role)->where('status', 'active')->first();
+        return User::whereHas('roles', function ($query) use ($role) {
+            $query->where('name', $role);
+        })->where('status', 'active')->first();
     }
 
     public function notifyApprovers(PostRequest $postRequest): void

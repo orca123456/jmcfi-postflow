@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class DepartmentController extends Controller
 {
@@ -20,7 +21,10 @@ class DepartmentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100|unique:departments,name',
+            'name' => [
+                'required', 'string', 'max:100',
+                \Illuminate\Validation\Rule::unique('departments')->whereNull('deleted_at')
+            ],
             'display_name' => 'required|string|max:200',
             'description' => 'nullable|string|max:500',
         ]);
@@ -40,7 +44,10 @@ class DepartmentController extends Controller
     public function update(Request $request, Department $department): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:100|unique:departments,name,' . $department->id,
+            'name' => [
+                'sometimes', 'string', 'max:100',
+                \Illuminate\Validation\Rule::unique('departments')->ignore($department->id)->whereNull('deleted_at')
+            ],
             'display_name' => 'sometimes|string|max:200',
             'description' => 'nullable|string|max:500',
             'is_active' => 'sometimes|boolean',
@@ -55,6 +62,15 @@ class DepartmentController extends Controller
 
     public function destroy(Department $department): JsonResponse
     {
+        $protected = [
+            'Information Technology Office', 
+            'Vice President of Academic Affairs', 
+            'Institutional Marketing Communication'
+        ];
+        if (in_array($department->name, $protected)) {
+            return response()->json(['message' => 'Cannot delete protected department.'], 403);
+        }
+
         $department->delete();
         return response()->json(null, 204);
     }
@@ -66,8 +82,8 @@ class DepartmentController extends Controller
         ]);
 
         // Delete old logo if exists
-        if ($department->logo_path && \Storage::disk('public')->exists($department->logo_path)) {
-            \Storage::disk('public')->delete($department->logo_path);
+        if ($department->logo_path && Storage::disk('public')->exists($department->logo_path)) {
+            Storage::disk('public')->delete($department->logo_path);
         }
 
         $path = $request->file('logo')->store('department-logos', 'public');
@@ -81,8 +97,8 @@ class DepartmentController extends Controller
 
     public function removeLogo(Department $department): JsonResponse
     {
-        if ($department->logo_path && \Storage::disk('public')->exists($department->logo_path)) {
-            \Storage::disk('public')->delete($department->logo_path);
+        if ($department->logo_path && Storage::disk('public')->exists($department->logo_path)) {
+            Storage::disk('public')->delete($department->logo_path);
         }
         $department->update(['logo_path' => null]);
 

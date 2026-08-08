@@ -1,22 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Animated, Easing, KeyboardAvoidingView, Platform, ScrollView,
-  Image, useWindowDimensions, TextInputProps
+  KeyboardAvoidingView, Platform, ScrollView,
+  Image, ImageBackground, Animated, TextInputProps, Easing, ViewStyle
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleDashboardPath } from '../../store/auth';
 
-// ── Floating Label Input Component ─────────────────────────────────────────
+// ── Floating Label Input Component (Facebook Style) ───────────────
 interface FloatingLabelProps extends TextInputProps {
   label: string;
   secureTextEntry?: boolean;
   rightIcon?: React.ReactNode;
+  containerStyle?: ViewStyle;
 }
 
 const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
-  ({ label, value, onChangeText, secureTextEntry, rightIcon, ...props }, ref) => {
+  ({ label, value, onChangeText, secureTextEntry, rightIcon, containerStyle, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isElevated, setIsElevated] = useState(!!value);
     const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
@@ -26,8 +27,8 @@ const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
       setIsElevated(true);
       Animated.timing(animatedValue, {
         toValue: 1,
-        duration: 180,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        duration: 150,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: false,
       }).start();
     }, [animatedValue]);
@@ -38,14 +39,13 @@ const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
         setIsElevated(false);
         Animated.timing(animatedValue, {
           toValue: 0,
-          duration: 180,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          duration: 150,
+          easing: Easing.in(Easing.ease),
           useNativeDriver: false,
         }).start();
       }
     }, [animatedValue, value]);
 
-    // Sync animation if value is set externally
     useEffect(() => {
       if (value && !isElevated) {
         setIsElevated(true);
@@ -55,132 +55,59 @@ const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
           useNativeDriver: false,
         }).start();
       }
-    }, [value, animatedValue, isElevated]);
+    }, [value, isElevated, animatedValue]);
 
     const labelStyle = {
       position: 'absolute' as const,
-      left: 14,
+      left: 16,
       top: animatedValue.interpolate({
         inputRange: [0, 1],
-        outputRange: [14, -8],
+        outputRange: [18, 6],
       }),
       fontSize: animatedValue.interpolate({
         inputRange: [0, 1],
-        outputRange: [16, 12],
+        outputRange: [15, 12],
       }),
-      color: animatedValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['#9CA3AF', isFocused ? '#4b0082' : '#6B7280'],
-      }),
-      backgroundColor: '#fff',
-      paddingHorizontal: 4,
-      zIndex: 2,
+      color: isFocused ? '#1877F2' : '#9CA3AF',
+      zIndex: 1,
     };
 
-    const borderColor = isFocused ? '#4b0082' : '#D1D5DB';
-
     return (
-      <View style={[styles.flContainer, { borderColor }]}>
+      <View style={[
+        styles.flContainer,
+        isFocused ? styles.flContainerFocused : undefined,
+        containerStyle
+      ]}>
         <Animated.Text style={labelStyle}>
           {label}
         </Animated.Text>
-        <TextInput
-          ref={ref}
-          style={styles.flInput}
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          secureTextEntry={secureTextEntry}
-          placeholder="" // placeholder is handled by floating label
-          {...props}
-        />
-        {rightIcon && (
-          <View style={styles.flRightIcon}>
-            {rightIcon}
-          </View>
-        )}
+        <View style={styles.flInputWrapper}>
+          <TextInput
+            ref={ref}
+            style={[
+              styles.flInput,
+              Platform.OS === 'web' && { outlineStyle: 'none' } as any
+            ]}
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            secureTextEntry={secureTextEntry}
+            placeholder=""
+            {...props}
+          />
+          {rightIcon && (
+            <View style={styles.flRightIcon}>
+              {rightIcon}
+            </View>
+          )}
+        </View>
       </View>
     );
   }
 );
-
 FloatingLabelInput.displayName = 'FloatingLabelInput';
-
-// ── End Floating Label ──────────────────────────────────────────────────────
-
-const ROLES = [
-  { label: 'Content Requestor', value: 'requestor', email: 'maria.delacruz@jmcfi.edu.ph' },
-  { label: 'Office Head', value: 'office_head', email: 'office.head@jmcfi.edu.ph' },
-  { label: 'Vice President', value: 'vp', email: 'vp@jmcfi.edu.ph' },
-  { label: 'IMC/QA Checker', value: 'imc_qa', email: 'imc.qa@jmcfi.edu.ph' },
-  { label: 'IT Admin (Publisher)', value: 'it_publisher', email: 'it.support@jmcfi.edu.ph' },
-];
-
-const AnimatedBackground = () => {
-  const { width, height } = useWindowDimensions();
-  const animValue1 = useRef(new Animated.Value(0)).current;
-  const animValue2 = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(animValue1, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(animValue1, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' })
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(animValue2, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(animValue2, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' })
-      ])
-    ).start();
-  }, []);
-
-  const offsetA = Math.min(width * 0.26, 160);
-  const offsetB = Math.min(width * 0.16, 105);
-
-  const translateA = animValue1.interpolate({ inputRange: [0, 1], outputRange: [0, offsetA] });
-  const translateB = animValue2.interpolate({ inputRange: [0, 1], outputRange: [0, -offsetB] });
-
-  return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F6F0FA', overflow: 'hidden' }]}>
-      <Animated.View style={{
-        position: 'absolute',
-        width: width * 0.7,
-        height: height * 0.42,
-        backgroundColor: 'rgba(143, 63, 255, 0.22)',
-        borderRadius: 90,
-        top: -height * 0.08,
-        left: -width * 0.08,
-        transform: [{ translateX: translateA }, { rotate: '18deg' }],
-      }} />
-
-      <Animated.View style={{
-        position: 'absolute',
-        width: width * 0.55,
-        height: height * 0.33,
-        backgroundColor: 'rgba(248, 196, 255, 0.28)',
-        borderRadius: 72,
-        top: height * 0.22,
-        right: -width * 0.08,
-        transform: [{ translateX: translateB }, { rotate: '-16deg' }],
-      }} />
-
-      <Animated.View style={{
-        position: 'absolute',
-        width: width * 0.46,
-        height: height * 0.2,
-        backgroundColor: 'rgba(255, 183, 65, 0.24)',
-        borderRadius: 64,
-        bottom: -height * 0.06,
-        left: width * 0.1,
-        transform: [{ translateX: translateA }, { rotate: '8deg' }],
-      }} />
-    </View>
-  );
-};
+// ─────────────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -190,12 +117,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   const handleLogin = async () => {
     setLoading(true);
-    
     const success = await login(email, password);
-    
     setLoading(false);
     
     if (success) {
@@ -217,27 +143,28 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <ImageBackground 
+      source={require('../../assets/images/jmcbg2.jpeg')}
+      style={styles.backgroundImage}
+      imageStyle={{ opacity: 0.9 }}
+      blurRadius={2}
     >
-      <AnimatedBackground />
-      
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Image
-            source={require('../../assets/images/jmc_logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <Text style={styles.headerTitle}>JMCFI POSTFLOW</Text>
-        </View>
-
-        <View style={styles.formbgOuter}>
-          <View style={styles.formbg}>
-            <View style={styles.formbgInner}>
-              <Text style={styles.subtitle}>Sign in to your account</Text>
-              
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            <View style={styles.header}>
+              <Image
+                source={require('../../assets/images/jmc_logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.headerTitle}>JMCFI PostFLow</Text>
+            </View>
+            
+            <View style={styles.formContainer}>
               <View style={styles.field}>
                 <FloatingLabelInput
                   label="Email"
@@ -246,35 +173,40 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
 
               <View style={styles.field}>
                 <FloatingLabelInput
+                  ref={passwordRef}
                   label="Password"
                   value={password}
                   onChangeText={handlePasswordChange}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoComplete="password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
                   rightIcon={
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
                       style={{ padding: 4 }}
                     >
-                      <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                      <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
                     </TouchableOpacity>
                   }
                 />
               </View>
 
-              {/* ⚠️ Error Trigger Warning — shown when login fails */}
-              {error && (
+              {error ? (
                 <View style={styles.errorBox}>
                   <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
-              )}
+              ) : null}
 
               <View style={styles.field}>
                 <TouchableOpacity
@@ -285,102 +217,116 @@ export default function LoginScreen() {
                   <Text style={styles.submitText}>{loading ? 'Signing in...' : 'Login'}</Text>
                 </TouchableOpacity>
               </View>
+            </View>
 
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>© 2026 JMCFI POSTFLOW System TechNycDev</Text>
             </View>
           </View>
-
-          <View style={styles.footerLink}>
-            <View style={styles.listing}>
-              <Text style={styles.listingLink}>© 2026 JMCFI POSTFLOW System TechNycDev</Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F6F0FA',
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
-    zIndex: 9,
+    paddingHorizontal: 20,
   },
-  
-  header: {
+  card: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#000000',
+    paddingTop: 32,
     paddingBottom: 24,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  header: {
     alignItems: 'center',
-    gap: 12,
+    marginBottom: 32,
   },
   logo: {
     width: 80,
     height: 80,
+    marginBottom: 12,
   },
   headerTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#4b0082',
+    fontFamily: 'Kameron_700Bold',
+    fontSize: 22,
+    color: '#8A008A',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
-  formbgOuter: {
+  formContainer: {
     width: '100%',
-    maxWidth: 440,
-    paddingHorizontal: 16,
-  },
-  formbg: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#3c4257',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  formbgInner: {
-    padding: 32,
-  },
-  subtitle: {
-    fontSize: 18,
-    lineHeight: 26,
-    color: '#4B5563',
-    paddingBottom: 24,
   },
   field: {
-    paddingBottom: 24,
+    marginBottom: 16,
   },
-
-  // ── Floating Label Styles ──────────────────────────────────────────────
+  // ── Floating Label Styles ──
   flContainer: {
-    position: 'relative',
+    borderRadius: 8,
     borderWidth: 1,
-    borderRadius: 6,
-    backgroundColor: '#fff',
+    borderColor: '#000000',
+    backgroundColor: '#F0F2F5',
+    minHeight: 56,
     justifyContent: 'center',
-    minHeight: 52,
+    position: 'relative',
+  },
+  flContainerFocused: {
+    borderColor: '#1877F2',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1877F2',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  flInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   flInput: {
-    fontSize: 16,
-    color: '#1a1f36',
-    paddingHorizontal: 18,
-    paddingTop: 16,
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 22,
     paddingBottom: 6,
-    minHeight: 52,
+    fontSize: 15,
+    color: '#111827',
+    minHeight: 56,
   },
   flRightIcon: {
     position: 'absolute',
     right: 12,
-    top: 0,
-    bottom: 0,
+    height: '100%',
     justifyContent: 'center',
+    zIndex: 2,
   },
-
+  // ────────────────────────────
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -399,40 +345,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   submitButton: {
-    backgroundColor: '#4b0082',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: '#4B0082',
+    paddingVertical: 14,
     borderRadius: 6,
-    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
+    marginTop: 8,
   },
   submitButtonDisabled: {
     opacity: 0.6,
   },
   submitText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: 'bold',
     fontSize: 16,
   },
-  footerLink: {
-    paddingTop: 24,
+  footer: {
+    marginTop: 24,
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
+    borderRadius: 2,
     alignItems: 'center',
   },
-  listing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 20,
-    paddingBottom: 20,
-    flexWrap: 'nowrap',
-  },
-  listingLink: {
+  footerText: {
     color: '#9CA3AF',
-    fontWeight: '500',
-    fontSize: 13,
-    textAlign: 'center',
-    flexShrink: 0,
-  }
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

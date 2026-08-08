@@ -22,6 +22,8 @@ import { ChatBot } from './ChatBot';
 import { departmentsApi } from '../services/api';
 import { authApi } from '../services/api';
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 interface DashboardShellProps {
   title: string;
   children: React.ReactNode;
@@ -74,18 +76,25 @@ export function DashboardShell({
   React.useEffect(() => {
     if (!user) return;
     authApi.getUser().then(res => {
-      const photo = res.data?.user?.photo_url || res.data?.photo_url;
-      if (photo && photo !== '') setApiUserPhoto(photo);
+      const userData = res.data?.user || res.data;
+      if (userData?.photo_url && userData.photo_url !== '') {
+        setApiUserPhoto(userData.photo_url);
+      }
+      if (userData?.department_logo_url) {
+        setAutoDeptLogo(userData.department_logo_url);
+        // Also update the global user object so it's cached in local storage for next time
+        useAuthStore.getState().setUser({ ...user, ...userData });
+      }
     }).catch(() => {});
   }, [user?.id]);
 
-  const finalDeptLogo = departmentLogo || autoDeptLogo;
+  const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
   const finalDeptName = departmentName || user?.department || 'JMCFI';
   const photoFromUser = (user as any)?.photo_url;
   const finalPhotoUrl = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
 
   const MIN_WIDTH = 64;
-  const MAX_WIDTH = 240;
+  const MAX_WIDTH = 260;
   const sidebarWidthAnim = React.useRef(new Animated.Value(MIN_WIDTH)).current;
 
   const openSidebar = React.useCallback(() => {
@@ -216,11 +225,7 @@ export function DashboardShell({
       ];
     }
 
-    if (
-      userRole === 'office_head' ||
-      userRole === 'imc_qa_checker' ||
-      userRole === 'vice_president'
-    ) {
+    if (userRole === 'approver') {
       const active = activeTab ?? 'dashboard';
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
@@ -230,7 +235,7 @@ export function DashboardShell({
       ];
     }
 
-    if (userRole === 'it_publisher') {
+    if (userRole === 'admin') {
       const active = activeTab ?? 'overview';
       return [
         { id: 'overview', label: 'Overview', icon: 'grid-outline' as const, active: active === 'overview' },
@@ -429,23 +434,31 @@ export function DashboardShell({
                 <View style={styles.sidebarHeaderContainer}>
                   <Image
                     source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
-                    style={{ width: 36, height: 36, borderRadius: 18 }}
+                    style={{ width: 40, height: 40, borderRadius: 20 }}
                     resizeMode="contain"
                   />
-                  <View style={styles.sidebarHeader}>
-                    <Text style={styles.sidebarTitle}>{finalDeptName}</Text>
-                  </View>
+                  {(isSidebarOpen || sidebarOpenedByHover) && (
+                    <View style={styles.sidebarHeader}>
+                      <Text style={[styles.sidebarTitle, { textAlign: 'center' }]} numberOfLines={2} adjustsFontSizeToFit>{finalDeptName}</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.sidebarDivider} />
 
                 <View style={styles.sidebarNav}>
                   {sidebarNavItems.map((item, idx) => (
-                    <TouchableOpacity
+                    <AnimatedTouchable
                       key={idx}
                       style={[
                         styles.sidebarNavItem,
                         item.active && styles.sidebarNavItemActivePurple,
+                        {
+                          width: sidebarWidthAnim.interpolate({
+                            inputRange: [MIN_WIDTH, MAX_WIDTH],
+                            outputRange: [48, MAX_WIDTH - 16]
+                          })
+                        }
                       ]}
                       onPress={() => {
                         if (onTabChange) onTabChange(item.id);
@@ -471,14 +484,25 @@ export function DashboardShell({
                           {item.label}
                         </Text>
                       </Animated.View>
-                    </TouchableOpacity>
+                    </AnimatedTouchable>
                   ))}
                 </View>
               </View>
 
               {/* Bottom footer */}
               <View style={styles.sidebarFooter}>
-                <TouchableOpacity style={styles.sidebarNavItem} onPress={() => alert('Help Center is under development.')}>
+                <AnimatedTouchable 
+                  style={[
+                    styles.sidebarNavItem, 
+                    {
+                      width: sidebarWidthAnim.interpolate({
+                        inputRange: [MIN_WIDTH, MAX_WIDTH],
+                        outputRange: [48, MAX_WIDTH - 16]
+                      })
+                    }
+                  ]} 
+                  onPress={() => alert('Help Center is under development.')}
+                >
                   <View style={styles.sidebarNavIconWrapper}>
                     <Ionicons name="help-circle-outline" size={22} color="rgba(255,255,255,0.8)" />
                   </View>
@@ -490,7 +514,7 @@ export function DashboardShell({
                   }}>
                     <Text style={styles.sidebarFooterLabel} numberOfLines={1}>Help Center</Text>
                   </Animated.View>
-                </TouchableOpacity>
+                </AnimatedTouchable>
               </View>
             </View>
           </Animated.View>
@@ -770,10 +794,11 @@ const styles = StyleSheet.create({
   },
   sidebarHeaderContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    gap: 16,
+    alignItems: 'center', // Centers vertically
+    paddingHorizontal: 12, // Exactly 12px padding centers the 40px logo within the 64px collapsed sidebar
+    gap: 12,
     marginBottom: Spacing.sm,
+    minHeight: 56, // Ensure container has enough height
   },
   schoolIconContainer: {
     width: 32,
@@ -784,13 +809,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sidebarHeader: {
-    flex: 1,
+    flex: 1, // Fill remaining space
+    justifyContent: 'center',
+    alignItems: 'center', // Center text horizontally within the remaining space
   },
   sidebarTitle: {
-    fontSize: FontSize.lg + 2,
-    fontWeight: FontWeight.bold,
+    fontSize: 14, // Explicitly not too big
+    fontWeight: 'bold',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+    textAlignVertical: 'center',
   },
   sidebarDivider: {
     height: 1,
@@ -805,13 +833,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   sidebarNavItem: {
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 20, // Rounded pill shape matching screenshot
+    borderRadius: 24, // Rounded pill shape matching screenshot
+    overflow: 'hidden',
   },
   sidebarNavIconWrapper: {
     width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
