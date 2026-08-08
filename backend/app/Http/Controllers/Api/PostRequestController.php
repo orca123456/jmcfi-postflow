@@ -79,18 +79,8 @@ class PostRequestController extends Controller
 
             if ($role === 'approver') {
                 if ($user->department === 'Vice President of Academic Affairs') {
-                    // VPAA should only see posts that have reached them or passed them
-                    $query->whereIn('status', [
-                        PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-                        PostRequest::STATUS_PENDING_PRESIDENT,
-                        PostRequest::STATUS_PENDING_IMC_QA,
-                        PostRequest::STATUS_APPROVED,
-                        PostRequest::STATUS_SCHEDULED,
-                        PostRequest::STATUS_PUBLISHED,
-                        PostRequest::STATUS_PUBLISH_FAILED,
-                        PostRequest::STATUS_REJECTED,
-                        PostRequest::STATUS_RETURNED_FOR_REVISION
-                    ]);
+                    // VPAA sees all non-draft posts (can monitor Department Head queue)
+                    $query->whereNotIn('status', ['draft']);
                 } elseif ($user->department === 'Institutional Marketing Communication') {
                     // IMC should only see posts that have reached them or passed them
                     $query->whereIn('status', [
@@ -594,8 +584,18 @@ class PostRequestController extends Controller
         if ($role === 'requestor') {
             $query->where('requestor_id', $user->id);
         } elseif ($role === 'approver') {
-            if (in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication'])) {
+            if ($user->department === 'Vice President of Academic Affairs') {
                 $query->whereNotIn('status', ['draft']);
+            } elseif ($user->department === 'Institutional Marketing Communication') {
+                $query->whereIn('status', [
+                    PostRequest::STATUS_PENDING_IMC_QA,
+                    PostRequest::STATUS_APPROVED,
+                    PostRequest::STATUS_SCHEDULED,
+                    PostRequest::STATUS_PUBLISHED,
+                    PostRequest::STATUS_PUBLISH_FAILED,
+                    PostRequest::STATUS_REJECTED,
+                    PostRequest::STATUS_RETURNED_FOR_REVISION
+                ]);
             } else {
                 $query->whereHas('requestor', function ($q) use ($user) {
                     $q->where('department', $user->department);
