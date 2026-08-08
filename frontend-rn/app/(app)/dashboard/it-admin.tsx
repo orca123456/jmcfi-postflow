@@ -19,8 +19,10 @@ import {
   Platform,
   Animated,
   Alert,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
@@ -142,7 +144,28 @@ export default function ITAdminDashboard() {
   const spinInterpolation = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
+    outputRange: ['0deg', '360deg'],
   });
+
+  const { data: postsQueryRes } = useQuery({ queryKey: ['adminPosts'], queryFn: () => postsApi.list(), refetchInterval: 3000 });
+  const { data: statsQueryRes } = useQuery({ queryKey: ['adminStats'], queryFn: () => dashboardApi.getStats(), refetchInterval: 3000 });
+  const { data: activitiesQueryRes } = useQuery({ queryKey: ['adminActivities'], queryFn: () => dashboardApi.getRecentActivity(), refetchInterval: 3000 });
+
+  useEffect(() => {
+    if (postsQueryRes?.data?.data) {
+      let posts = postsQueryRes.data.data;
+      if (posts && !Array.isArray(posts) && posts.data) posts = posts.data;
+      processPostsData(posts);
+    }
+  }, [postsQueryRes]);
+
+  useEffect(() => {
+    if (statsQueryRes?.data?.data) setStats(statsQueryRes.data.data);
+  }, [statsQueryRes]);
+
+  useEffect(() => {
+    if (activitiesQueryRes?.data) setActivities(activitiesQueryRes.data);
+  }, [activitiesQueryRes]);
 
   // ── Process posts into the three component state arrays ──
   function processPostsData(posts: any[]) {
@@ -183,26 +206,18 @@ export default function ITAdminDashboard() {
 
       // Fire all requests in parallel — a timeout on one won't block the others
       const results = await Promise.allSettled([
-        dashboardApi.getStats(),
         usersApi.list().catch(() => ({ data: { data: [] } })),
         rolesApi.list().catch(() => ({ data: { data: [] } })),
         departmentsApi.list().catch(() => ({ data: { data: [] } })),
-        postsApi.list().catch(() => ({ data: { data: [] } })),
-        dashboardApi.getRecentActivity().catch(() => ({ data: [] })),
         dashboardApi.getAnalyticsOverview().catch(() => ({ data: { data: null } })),
         auditLogsApi.list().catch(() => ({ data: { data: [] } })),
       ]);
 
-      // 1. Stats (index 0)
-      if (results[0].status === 'fulfilled') {
-        setStats(results[0].value.data.data);
-      } else {
-        console.error('Failed to load stats:', results[0].reason);
-      }
+      // Note: Stats, Posts, and Recent Activity are now handled by React Query auto-polling.
 
-      // 2. Users (index 1) — always fetch on mount for user management tab
-      if (results[1].status === 'fulfilled') {
-        const raw = results[1].value.data.data;
+      // 1. Users (index 0) — always fetch on mount for user management tab
+      if (results[0].status === 'fulfilled') {
+        const raw = results[0].value.data.data;
         const mappedUsers = (raw || []).map((u: any) => ({
           ...u,
           role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
@@ -211,7 +226,7 @@ export default function ITAdminDashboard() {
         setUsers(mappedUsers);
       }
 
-      // 3. Roles — always hardcode to exactly 3
+      // 2. Roles — always hardcode to exactly 3
       setRolesList([
         { label: 'Requestor', value: 'requestor' },
         { label: 'Approver', value: 'approver' },
@@ -219,34 +234,23 @@ export default function ITAdminDashboard() {
       ]);
       setNewUserRole('requestor');
 
-      // 4. Departments (index 3)
-      if (results[3].status === 'fulfilled') {
-        const fetchedDepts = results[3].value.data?.data;
+      // 3. Departments (index 2)
+      if (results[2].status === 'fulfilled') {
+        const fetchedDepts = results[2].value.data?.data;
         if (fetchedDepts && fetchedDepts.length > 0) {
           setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
           setNewUserDepartment(fetchedDepts[0].display_name);
         }
       }
 
-      // 5. Posts (index 4) — for all content requests tab
-      if (results[4].status === 'fulfilled') {
-        const posts = results[4].value.data.data;
-        processPostsData(posts);
+      // 4. Analytics (index 3)
+      if (results[3].status === 'fulfilled' && results[3].value.data?.data) {
+        setAnalyticsOverview(results[3].value.data.data);
       }
 
-      // 6. Recent activity (index 5)
-      if (results[5].status === 'fulfilled') {
-        setActivities(results[5].value.data ?? []);
-      }
-
-      // 7. Analytics (index 6)
-      if (results[6].status === 'fulfilled' && results[6].value.data?.data) {
-        setAnalyticsOverview(results[6].value.data.data);
-      }
-
-      // 8. Audit logs (index 7)
-      if (results[7].status === 'fulfilled' && results[7].value.data?.data) {
-        setAuditLogs(results[7].value.data.data);
+      // 5. Audit logs (index 4)
+      if (results[4].status === 'fulfilled' && results[4].value.data?.data) {
+        setAuditLogs(results[4].value.data.data);
       }
 
       setIsInitialLoading(false);

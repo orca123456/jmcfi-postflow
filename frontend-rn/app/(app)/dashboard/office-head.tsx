@@ -66,13 +66,13 @@ export default function OfficeHeadDashboard() {
   const { data: postsQueryRes, isLoading: postsLoading, refetch: refetchPosts } = useQuery({
     queryKey: ['posts'],
     queryFn: () => postsApi.list(),
-    refetchInterval: 10000, // 10 seconds auto-polling
+    refetchInterval: 3000, // 3 seconds auto-polling
   });
 
   const { data: statsQueryRes, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['dashboardStats'],
     queryFn: () => dashboardApi.getStats(),
-    refetchInterval: 10000,
+    refetchInterval: 3000,
   });
 
   const isInitialLoading = postsLoading || statsLoading;
