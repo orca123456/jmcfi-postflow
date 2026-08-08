@@ -579,113 +579,122 @@ class PostRequestController extends Controller
         $user = $request->user();
         $role = $user->getRoleNames()->first();
 
-        $query = PostRequest::query();
+        $cacheKey = "dashboard_stats_{$user->id}_{$role}";
 
-        if ($role === 'requestor') {
-            $query->where('requestor_id', $user->id);
-        } elseif ($role === 'approver') {
-            if ($user->department === 'Vice President of Academic Affairs') {
-                $query->whereNotIn('status', ['draft']);
-            } elseif ($user->department === 'Institutional Marketing Communication') {
-                $query->whereIn('status', [
+        $stats = Cache::remember($cacheKey, 10, function () use ($user, $role) {
+            $query = PostRequest::query();
+
+            if ($role === 'requestor') {
+                $query->where('requestor_id', $user->id);
+            } elseif ($role === 'approver') {
+                if ($user->department === 'Vice President of Academic Affairs') {
+                    $query->whereNotIn('status', ['draft']);
+                } elseif ($user->department === 'Institutional Marketing Communication') {
+                    $query->whereIn('status', [
+                        PostRequest::STATUS_PENDING_IMC_QA,
+                        PostRequest::STATUS_APPROVED,
+                        PostRequest::STATUS_SCHEDULED,
+                        PostRequest::STATUS_PUBLISHED,
+                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_REJECTED,
+                        PostRequest::STATUS_RETURNED_FOR_REVISION
+                    ]);
+                } else {
+                    $query->whereHas('requestor', function ($q) use ($user) {
+                        $q->where('department', $user->department);
+                    })->whereNotIn('status', ['draft']);
+                }
+            } elseif ($role === 'admin') {
+                // Admin sees all
+            }
+
+            $totalUsers = 0;
+            if ($role === 'admin') {
+                $totalUsers = \App\Models\User::count();
+            }
+
+            $totalSubmissions = (clone $query)->count();
+            $draftCount = (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count();
+            
+            $pendingCount = 0;
+            $approvedCount = 0;
+            $rejectedCount = 0;
+
+            if ($role === 'approver') {
+                if ($user->department === 'Vice President of Academic Affairs') {
+                    $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT)->count();
+                } elseif ($user->department === 'Institutional Marketing Communication') {
+                    $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_IMC_QA)->count();
+                } else {
+                    $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD)->count();
+                }
+                
+                $approvedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
+                    $aw->where('approver_id', $user->id)->where('action', 'approved');
+                })->count();
+                
+                $rejectedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
+                    $aw->where('approver_id', $user->id)->whereIn('action', ['rejected', 'returned_for_revision']);
+                })->count();
+            } else {
+                $pendingCount = (clone $query)->whereIn('status', [
+                    PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                    PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+                    PostRequest::STATUS_PENDING_PRESIDENT,
                     PostRequest::STATUS_PENDING_IMC_QA,
-                    PostRequest::STATUS_APPROVED,
-                    PostRequest::STATUS_SCHEDULED,
-                    PostRequest::STATUS_PUBLISHED,
-                    PostRequest::STATUS_PUBLISH_FAILED,
-                    PostRequest::STATUS_REJECTED,
-                    PostRequest::STATUS_RETURNED_FOR_REVISION
-                ]);
-            } else {
-                $query->whereHas('requestor', function ($q) use ($user) {
-                    $q->where('department', $user->department);
-                })->whereNotIn('status', ['draft']);
+                ])->count();
+                $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
+                $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
             }
-        } elseif ($role === 'admin') {
-            // Admin sees all
-        }
-        // Admin sees all
 
-        // Total user count (only for admin)
-        $totalUsers = 0;
-        if ($role === 'admin') {
-            $totalUsers = \App\Models\User::count();
-        }
+            $returnedCount = (clone $query)->where('status', PostRequest::STATUS_RETURNED_FOR_REVISION)->count();
+            $scheduledCount = (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count();
+            $publishedCount = (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count();
 
-        $totalSubmissions = (clone $query)->count();
-        $draftCount = (clone $query)->where('status', PostRequest::STATUS_DRAFT)->count();
-        
-        if ($role === 'approver') {
-            if ($user->department === 'Vice President of Academic Affairs') {
-                $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT)->count();
-            } elseif ($user->department === 'Institutional Marketing Communication') {
-                $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_IMC_QA)->count();
-            } else {
-                $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD)->count();
-            }
-            
-            $approvedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
-                $aw->where('approver_id', $user->id)->where('action', 'approved');
-            })->count();
-            
-            $rejectedCount = (clone $query)->whereHas('approvalWorkflows', function ($aw) use ($user) {
-                $aw->where('approver_id', $user->id)->whereIn('action', ['rejected', 'returned_for_revision']);
-            })->count();
-        } else {
-            $pendingCount = (clone $query)->whereIn('status', [
-                PostRequest::STATUS_PENDING_OFFICE_HEAD,
-                PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-                PostRequest::STATUS_PENDING_PRESIDENT,
-                PostRequest::STATUS_PENDING_IMC_QA,
-            ])->count();
-            $approvedCount = (clone $query)->where('status', PostRequest::STATUS_APPROVED)->count();
-            $rejectedCount = (clone $query)->where('status', PostRequest::STATUS_REJECTED)->count();
-        }
+            $recentPosts = PostRequest::with(['requestor', 'approvalWorkflows.approver'])
+                ->orderBy('updated_at', 'desc')
+                ->take(10)
+                ->get()
+                ->map(function ($post) {
+                    $currentStage = $post->currentApprovalStage();
+                    return [
+                        'id' => $post->id,
+                        'title' => $post->title,
+                        'status' => $post->status,
+                        'status_label' => $post->status_label,
+                        'requestor_name' => $post->requestor?->first_name . ' ' . $post->requestor?->last_name,
+                        'requestor_initials' => strtoupper(substr($post->requestor?->first_name ?? 'U', 0, 1) . substr($post->requestor?->last_name ?? 'N', 0, 1)),
+                        'current_stage' => $currentStage?->stage_label,
+                        'current_approver' => $currentStage?->approver?->first_name . ' ' . $currentStage?->approver?->last_name,
+                        'updated_at' => $post->updated_at?->diffForHumans(),
+                        'created_at' => $post->created_at,
+                    ];
+                });
 
-        $returnedCount = (clone $query)->where('status', PostRequest::STATUS_RETURNED_FOR_REVISION)->count();
-        $scheduledCount = (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count();
-        $publishedCount = (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count();
+            return [
+                'total_users' => $totalUsers,
+                'total_submissions' => $totalSubmissions,
+                'total' => $totalSubmissions,
+                'draft' => $draftCount,
+                'pending_review' => $pendingCount,
+                'pending' => $pendingCount,
+                'approved_posts' => $approvedCount,
+                'approved' => $approvedCount,
+                'rejected' => $rejectedCount,
+                'returned_revision' => $returnedCount,
+                'returned_for_revision' => $returnedCount,
+                'scheduled' => $scheduledCount,
+                'published_posts' => $publishedCount,
+                'published' => $publishedCount,
+                'recent_activity' => $recentPosts,
+                'recent_posts' => $recentPosts,
+            ];
+        });
 
-        // Recent post requests for activity feed (last 10)
-        $recentPosts = PostRequest::with(['requestor', 'approvalWorkflows.approver'])
-            ->orderBy('updated_at', 'desc')
-            ->take(10)
-            ->get()
-            ->map(function ($post) {
-                $currentStage = $post->currentApprovalStage();
-                return [
-                    'id' => $post->id,
-                    'title' => $post->title,
-                    'status' => $post->status,
-                    'status_label' => $post->status_label,
-                    'requestor_name' => $post->requestor?->first_name . ' ' . $post->requestor?->last_name,
-                    'requestor_initials' => strtoupper(substr($post->requestor?->first_name ?? 'U', 0, 1) . substr($post->requestor?->last_name ?? 'N', 0, 1)),
-                    'current_stage' => $currentStage?->stage_label,
-                    'current_approver' => $currentStage?->approver?->first_name . ' ' . $currentStage?->approver?->last_name,
-                    'updated_at' => $post->updated_at?->diffForHumans(),
-                    'created_at' => $post->created_at,
-                ];
-            });
-
-        $stats = [
-            'total_users' => $totalUsers,
-            'total_submissions' => $totalSubmissions,
-            'total' => $totalSubmissions,
-            'draft' => $draftCount,
-            'pending_review' => $pendingCount,
-            'pending' => $pendingCount,
-            'approved_posts' => $approvedCount,
-            'approved' => $approvedCount,
-            'rejected' => $rejectedCount,
-            'returned_revision' => $returnedCount,
-            'returned_for_revision' => $returnedCount,
-            'scheduled' => $scheduledCount,
-            'published_posts' => $publishedCount,
-            'published' => $publishedCount,
-            'recent_activity' => $recentPosts,
-        ];
-
-        return response()->json(['data' => $stats]);
+        return response()->json([
+            'data' => $stats,
+            'message' => 'Dashboard statistics retrieved successfully',
+        ]);
     }
 
     private function canView(PostRequest $post, \App\Models\User $user): bool
