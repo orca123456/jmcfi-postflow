@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('posts/{postRequest}/approve', [PostRequestController::class, 'approve']);
     Route::post('posts/{postRequest}/reject', [PostRequestController::class, 'reject']);
     Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision']);
+    Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck']);
     Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck']);
 
     // Categories

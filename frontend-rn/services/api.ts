@@ -87,6 +87,7 @@ export const postsApi = {
   reject: (id: number, data: object) => api.post(`/posts/${id}/reject`, data),
   returnRevision: (id: number, data: object) => api.post(`/posts/${id}/return-revision`, data),
   aiCheck: (id: number) => api.post(`/posts/${id}/ai-check`),
+  aiCheckDraft: (data: object) => api.post(`/posts/ai-check-draft`, data),
 };
 
 // ── Categories endpoints ───────────────────────────────────────────────────
