@@ -14,6 +14,7 @@ use App\Services\AIComplianceService;
 use App\Notifications\ApprovalNeededNotification;
 use App\Services\AuditLogService;
 use App\Services\ApprovalWorkflowService;
+use App\Jobs\AutoPublishJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -346,46 +347,56 @@ class PostRequestController extends Controller
         return DB::transaction(function () use ($request, $postRequest, $user) {
             $currentStage = $postRequest->currentApprovalStage();
             $nextStage = $postRequest->getNextStage();
+            $approvedStageName = $currentStage?->stage;
 
             $currentStage->update([
-                'action' => 'approved',
+                'action'      => 'approved',
                 'approver_id' => $user->id,
-                'remarks' => $request->remarks,
-                'acted_at' => now(),
+                'remarks'     => $request->remarks,
+                'acted_at'    => now(),
             ]);
 
             if ($nextStage) {
                 // Move to next stage
                 $statusMap = [
-                    'office_head' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                    'office_head'    => PostRequest::STATUS_PENDING_OFFICE_HEAD,
                     'vice_president' => PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-                    'imc_qa' => PostRequest::STATUS_PENDING_IMC_QA,
-                    'it_publisher' => PostRequest::STATUS_APPROVED,
+                    'imc_qa'         => PostRequest::STATUS_PENDING_IMC_QA,
+                    'it_publisher'   => PostRequest::STATUS_APPROVED,
                 ];
-                
+
                 $postRequest->update([
                     'status' => $statusMap[$nextStage] ?? PostRequest::STATUS_APPROVED,
                 ]);
 
-                // Notify next approver
+                // Notify next approver (with stage info)
                 $this->workflowService->notifyNextApprover($postRequest, $nextStage);
+
+                // Notify requestor that their post moved to the next stage
+                $this->workflowService->notifyRequestorOfStageApproval($postRequest, $approvedStageName, $user->full_name);
             } else {
-                // All approvals done
+                // All approvals done — IMC gave final sign-off
                 $postRequest->update([
                     'status' => PostRequest::STATUS_APPROVED,
                 ]);
-                
-                // Notify IT Publisher for scheduling/publishing
+
+                // Notify requestor of full approval
+                $this->workflowService->notifyRequestorOfStageApproval($postRequest, $approvedStageName, $user->full_name);
+
+                // Notify IT Admin that post is ready
                 $this->workflowService->notifyITPublisher($postRequest);
+
+                // Dispatch auto-publish job to background queue
+                AutoPublishJob::dispatch($postRequest)->delay(now()->addSeconds(5));
             }
 
             // Record audit trail
-            AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $postRequest->title, 'INFO', ['post_id' => $postRequest->id, 'remarks' => $request->remarks], $request);
+            AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $postRequest->title, 'INFO', ['post_id' => $postRequest->id, 'stage' => $approvedStageName, 'remarks' => $request->remarks], $request);
 
             $this->clearDashboardCache();
 
             return response()->json([
-                'data' => new PostRequestResource($postRequest->load([
+                'data'    => new PostRequestResource($postRequest->load([
                     'category', 'requestor', 'media', 'approvalWorkflows.approver'
                 ])),
                 'message' => 'Post approved successfully',

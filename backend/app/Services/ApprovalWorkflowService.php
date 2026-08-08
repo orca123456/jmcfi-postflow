@@ -94,8 +94,23 @@ class ApprovalWorkflowService
         if ($approval && $approval->approver_id) {
             $approver = User::find($approval->approver_id);
             if ($approver) {
-                $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest));
+                $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest, $nextStage));
             }
+        }
+    }
+
+    /**
+     * Notify the requestor that their post was approved at a specific stage.
+     */
+    public function notifyRequestorOfStageApproval(PostRequest $postRequest, ?string $stage, ?string $approverName = null): void
+    {
+        $requestor = $postRequest->requestor;
+        if (!$requestor) return;
+
+        try {
+            $requestor->notify(new PostApprovedNotification($postRequest, $stage, $approverName));
+        } catch (\Exception $e) {
+            Log::warning("Failed to notify requestor of stage approval. Error: " . $e->getMessage());
         }
     }
 

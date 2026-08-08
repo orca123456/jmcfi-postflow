@@ -28,7 +28,7 @@ class AIComplianceService
         try {
             $prompt = $this->buildCompliancePrompt($postRequest);
             
-            $response = Http::withHeaders([
+            $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
             ])->timeout(120)->post("{$this->apiUrl}/chat/completions", [
@@ -154,7 +154,7 @@ CAPTION/NARRATIVE:
 Provide compliance analysis as JSON with the exact structure specified in system prompt.
 PROMPT;
             
-            $response = Http::withHeaders([
+            $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
             ])->timeout(120)->post("{$this->apiUrl}/chat/completions", [
@@ -212,6 +212,74 @@ PROMPT;
 
     private function getSystemPrompt(): string
     {
+        $policyRulesText = "";
+        try {
+            $sectionsJson = \App\Models\SystemSetting::where('key', 'policy_sections')->value('value');
+            $sections = $sectionsJson ? json_decode($sectionsJson, true) : null;
+            
+            if (!$sections || !is_array($sections)) {
+                $sections = [
+                    [
+                        'title' => '1. Purpose',
+                        'content' => 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
+                    ],
+                    [
+                        'title' => '2. Scope & Limitations',
+                        'bullets' => [
+                            ['title' => 'Brand Integrity', 'desc' => 'All content must adhere to the official JMCFI Brand Guidelines (colors, logos, typography).'],
+                            ['title' => 'Platform Limitation', 'desc' => 'This policy applies exclusively to the official school domain and subdomains.'],
+                            ['title' => 'Editorial Control', 'desc' => 'The school reserves the right to edit, reject, or remove any content without prior notice.'],
+                            ['title' => 'Non-Compliance', 'desc' => 'Violation results in immediate removal from the platform and potential disciplinary action.'],
+                        ],
+                    ],
+                    [
+                        'title' => '3. Acceptable Content',
+                        'bullets' => [
+                            ['title' => 'Academic & Professional', 'desc' => 'Content must support the school\'s mission, be factually accurate, and maintain an inclusive tone.'],
+                            ['title' => 'Visual Standards', 'desc' => 'Use approved templates, high-resolution media, and official school colors/logo only.'],
+                            ['title' => 'Consent (Minors Under 18)', 'desc' => 'Written parental/guardian consent is required.'],
+                            ['title' => 'Consent (Adults 18+)', 'desc' => 'Student\'s own signed consent is required.'],
+                        ],
+                    ],
+                    [
+                        'title' => '4. Prohibited Content',
+                        'bullets' => [
+                            ['title' => 'Academic Misconduct', 'desc' => 'Cheating guides, answer keys, or plagiarism.'],
+                            ['title' => 'Inappropriate Material', 'desc' => 'Bullying, hate speech, explicit content, or harassment.'],
+                            ['title' => 'Commercial/Political', 'desc' => 'Unauthorized ads, personal fundraising, or political endorsements.'],
+                            ['title' => 'Privacy Breach', 'desc' => 'Publishing student grades, private addresses, or administrative records.'],
+                        ],
+                    ],
+                ];
+            }
+
+            if (is_array($sections)) {
+                $policyRulesText = "\n\nOFFICIAL JMCFI SYSTEM POLICIES (Must be strictly followed):\n";
+                foreach ($sections as $section) {
+                    $policyRulesText .= "- " . ($section['title'] ?? 'Rule') . ":\n";
+                    if (!empty($section['content'])) {
+                        $policyRulesText .= "  " . $section['content'] . "\n";
+                    }
+                    if (!empty($section['bullets'])) {
+                        foreach ($section['bullets'] as $bullet) {
+                            $title = $bullet['title'] ?? '';
+                            $desc = $bullet['desc'] ?? '';
+                            $policyRulesText .= "  * {$title}: {$desc}\n";
+                        }
+                    }
+                    if (!empty($section['steps'])) {
+                        foreach ($section['steps'] as $step) {
+                            $title = $step['title'] ?? '';
+                            $desc = $step['desc'] ?? '';
+                            $policyRulesText .= "  * {$title}: {$desc}\n";
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to load dynamic policies for AI', ['error' => $e->getMessage()]);
+        }
+
         return <<<PROMPT
 You are an AI Content Compliance Assistant for Jose Maria College Foundation, Inc. (JMCFI).
 Your role is to analyze captions, narratives, and content materials for official institutional posts
@@ -219,9 +287,11 @@ against the following criteria:
 
 1. ACCURACY & FACTUALITY - Verify factual claims, dates, names, statistics. Flag unverified claims.
 2. COMPLETENESS - Check if all required information is present (who, what, when, where, why, how).
-3. BRANDING & STYLE - Ensure tone matches institutional voice, proper terminology, brand guidelines.
+3. BRANDING & STYLE - Ensure tone matches institutional voice, proper terminology, and brand guidelines. 
+   - Typography Rules: "Old English Text MT" is the official font that represents the JOSE MARIA COLLEGE in all Official Communications. Note: This is only intended for Letter Head but not as to the body text of the letter only. "Montserrat" should be used as the primary Sans Serif font for heavy text. "Book Antiqua" should be used as the primary Serif font for heavy text. Remind users of these fonts if applicable in the caption suggestions.
 4. PRIVACY & DATA PROTECTION - Identify PII, student records, sensitive info that shouldn't be public.
 5. POSTING COMPLIANCE - Check against JMCFI posting policy: no prohibited content, proper format, platform-appropriate.
+{$policyRulesText}
 
 For each criterion, provide:
 - passed: true/false

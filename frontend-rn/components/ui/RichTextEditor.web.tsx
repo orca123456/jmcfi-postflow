@@ -37,6 +37,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     link.rel = 'stylesheet';
     link.href = 'https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css';
     document.head.appendChild(link);
+
+    if (!document.getElementById('montserrat-font')) {
+      const link2 = document.createElement('link');
+      link2.id = 'montserrat-font';
+      link2.rel = 'stylesheet';
+      link2.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap';
+      document.head.appendChild(link2);
+    }
   }, []);
 
   // Sync external value changes into the editor
@@ -106,6 +114,31 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 12, color: '#6B7280' }}
         >
           ✕
+        </button>
+      </div>
+      {/* Font Toolbar */}
+      {/* @ts-ignore */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F3F4F6', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+        {/* @ts-ignore */}
+        <button
+          onMouseDown={(e: any) => { e.preventDefault(); execFormat('fontName', 'Montserrat'); }}
+          style={{ border: '1px solid #D1D5DB', background: '#ffffff', cursor: 'pointer', padding: '6px 12px', borderRadius: 4, fontSize: 12, color: '#374151', fontFamily: 'Montserrat', fontWeight: 'bold' }}
+        >
+          Sans Serif (Montserrat)
+        </button>
+        {/* @ts-ignore */}
+        <button
+          onMouseDown={(e: any) => { e.preventDefault(); execFormat('fontName', 'Book Antiqua'); }}
+          style={{ border: '1px solid #D1D5DB', background: '#ffffff', cursor: 'pointer', padding: '6px 12px', borderRadius: 4, fontSize: 12, color: '#374151', fontFamily: 'Book Antiqua' }}
+        >
+          Serif (Book Antiqua)
+        </button>
+        {/* @ts-ignore */}
+        <button
+          onMouseDown={(e: any) => { e.preventDefault(); execFormat('fontName', 'Old English Text MT'); }}
+          style={{ border: '1px solid #D1D5DB', background: '#ffffff', cursor: 'pointer', padding: '6px 12px', borderRadius: 4, fontSize: 12, color: '#374151', fontFamily: 'Old English Text MT' }}
+        >
+          Headers (Old English)
         </button>
       </div>
       {/* @ts-ignore */}

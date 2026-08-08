@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
+import { ComplianceResultModal } from '../../../components/ui/ComplianceResultModal';
+import { RichTextEditor } from '../../../components/ui/RichTextEditor';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import { useAuthStore, getAvatarColors } from '../../../store/auth';
@@ -450,6 +452,11 @@ export default function RequestorDashboard() {
     }
   };
 
+  const [isComplianceModalVisible, setIsComplianceModalVisible] = useState(false);
+  const [complianceScore, setComplianceScore] = useState(0);
+  const [complianceStatus, setComplianceStatus] = useState('');
+  const [complianceAnalysis, setComplianceAnalysis] = useState('');
+
   const [isCheckingPolicy, setIsCheckingPolicy] = useState(false);
 
   const handleCheckPolicy = async () => {
@@ -465,7 +472,10 @@ export default function RequestorDashboard() {
       if (data.overall_status === 'error') {
          alert('AI Analysis failed: ' + data.analysis_logic);
       } else {
-         alert(`Policy Alignment Score: ${data.compliance_score}%\nStatus: ${data.overall_status}\n\nAnalysis:\n${data.analysis_logic}`);
+         setComplianceScore(data.compliance_score);
+         setComplianceStatus(data.overall_status);
+         setComplianceAnalysis(data.analysis_logic);
+         setIsComplianceModalVisible(true);
       }
     } catch (e: any) {
       alert('Failed to check policy alignment: ' + (e.response?.data?.message || e.message));
@@ -879,16 +889,16 @@ export default function RequestorDashboard() {
 
                   <View style={styles.fieldGroup}>
                     <Text style={styles.inputLabel}>CAPTION TEXT</Text>
-                    <TextInput
-                      style={styles.textArea}
-                      placeholder="Write your post caption here. Ensure it follows the university's brand voice and tonal guidelines..."
-                      multiline
-                      numberOfLines={6}
-                      value={caption}
-                      onChangeText={(val) => {
-                        if (val.length <= 2200) setCaption(val);
-                      }}
-                    />
+                    <View style={{ marginBottom: 8 }}>
+                      <RichTextEditor
+                        value={caption}
+                        onChange={(val: string) => {
+                          if (val.length <= 5000) setCaption(val); // HTML strings can be much longer
+                        }}
+                        placeholder="Write your post caption here. Ensure it follows the university's brand voice and tonal guidelines..."
+                        minHeight={250}
+                      />
+                    </View>
                     <View style={styles.textAreaFooter}>
                       <Text style={styles.characterCounter}>
                         {caption.length} / 2200 characters
@@ -1815,6 +1825,13 @@ export default function RequestorDashboard() {
           </View>
         </Modal>
       )}
+      <ComplianceResultModal
+        visible={isComplianceModalVisible}
+        onClose={() => setIsComplianceModalVisible(false)}
+        score={complianceScore}
+        status={complianceStatus}
+        analysisLogic={complianceAnalysis}
+      />
 
     </DashboardShell>
   );
