@@ -49,17 +49,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('categories', [CategoryController::class, 'index']);
 
     // Users (Admin only)
-    Route::get('users/roles', [UserController::class, 'getRoles']);
-    Route::apiResource('users', UserController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    Route::get('users/roles', [UserController::class, 'getRoles'])->middleware('role:it_publisher,it_admin');
+    Route::apiResource('users', UserController::class)->only(['index', 'store', 'show', 'update', 'destroy'])->middleware('role:it_publisher,it_admin');
 
     // Dashboard
+    Route::get('dashboard/init', [DashboardController::class, 'getInitData']);
     Route::get('dashboard/stats', [DashboardController::class, 'getStats']);
     Route::get('dashboard/recent-activity', [DashboardController::class, 'getRecentActivity']);
     Route::get('dashboard/violation-trends', [DashboardController::class, 'getViolationTrends']);
-    Route::get('dashboard/analytics', [DashboardController::class, 'getAnalyticsOverview']);
+    Route::get('dashboard/analytics', [DashboardController::class, 'getAnalyticsOverview'])->middleware('role:it_publisher,it_admin');
     
-    // Audit Logs
-    Route::get('audit-logs', [AuditLogController::class, 'index']);
+    // Audit Logs (Admin only)
+    Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('role:it_publisher,it_admin');
 
     // Publishing
     // Route::apiResource('publishing', PublishingController::class)->only(['index', 'show']);
@@ -72,26 +73,26 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::post('violations/{violation}/resolve', [ViolationController::class, 'resolve']);
     // Route::get('violations/dashboard/stats', [ViolationController::class, 'getDashboardStats']);
 
-    // Policy Settings
+    // Policy Settings (update admin only)
     Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);
-    Route::post('policy-settings', [PolicySettingController::class, 'updateSettings']);
+    Route::post('policy-settings', [PolicySettingController::class, 'updateSettings'])->middleware('role:it_publisher,it_admin');
 
-    // Token Settings
-    Route::get('token-settings', [TokenSettingController::class, 'getTokens']);
-    Route::post('token-settings', [TokenSettingController::class, 'updateTokens']);
+    // Token Settings (Admin only)
+    Route::get('token-settings', [TokenSettingController::class, 'getTokens'])->middleware('role:it_publisher,it_admin');
+    Route::post('token-settings', [TokenSettingController::class, 'updateTokens'])->middleware('role:it_publisher,it_admin');
 
-    // Departments
+    // Departments (reads open, writes admin only)
     Route::get('departments', [DepartmentController::class, 'index']);
-    Route::post('departments', [DepartmentController::class, 'store']);
-    Route::put('departments/{department}', [DepartmentController::class, 'update']);
-    Route::delete('departments/{department}', [DepartmentController::class, 'destroy']);
-    Route::post('departments/{department}/logo', [DepartmentController::class, 'uploadLogo']);
-    Route::delete('departments/{department}/logo', [DepartmentController::class, 'removeLogo']);
+    Route::post('departments', [DepartmentController::class, 'store'])->middleware('role:it_publisher,it_admin');
+    Route::put('departments/{department}', [DepartmentController::class, 'update'])->middleware('role:it_publisher,it_admin');
+    Route::delete('departments/{department}', [DepartmentController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
+    Route::post('departments/{department}/logo', [DepartmentController::class, 'uploadLogo'])->middleware('role:it_publisher,it_admin');
+    Route::delete('departments/{department}/logo', [DepartmentController::class, 'removeLogo'])->middleware('role:it_publisher,it_admin');
 
-    // Roles
+    // Roles (reads open, writes admin only)
     Route::get('roles/list', [RoleController::class, 'index']);
-    Route::post('roles/list', [RoleController::class, 'store']);
-    Route::delete('roles/list/{role}', [RoleController::class, 'destroy']);
+    Route::post('roles/list', [RoleController::class, 'store'])->middleware('role:it_publisher,it_admin');
+    Route::delete('roles/list/{role}', [RoleController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
 
     // AI Compliance
     // Route::post('ai/check/{post}', [AIComplianceController::class, 'checkCompliance']);
@@ -99,7 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::post('ai/improve-caption/{post}', [AIComplianceController::class, 'improveCaption']);
 
     // Email Settings (Admin only)
-    Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings']);
-    Route::post('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'updateSettings']);
-    Route::post('email-settings/test', [App\Http\Controllers\Api\EmailSettingController::class, 'sendTestEmail']);
+    Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings'])->middleware('role:it_publisher,it_admin');
+    Route::post('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'updateSettings'])->middleware('role:it_publisher,it_admin');
+    Route::post('email-settings/test', [App\Http\Controllers\Api\EmailSettingController::class, 'sendTestEmail'])->middleware('role:it_publisher,it_admin');
 });

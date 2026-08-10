@@ -56,56 +56,15 @@ class PostRequestController extends Controller
 
         // Filter by approval stage (for approvers)
         if ($request->has('pending_approval') && $request->pending_approval) {
-            $user = $request->user();
-            $role = $user->getRoleNames()->first();
-            if ($role === 'approver') {
-                if ($user->department === 'Vice President of Academic Affairs') {
-                    $query->where('status', 'pending_vice_president');
-                } elseif ($user->department === 'Institutional Marketing Communication') {
-                    $query->where('status', 'pending_imc_qa');
-                } else {
-                    $query->where('status', 'pending_office_head')
-                          ->whereHas('requestor', function ($q) use ($user) {
-                              $q->where('department', $user->department);
-                          });
-                }
-            }
+            $this->applyPendingApprovalScope($query, $request->user());
         }
 
-        // For the new 'approver' role: always filter posts to their department only (unless viewing own requests)
+        // Role-based scoping — only when not explicitly asking for own requests.
+        // Locks each role to its own data using the REAL DB role names
+        // (office_head / vice_president / imc_qa_checker / content_requestor /
+        // it_publisher) so URL/API manipulation can't leak other roles' posts.
         if (!$request->has('my_requests')) {
-            $user = $request->user();
-            $role = $user->getRoleNames()->first();
-
-            if ($role === 'approver') {
-                if ($user->department === 'Vice President of Academic Affairs') {
-                    // VPAA sees all non-draft posts (can monitor Department Head queue)
-                    $query->whereNotIn('status', ['draft']);
-                } elseif ($user->department === 'Institutional Marketing Communication') {
-                    // IMC should only see posts that have reached them or passed them
-                    $query->whereIn('status', [
-                        PostRequest::STATUS_PENDING_IMC_QA,
-                        PostRequest::STATUS_APPROVED,
-                        PostRequest::STATUS_SCHEDULED,
-                        PostRequest::STATUS_PUBLISHED,
-                        PostRequest::STATUS_PUBLISH_FAILED,
-                        PostRequest::STATUS_REJECTED,
-                        PostRequest::STATUS_RETURNED_FOR_REVISION
-                    ]);
-                } else {
-                    // Regular department head approvers only show posts from the same department
-                    $query->whereHas('requestor', function ($q) use ($user) {
-                        $q->where('department', $user->department);
-                    })->whereNotIn('status', ['draft']);
-                }
-            } elseif ($role === 'requestor') {
-                // Requestors should only see requests from their own department when browsing general posts
-                $query->whereHas('requestor', function ($q) use ($user) {
-                    $q->where('department', $user->department);
-                });
-            } elseif ($role === 'admin') {
-                // Admin sees everything — no filter
-            }
+            $this->applyRoleScoping($query, $request->user());
         }
 
 
@@ -577,39 +536,17 @@ class PostRequestController extends Controller
     public function getDashboardStats(Request $request): JsonResponse
     {
         $user = $request->user();
+        $category = $user->roleCategory();
         $role = $user->getRoleNames()->first();
 
-        $cacheKey = "dashboard_stats_{$user->id}_{$role}";
+        $cacheKey = "dashboard_stats_{$user->id}_{$category}";
 
-        $stats = Cache::remember($cacheKey, 10, function () use ($user, $role) {
+        $stats = Cache::remember($cacheKey, 10, function () use ($user, $category, $role) {
             $query = PostRequest::query();
-
-            if ($role === 'requestor') {
-                $query->where('requestor_id', $user->id);
-            } elseif ($role === 'approver') {
-                if ($user->department === 'Vice President of Academic Affairs') {
-                    $query->whereNotIn('status', ['draft']);
-                } elseif ($user->department === 'Institutional Marketing Communication') {
-                    $query->whereIn('status', [
-                        PostRequest::STATUS_PENDING_IMC_QA,
-                        PostRequest::STATUS_APPROVED,
-                        PostRequest::STATUS_SCHEDULED,
-                        PostRequest::STATUS_PUBLISHED,
-                        PostRequest::STATUS_PUBLISH_FAILED,
-                        PostRequest::STATUS_REJECTED,
-                        PostRequest::STATUS_RETURNED_FOR_REVISION
-                    ]);
-                } else {
-                    $query->whereHas('requestor', function ($q) use ($user) {
-                        $q->where('department', $user->department);
-                    })->whereNotIn('status', ['draft']);
-                }
-            } elseif ($role === 'admin') {
-                // Admin sees all
-            }
+            $this->applyRoleScoping($query, $user);
 
             $totalUsers = 0;
-            if ($role === 'admin') {
+            if ($category === 'admin') {
                 $totalUsers = \App\Models\User::count();
             }
 
@@ -620,12 +557,12 @@ class PostRequestController extends Controller
             $approvedCount = 0;
             $rejectedCount = 0;
 
-            if ($role === 'approver') {
-                if ($user->department === 'Vice President of Academic Affairs') {
+            if ($category === 'approver') {
+                if ($role === 'vice_president') {
                     $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT)->count();
-                } elseif ($user->department === 'Institutional Marketing Communication') {
+                } elseif ($role === 'imc_qa_checker') {
                     $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_IMC_QA)->count();
-                } else {
+                } else { // office_head
                     $pendingCount = (clone $query)->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD)->count();
                 }
                 
@@ -651,7 +588,8 @@ class PostRequestController extends Controller
             $scheduledCount = (clone $query)->where('status', PostRequest::STATUS_SCHEDULED)->count();
             $publishedCount = (clone $query)->where('status', PostRequest::STATUS_PUBLISHED)->count();
 
-            $recentPosts = PostRequest::with(['requestor', 'approvalWorkflows.approver'])
+            $recentPosts = (clone $query)
+                ->with(['requestor', 'approvalWorkflows.approver'])
                 ->orderBy('updated_at', 'desc')
                 ->take(10)
                 ->get()
@@ -704,26 +642,90 @@ class PostRequestController extends Controller
             return true;
         }
 
+        $category = $user->roleCategory();
         $role = $user->getRoleNames()->first();
 
         // Admin sees everything
-        if ($role === 'admin') return true;
+        if ($category === 'admin') return true;
 
         // Approvers: VP and IMC can see all non-draft posts; dept heads can see their own department's posts
-        if ($role === 'approver') {
-            if (in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication'])) {
+        if ($category === 'approver') {
+            if (in_array($role, ['vice_president', 'imc_qa_checker'])) {
                 return $post->status !== 'draft';
             }
-            // Regular dept head: can see posts from their own department
+            // Regular dept head (office_head): can see posts from their own department
             return $post->requestor?->department === $user->department && $post->status !== 'draft';
         }
 
-        // Requestors: can see posts from their own department
-        if ($role === 'requestor') {
-            return $post->requestor?->department === $user->department;
+        // Requestors: can only view their own posts
+        if ($category === 'requestor') {
+            return $post->requestor_id === $user->id;
         }
 
         return false;
+    }
+
+    /**
+     * Scope a post query to the posts the given user is allowed to see.
+     * Mirrors the frontend role categories using the REAL DB role names:
+     *   - admin     (it_publisher / it_admin)          -> everything
+     *   - requestor (requestor / content_requestor)     -> only their own posts
+     *   - approver  (office_head / vice_president / imc_qa_checker) -> stage/department scoped
+     */
+    private function applyRoleScoping($query, \App\Models\User $user): void
+    {
+        $category = $user->roleCategory();
+        $role = $user->getRoleNames()->first();
+
+        if ($category === 'requestor') {
+            // Requestors should only see their own requests
+            $query->where('requestor_id', $user->id);
+        } elseif ($category === 'approver') {
+            if ($role === 'vice_president') {
+                // VP sees all non-draft posts (can monitor the Department Head queue)
+                $query->whereNotIn('status', ['draft']);
+            } elseif ($role === 'imc_qa_checker') {
+                // IMC QA should only see posts that have reached them or passed them
+                $query->whereIn('status', [
+                    PostRequest::STATUS_PENDING_IMC_QA,
+                    PostRequest::STATUS_APPROVED,
+                    PostRequest::STATUS_SCHEDULED,
+                    PostRequest::STATUS_PUBLISHED,
+                    PostRequest::STATUS_PUBLISH_FAILED,
+                    PostRequest::STATUS_REJECTED,
+                    PostRequest::STATUS_RETURNED_FOR_REVISION,
+                ]);
+            } else {
+                // Department head (office_head): only posts from the same department
+                $query->whereHas('requestor', function ($q) use ($user) {
+                    $q->where('department', $user->department);
+                })->whereNotIn('status', ['draft']);
+            }
+        } elseif ($category === 'admin') {
+            // Admin sees everything — no filter
+        }
+    }
+
+    /**
+     * Scope a query to the posts currently pending the user's approval stage.
+     */
+    private function applyPendingApprovalScope($query, \App\Models\User $user): void
+    {
+        if ($user->roleCategory() !== 'approver') {
+            return;
+        }
+        $role = $user->getRoleNames()->first();
+
+        if ($role === 'vice_president') {
+            $query->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT);
+        } elseif ($role === 'imc_qa_checker') {
+            $query->where('status', PostRequest::STATUS_PENDING_IMC_QA);
+        } else { // office_head
+            $query->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD)
+                  ->whereHas('requestor', function ($q) use ($user) {
+                      $q->where('department', $user->department);
+                  });
+        }
     }
 
     private function getMediaType(string $mimeType): string

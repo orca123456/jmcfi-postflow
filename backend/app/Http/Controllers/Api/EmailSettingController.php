@@ -27,7 +27,7 @@ class EmailSettingController extends Controller
      */
     public function getSettings(): JsonResponse
     {
-        if (!request()->user()?->hasRole('admin')) {
+        if (request()->user()?->roleCategory() !== 'admin') {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
@@ -47,7 +47,7 @@ class EmailSettingController extends Controller
      */
     public function updateSettings(Request $request): JsonResponse
     {
-        if (!$request->user()?->hasRole('admin')) {
+        if ($request->user()?->roleCategory() !== 'admin') {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
@@ -87,7 +87,7 @@ class EmailSettingController extends Controller
      */
     public function sendTestEmail(Request $request): JsonResponse
     {
-        if (!$request->user()?->hasRole('admin')) {
+        if ($request->user()?->roleCategory() !== 'admin') {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 

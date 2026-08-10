@@ -9,12 +9,11 @@ use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
-    // Only these 3 roles are allowed in the system
-    const ALLOWED_ROLES = ['requestor', 'approver', 'admin'];
-
     public function index(): JsonResponse
     {
-        $roles = Role::whereIn('name', self::ALLOWED_ROLES)->orderBy('display_name')->get();
+        // Return all real roles from the DB (office_head, vice_president,
+        // imc_qa_checker, it_publisher, content_requestor, requestor).
+        $roles = Role::orderBy('display_name')->get();
         return response()->json([
             'data' => $roles->map(fn($r) => [
                 'id' => $r->id,

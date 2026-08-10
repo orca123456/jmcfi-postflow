@@ -39,7 +39,13 @@ export default function ImcQaDashboard() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
+  const [departmentOptions, setDepartmentOptions] = useState(['All Departments']);
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+
+  const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
@@ -75,25 +81,25 @@ export default function ImcQaDashboard() {
       input.onchange = async (e: any) => {
         const f = e.target.files?.[0]; if (!f) return;
         setUploadingPhoto(true);
-        try { const r = await authApi.uploadPhoto(f); setProfilePhotoUrl(r.data.photo_url); } catch {} finally { setUploadingPhoto(false); }
+        try { const r = await authApi.uploadPhoto(f); setProfilePhotoUrl(r.data.photo_url); } catch { } finally { setUploadingPhoto(false); }
       };
       input.click();
     }
   };
   const handleRemovePhoto = async () => {
     setUploadingPhoto(true);
-    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch {} finally { setUploadingPhoto(false); }
+    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch { } finally { setUploadingPhoto(false); }
   };
   const handleSaveDetails = async () => {
     const parts = acctFullName.trim().split(' ');
     const first_name = parts[0] || ''; const last_name = parts.slice(1).join(' ') || '';
     setSavingAcct(true);
-    try { 
-      await authApi.updateProfile({ first_name, last_name }); 
+    try {
+      await authApi.updateProfile({ first_name, last_name });
       if (user) {
         await useAuthStore.getState().setUser({ ...user, first_name, last_name, name: `${first_name} ${last_name}` });
       }
-      alert('Profile updated!'); 
+      alert('Profile updated!');
     } catch (e: any) { alert('Failed.'); }
     finally { setSavingAcct(false); }
   };
@@ -103,18 +109,19 @@ export default function ImcQaDashboard() {
     if (acctNewPw !== acctConfirmPw) { alert('Passwords do not match.'); return; }
     setSavingAcct(true);
     try { await authApi.changePassword(acctCurrentPw, acctNewPw, acctConfirmPw); alert('Password changed!'); setAcctCurrentPw(''); setAcctNewPw(''); setAcctConfirmPw(''); }
-    catch {} finally { setSavingAcct(false); }
+    catch { } finally { setSavingAcct(false); }
   };
 
-  const loadData = async () => {
-    setIsInitialLoading(true);
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setIsInitialLoading(true);
     try {
-      const [postsRes, statsRes] = await Promise.all([
-        postsApi.list(),
-        dashboardApi.getStats()
-      ]);
-      const posts = postsRes.data.data;
-      setStats(statsRes.data.data);
+      const res = await dashboardApi.getInitData();
+      const posts = res.data.posts?.data || res.data.posts || [];
+      const statsData = res.data.stats || {};
+      setStats(statsData);
+
+      const depts = res.data.departments || [];
+      setDepartmentOptions(['All Departments', ...depts]);
 
       const mapPost = (p: any) => ({
         ...p,
@@ -126,6 +133,7 @@ export default function ImcQaDashboard() {
         requestedByRole: 'Requestor',
         date: new Date(p.created_at).toLocaleDateString(),
         time: new Date(p.created_at).toLocaleTimeString(),
+        rawDate: new Date(p.created_at),
         platforms: p.target_platforms || [],
         caption: p.caption_narrative || '',
         previewBanner: (p.title || '').toUpperCase(),
@@ -141,17 +149,18 @@ export default function ImcQaDashboard() {
       setApprovedRequests(mapped.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
       setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
     } catch (err) {
-      console.error('Failed to load data', err);
+      console.error(err);
     } finally {
-      setIsInitialLoading(false);
+      if (showLoading) setIsInitialLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+    const interval = setInterval(() => loadData(false), 10000);
+    return () => clearInterval(interval);
   }, [activeTab]);
 
-  const departmentOptions = ['All Departments', 'MARKETING', 'ATHLETICS', 'REGISTRAR', 'CAS', 'CITE', 'COBE'];
 
   // Handlers for actions
   const handleApprove = async (req: any) => {
@@ -212,7 +221,34 @@ export default function ImcQaDashboard() {
       req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesDept && matchesSearch;
+      
+    let matchesDate = true;
+    if (dateFilter !== 'All Time') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const postDate = new Date(req.rawDate);
+      postDate.setHours(0, 0, 0, 0);
+      const diffTime = today.getTime() - postDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+      
+      if (dateFilter === 'Today') {
+        matchesDate = diffDays === 0;
+      } else if (dateFilter === 'Yesterday') {
+        matchesDate = diffDays === 1;
+      } else if (dateFilter === 'Last 7 Days') {
+        matchesDate = diffDays >= 0 && diffDays <= 7;
+      } else if (dateFilter === 'Last 30 Days') {
+        matchesDate = diffDays >= 0 && diffDays <= 30;
+      } else if (dateFilter === 'Custom Range') {
+        const start = new Date(customStartDate);
+        const end = new Date(customEndDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            matchesDate = req.rawDate >= start && req.rawDate <= new Date(end.getTime() + 86400000);
+        }
+      }
+    }
+
+    return matchesDept && matchesSearch && matchesDate;
   });
 
   const computedStats = React.useMemo(() => ({
@@ -318,8 +354,8 @@ export default function ImcQaDashboard() {
                 {activeTab === 'dashboard'
                   ? 'Requests Awaiting QA Review'
                   : activeTab === 'approved'
-                  ? 'Approved Requests'
-                  : 'Rejected Requests'}
+                    ? 'Approved Requests'
+                    : 'Rejected Requests'}
               </Text>
 
               <View style={styles.tableControlsRight}>
@@ -345,7 +381,7 @@ export default function ImcQaDashboard() {
                   </TouchableOpacity>
 
                   {isDeptDropdownOpen && (
-                    <View style={styles.dropdownMenu}>
+                    <ScrollView style={[styles.dropdownMenu, { maxHeight: 300 }]} nestedScrollEnabled>
                       {departmentOptions.map((deptOption) => (
                         <TouchableOpacity
                           key={deptOption}
@@ -358,15 +394,53 @@ export default function ImcQaDashboard() {
                           <Text style={styles.dropdownItemText}>{deptOption}</Text>
                         </TouchableOpacity>
                       ))}
-                    </View>
+                    </ScrollView>
                   )}
                 </View>
 
-                {/* Filter Button */}
-                <TouchableOpacity style={styles.filterBtn} onPress={() => alert('Filter options')}>
-                  <Ionicons name="options-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
-                  <Text style={styles.filterBtnText}>Filter</Text>
-                </TouchableOpacity>
+                {/* Date Range Dropdown Selector */}
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 140 }]}
+                    onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isDateDropdownOpen && (
+                    <View style={[styles.dropdownMenu, { minWidth: 200 }]}>
+                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setDateFilter(opt);
+                            if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      
+                      {dateFilter === 'Custom Range' && (
+                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
+                          <TouchableOpacity 
+                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
+                            onPress={() => setIsDateDropdownOpen(false)}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -382,8 +456,8 @@ export default function ImcQaDashboard() {
               </View>
 
               {filteredRequests.map((req) => (
-                <TouchableOpacity 
-                  key={req.id} 
+                <TouchableOpacity
+                  key={req.id}
                   style={styles.tableRow}
                   activeOpacity={0.7}
                   onPress={() => {
@@ -830,6 +904,15 @@ export default function ImcQaDashboard() {
                       </View>
                     </View>
 
+                    { (selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
+                      <View style={[styles.metaRow, { backgroundColor: '#FEF2F2', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', marginTop: 12 }]}>
+                        <Text style={[styles.metaLabel, { color: '#B91C1C' }]}>Rejection Reason</Text>
+                        <Text style={{ fontSize: 14, color: '#991B1B', marginTop: 4, fontWeight: '500' }}>
+                          {selectedRequest.rejectionReason || 'No reason provided.'}
+                        </Text>
+                      </View>
+                    )}
+
                     <View style={styles.metaDivider} />
 
                     <View style={styles.metaRow}>
@@ -995,7 +1078,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 42,
     right: 0,
-    width: 160,
+    minWidth: 240,
     backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.md,
     borderWidth: 1,
@@ -1139,12 +1222,12 @@ const styles = StyleSheet.create({
   },
 
   // Column Flex Multipliers
-  flexTitle: { flex: 2.2 },
-  flexDept: { flex: 1 },
+  flexTitle: { flex: 2 },
+  flexDept: { flex: 2.2 },
   flexUser: { flex: 1.5 },
-  flexDate: { flex: 1.3 },
-  flexPlatforms: { flex: 1.2 },
-  flexActions: { flex: 2 },
+  flexDate: { flex: 1.2 },
+  flexPlatforms: { flex: 1 },
+  flexActions: { flex: 1.5 },
   alignRight: { textAlign: 'right' },
 
   tableRow: {

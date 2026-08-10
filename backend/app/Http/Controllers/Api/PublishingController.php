@@ -89,7 +89,7 @@ class PublishingController extends Controller
             DB::commit();
 
             // Notify IT Admins of manual publish success
-            $itAdmins = User::whereHas('roles', fn($q) => $q->where('name', 'admin'))
+            $itAdmins = User::whereHas('roles', fn($q) => $q->whereIn('name', ['it_publisher', 'it_admin']))
                 ->where('status', 'active')->get();
             if ($itAdmins->isNotEmpty()) {
                 Notification::send($itAdmins, new PostPublishedSuccessNotification($post, $publishResults));
@@ -109,7 +109,7 @@ class PublishingController extends Controller
 
             // Notify IT Admins of failure
             try {
-                $itAdmins = User::whereHas('roles', fn($q) => $q->where('name', 'admin'))
+                $itAdmins = User::whereHas('roles', fn($q) => $q->whereIn('name', ['it_publisher', 'it_admin']))
                     ->where('status', 'active')->get();
                 if ($itAdmins->isNotEmpty()) {
                     Notification::send($itAdmins, new PostPublishingFailedNotification($post, $e->getMessage()));

@@ -14,8 +14,12 @@ class FacebookPublishingService
 
     public function __construct()
     {
-        $this->pageId = \App\Models\SystemSetting::where('key', 'facebook_page_id')->value('value') ?? env('FACEBOOK_PAGE_ID', '');
-        $this->accessToken = \App\Models\SystemSetting::where('key', 'facebook_access_token')->value('value') ?? env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
+        $this->pageId = \Illuminate\Support\Facades\Cache::remember('facebook_page_id', 3600, function () {
+            return \App\Models\SystemSetting::where('key', 'facebook_page_id')->value('value') ?? env('FACEBOOK_PAGE_ID', '');
+        });
+        $this->accessToken = \Illuminate\Support\Facades\Cache::remember('facebook_access_token', 3600, function () {
+            return \App\Models\SystemSetting::where('key', 'facebook_access_token')->value('value') ?? env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
+        });
         $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');
     }
 
@@ -23,7 +27,7 @@ class FacebookPublishingService
      * Publish a post to the Facebook Page.
      * 
      * @param string $message The content of the post
-     * @param string|null $mediaUrl Optional URL to a media file (image)
+     * @param string|null $mediaPath Optional URL to a media file (image)
      * @return array|null Returns the API response containing the post ID if successful
      * @throws Exception
      */

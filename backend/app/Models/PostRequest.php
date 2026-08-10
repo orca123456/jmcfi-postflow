@@ -46,6 +46,8 @@ class PostRequest extends Model
         'imc_branding_checklist',
     ];
 
+    protected $appends = ['current_approval_stage', 'current_stage_label'];
+
     protected function casts(): array
     {
         return [
@@ -123,6 +125,11 @@ class PostRequest extends Model
             // No need for a second orderBy since relation already handles it, but we can be explicit
             ->orderBy('stage_order')
             ->first();
+    }
+
+    public function getCurrentApprovalStageAttribute(): ?string
+    {
+        return $this->currentApprovalStage()?->stage;
     }
 
     public function aiComplianceCheck(): HasOne

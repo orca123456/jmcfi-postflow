@@ -27,12 +27,12 @@ class User extends Authenticatable implements MustVerifyEmail
         'photo_path',
     ];
 
-    protected $appends = ['full_name', 'photo_url', 'department_logo_url'];
-
     protected $hidden = [
         'password',
         'remember_token',
     ];
+
+    protected $appends = ['full_name', 'photo_url', 'department_logo_url'];
 
     protected function casts(): array
     {
@@ -107,10 +107,30 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->status === 'active';
     }
 
-    public function hasAnyRole(array $roles): bool
+    /**
+     * Map the user's raw DB role to the app's role category used for data scoping.
+     * The DB stores granular roles (it_publisher, office_head, vice_president,
+     * imc_qa_checker, content_requestor, requestor), while the app logic is written
+     * against three categories — mirroring the frontend normalization:
+     *   - admin     -> it_publisher, it_admin
+     *   - approver  -> office_head, vice_president, imc_qa_checker
+     *   - requestor -> requestor, content_requestor
+     */
+    public function roleCategory(): string
     {
-        return $this->hasAnyRole($roles);
+        $role = $this->getRoleNames()->first();
+
+        return match ($role) {
+            'it_publisher', 'it_admin' => 'admin',
+            'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
+            'requestor', 'content_requestor' => 'requestor',
+            default => $role ?? 'requestor',
+        };
     }
+
+    // NOTE: hasAnyRole() intentionally not overridden — Spatie's HasRoles trait
+    // provides it. A previous custom override recursively called itself and
+    // exhausted PHP's memory (fixed 2026-08-09).
 
     public static function roleLabels(): array
     {

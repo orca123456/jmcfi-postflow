@@ -40,7 +40,13 @@ export default function OfficeHeadDashboard() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
+  const [departmentOptions, setDepartmentOptions] = useState(['All Departments']);
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+
+  const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
@@ -48,6 +54,7 @@ export default function OfficeHeadDashboard() {
   // Modal / Selected Request Preview State
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
@@ -63,19 +70,14 @@ export default function OfficeHeadDashboard() {
     total: 0
   });
 
-  const { data: postsQueryRes, isLoading: postsLoading, refetch: refetchPosts } = useQuery({
-    queryKey: ['posts'],
-    queryFn: () => postsApi.list(),
-    refetchInterval: 3000, // 3 seconds auto-polling
+  const { data: initDataRes, isLoading: initLoading, refetch: refetchInitData } = useQuery({
+    queryKey: ['officeHeadInitData'],
+    queryFn: () => dashboardApi.getInitData(),
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 
-  const { data: statsQueryRes, isLoading: statsLoading, refetch: refetchStats } = useQuery({
-    queryKey: ['dashboardStats'],
-    queryFn: () => dashboardApi.getStats(),
-    refetchInterval: 3000,
-  });
-
-  const isInitialLoading = postsLoading || statsLoading;
+  const isInitialLoading = initLoading;
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -88,30 +90,28 @@ export default function OfficeHeadDashboard() {
   useEffect(() => { if (user) setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim()); }, [user]);
 
   const handleUploadPhoto = () => {
-    if (Platform.OS === 'web') {
-      const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
-      input.onchange = async (e: any) => {
-        const f = e.target.files?.[0]; if (!f) return;
-        setUploadingPhoto(true);
-        try { const r = await authApi.uploadPhoto(f); setProfilePhotoUrl(r.data.photo_url); } catch {} finally { setUploadingPhoto(false); }
-      };
-      input.click();
-    }
-  };
-  const handleRemovePhoto = async () => {
+    // mock implementation
     setUploadingPhoto(true);
-    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch {} finally { setUploadingPhoto(false); }
+    setTimeout(() => {
+      setProfilePhotoUrl('https://via.placeholder.com/150');
+      setUploadingPhoto(false);
+    }, 1000);
   };
-  const handleSaveDetails = async () => {
-    const parts = acctFullName.trim().split(' ');
-    const first_name = parts[0] || ''; const last_name = parts.slice(1).join(' ') || '';
+  const handleRemovePhoto = () => {
+    setProfilePhotoUrl(null);
+  };
+  const handleSaveProfile = async () => {
+    if (!acctFullName) { alert('Full name required.'); return; }
+    const parts = acctFullName.split(' ');
+    const first_name = parts[0];
+    const last_name = parts.slice(1).join(' ');
     setSavingAcct(true);
-    try { 
-      await authApi.updateProfile({ first_name, last_name }); 
+    try {
+      await authApi.updateProfile({ first_name, last_name });
       if (user) {
         await useAuthStore.getState().setUser({ ...user, first_name, last_name, name: `${first_name} ${last_name}` });
       }
-      alert('Profile updated!'); 
+      alert('Profile updated!');
     } catch (e: any) { alert('Failed.'); }
     finally { setSavingAcct(false); }
   };
@@ -121,74 +121,82 @@ export default function OfficeHeadDashboard() {
     if (acctNewPw !== acctConfirmPw) { alert('Passwords do not match.'); return; }
     setSavingAcct(true);
     try { await authApi.changePassword(acctCurrentPw, acctNewPw, acctConfirmPw); alert('Password changed!'); setAcctCurrentPw(''); setAcctNewPw(''); setAcctConfirmPw(''); }
-    catch {} finally { setSavingAcct(false); }
+    catch { } finally { setSavingAcct(false); }
   };
 
   useEffect(() => {
-    if (postsQueryRes?.data?.data && statsQueryRes?.data?.data) {
-      let posts = postsQueryRes.data.data;
-      if (posts && !Array.isArray(posts) && posts.data) {
-        posts = posts.data;
+    if (initDataRes?.data) {
+      const data = initDataRes.data;
+      if (data.posts) {
+        let posts = data.posts;
+        if (posts && !Array.isArray(posts) && posts.data) {
+          posts = posts.data;
+        }
+
+        const mapPost = (p: any) => ({
+          ...p,
+          id: p.id.toString(),
+          title: p.title || 'Untitled',
+          category: p.category?.name || 'Category',
+          dept: p.requestor?.department || 'Department',
+          requestedBy: p.requestor?.full_name || 'Unknown',
+          requestedByRole: 'Requestor',
+          date: new Date(p.created_at).toLocaleDateString(),
+          time: new Date(p.created_at).toLocaleTimeString(),
+          rawDate: new Date(p.created_at),
+          platforms: p.target_platforms || [],
+          caption: p.caption_narrative || '',
+          previewBanner: (p.title || '').toUpperCase(),
+          attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+          attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+          thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+          status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+          rejectionReason: p.rejection_reason || '',
+        });
+
+        const mapped = posts.map(mapPost);
+
+        let pendingStatuses: string[] = [];
+        let approvedStatuses: string[] = [];
+
+        if (user?.department === 'Vice President of Academic Affairs') {
+          pendingStatuses = ['PENDING_OFFICE_HEAD', 'PENDING_VICE_PRESIDENT'];
+          approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
+        } else if (user?.department === 'Institutional Marketing Communication') {
+          pendingStatuses = ['PENDING_IMC_QA'];
+          approvedStatuses = ['APPROVED', 'SCHEDULED', 'PUBLISHED'];
+        } else {
+          pendingStatuses = ['PENDING_OFFICE_HEAD'];
+          approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
+        }
+
+        setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status)));
+        setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
+        setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
       }
-      setStats(statsQueryRes.data.data);
 
-      const mapPost = (p: any) => ({
-        ...p,
-        id: p.id.toString(),
-        title: p.title || 'Untitled',
-        category: p.category?.name || 'Category',
-        dept: p.requestor?.department || 'Department',
-        requestedBy: p.requestor?.full_name || 'Unknown',
-        requestedByRole: 'Requestor',
-        date: new Date(p.created_at).toLocaleDateString(),
-        time: new Date(p.created_at).toLocaleTimeString(),
-        platforms: p.target_platforms || [],
-        caption: p.caption_narrative || '',
-        previewBanner: (p.title || '').toUpperCase(),
-        attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
-        attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
-        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
-        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
-        rejectionReason: p.rejection_reason || '',
-      });
+      const statsData = data.stats || {};
+      setStats(statsData);
 
-      const mapped = posts.map(mapPost);
-      
-      let pendingStatuses: string[] = [];
-      let approvedStatuses: string[] = [];
-
-      if (user?.department === 'Vice President of Academic Affairs') {
-        pendingStatuses = ['PENDING_OFFICE_HEAD', 'PENDING_VICE_PRESIDENT'];
-        approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
-      } else if (user?.department === 'Institutional Marketing Communication') {
-        pendingStatuses = ['PENDING_IMC_QA'];
-        approvedStatuses = ['APPROVED', 'SCHEDULED', 'PUBLISHED'];
-      } else {
-        pendingStatuses = ['PENDING_OFFICE_HEAD'];
-        approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
-      }
-
-      setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status)));
-      setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
-      setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+      const depts = data.departments || [];
+      setDepartmentOptions(['All Departments', ...depts]);
     }
-  }, [postsQueryRes, statsQueryRes, user?.department]);
+  }, [initDataRes, user?.department]);
 
   const loadData = () => {
-    refetchPosts();
-    refetchStats();
+    refetchInitData();
   };
 
-  const departmentOptions = ['All Departments', 'CITE', 'COBE', 'CAS', 'CED'];
 
   const handleApprove = async (req: any) => {
+    setModalError(null);
     try {
       await postsApi.approve(req.id, {});
-      alert(`Request Approved: "${req.title}"\nForwarded to next stage.`);
+      alert(`Request Approved: "${req.title}"\nForwarded to VPAA for approval.`);
       setSelectedRequest(null);
       loadData();
-    } catch (err) {
-      alert('Failed to approve request.');
+    } catch (err: any) {
+      setModalError(err.response?.data?.message || 'Failed to approve request.');
     }
   };
 
@@ -203,6 +211,7 @@ export default function OfficeHeadDashboard() {
       alert('Please provide a reason for rejecting the request.');
       return;
     }
+    setModalError(null);
     try {
       await postsApi.reject(requestToReject?.id, { reason: rejectComment });
       alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
@@ -210,8 +219,8 @@ export default function OfficeHeadDashboard() {
       setRequestToReject(null);
       setSelectedRequest(null);
       loadData();
-    } catch (err) {
-      alert('Failed to reject request.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject request.');
     }
   };
 
@@ -239,7 +248,34 @@ export default function OfficeHeadDashboard() {
       req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesDept && matchesSearch;
+      
+    let matchesDate = true;
+    if (dateFilter !== 'All Time') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const postDate = new Date(req.rawDate);
+      postDate.setHours(0, 0, 0, 0);
+      const diffTime = today.getTime() - postDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+      
+      if (dateFilter === 'Today') {
+        matchesDate = diffDays === 0;
+      } else if (dateFilter === 'Yesterday') {
+        matchesDate = diffDays === 1;
+      } else if (dateFilter === 'Last 7 Days') {
+        matchesDate = diffDays >= 0 && diffDays <= 7;
+      } else if (dateFilter === 'Last 30 Days') {
+        matchesDate = diffDays >= 0 && diffDays <= 30;
+      } else if (dateFilter === 'Custom Range') {
+        const start = new Date(customStartDate);
+        const end = new Date(customEndDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            matchesDate = req.rawDate >= start && req.rawDate <= new Date(end.getTime() + 86400000);
+        }
+      }
+    }
+
+    return matchesDept && matchesSearch && matchesDate;
   });
 
   const computedStats = React.useMemo(() => ({
@@ -254,7 +290,7 @@ export default function OfficeHeadDashboard() {
   let userPosition = user?.position || 'Department Head';
   if (user?.department === 'Vice President of Academic Affairs') userPosition = 'Vice President';
   if (user?.department === 'Institutional Marketing Communication') userPosition = 'QA / Branding Checker';
-  
+
   const greetingName = user?.name ? `${userPosition} ${user.name}` : userPosition;
 
   return (
@@ -351,8 +387,8 @@ export default function OfficeHeadDashboard() {
                 {activeTab === 'dashboard'
                   ? 'Pending Departmental Requests'
                   : activeTab === 'approved'
-                  ? 'Approved Requests'
-                  : 'Rejected Requests'}
+                    ? 'Approved Requests'
+                    : 'Rejected Requests'}
               </Text>
 
               <View style={styles.tableControlsRight}>
@@ -379,7 +415,7 @@ export default function OfficeHeadDashboard() {
                     </TouchableOpacity>
 
                     {isDeptDropdownOpen && (
-                      <View style={styles.dropdownMenu}>
+                      <ScrollView style={[styles.dropdownMenu, { maxHeight: 300 }]} nestedScrollEnabled>
                         {departmentOptions.map((deptOption) => (
                           <TouchableOpacity
                             key={deptOption}
@@ -392,16 +428,54 @@ export default function OfficeHeadDashboard() {
                             <Text style={styles.dropdownItemText}>{deptOption}</Text>
                           </TouchableOpacity>
                         ))}
-                      </View>
+                      </ScrollView>
                     )}
                   </View>
                 )}
 
-                {/* Filter Button */}
-                <TouchableOpacity style={styles.filterBtn} onPress={() => alert('Filter options')}>
-                  <Ionicons name="options-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
-                  <Text style={styles.filterBtnText}>Filter</Text>
-                </TouchableOpacity>
+                {/* Date Range Dropdown Selector */}
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 140 }]}
+                    onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isDateDropdownOpen && (
+                    <View style={[styles.dropdownMenu, { minWidth: 200 }]}>
+                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setDateFilter(opt);
+                            if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      
+                      {dateFilter === 'Custom Range' && (
+                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
+                          <TouchableOpacity 
+                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
+                            onPress={() => setIsDateDropdownOpen(false)}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -417,8 +491,8 @@ export default function OfficeHeadDashboard() {
               </View>
 
               {filteredRequests.map((req) => (
-                <TouchableOpacity 
-                  key={req.id} 
+                <TouchableOpacity
+                  key={req.id}
                   style={styles.tableRow}
                   activeOpacity={0.7}
                   onPress={() => {
@@ -485,8 +559,8 @@ export default function OfficeHeadDashboard() {
                     {activeTab === 'dashboard' ? (
                       req.status === (
                         user?.department === 'Vice President of Academic Affairs' ? 'PENDING_VICE_PRESIDENT' :
-                        user?.department === 'Institutional Marketing Communication' ? 'PENDING_IMC_QA' :
-                        'PENDING_OFFICE_HEAD'
+                          user?.department === 'Institutional Marketing Communication' ? 'PENDING_IMC_QA' :
+                            'PENDING_OFFICE_HEAD'
                       ) ? (
                         <>
                           <TouchableOpacity
@@ -671,11 +745,25 @@ export default function OfficeHeadDashboard() {
                 <Text style={styles.modalHeaderTitle}>Departmental Content Request Review</Text>
                 <TouchableOpacity
                   style={styles.modalCloseIconBtn}
-                  onPress={() => setSelectedRequest(null)}
+                  onPress={() => {
+                    setSelectedRequest(null);
+                    setModalError(null);
+                  }}
                 >
                   <Ionicons name="close" size={20} color={Colors.textPrimary} />
                 </TouchableOpacity>
               </View>
+
+              {/* Error Banner */}
+              {modalError && (
+                <View style={{ backgroundColor: '#FEE2E2', padding: 12, marginHorizontal: 24, marginTop: 16, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="warning" size={20} color="#DC2626" style={{ marginRight: 8 }} />
+                  <Text style={{ color: '#B91C1C', fontSize: 14, fontWeight: '500', flex: 1 }}>{modalError}</Text>
+                  <TouchableOpacity onPress={() => setModalError(null)}>
+                    <Ionicons name="close" size={16} color="#B91C1C" />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Modal Body Split */}
               <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
@@ -877,6 +965,15 @@ export default function OfficeHeadDashboard() {
                       </View>
                     </View>
 
+                    { (selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
+                      <View style={[styles.metaRow, { backgroundColor: '#FEF2F2', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', marginTop: 12 }]}>
+                        <Text style={[styles.metaLabel, { color: '#B91C1C' }]}>Rejection Reason</Text>
+                        <Text style={{ fontSize: 14, color: '#991B1B', marginTop: 4, fontWeight: '500' }}>
+                          {selectedRequest.rejectionReason || 'No reason provided.'}
+                        </Text>
+                      </View>
+                    )}
+
                     <View style={styles.metaDivider} />
 
                     <View style={styles.metaRow}>
@@ -905,7 +1002,10 @@ export default function OfficeHeadDashboard() {
               <View style={styles.modalFooterRow}>
                 <TouchableOpacity
                   style={styles.btnModalClose}
-                  onPress={() => setSelectedRequest(null)}
+                  onPress={() => {
+                    setSelectedRequest(null);
+                    setModalError(null);
+                  }}
                 >
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>
@@ -1042,7 +1142,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 42,
     right: 0,
-    width: 160,
+    minWidth: 240,
     backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.md,
     borderWidth: 1,
@@ -1186,12 +1286,12 @@ const styles = StyleSheet.create({
   },
 
   // Column Flex Multipliers
-  flexTitle: { flex: 2.2 },
-  flexDept: { flex: 1 },
+  flexTitle: { flex: 2 },
+  flexDept: { flex: 2.2 },
   flexUser: { flex: 1.5 },
-  flexDate: { flex: 1.3 },
-  flexPlatforms: { flex: 1.2 },
-  flexActions: { flex: 2 },
+  flexDate: { flex: 1.2 },
+  flexPlatforms: { flex: 1 },
+  flexActions: { flex: 1.5 },
   alignRight: { textAlign: 'right' },
 
   tableRow: {

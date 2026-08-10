@@ -40,9 +40,9 @@ class SystemSettingsSeeder extends Seeder
             ],
             [
                 'key' => 'ai_model',
-                'value' => 'nvidia/nemotron-3-ultra-550b-a55b',
+                'value' => 'deepseek-chat',
                 'type' => 'string',
-                'description' => 'NVIDIA AI model for content compliance checking',
+                'description' => 'DeepSeek AI model for content compliance checking',
                 'is_public' => false,
             ],
             [
