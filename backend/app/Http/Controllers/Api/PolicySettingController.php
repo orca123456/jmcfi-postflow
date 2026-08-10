@@ -37,7 +37,7 @@ class PolicySettingController extends Controller
     public function updateSettings(Request $request): JsonResponse
     {
         // Require admin role
-        if ($request->user() && $request->user()->role !== 'admin') {
+        if ($request->user() && $request->user()->roleCategory() !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Admin role required.'], 403);
         }
 

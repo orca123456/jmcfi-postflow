@@ -41,21 +41,23 @@ class UserController extends Controller
             'role' => 'required|string|exists:roles,name',
         ]);
 
-        // Auto-set position based on role + department
+        // Auto-set position based on role category (mirrors User::roleCategory)
         $dept = $validated['department'] ?? null;
         $role = $validated['role'];
-        $FIXED_DEPTS = ['Information Technology Office', 'Vice President of Academic Affairs', 'Institutional Marketing Communication'];
         $position = $validated['position'] ?? null;
         if (!$position) {
-            if ($role === 'approver') {
-                if ($dept === 'Institutional Marketing Communication') {
-                    $position = 'QA / Branding Checker';
-                } elseif ($dept === 'Vice President of Academic Affairs') {
-                    $position = 'Vice President';
-                } elseif ($dept && !in_array($dept, $FIXED_DEPTS)) {
-                    $position = 'Department Head';
-                }
-            } elseif ($role === 'admin') {
+            $category = match ($role) {
+                'it_publisher', 'it_admin' => 'admin',
+                'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
+                default => 'requestor',
+            };
+            if ($category === 'approver') {
+                $position = match ($role) {
+                    'vice_president' => 'Vice President',
+                    'imc_qa_checker' => 'QA / Branding Checker',
+                    default => 'Department Head',
+                };
+            } elseif ($category === 'admin') {
                 $position = 'IT Administrator';
             }
         }

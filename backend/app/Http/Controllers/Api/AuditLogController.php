@@ -10,7 +10,7 @@ class AuditLogController extends Controller
 {
     public function index(Request $request)
     {
-        $query = AuditLog::with('user')->orderBy('created_at', 'desc');
+        $query = AuditLog::with('user.roles')->orderBy('created_at', 'desc');
         
         $logs = $query->paginate(50);
         

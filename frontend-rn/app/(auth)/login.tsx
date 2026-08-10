@@ -14,6 +14,8 @@ interface FloatingLabelProps extends TextInputProps {
   secureTextEntry?: boolean;
   rightIcon?: React.ReactNode;
   containerStyle?: ViewStyle;
+  id?: string;
+  name?: string;
 }
 
 const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
@@ -168,6 +170,8 @@ export default function LoginScreen() {
               <View style={styles.field}>
                 <FloatingLabelInput
                   label="Email"
+                  id="email"
+                  name="email"
                   value={email}
                   onChangeText={handleEmailChange}
                   keyboardType="email-address"
@@ -183,6 +187,8 @@ export default function LoginScreen() {
                 <FloatingLabelInput
                   ref={passwordRef}
                   label="Password"
+                  id="password"
+                  name="password"
                   value={password}
                   onChangeText={handlePasswordChange}
                   secureTextEntry={!showPassword}

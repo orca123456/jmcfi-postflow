@@ -4,6 +4,7 @@ backend/vendor/
 
 # Build outputs
 frontend-rn/.expo/
+frontend-rn/.metro-cache/
 frontend-rn/dist/
 frontend-rn/build/
 

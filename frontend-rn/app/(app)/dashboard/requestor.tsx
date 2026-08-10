@@ -48,7 +48,7 @@ export default function RequestorDashboard() {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [apiCategories, setApiCategories] = useState<{ id: number; name: string }[]>([]);
   const [department, setDepartment] = useState(user?.department || 'ICT');
-  
+
   useEffect(() => {
     if (user?.department) {
       setDepartment(user.department);
@@ -76,6 +76,7 @@ export default function RequestorDashboard() {
   // Dashboard Page State
   const [dashboardPage, setDashboardPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Active Post for Dialog/Comments Modal
@@ -112,9 +113,9 @@ export default function RequestorDashboard() {
     }
     // Fetch latest user details on mount to ensure photo_url is up to date
     authApi.getUser().then(res => {
-       const photo = res.data?.user?.photo_url || res.data?.photo_url;
-       if (photo) setProfilePhotoUrl(photo);
-    }).catch(() => {});
+      const photo = res.data?.user?.photo_url || res.data?.photo_url;
+      if (photo) setProfilePhotoUrl(photo);
+    }).catch(() => { });
   }, [user]);
 
   const handleUploadPhoto = () => {
@@ -141,12 +142,12 @@ export default function RequestorDashboard() {
     const parts = acctFullName.trim().split(' ');
     const first_name = parts[0] || ''; const last_name = parts.slice(1).join(' ') || '';
     setSavingAcct(true);
-    try { 
-      await authApi.updateProfile({ first_name, last_name }); 
+    try {
+      await authApi.updateProfile({ first_name, last_name });
       if (user) {
         await useAuthStore.getState().setUser({ ...user, first_name, last_name, name: `${first_name} ${last_name}` });
       }
-      alert('Profile updated!'); 
+      alert('Profile updated!');
     } catch (e: any) { alert('Failed.'); }
     finally { setSavingAcct(false); }
   };
@@ -262,12 +263,12 @@ export default function RequestorDashboard() {
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  const loadPosts = async () => {
-    setIsInitialLoading(true);
+  const loadPosts = async (showLoading = true) => {
+    if (showLoading) setIsInitialLoading(true);
     try {
       const res = await postsApi.list();
       const posts = res.data.data;
-      
+
       const mapPost = (p: any) => ({
         ...p,
         id: p.id.toString(),
@@ -278,6 +279,7 @@ export default function RequestorDashboard() {
         department: p.requestor?.department || 'Department',
         date: new Date(p.created_at).toLocaleDateString(),
         dateSaved: new Date(p.created_at).toLocaleDateString(),
+        rawStatus: p.status, // Add rawStatus for reliable filtering
         status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
         statusLabel: p.status_label || p.status,
         statusColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
@@ -303,19 +305,21 @@ export default function RequestorDashboard() {
       });
 
       const mapped = posts.map(mapPost);
-      setMockRequests(mapped.filter((p: any) => p.status !== 'DRAFT'));
-      setMockQueuePosts(mapped.filter((p: any) => p.status !== 'DRAFT'));
-      setDrafts(mapped.filter((p: any) => p.status === 'DRAFT'));
-      setRejectedPosts(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+      setMockRequests(mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision'));
+      setMockQueuePosts(mapped.filter((p: any) => p.rawStatus !== 'draft'));
+      setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
+      setRejectedPosts(mapped.filter((p: any) => p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision'));
     } catch (err) {
-      console.error('Failed to load posts', err);
+      console.error(err);
     } finally {
-      setIsInitialLoading(false);
+      if (showLoading) setIsInitialLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPosts();
+    loadPosts(true);
+    const interval = setInterval(() => loadPosts(false), 10000);
+    return () => clearInterval(interval);
   }, [activeTab]);
 
   const handleSaveDraft = async () => {
@@ -340,7 +344,7 @@ export default function RequestorDashboard() {
         await postsApi.create(payload);
         alert('Content request saved as draft!');
       }
-      
+
       setEditingPostId(null);
       loadPosts();
       setActiveTab('dashboard');
@@ -365,7 +369,7 @@ export default function RequestorDashboard() {
       alert('Please attach at least one media or asset file before submitting.');
       return;
     }
-    
+
     try {
       const payload: any = {
         title: postTitle,
@@ -394,7 +398,7 @@ export default function RequestorDashboard() {
         if (payload.preferred_schedule_at) {
           formData.append('preferred_schedule_at', payload.preferred_schedule_at);
         }
-        
+
         mediaFiles.forEach((file: any, idx: number) => {
           if (Platform.OS === 'web' && file.file) {
             formData.append('media[]', file.file);
@@ -406,7 +410,7 @@ export default function RequestorDashboard() {
             } as any);
           }
         });
-        
+
         supportingDocs.forEach((file: any, idx: number) => {
           if (Platform.OS === 'web' && file.file) {
             formData.append('supporting_docs[]', file.file);
@@ -418,7 +422,7 @@ export default function RequestorDashboard() {
             } as any);
           }
         });
-        
+
         if (editingPostId) {
           res = await postsApi.updateWithFiles(Number(editingPostId), formData);
         } else {
@@ -431,11 +435,11 @@ export default function RequestorDashboard() {
           res = await postsApi.create(payload);
         }
       }
-      
+
       if (editingPostId) {
         await postsApi.submit(Number(editingPostId));
       }
-      
+
       alert('Content request submitted successfully for review!');
       setEditingPostId(null);
       setPostTitle('');
@@ -464,18 +468,18 @@ export default function RequestorDashboard() {
       alert('Please write a caption first.');
       return;
     }
-    
+
     setIsCheckingPolicy(true);
     try {
       const response = await postsApi.aiCheckDraft({ title: postTitle, caption_narrative: caption });
       const data = response.data.data;
       if (data.overall_status === 'error') {
-         alert('AI Analysis failed: ' + data.analysis_logic);
+        alert('AI Analysis failed: ' + data.analysis_logic);
       } else {
-         setComplianceScore(data.compliance_score);
-         setComplianceStatus(data.overall_status);
-         setComplianceAnalysis(data.analysis_logic);
-         setIsComplianceModalVisible(true);
+        setComplianceScore(data.compliance_score);
+        setComplianceStatus(data.overall_status);
+        setComplianceAnalysis(data.analysis_logic);
+        setIsComplianceModalVisible(true);
       }
     } catch (e: any) {
       alert('Failed to check policy alignment: ' + (e.response?.data?.message || e.message));
@@ -584,7 +588,7 @@ export default function RequestorDashboard() {
         { label: 'Publisher', state: 'upcoming' },
       ];
     }
-    
+
     return [];
   };
 
@@ -618,7 +622,7 @@ export default function RequestorDashboard() {
           </View>
 
           {/* Metrics Row */}
-          
+
 
           {/* Recent Post Requests Table */}
           <Card style={styles.tableCard}>
@@ -634,6 +638,29 @@ export default function RequestorDashboard() {
                     onChangeText={setSearchQuery}
                   />
                 </View>
+
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      backgroundColor: '#F3F4F6',
+                      color: '#374151',
+                      fontSize: '14px',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      marginRight: '8px'
+                    }}
+                  >
+                    <option value="All">All Status</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                  </select>
+                ) : null}
+
                 <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
                   <Ionicons name={sortOrder === 'desc' ? 'filter' : 'filter-outline'} size={16} color={Colors.textSecondary} />
                 </TouchableOpacity>
@@ -652,50 +679,57 @@ export default function RequestorDashboard() {
 
               {mockRequests
                 .filter(req => (req.title && req.title.toLowerCase().includes(searchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(searchQuery.toLowerCase())))
+                .filter(req => {
+                  if (statusFilter === 'All') return true;
+                  const st = req.status || '';
+                  if (statusFilter === 'PENDING') return st.includes('PENDING');
+                  if (statusFilter === 'APPROVED') return st === 'APPROVED' || st === 'PUBLISHED' || st === 'SCHEDULED';
+                  return st === statusFilter;
+                })
                 .sort((a, b) => {
                   const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
                   const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
                   return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
                 })
                 .map((req) => (
-                <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedRow(req)}>
-                  <View style={[styles.cellFlex2, styles.titleCellContainer]}>
-                    <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
-                      {req.thumbnailUrl ? (
-                        <Image
-                          source={{ uri: req.thumbnailUrl }}
-                          style={{ width: '100%', height: '100%', borderRadius: 4 }}
-                          resizeMode="cover"
-                          onError={() => {}}
-                        />
-                      ) : (
-                        <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
-                      )}
+                  <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedRow(req)}>
+                    <View style={[styles.cellFlex2, styles.titleCellContainer]}>
+                      <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
+                        {req.thumbnailUrl ? (
+                          <Image
+                            source={{ uri: req.thumbnailUrl }}
+                            style={{ width: '100%', height: '100%', borderRadius: 4 }}
+                            resizeMode="cover"
+                            onError={() => { }}
+                          />
+                        ) : (
+                          <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
+                        )}
+                      </View>
+                      <View>
+                        <Text style={styles.postTitleText}>{req.title}</Text>
+                        <Text style={styles.postPlatformsText}>{req.platforms}</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={styles.postTitleText}>{req.title}</Text>
-                      <Text style={styles.postPlatformsText}>{req.platforms}</Text>
+                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.category}</Text>
+                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.date}</Text>
+                    <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
+                      <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
+                        <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
+                          {req.status}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.category}</Text>
-                  <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.date}</Text>
-                  <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
-                    <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
-                      <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
-                        {req.status}
-                      </Text>
+                    <View style={[styles.cellFlex1, styles.actionsCell]}>
+                      <TouchableOpacity onPress={() => alert(`Previewing ${req.title}`)}>
+                        <Ionicons name={req.actionIcon1} size={16} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => alert(`Executing action on ${req.title}`)}>
+                        <Ionicons name={req.actionIcon2} size={16} color={Colors.textSecondary} />
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                  <View style={[styles.cellFlex1, styles.actionsCell]}>
-                    <TouchableOpacity onPress={() => alert(`Previewing ${req.title}`)}>
-                      <Ionicons name={req.actionIcon1} size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => alert(`Executing action on ${req.title}`)}>
-                      <Ionicons name={req.actionIcon2} size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))}
             </View>
 
             <View style={styles.tableFooter}>
@@ -834,7 +868,7 @@ export default function RequestorDashboard() {
                     </View>
                     <Text style={styles.cardTitle}>Target Platforms</Text>
                   </View>
-                  
+
                   <View style={styles.platformsList}>
                     <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('facebook')}>
                       <View style={styles.platformLeft}>
@@ -1104,7 +1138,7 @@ export default function RequestorDashboard() {
               <View style={styles.rightColumn}>
                 <Card style={[styles.formCard, { flex: 1 }] as any}>
                   <View style={styles.cardHeader}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.headerIconWrapper, { backgroundColor: Colors.primary }]}
                       onPress={() => setIsPreviewModalOpen(true)}
                     >
@@ -1112,7 +1146,7 @@ export default function RequestorDashboard() {
                     </TouchableOpacity>
                     <Text style={styles.cardTitle}>Live Preview</Text>
                   </View>
-                  
+
                   <View style={styles.previewModeRow}>
                     <TouchableOpacity
                       style={[styles.previewToggleBtn, previewMode === 'mobile' && styles.previewToggleBtnActive]}
@@ -1151,7 +1185,7 @@ export default function RequestorDashboard() {
                     </View>
 
                     {mediaFiles && mediaFiles.length > 0 ? (
-                      <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4/3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
                         <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       </View>
                     ) : (
@@ -1224,7 +1258,7 @@ export default function RequestorDashboard() {
                     {post.nextAction}
                   </Text>
                 </View>
-                
+
                 {/* Action Buttons */}
                 <View style={styles.queueCardActions}>
                   <TouchableOpacity
@@ -1465,86 +1499,35 @@ export default function RequestorDashboard() {
           ) : (
             <View style={{ gap: Spacing.lg }}>
               {rejectedPosts.map((post) => (
-                <Card key={post.id} style={[styles.formCard, { borderColor: '#FECDD3' }] as any}>
-                  {/* Rejected Card Header */}
-                  <View style={styles.queueCardHeader}>
-                    <View style={styles.queueCardTitleCol}>
-                      <Text style={styles.queuePostTitle}>{post.title}</Text>
-                      <Text style={styles.queuePostMeta}>
-                        Rejected Date: {post.rejectedDate} &bull; Category: {post.category}
+                <TouchableOpacity 
+                  key={post.id} 
+                  activeOpacity={0.7} 
+                  onPress={() => setSelectedQueuePost(post)}
+                >
+                  <Card style={[styles.formCard, { borderColor: '#FECDD3', padding: Spacing.md }] as any}>
+                    {/* Rejected Card Header */}
+                    <View style={styles.queueCardHeader}>
+                      <View style={styles.queueCardTitleCol}>
+                        <Text style={styles.queuePostTitle}>{post.title}</Text>
+                        <Text style={styles.queuePostMeta}>
+                          Rejected Date: {post.rejectedDate} &bull; Category: {post.category}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}>
+                        <Text style={[styles.statusBadgeText, { color: '#B91C1C' }]}>
+                          REJECTED
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ marginTop: Spacing.sm, flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="eye-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                      <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: '500' }}>
+                        Tap to view rejection remarks and details
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}>
-                      <Text style={[styles.statusBadgeText, { color: '#B91C1C' }]}>
-                        REJECTED
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Approver Remarks Container */}
-                  <View style={{
-                    backgroundColor: '#FFF1F2',
-                    borderWidth: 1,
-                    borderColor: '#FDA4AF',
-                    borderRadius: 6,
-                    padding: Spacing.md,
-                    gap: 6,
-                  }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="alert-circle" size={18} color="#E11D48" />
-                      <Text style={{ fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#9F1239' }}>
-                        Approver Remarks ({post.rejectedBy}):
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: FontSize.sm, color: '#881337', lineHeight: 20 }}>
-                      "{post.rejectionReason}"
-                    </Text>
-                  </View>
-
-                  {/* Post Content Details Preview */}
-                  <View style={{ backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 6, padding: Spacing.md, gap: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: Colors.textSecondary, letterSpacing: 0.5 }}>
-                      SUBMITTED CAPTION PREVIEW
-                    </Text>
-                    <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
-                      {post.caption}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
-                      Department: {post.department}
-                    </Text>
-                  </View>
-
-                  {/* Audit Notice Box */}
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: '#F8FAFC',
-                    paddingHorizontal: Spacing.md,
-                    paddingVertical: 10,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                  }}>
-                    <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold' }}>Audit Compliance Notice: </Text>
-                      This rejected record is locked for audit history and cannot be directly resubmitted. Use the button below to generate a new request based on this post.
-                    </Text>
-                  </View>
-
-                  {/* Actions */}
-                  <View style={styles.queueCardFooter}>
-                    <View style={{ flex: 1 }} />
-                    <TouchableOpacity
-                      style={styles.createRequestBtnGold}
-                      onPress={() => handleCreateNewFromRejected(post)}
-                    >
-                      <Ionicons name="add-circle-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                      <Text style={styles.createRequestBtnGoldText}>Create Request Again</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Card>
+                  </Card>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -1570,7 +1553,7 @@ export default function RequestorDashboard() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Approver Feedback Comments</Text>
+                <Text style={styles.modalTitle}>Request Feedback & Details</Text>
                 <TouchableOpacity onPress={() => setSelectedQueuePost(null)}>
                   <Ionicons name="close" size={24} color={Colors.textPrimary} />
                 </TouchableOpacity>
@@ -1581,7 +1564,32 @@ export default function RequestorDashboard() {
                 <Text style={styles.modalPostMeta}>Status: {selectedQueuePost.statusLabel}</Text>
                 <View style={styles.modalDivider} />
 
-                {selectedQueuePost.comments.length > 0 ? (
+                {selectedQueuePost.rawStatus === 'rejected' || selectedQueuePost.rawStatus === 'returned_for_revision' ? (
+                  <View style={{ backgroundColor: '#FFF1F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#FDA4AF', marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+                      <Ionicons name="alert-circle" size={20} color="#E11D48" />
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#9F1239' }}>Approver Rejection Remarks</Text>
+                    </View>
+                    <Text style={{ fontSize: 15, color: '#881337', lineHeight: 22, fontStyle: 'italic' }}>
+                      "{selectedQueuePost.rejectionReason || 'No specific reason provided.'}"
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Show caption preview */}
+                <View style={{ backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 6, padding: Spacing.md, gap: 4, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: Colors.textSecondary, letterSpacing: 0.5 }}>
+                    SUBMITTED CAPTION PREVIEW
+                  </Text>
+                  <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
+                    {selectedQueuePost.caption || 'No caption provided.'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
+                    Department: {selectedQueuePost.department}
+                  </Text>
+                </View>
+
+                {selectedQueuePost.comments && selectedQueuePost.comments.length > 0 ? (
                   selectedQueuePost.comments.map((c: any, index: number) => (
                     <View key={index} style={styles.commentItem}>
                       <View style={styles.commentHeader}>
@@ -1592,7 +1600,9 @@ export default function RequestorDashboard() {
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.noCommentsText}>No comments have been posted for this request yet.</Text>
+                  selectedQueuePost.rawStatus !== 'rejected' && selectedQueuePost.rawStatus !== 'returned_for_revision' && (
+                    <Text style={styles.noCommentsText}>No additional comments have been posted for this request yet.</Text>
+                  )
                 )}
               </ScrollView>
 
@@ -1630,7 +1640,7 @@ export default function RequestorDashboard() {
                 <Text style={styles.modalPostTitle}>{selectedRow.title}</Text>
                 <Text style={styles.modalPostMeta}>Status: {selectedRow.status}</Text>
                 <View style={styles.modalDivider} />
-                
+
                 <View style={styles.stepperContainer}>
                   {getMockSteps(selectedRow.status).map((step, index, arr) =>
                     renderStep(step, index, index === arr.length - 1)
@@ -1640,7 +1650,7 @@ export default function RequestorDashboard() {
                 <View style={styles.modalDivider} />
 
                 <Text style={styles.detailsHeader}>Request Details</Text>
-                
+
                 <View style={styles.detailsSection}>
                   <Text style={styles.detailsLabel}>Caption / Narrative</Text>
                   <Text style={styles.detailsText}>{selectedRow.caption_narrative || 'No caption provided.'}</Text>
@@ -1703,52 +1713,52 @@ export default function RequestorDashboard() {
         >
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 400 : 800, padding: 0, backgroundColor: 'transparent', shadowColor: 'transparent', elevation: 0 }]}>
-              
+
               <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: '#ffffff', maxHeight: '90%' }]}>
                 <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
                   <View style={styles.mockPostHeader}>
-                  <View style={[styles.mockPostAvatarCircle, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
-                    <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <View style={[styles.mockPostAvatarCircle, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+                      <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.mockPostAuthorName}>JMCFI Institutional</Text>
+                      <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setIsPreviewModalOpen(false)}>
+                      <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                    </TouchableOpacity>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.mockPostAuthorName}>JMCFI Institutional</Text>
-                    <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setIsPreviewModalOpen(false)}>
-                    <Ionicons name="close" size={24} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
 
-                <View style={styles.mockPostContentArea}>
-                  <Text style={styles.mockPostCaptionText}>
-                    {caption ? caption : 'Upload media to see your content preview here...'}
-                  </Text>
-                </View>
-
-                {mediaFiles && mediaFiles.length > 0 ? (
-                  <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4/3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
-                    <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  </View>
-                ) : (
-                  <View style={styles.mockPostMediaPlaceholder}>
-                    <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
-                    <Text style={styles.mockPostMediaPlaceholderText}>
-                      Upload media to see your content preview here...
+                  <View style={styles.mockPostContentArea}>
+                    <Text style={styles.mockPostCaptionText}>
+                      {caption ? caption : 'Upload media to see your content preview here...'}
                     </Text>
                   </View>
-                )}
 
-                <View style={styles.mockPostActionsRow}>
-                  <View style={styles.mockActionGroup}>
-                    <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+                  {mediaFiles && mediaFiles.length > 0 ? (
+                    <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    </View>
+                  ) : (
+                    <View style={styles.mockPostMediaPlaceholder}>
+                      <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                      <Text style={styles.mockPostMediaPlaceholderText}>
+                        Upload media to see your content preview here...
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.mockPostActionsRow}>
+                    <View style={styles.mockActionGroup}>
+                      <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+                    </View>
+                    <View style={styles.mockActionGroup}>
+                      <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+                    </View>
+                    <View style={styles.mockActionGroup}>
+                      <Ionicons name="arrow-redo-outline" size={18} color={Colors.textSecondary} />
+                    </View>
                   </View>
-                  <View style={styles.mockActionGroup}>
-                    <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
-                  </View>
-                  <View style={styles.mockActionGroup}>
-                    <Ionicons name="arrow-redo-outline" size={18} color={Colors.textSecondary} />
-                  </View>
-                </View>
                 </ScrollView>
               </View>
 
@@ -1811,16 +1821,16 @@ export default function RequestorDashboard() {
           onRequestClose={() => setFullScreenImage(null)}
         >
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
-            <TouchableOpacity 
-              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }} 
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
               onPress={() => setFullScreenImage(null)}
             >
               <Ionicons name="close" size={32} color="#FFFFFF" />
             </TouchableOpacity>
-            <Image 
-              source={{ uri: fullScreenImage }} 
-              style={{ width: '90%', height: '90%' }} 
-              resizeMode="contain" 
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={{ width: '90%', height: '90%' }}
+              resizeMode="contain"
             />
           </View>
         </Modal>
@@ -3012,7 +3022,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
     lineHeight: 20,
-    
+
   },
   policyFlowTimeline: {
     marginTop: 6,

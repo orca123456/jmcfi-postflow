@@ -192,7 +192,7 @@ return new class extends Migration
             $table->string('suggested_improved_caption')->nullable();
             $table->enum('overall_status', ['pass', 'fail', 'review_required'])->default('review_required');
             $table->decimal('confidence_score', 5, 2)->nullable();
-            $table->string('model_used')->default('nvidia/nemotron-3-ultra-550b-a55b');
+            $table->string('model_used')->default('deepseek-chat');
             $table->text('prompt_used')->nullable();
             $table->timestamps();
         });

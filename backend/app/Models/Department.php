@@ -16,12 +16,14 @@ class Department extends Model
         'description',
         'logo_path',
         'is_active',
+        'role_categories',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'role_categories' => 'array',
         ];
     }
 

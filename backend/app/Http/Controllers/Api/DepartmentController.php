@@ -27,6 +27,8 @@ class DepartmentController extends Controller
             ],
             'display_name' => 'required|string|max:200',
             'description' => 'nullable|string|max:500',
+            'role_categories' => 'nullable|array',
+            'role_categories.*' => 'in:admin,approver,requestor',
         ]);
 
         $department = Department::create([
@@ -34,6 +36,7 @@ class DepartmentController extends Controller
             'display_name' => $validated['display_name'],
             'description' => $validated['description'] ?? null,
             'is_active' => true,
+            'role_categories' => $validated['role_categories'] ?? [],
         ]);
 
         return response()->json([
@@ -51,6 +54,8 @@ class DepartmentController extends Controller
             'display_name' => 'sometimes|string|max:200',
             'description' => 'nullable|string|max:500',
             'is_active' => 'sometimes|boolean',
+            'role_categories' => 'nullable|array',
+            'role_categories.*' => 'in:admin,approver,requestor',
         ]);
 
         $department->update($validated);
@@ -60,17 +65,22 @@ class DepartmentController extends Controller
         ]);
     }
 
-    public function destroy(Department $department): JsonResponse
+    public function destroy(Request $request, Department $department): JsonResponse
     {
-        $protected = [
-            'Information Technology Office', 
-            'Vice President of Academic Affairs', 
-            'Institutional Marketing Communication'
-        ];
-        if (in_array($department->name, $protected)) {
-            return response()->json(['message' => 'Cannot delete protected department.'], 403);
+        // Role-scoped delete: if a role_category is provided, only detach that
+        // role from the department. It stays available for other roles that
+        // share it (e.g. a college used by both Requestor and Approver).
+        $roleCategory = $request->query('role_category');
+        if (in_array($roleCategory, ['admin', 'approver', 'requestor'], true)) {
+            $categories = $department->role_categories ?? [];
+            $categories = array_values(array_filter($categories, fn($c) => $c !== $roleCategory));
+            if (count($categories) > 0) {
+                $department->update(['role_categories' => $categories]);
+                return response()->json(['data' => $department]);
+            }
         }
 
+        // No role scope, or this was the last role using it -> delete the row.
         $department->delete();
         return response()->json(null, 204);
     }

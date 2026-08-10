@@ -12,33 +12,65 @@ use Illuminate\Support\Facades\Cache;
 class DashboardController extends Controller
 {
     /**
+     * Dashboard Initial Data
+     * Consolidates stats, recent activity, and posts into one endpoint to bypass single-threaded bottleneck.
+     */
+    public function getInitData(Request $request): JsonResponse
+    {
+        $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
+        $stats = $postController->getDashboardStats($request)->getData(true)['data'] ?? [];
+        $activities = $this->getRecentActivity($request)->getData(true) ?? [];
+        $postsData = $postController->index($request)->getData(true);
+        $departments = \App\Models\Department::where('is_active', true)
+            ->where('display_name', 'LIKE', 'College%')
+            ->pluck('display_name');
+        
+        return response()->json([
+            'success' => true,
+            'stats' => $stats,
+            'activities' => $activities,
+            'posts' => $postsData,
+            'departments' => $departments,
+        ]);
+    }
+
+    /**
      * Get dashboard stats — cached for 60 seconds.
      * Uses a single GROUP BY query instead of 8 separate COUNTs.
      */
     public function getStats(Request $request): JsonResponse
     {
         $user = $request->user();
+        $category = $user->roleCategory();
         $role = $user->getRoleNames()->first();
 
         // Cache key is role-specific (different roles see different counts)
-        $cacheKey = 'dashboard_stats_' . $role . '_' . $user->id;
+        $cacheKey = 'dashboard_stats_' . $category . '_' . $user->id;
 
-        $stats = Cache::remember($cacheKey, 60, function () use ($user, $role) {
+        $stats = Cache::remember($cacheKey, 60, function () use ($user, $category, $role) {
             $query = PostRequest::query();
 
             // Role-based filtering (mirroring PostRequestController visibility)
-            if ($role === 'requestor') {
+            if ($category === 'requestor') {
                 $query->where('requestor_id', $user->id);
-            } elseif (in_array($role, ['vice_president', 'imc_qa_checker', 'president'])) {
-                $query->where(function ($q) use ($user) {
-                    $q->whereNotIn('status', ['draft', 'returned_for_revision', 'rejected'])
-                      ->orWhereHas('approvalWorkflows', function ($aw) use ($user) {
-                          $aw->where('approver_id', $user->id)
-                             ->whereIn('action', ['rejected', 'returned_for_revision']);
-                      });
-                });
-            } elseif ($role === 'office_head') {
-                $query->whereNotIn('status', ['draft']);
+            } elseif ($category === 'approver') {
+                if ($role === 'vice_president') {
+                    $query->whereNotIn('status', ['draft']);
+                } elseif ($role === 'imc_qa_checker') {
+                    $query->whereIn('status', [
+                        PostRequest::STATUS_PENDING_IMC_QA,
+                        PostRequest::STATUS_APPROVED,
+                        PostRequest::STATUS_SCHEDULED,
+                        PostRequest::STATUS_PUBLISHED,
+                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_REJECTED,
+                        PostRequest::STATUS_RETURNED_FOR_REVISION,
+                    ]);
+                } else { // office_head
+                    $query->whereHas('requestor', function ($q) use ($user) {
+                        $q->where('department', $user->department);
+                    })->whereNotIn('status', ['draft']);
+                }
             }
 
             // ── Single GROUP BY query: one DB round-trip ──
@@ -50,7 +82,7 @@ class DashboardController extends Controller
 
             // ── Total user count (admin only) ──
             $totalUsers = 0;
-            if ($role === 'admin' || $role === 'it_publisher') {
+            if ($category === 'admin') {
                 $totalUsers = User::count();
             }
 
@@ -98,10 +130,39 @@ class DashboardController extends Controller
      */
     public function getRecentActivity(Request $request): JsonResponse
     {
-        $cacheKey = 'dashboard_recent_activity';
+        $user = $request->user();
+        $category = $user->roleCategory();
+        $role = $user->getRoleNames()->first();
 
-        $activities = Cache::remember($cacheKey, 60, function () {
-            $recentPosts = PostRequest::with(['requestor', 'approvalWorkflows.approver'])
+        $cacheKey = 'dashboard_recent_activity_' . $category . '_' . $user->id;
+
+        $activities = Cache::remember($cacheKey, 60, function () use ($user, $category, $role) {
+            $query = PostRequest::with(['requestor', 'approvalWorkflows.approver']);
+
+            // Scope activity to the user's role so it doesn't leak across roles
+            if ($category === 'requestor') {
+                $query->where('requestor_id', $user->id);
+            } elseif ($category === 'approver') {
+                if ($role === 'vice_president') {
+                    $query->whereNotIn('status', ['draft']);
+                } elseif ($role === 'imc_qa_checker') {
+                    $query->whereIn('status', [
+                        PostRequest::STATUS_PENDING_IMC_QA,
+                        PostRequest::STATUS_APPROVED,
+                        PostRequest::STATUS_SCHEDULED,
+                        PostRequest::STATUS_PUBLISHED,
+                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_REJECTED,
+                        PostRequest::STATUS_RETURNED_FOR_REVISION,
+                    ]);
+                } else { // office_head
+                    $query->whereHas('requestor', function ($q) use ($user) {
+                        $q->where('department', $user->department);
+                    })->whereNotIn('status', ['draft']);
+                }
+            }
+
+            $recentPosts = $query
                 ->orderBy('updated_at', 'desc')
                 ->take(15)
                 ->get()

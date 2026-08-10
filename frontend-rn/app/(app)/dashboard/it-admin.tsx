@@ -68,26 +68,48 @@ const CustomStatCard: React.FC<StatCardProps> = ({
   </Card>
 );
 
-// Role options — exactly 3 roles
-const ROLE_OPTIONS = [
-  { label: 'Requestor', value: 'requestor' },
+// ── Role picker: 3 friendly categories shown to admins ──
+// The DB stores granular roles; category + department maps to the exact role.
+const ROLE_CATEGORIES = [
+  { label: 'Admin', value: 'admin' },
   { label: 'Approver', value: 'approver' },
-  { label: 'Administrator', value: 'admin' },
+  { label: 'Requestor', value: 'requestor' },
 ];
 
-// Profile Settings modal role options — same 3 roles
-const PROFILE_ROLE_OPTIONS = [
-  { label: 'Requestor', value: 'requestor' },
-  { label: 'Approver', value: 'approver' },
-  { label: 'Administrator', value: 'admin' },
-];
+// Map a granular DB role to its friendly category
+const roleCategoryOf = (role: string): string => {
+  if (role === 'it_publisher' || role === 'it_admin') return 'admin';
+  if (role === 'office_head' || role === 'vice_president' || role === 'imc_qa_checker') return 'approver';
+  return 'requestor'; // requestor, content_requestor, or unknown -> safest
+};
 
-const DEPARTMENT_OPTIONS = [
-  { id: 1, display_name: 'Information Technology Office' },
-  { id: 2, display_name: 'Vice President of Academic Affairs' },
-  { id: 3, display_name: 'Institutional Marketing Communication' },
-  { id: 4, display_name: 'College of Agriculture' },
-];
+// Map category + department -> exact granular role to assign (mirrors backend)
+const granularRoleFor = (category: string, department: string): string => {
+  if (category === 'admin') return 'it_publisher';
+  if (category === 'requestor') return 'requestor';
+  // approver -> department picks the sub-role
+  if (department === 'Institutional Marketing & Communications') return 'imc_qa_checker';
+  if (department === 'Office of the President' || department === 'Vice President of Academic Affairs' || department === 'Academic Affairs') return 'vice_president';
+  return 'office_head';
+};
+
+// Departments are role-scoped: each department carries which roles may use it.
+// This keeps each role's pool independent — adding/deleting in one role never
+// touches another role's departments.
+const departmentsForRole = (category: string, departments: any[]): any[] => {
+  return departments.filter(d => (d.role_categories || []).includes(category));
+};
+
+// Auto-suggested position for category + department (mirrors backend)
+const autoPositionFor = (category: string, department: string): string => {
+  if (category === 'admin') return 'IT Administrator';
+  if (category === 'approver') {
+    if (department === 'Institutional Marketing & Communications') return 'QA / Branding Checker';
+    if (department === 'Office of the President' || department === 'Vice President of Academic Affairs' || department === 'Academic Affairs') return 'Vice President';
+    return 'Department Head';
+  }
+  return '';
+};
 
 
 export default function ITAdminDashboard() {
@@ -143,28 +165,22 @@ export default function ITAdminDashboard() {
   const spinInterpolation = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
-    outputRange: ['0deg', '360deg'],
   });
 
-  const { data: postsQueryRes } = useQuery({ queryKey: ['adminPosts'], queryFn: () => postsApi.list(), refetchInterval: 3000 });
-  const { data: statsQueryRes } = useQuery({ queryKey: ['adminStats'], queryFn: () => dashboardApi.getStats(), refetchInterval: 3000 });
-  const { data: activitiesQueryRes } = useQuery({ queryKey: ['adminActivities'], queryFn: () => dashboardApi.getRecentActivity(), refetchInterval: 3000 });
+  const { data: initDataRes, isLoading } = useQuery({ queryKey: ['adminInitData'], queryFn: () => dashboardApi.getInitData(), refetchInterval: 10000, staleTime: 5000 });
 
   useEffect(() => {
-    if (postsQueryRes?.data?.data) {
-      let posts = postsQueryRes.data.data;
-      if (posts && !Array.isArray(posts) && posts.data) posts = posts.data;
-      processPostsData(posts);
+    if (initDataRes?.data) {
+      const data = initDataRes.data;
+      if (data.posts) {
+        let posts = data.posts;
+        if (posts && !Array.isArray(posts) && posts.data) posts = posts.data;
+        processPostsData(posts);
+      }
+      if (data.stats) setStats(data.stats);
+      if (data.activities) setActivities(data.activities);
     }
-  }, [postsQueryRes]);
-
-  useEffect(() => {
-    if (statsQueryRes?.data?.data) setStats(statsQueryRes.data.data);
-  }, [statsQueryRes]);
-
-  useEffect(() => {
-    if (activitiesQueryRes?.data) setActivities(activitiesQueryRes.data);
-  }, [activitiesQueryRes]);
+  }, [initDataRes]);
 
   // ── Process posts into the three component state arrays ──
   function processPostsData(posts: any[]) {
@@ -203,6 +219,13 @@ export default function ITAdminDashboard() {
     const loadAllData = async () => {
       setIsInitialLoading(true);
 
+      // The single-threaded dev server (php artisan serve) processes requests one
+      // at a time. Firing all 8 requests at once queues the essential overview data
+      // (react-query getInitData) behind the tab-only requests -> ~10s reloads.
+      // Delay these background tab requests so the overview loads first, then the
+      // tabs populate in the background (data + flow are unchanged).
+      await new Promise((r) => setTimeout(r, 600));
+
       // Fire all requests in parallel — a timeout on one won't block the others
       const results = await Promise.allSettled([
         usersApi.list().catch(() => ({ data: { data: [] } })),
@@ -225,12 +248,8 @@ export default function ITAdminDashboard() {
         setUsers(mappedUsers);
       }
 
-      // 2. Roles — always hardcode to exactly 3
-      setRolesList([
-        { label: 'Requestor', value: 'requestor' },
-        { label: 'Approver', value: 'approver' },
-        { label: 'Administrator', value: 'admin' },
-      ]);
+      // 2. Roles — the picker uses the 3 fixed categories (Admin/Approver/Requestor)
+      setRolesList(ROLE_CATEGORIES);
       setNewUserRole('requestor');
 
       // 3. Departments (index 2)
@@ -262,52 +281,32 @@ export default function ITAdminDashboard() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
-  const [rolesList, setRolesList] = useState<{label: string, value: string}[]>([]);
+  const [rolesList, setRolesList] = useState<{ label: string, value: string }[]>([]);
   const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [newUserRole, setNewUserRole] = useState('requestor');
   const [newUserDepartment, setNewUserDepartment] = useState('');
   const [newUserPosition, setNewUserPosition] = useState('');
 
-  // The 3 protected/fixed departments
-  const FIXED_DEPTS = ['Information Technology Office', 'Vice President of Academic Affairs', 'Institutional Marketing Communication'];
-
-  // Filtered dept list based on selected role
+  // Filtered dept list based on selected role category (Admin/Approver/Requestor)
   const filteredDepts = React.useMemo(() => {
-    if (newUserRole === 'requestor') {
-      // Only colleges (exclude all 3 fixed depts)
-      return departmentsList.filter(d => !FIXED_DEPTS.includes(d.display_name));
-    } else if (newUserRole === 'admin') {
-      // Only Information Technology Office
-      return departmentsList.filter(d => d.display_name === 'Information Technology Office');
-    } else if (newUserRole === 'approver') {
-      // All except Information Technology Office
-      return departmentsList.filter(d => d.display_name !== 'Information Technology Office');
-    }
-    return departmentsList;
+    return departmentsForRole(newUserRole, departmentsList);
   }, [newUserRole, departmentsList]);
 
   // Auto-reset department when role changes, and pick appropriate default
   React.useEffect(() => {
     if (filteredDepts.length > 0) {
       setNewUserDepartment(filteredDepts[0].display_name);
-    }
-    // Auto-fill position when approver + college dept selected
-    const isCollegeDept = !FIXED_DEPTS.includes(newUserDepartment);
-    if (newUserRole === 'approver' && isCollegeDept && newUserDepartment) {
-      setNewUserPosition('Department Head');
     } else {
-      setNewUserPosition('');
+      // No departments left for this role (e.g. the last one was just deleted)
+      // — clear the stale selection so the dropdown doesn't show a removed one.
+      setNewUserDepartment('');
     }
+    setNewUserPosition(autoPositionFor(newUserRole, newUserDepartment));
   }, [newUserRole, departmentsList]);
 
-  // Auto-fill position when department changes (for approver role)
+  // Auto-fill position when department changes
   React.useEffect(() => {
-    const isCollegeDept = !FIXED_DEPTS.includes(newUserDepartment);
-    if (newUserRole === 'approver' && isCollegeDept && newUserDepartment) {
-      setNewUserPosition('Department Head');
-    } else if (newUserRole !== 'approver') {
-      setNewUserPosition('');
-    }
+    setNewUserPosition(autoPositionFor(newUserRole, newUserDepartment));
   }, [newUserDepartment]);
 
   // Inline add-role/department state
@@ -367,10 +366,13 @@ export default function ITAdminDashboard() {
     if (deptName) {
       try {
         const val = deptName.toLowerCase().replace(/\s+/g, '_');
-        const res = await departmentsApi.create({ name: val, display_name: deptName });
-        const newDept = res.data?.data || { id: Date.now(), display_name: deptName };
-        setDepartmentsList((prev) => [...prev, newDept]);
+        // Tag the new department to the currently selected role ONLY, so it
+        // does not leak into other roles' lists.
+        await departmentsApi.create({ name: val, display_name: deptName, role_categories: [newUserRole] });
+        const res = await departmentsApi.listFresh();
+        setDepartmentsList(res.data?.data || []);
         setNewUserDepartment(deptName);
+        showToast(`Department added to ${newUserRole}.`, 'success');
       } catch (e: any) {
         showToast('Failed to add department: ' + (e.response?.data?.message || e.message), 'error');
       }
@@ -387,29 +389,32 @@ export default function ITAdminDashboard() {
     const deptToDelete = departmentsList.find(d => d.display_name === newUserDepartment);
     if (!deptToDelete) return;
 
-    if (FIXED_DEPTS.includes(deptToDelete.display_name)) {
-      showToast('This is a protected department and cannot be deleted.', 'error');
-      return;
-    }
-
     try {
-      await departmentsApi.delete(deptToDelete.id);
-      const updated = departmentsList.filter((d) => d.id !== deptToDelete.id);
-      setDepartmentsList(updated);
-      setNewUserDepartment(updated[0].display_name);
+      // Role-scoped: only detach this department from the selected role. If it
+      // is shared (e.g. a college used by Requestor AND Approver), the other
+      // role keeps it.
+      await departmentsApi.deleteFromRole(deptToDelete.id, newUserRole);
+      const res = await departmentsApi.listFresh();
+      const fresh = res.data?.data || [];
+      setDepartmentsList(fresh);
+      const visible = fresh.filter(d => (d.role_categories || []).includes(newUserRole));
+      if (visible.length > 0) {
+        setNewUserDepartment(visible[0].display_name);
+      } else {
+        setNewUserDepartment('');
+      }
+      showToast(`Department removed from ${newUserRole}.`, 'success');
     } catch (e: any) {
       const msg = e.response?.data?.message || e.message;
-      if (msg.toLowerCase().includes('protected')) {
-        showToast('This is a protected department and cannot be deleted.', 'error');
-      } else {
-        showToast('Failed to delete department: ' + msg, 'error');
-      }
+      showToast('Failed to delete department: ' + msg, 'error');
     }
   };
   const [showPassword, setShowPassword] = useState(false);
   const [userFilter, setUserFilter] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingUserRole, setEditingUserRole] = useState<string>('requestor');
+  const [editingUserOriginalRole, setEditingUserOriginalRole] = useState<string>('requestor');
+  const [editingUserDept, setEditingUserDept] = useState('');
 
   // ── Profile Modal State ──
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -421,6 +426,7 @@ export default function ITAdminDashboard() {
   const [profilePosition, setProfilePosition] = useState('');
   const [profileDepartment, setProfileDepartment] = useState('');
   const [profileRole, setProfileRole] = useState('');
+  const [profileOriginalRole, setProfileOriginalRole] = useState('');
   const [profileStatus, setProfileStatus] = useState('active');
   const [profilePassword, setProfilePassword] = useState('');
   const [profilePasswordConfirmation, setProfilePasswordConfirmation] = useState('');
@@ -589,7 +595,7 @@ export default function ITAdminDashboard() {
           }));
           setTokenLastUpdated(res.data.last_updated || 'Never');
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [activeTab]);
 
@@ -665,7 +671,7 @@ export default function ITAdminDashboard() {
           }));
           setEmailPasswordSet(!!s.mail_password_set);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [activeTab]);
 
@@ -697,9 +703,8 @@ export default function ITAdminDashboard() {
     }
   };
 
-  // ── Department Logo State ──
+  // ── Department Logo State (used to show a dept logo next to a user's avatar) ──
   const [deptLogos, setDeptLogos] = useState<Record<number, string>>({});
-  const [uploadingLogoId, setUploadingLogoId] = useState<number | null>(null);
 
   useEffect(() => {
     if (departmentsList.length > 0) {
@@ -718,53 +723,6 @@ export default function ITAdminDashboard() {
     if (deptLogos[deptId]) return deptLogos[deptId];
     const d = departmentsList.find((x: any) => x.id === deptId);
     return d?.logo_url || null;
-  };
-
-  const handleUploadLogo = async (deptId: number) => {
-    if (Platform.OS === 'web') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async (e: any) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setUploadingLogoId(deptId);
-        try {
-          const res = await departmentsApi.uploadLogo(deptId, file);
-          const url = res.data.logo_url;
-          setDeptLogos(prev => ({ ...prev, [deptId]: url }));
-          setDepartmentsList(prev => prev.map((d: any) =>
-            d.id === deptId ? { ...d, logo_path: res.data.data?.logo_path, logo_url: url } : d
-          ));
-          showToast('Logo uploaded!', 'success');
-        } catch (e: any) {
-          showToast('Upload failed: ' + (e.response?.data?.message || e.message), 'error');
-        } finally {
-          setUploadingLogoId(null);
-        }
-      };
-      input.click();
-    }
-  };
-
-  const handleRemoveLogo = async (deptId: number) => {
-    setUploadingLogoId(deptId);
-    try {
-      await departmentsApi.removeLogo(deptId);
-      setDeptLogos(prev => {
-        const next = { ...prev };
-        delete next[deptId];
-        return next;
-      });
-      setDepartmentsList(prev => prev.map((d: any) =>
-        d.id === deptId ? { ...d, logo_path: null, logo_url: null } : d
-      ));
-      showToast('Logo removed.', 'success');
-    } catch (e: any) {
-      showToast('Remove failed.', 'error');
-    } finally {
-      setUploadingLogoId(null);
-    }
   };
 
   const handlePublish = async (id: string | number) => {
@@ -817,7 +775,7 @@ export default function ITAdminDashboard() {
     if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { showToast('Please fill in all required fields.', 'warning'); return; }
     // Auto-append @jmc.edu.ph if not already a full email
     const finalEmail = newUserEmail.includes('@') ? newUserEmail : newUserEmail.trim() + '@jmc.edu.ph';
-    
+
     try {
       const generatedEmpId = 'EMP-' + Math.floor(10000 + Math.random() * 90000);
       const res = await usersApi.create({
@@ -826,7 +784,7 @@ export default function ITAdminDashboard() {
         last_name: newUserLastName,
         email: finalEmail,
         password: newUserPassword,
-        role: newUserRole,
+        role: granularRoleFor(newUserRole, newUserDepartment),
         department: newUserDepartment,
         position: newUserPosition || undefined,
       });
@@ -865,8 +823,12 @@ export default function ITAdminDashboard() {
 
   const handleSaveEditedRole = async (id: string) => {
     try {
-      await usersApi.update(id, { role: editingUserRole });
-      setUsers(users.map(u => u.id === id ? { ...u, role: editingUserRole } : u));
+      // Preserve the exact granular role unless the category actually changed
+      const roleToSend = roleCategoryOf(editingUserOriginalRole) === editingUserRole
+        ? editingUserOriginalRole
+        : granularRoleFor(editingUserRole, editingUserDept);
+      await usersApi.update(id, { role: roleToSend });
+      setUsers(users.map(u => u.id === id ? { ...u, role: roleToSend } : u));
       setEditingUserId(null);
       showToast('User role updated successfully!', 'success');
     } catch (e: any) {
@@ -884,7 +846,8 @@ export default function ITAdminDashboard() {
     setProfilePhone(u.phone || '');
     setProfilePosition(u.position || '');
     setProfileDepartment(u.department || '');
-    setProfileRole(u.role || 'requestor');
+    setProfileRole(roleCategoryOf(u.role || 'requestor'));
+    setProfileOriginalRole(u.role || 'requestor');
     setProfileStatus(u.status || 'active');
     setProfilePassword('');
     setProfilePasswordConfirmation('');
@@ -900,12 +863,15 @@ export default function ITAdminDashboard() {
     if (!selectedUser) return;
     setSavingProfile(true);
     try {
+      const roleToSend = roleCategoryOf(profileOriginalRole) === profileRole
+        ? profileOriginalRole
+        : granularRoleFor(profileRole, profileDepartment);
       const payload: any = {
         first_name: profileFirstName,
         last_name: profileLastName,
         email: profileEmail,
         department: profileDepartment,
-        role: profileRole,
+        role: roleToSend,
         status: profileStatus,
       };
       if (profileMiddleName) payload.middle_name = profileMiddleName;
@@ -940,7 +906,7 @@ export default function ITAdminDashboard() {
         status: updatedUser.status,
       } : u));
       showToast('Profile updated successfully!', 'success');
-      
+
       // If the edited user is the currently logged-in user, sync global state
       if (user && String(selectedUser.id) === String(user.id)) {
         await setUser({
@@ -953,7 +919,7 @@ export default function ITAdminDashboard() {
           role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
         });
       }
-      
+
       handleCloseProfile();
     } catch (e: any) {
       showToast('Failed to update profile: ' + (e.response?.data?.message || e.message), 'error');
@@ -970,6 +936,7 @@ export default function ITAdminDashboard() {
       case 'admin': return { label: 'ADMINISTRATOR', color: '#1E40AF', bgColor: '#DBEAFE' };
       case 'approver': return { label: 'APPROVER', color: '#B45309', bgColor: '#FEF3C7' };
       case 'requestor': return { label: 'REQUESTOR', color: '#0F766E', bgColor: '#CCFBF1' };
+      case 'content_requestor': return { label: 'CONTENT REQUESTOR', color: '#0F766E', bgColor: '#CCFBF1' };
       // legacy
       case 'it_publisher': return { label: 'IT ADMIN', color: '#1E40AF', bgColor: '#DBEAFE' };
       case 'vice_president': return { label: 'VICE PRESIDENT', color: '#B45309', bgColor: '#FEF3C7' };
@@ -992,10 +959,10 @@ export default function ITAdminDashboard() {
   const postsToShow = statusFilter === 'all' ? allMockPosts : allMockPosts.filter(p => p.status === statusFilter);
 
   const filteredTablePosts = mockTablePosts.filter((post) => {
-    const matchesSearch = requestsSearch === '' || 
-                          post.title.toLowerCase().includes(requestsSearch.toLowerCase()) || 
-                          post.requestedBy.toLowerCase().includes(requestsSearch.toLowerCase());
-    
+    const matchesSearch = requestsSearch === '' ||
+      post.title.toLowerCase().includes(requestsSearch.toLowerCase()) ||
+      post.requestedBy.toLowerCase().includes(requestsSearch.toLowerCase());
+
     let matchesStatus = true;
     if (requestsStatus !== 'All Status') {
       if (requestsStatus === 'Pending') {
@@ -1010,9 +977,9 @@ export default function ITAdminDashboard() {
     }
 
     const matchesDept = requestsDept === 'All Departments' || post.department === requestsDept;
-    
+
     const matchesDate = requestsDate === '' || post.rawDate === requestsDate;
-    
+
     return matchesSearch && matchesStatus && matchesDept && matchesDate;
   });
 
@@ -1044,13 +1011,17 @@ export default function ITAdminDashboard() {
 
       {/* GLOBAL TOAST NOTIFICATION DELETED - NOW USING GLOBAL ALERT MODAL */}
 
-      {/* ── LOADING SKELETON ── */}
-      {isInitialLoading && (
+      {/* ── LOADING SKELETON ──
+        The overview only needs the react-query init fetch (isLoading), while
+        the other tabs wait for their background data (isInitialLoading). */}
+      {((isInitialLoading && activeTab !== 'overview') || (activeTab === 'overview' && isLoading)) && (
         <DashboardSkeleton />
       )}
 
-      {/* ── OVERVIEW TAB ── */}
-      {activeTab === 'overview' && !isInitialLoading && (
+      {/* ── OVERVIEW TAB ──
+        Renders as soon as the essential init data arrives (isLoading), without
+        waiting for the 5 background tab-requests on the single-threaded server. */}
+      {activeTab === 'overview' && !isLoading && (
         <>
           <View style={{ flexDirection: 'row', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
             <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.7}>
@@ -1114,20 +1085,20 @@ export default function ITAdminDashboard() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 6, paddingHorizontal: 12, height: 36, borderWidth: 1, borderColor: '#e5e7eb' }}>
                   <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
-                  <TextInput placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
+                  <TextInput id="search-requests" name="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
                 </View>
-                <select style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
+                <select id="filter-status" name="filter-status" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
                   <option>All Status</option>
                   <option>Pending</option>
                   <option>Published</option>
                   <option>Rejected</option>
                 </select>
-                <select style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsDept} onChange={(e) => setRequestsDept(e.target.value)}>
+                <select id="filter-department" name="filter-department" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsDept} onChange={(e) => setRequestsDept(e.target.value)}>
                   <option>All Departments</option>
                   {departmentsList.map(d => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                 </select>
                 <View style={{ flexDirection: 'row', alignItems: 'center', height: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 12, backgroundColor: '#fff' }}>
-                  <input type="date" style={{ fontSize: 13, color: '#374151', border: 'none', outline: 'none', backgroundColor: 'transparent' }} value={requestsDate} onChange={(e) => setRequestsDate(e.target.value)} />
+                  <input id="filter-date" name="filter-date" type="date" style={{ fontSize: 13, color: '#374151', border: 'none', outline: 'none', backgroundColor: 'transparent' }} value={requestsDate} onChange={(e) => setRequestsDate(e.target.value)} />
                 </View>
                 <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
                   <Ionicons name="options-outline" size={16} color="#374151" />
@@ -1222,7 +1193,7 @@ export default function ITAdminDashboard() {
                 <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#4b5563', fontSize: 13 }}>9</Text></TouchableOpacity>
                 <TouchableOpacity style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="chevron-forward" size={16} color="#9ca3af" /></TouchableOpacity>
 
-                <select style={{ marginLeft: 16, height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }}>
+                <select id="per-page" name="per-page" style={{ marginLeft: 16, height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }}>
                   <option>10 / page</option>
                   <option>20 / page</option>
                 </select>
@@ -1284,7 +1255,7 @@ export default function ITAdminDashboard() {
                   onChange={(e: any) => setNewUserRole(e.target.value)}
                   style={{ height: 38, fontSize: 13, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', color: '#1A1A2E', paddingLeft: 10, outline: 'none', cursor: 'pointer', width: '100%' }}
                 >
-                  {rolesList.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </View>
               <View style={styles.formField}>
@@ -1298,15 +1269,13 @@ export default function ITAdminDashboard() {
                       <Ionicons name="add-circle-outline" size={14} color="#1E40AF" />
                       <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E40AF' }}>Add</Text>
                     </TouchableOpacity>
-                    {!FIXED_DEPTS.includes(newUserDepartment) && (
-                      <TouchableOpacity
-                        style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                        onPress={handleDeleteDepartment}
-                      >
-                        <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#DC2626' }}>Delete</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                      onPress={handleDeleteDepartment}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#DC2626' }}>Delete</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
                 <select
@@ -1345,72 +1314,6 @@ export default function ITAdminDashboard() {
               <Ionicons name="person-add-outline" size={16} color="#fff" />
               <Text style={styles.createBtnText}>Create Account</Text>
             </TouchableOpacity>
-          </Card>
-
-           {/* Department Logos Card */}
-          <Card style={styles.userCard}>
-            <Text style={styles.sectionHeader}>Department Logos</Text>
-            <Text style={styles.policyNote}>Upload a logo for each department. Used across the platform.</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 16 }}>
-              {/* Always show the 3 fixed depts first, highlighted */}
-              {[...departmentsList].sort((a: any, b: any) => {
-                const fixedOrder = ['Information Technology Office', 'Vice President of Academic Affairs', 'Institutional Marketing Communication'];
-                const ai = fixedOrder.indexOf(a.display_name);
-                const bi = fixedOrder.indexOf(b.display_name);
-                if (ai !== -1 && bi !== -1) return ai - bi;
-                if (ai !== -1) return -1;
-                if (bi !== -1) return 1;
-                return 0;
-              }).map((dept: any) => {
-                const isFixed = ['Information Technology Office', 'Vice President of Academic Affairs', 'Institutional Marketing Communication'].includes(dept.display_name);
-                return (
-                <View key={dept.id} style={{
-                  width: 140,
-                  backgroundColor: isFixed ? '#faf5ff' : '#f9fafb',
-                  borderRadius: 12,
-                  borderWidth: isFixed ? 2 : 1,
-                  borderColor: isFixed ? '#7E22CE' : '#e5e7eb',
-                  overflow: 'hidden',
-                }}>
-                  {isFixed && (
-                    <View style={{ backgroundColor: '#7E22CE', paddingVertical: 2, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="star" size={10} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>REQUIRED</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => handleUploadLogo(dept.id)}
-                    disabled={uploadingLogoId === dept.id}
-                    style={{
-                      height: 100,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: getDeptLogo(dept.id) ? 'transparent' : '#f3f4f6',
-                    }}
-                  >
-                    {uploadingLogoId === dept.id ? (
-                      <Text style={{ fontSize: 12, color: Colors.primary }}>Uploading...</Text>
-                    ) : getDeptLogo(dept.id) ? (
-                      <Image source={{ uri: getDeptLogo(dept.id)! }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
-                    ) : (
-                      <View style={{ alignItems: 'center', gap: 6 }}>
-                        <Ionicons name="cloud-upload-outline" size={28} color="#9ca3af" />
-                        <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>Tap to upload</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                  <View style={{ padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{dept.display_name}</Text>
-                    {getDeptLogo(dept.id) && (
-                      <TouchableOpacity onPress={() => handleRemoveLogo(dept.id)}>
-                        <Ionicons name="trash-outline" size={14} color="#ef4444" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-                );
-              })}
-            </View>
           </Card>
 
           <Card style={styles.userCard}>
@@ -1464,7 +1367,7 @@ export default function ITAdminDashboard() {
                               cursor: 'pointer',
                             }}
                           >
-                            {ROLE_OPTIONS.map(r => (
+                            {ROLE_CATEGORIES.map(r => (
                               <option key={r.value} value={r.value}>{r.label}</option>
                             ))}
                           </select>
@@ -1481,7 +1384,7 @@ export default function ITAdminDashboard() {
                         <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
                           <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
                         </View>
-                        <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); setEditingUserId(u.id); setEditingUserRole(u.role); }}>
+                        <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); setEditingUserId(u.id); setEditingUserRole(roleCategoryOf(u.role)); setEditingUserOriginalRole(u.role); setEditingUserDept(u.department || ''); }}>
                           <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.deleteBtn} onPress={(e: any) => { e.stopPropagation?.(); handleDeleteUser(u.id); }}>
@@ -1636,7 +1539,7 @@ export default function ITAdminDashboard() {
                             onChange={(e: any) => setProfileRole(e.target.value)}
                             style={styles.wideFieldSelect}
                           >
-                            {PROFILE_ROLE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                           </select>
                         </View>
                       </View>
@@ -2440,17 +2343,17 @@ export default function ITAdminDashboard() {
 
       {/* ── ANALYTICS TAB ── */}
       {activeTab === 'analytics' && !isInitialLoading && (() => {
-        const monthsData = analyticsOverview?.monthsData && analyticsOverview.monthsData.length > 0 
-          ? analyticsOverview.monthsData 
+        const monthsData = analyticsOverview?.monthsData && analyticsOverview.monthsData.length > 0
+          ? analyticsOverview.monthsData
           : [
-              { month: 'Jan', posts: 0 }, { month: 'Feb', posts: 0 }, { month: 'Mar', posts: 0 },
-              { month: 'Apr', posts: 0 }, { month: 'May', posts: 0 }, { month: 'Jun', posts: 0 },
-              { month: 'Jul', posts: 0 }, { month: 'Aug', posts: 0 }, { month: 'Sep', posts: 0 },
-              { month: 'Oct', posts: 0 }, { month: 'Nov', posts: 0 }, { month: 'Dec', posts: 0 }
-            ];
-        
+            { month: 'Jan', posts: 0 }, { month: 'Feb', posts: 0 }, { month: 'Mar', posts: 0 },
+            { month: 'Apr', posts: 0 }, { month: 'May', posts: 0 }, { month: 'Jun', posts: 0 },
+            { month: 'Jul', posts: 0 }, { month: 'Aug', posts: 0 }, { month: 'Sep', posts: 0 },
+            { month: 'Oct', posts: 0 }, { month: 'Nov', posts: 0 }, { month: 'Dec', posts: 0 }
+          ];
+
         const maxPosts = Math.max(...monthsData.map((d: any) => d.posts), 10);
-        
+
         return (
           <View style={{ gap: Spacing.xl }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -2483,7 +2386,7 @@ export default function ITAdminDashboard() {
 
             {/* Main Charts Row */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { gap: 24 }]}>
-              
+
               {/* Yearly Bar Chart */}
               <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: '#ffffff', borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
@@ -2501,7 +2404,7 @@ export default function ITAdminDashboard() {
                   {/* Grid lines */}
                   <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#F3F4F6', borderStyle: 'dashed' }} />
                   <View style={{ position: 'absolute', top: 110, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#F3F4F6', borderStyle: 'dashed' }} />
-                  
+
                   {monthsData.map((item: any, index: number) => {
                     const heightPercent = (item.posts / maxPosts) * 100;
                     return (
@@ -2523,13 +2426,13 @@ export default function ITAdminDashboard() {
                 </View>
 
                 {/* Simulated 4-Color Donut Chart */}
-                <View style={{ 
-                  width: 180, height: 180, borderRadius: 90, borderWidth: 24, 
+                <View style={{
+                  width: 180, height: 180, borderRadius: 90, borderWidth: 24,
                   borderTopColor: '#1877F2',    // Facebook
                   borderRightColor: '#E4405F',  // Instagram
                   borderBottomColor: '#1DA1F2', // Twitter
                   borderLeftColor: '#9CA3AF',   // Other/Website
-                  alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 10 
+                  alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 10
                 }}>
                   <View style={{ alignItems: 'center' }}>
                     <Text style={{ fontSize: 24, fontWeight: '900', color: '#111827' }}>Total</Text>
@@ -2724,126 +2627,126 @@ export default function ITAdminDashboard() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Top Area */}
-            <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
-              <View style={{ flex: 1.5, alignItems: 'center', justifyContent: 'center' }}>
-                <TouchableOpacity onPress={() => previewPost?.image && setFullScreenImage(previewPost.image)} activeOpacity={0.8} style={{ width: '100%' }}>
-                  <Image
-                    source={{ uri: previewPost?.image }}
-                    resizeMode="contain"
-                    style={{
-                      width: '100%',
-                      maxHeight: 400,
-                      aspectRatio: previewImgSize ? previewImgSize.width / previewImgSize.height : undefined,
-                      backgroundColor: '#f3f4f6',
-                      borderRadius: 8,
-                    }}
-                  />
-                </TouchableOpacity>
-              </View>
-              <View style={{ flex: 1, gap: 12 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{previewPost?.title}</Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
-                  <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.primary }}>
-                    Request posted on {previewPost?.requestedOn} at {previewPost?.requestedTime}
-                  </Text>
+              {/* Top Area */}
+              <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
+                <View style={{ flex: 1.5, alignItems: 'center', justifyContent: 'center' }}>
+                  <TouchableOpacity onPress={() => previewPost?.image && setFullScreenImage(previewPost.image)} activeOpacity={0.8} style={{ width: '100%' }}>
+                    <Image
+                      source={{ uri: previewPost?.image }}
+                      resizeMode="contain"
+                      style={{
+                        width: '100%',
+                        maxHeight: 400,
+                        aspectRatio: previewImgSize ? previewImgSize.width / previewImgSize.height : undefined,
+                        backgroundColor: '#f3f4f6',
+                        borderRadius: 8,
+                      }}
+                    />
+                  </TouchableOpacity>
                 </View>
+                <View style={{ flex: 1, gap: 12 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{previewPost?.title}</Text>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Department</Text>
-                  <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>{previewPost?.department}</Text>
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested By</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '500', color: '#111827' }}>{previewPost?.requestedBy}</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested On</Text>
-                  <Text style={{ fontSize: 12, color: '#374151' }}>{previewPost?.requestedOn} {previewPost?.requestedTime}</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Platforms</Text>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {previewPost?.platforms?.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
-                    {previewPost?.platforms?.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                    {previewPost?.platforms?.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Status</Text>
-                  <View style={{
-                    backgroundColor: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#dcfce7' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
-                    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4
-                  }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#16a34a' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309' }}>
-                      {previewPost?.status}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.primary }}>
+                      Request posted on {previewPost?.requestedOn} at {previewPost?.requestedTime}
                     </Text>
                   </View>
-                </View>
-              </View>
-            </View>
 
-            {/* Caption / Description / Approval Timeline */}
-            <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Caption / Narrative</Text>
-                <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
-                  {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
-                </Text>
-
-                {previewPost?.rawPost?.description ? (
-                  <>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Description</Text>
-                    <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
-                  </>
-                ) : null}
-
-                {previewPost?.rawPost?.rejection_reason ? (
-                  <>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Rejection Reason</Text>
-                    <Text style={{ fontSize: 13, color: '#dc2626' }}>{previewPost?.rawPost?.rejection_reason}</Text>
-                  </>
-                ) : null}
-              </View>
-
-              <View style={{ flex: 1, gap: 16 }}>
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 12 }}>Approval Timeline</Text>
-                  {(previewPost?.rawPost?.approval_workflows && previewPost?.rawPost?.approval_workflows.length > 0) ? (
-                    <View style={{ gap: 8 }}>
-                      {previewPost.rawPost.approval_workflows.map((wf: any, i: number) => (
-                        <View key={wf.id || i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name={wf.action === 'approved' || wf.action === 'published' ? 'checkmark' : wf.action === 'rejected' || wf.action === 'returned' ? 'close' : 'time-outline'} size={12} color={wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#9ca3af'} />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#111827' }}>{wf.stage_label || wf.stage}</Text>
-                            <Text style={{ fontSize: 10, color: '#6b7280' }}>
-                              {wf.approver?.full_name || 'Unknown'} {wf.acted_at ? '• ' + new Date(wf.acted_at).toLocaleDateString() : ''}
-                            </Text>
-                          </View>
-                          <View style={{ backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 9, fontWeight: '600', color: wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#6b7280' }}>
-                              {wf.action_label || wf.action?.toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Department</Text>
+                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>{previewPost?.department}</Text>
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 12, color: '#9ca3af' }}>No approval workflow data available.</Text>
-                  )}
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested By</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: '#111827' }}>{previewPost?.requestedBy}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested On</Text>
+                    <Text style={{ fontSize: 12, color: '#374151' }}>{previewPost?.requestedOn} {previewPost?.requestedTime}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Platforms</Text>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {previewPost?.platforms?.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
+                      {previewPost?.platforms?.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
+                      {previewPost?.platforms?.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Status</Text>
+                    <View style={{
+                      backgroundColor: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#dcfce7' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                      paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4
+                    }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#16a34a' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309' }}>
+                        {previewPost?.status}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
+
+              {/* Caption / Description / Approval Timeline */}
+              <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Caption / Narrative</Text>
+                  <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
+                    {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
+                  </Text>
+
+                  {previewPost?.rawPost?.description ? (
+                    <>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Description</Text>
+                      <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
+                    </>
+                  ) : null}
+
+                  {previewPost?.rawPost?.rejection_reason ? (
+                    <>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Rejection Reason</Text>
+                      <Text style={{ fontSize: 13, color: '#dc2626' }}>{previewPost?.rawPost?.rejection_reason}</Text>
+                    </>
+                  ) : null}
+                </View>
+
+                <View style={{ flex: 1, gap: 16 }}>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 12 }}>Approval Timeline</Text>
+                    {(previewPost?.rawPost?.approval_workflows && previewPost?.rawPost?.approval_workflows.length > 0) ? (
+                      <View style={{ gap: 8 }}>
+                        {previewPost.rawPost.approval_workflows.map((wf: any, i: number) => (
+                          <View key={wf.id || i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name={wf.action === 'approved' || wf.action === 'published' ? 'checkmark' : wf.action === 'rejected' || wf.action === 'returned' ? 'close' : 'time-outline'} size={12} color={wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#9ca3af'} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: '#111827' }}>{wf.stage_label || wf.stage}</Text>
+                              <Text style={{ fontSize: 10, color: '#6b7280' }}>
+                                {wf.approver?.full_name || 'Unknown'} {wf.acted_at ? '• ' + new Date(wf.acted_at).toLocaleDateString() : ''}
+                              </Text>
+                            </View>
+                            <View style={{ backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 9, fontWeight: '600', color: wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#6b7280' }}>
+                                {wf.action_label || wf.action?.toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 12, color: '#9ca3af' }}>No approval workflow data available.</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
             </ScrollView>
 
             {/* Footer Buttons */}
@@ -2866,16 +2769,16 @@ export default function ITAdminDashboard() {
           onRequestClose={() => setFullScreenImage(null)}
         >
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
-            <TouchableOpacity 
-              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }} 
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
               onPress={() => setFullScreenImage(null)}
             >
               <Ionicons name="close" size={32} color="#FFFFFF" />
             </TouchableOpacity>
-            <Image 
-              source={{ uri: fullScreenImage }} 
-              style={{ width: '90%', height: '90%' }} 
-              resizeMode="contain" 
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={{ width: '90%', height: '90%' }}
+              resizeMode="contain"
             />
           </View>
         </Modal>
