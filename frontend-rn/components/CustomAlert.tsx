@@ -35,28 +35,37 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
+  // On web, every react-native <Modal> portals into <body> on FIRST mount and
+  // every modal overlay uses the same z-index (9999), so a Modal mounted EARLIER
+  // is painted UNDER a Modal mounted later. The alert Modal was always mounted
+  // from app start (before the it-admin/profile modals), so its portal ended up
+  // BEFORE them in the DOM -> the error/notification box appeared BEHIND the
+  // floating edit box. Mounting the alert Modal only while it is visible makes
+  // its portal the LAST child of <body> whenever it shows, so it always renders
+  // on top of every other modal.
   return (
     <>
       {children}
-      <Modal
-        transparent
-        visible={alertConfig.visible}
-        animationType="fade"
-        onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}
-      >
-        <View style={styles.overlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>JMCFI PostFlow</Text>
-            <Text style={styles.alertMessage}>{alertConfig.message}</Text>
-            <TouchableOpacity
-              style={styles.okButton}
-              onPress={() => setAlertConfig({ ...alertConfig, visible: false })}
-            >
-              <Text style={styles.okButtonText}>OK</Text>
-            </TouchableOpacity>
+      {alertConfig.visible && (
+        <Modal
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+        >
+          <View style={styles.overlay}>
+            <View style={styles.alertBox}>
+              <Text style={styles.alertTitle}>JMCFI PostFlow</Text>
+              <Text style={styles.alertMessage}>{alertConfig.message}</Text>
+              <TouchableOpacity
+                style={styles.okButton}
+                onPress={() => setAlertConfig({ ...alertConfig, visible: false })}
+              >
+                <Text style={styles.okButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }
