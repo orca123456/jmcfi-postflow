@@ -7,6 +7,7 @@ use App\Http\Resources\Api\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
@@ -109,7 +110,11 @@ class UserController extends Controller
             'password' => 'sometimes|string|min:8|confirmed',
         ]);
 
-        $user->fill($validated);
+        // `role` is not a users column (roles live in the Spatie pivot table and
+        // are synced below via syncRoles), and `password` is assigned explicitly
+        // after fill — so exclude both from mass assignment. Including `role`
+        // here throws a MassAssignmentException because it is not $fillable.
+        $user->fill(Arr::except($validated, ['role', 'password']));
 
         if ($request->has('password')) {
             $user->password = $validated['password'];
