@@ -36,35 +36,35 @@ class ApprovalWorkflowService
 
     public function getApproverForStage(string $stage, ?PostRequest $postRequest = null): ?User
     {
-        $departmentMap = [
-            'vice_president' => 'Vice President of Academic Affairs',
-            'imc_qa' => 'Institutional Marketing Communication',
-        ];
-
         try {
             if ($stage === 'office_head') {
-                // For office_head stage, find an approver in the same department as the requestor
+                // Office Head must belong to the requestor's department
                 $requestorDept = $postRequest?->requestor?->department;
                 if (!$requestorDept) {
                     return null;
                 }
-                return User::whereHas('roles', function ($query) {
-                    $query->where('name', 'approver');
-                })->where('department', $requestorDept)
-                  ->where('status', 'active')
-                  ->first();
+                return User::role('office_head')
+                    ->where('department', $requestorDept)
+                    ->where('status', 'active')
+                    ->first();
             }
 
-            $department = $departmentMap[$stage] ?? null;
-            if (!$department) {
+            // vice_president / imc_qa — match by ROLE (the old department-map
+            // strings like 'Vice President of Academic Affairs' never matched
+            // the real department names, and the old 'approver' role lookup
+            // matched nobody, so no workflow rows were ever created)
+            $roleName = match ($stage) {
+                'vice_president' => 'vice_president',
+                'imc_qa' => 'imc_qa_checker',
+                default => null,
+            };
+            if (!$roleName) {
                 return null;
             }
 
-            return User::whereHas('roles', function ($query) {
-                $query->where('name', 'approver');
-            })->where('department', $department)
-              ->where('status', 'active')
-              ->first();
+            return User::role($roleName)
+                ->where('status', 'active')
+                ->first();
         } catch (\Exception $e) {
             Log::warning("Failed to get approver for stage: {$stage}. Error: " . $e->getMessage());
             return null;

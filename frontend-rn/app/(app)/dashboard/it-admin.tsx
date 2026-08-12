@@ -2698,9 +2698,9 @@ export default function ITAdminDashboard() {
               <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Caption / Narrative</Text>
-                  <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
+                  <FormattedText style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
                     {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
-                  </Text>
+                  </FormattedText>
 
                   {previewPost?.rawPost?.description ? (
                     <>

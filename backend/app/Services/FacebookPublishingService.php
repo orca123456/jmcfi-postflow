@@ -49,9 +49,14 @@ class FacebookPublishingService
             ? "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/photos"
             : "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/feed";
 
+        // Strip HTML tags before publishing, as Facebook does not support them
+        $cleanMessage = str_ireplace(['<br>', '<br/>', '<br />', '</p>'], "\n", $message);
+        $cleanMessage = html_entity_decode(strip_tags($cleanMessage), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $cleanMessage = trim($cleanMessage);
+
         $payload = [
             'access_token' => $this->accessToken,
-            'message' => $message,
+            'message' => $cleanMessage,
         ];
 
         try {

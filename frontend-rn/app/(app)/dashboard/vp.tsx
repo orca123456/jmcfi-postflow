@@ -781,7 +781,7 @@ export default function VPDashboard() {
                           </View>
                         </View>
 
-                        <Text style={styles.socialCaptionText}>{selectedRequest.caption}</Text>
+                        <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
 
                         {selectedRequest.thumbnailUrl ? (
                           <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
@@ -835,10 +835,7 @@ export default function VPDashboard() {
                             <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
                           </View>
                           <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                          <Text style={styles.socialCaptionText}>
-                            <Text style={{ fontWeight: 'bold' }}>jmcfi_official </Text>
-                            {selectedRequest.caption}
-                          </Text>
+                          <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_official </b>' + (selectedRequest.caption || '')}</FormattedText>
                         </View>
                       </View>
                     )}
@@ -857,7 +854,7 @@ export default function VPDashboard() {
                           <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
                           <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedRequest.title}</Text>
                           <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedRequest.date}</Text>
-                          <Text style={[styles.socialCaptionText, { fontSize: 14, lineHeight: 22 }]}>{selectedRequest.caption}</Text>
+                          <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedRequest.caption}</FormattedText>
                         </View>
                       </View>
                     )}
@@ -937,7 +934,7 @@ export default function VPDashboard() {
 
                     <View style={styles.metaRow}>
                       <Text style={styles.metaLabel}>Caption / Main Text</Text>
-                      <Text style={styles.metaCaptionBox}>{selectedRequest.caption}</Text>
+                      <FormattedText style={styles.metaCaptionBox}>{selectedRequest.caption}</FormattedText>
                     </View>
 
                     {/* Attachments Section */}
