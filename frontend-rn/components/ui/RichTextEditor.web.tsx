@@ -47,12 +47,28 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, []);
 
-  // Sync external value changes into the editor
+  // Set the initial content ONCE on mount. We must NOT re-apply it on every
+  // render (e.g. via dangerouslySetInnerHTML) because that resets the caret to
+  // position 0 after every keystroke -> typed text builds up in reverse.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const el = editorRef.current;
+    if (el && value) {
+      el.innerHTML = value;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync external value changes (e.g. loading a draft) into the editor — but
+  // never clobber the caret while the user is typing. isInternalChange is set
+  // by handleInput, and the equality check avoids pointless re-writes.
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const el = editorRef.current;
     if (!el || isInternalChange.current) return;
-    el.innerHTML = value || '';
+    if (el.innerHTML !== value) {
+      el.innerHTML = value || '';
+    }
   }, [value]);
 
   const execFormat = (cmd: string, val?: string) => {
@@ -148,7 +164,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         suppressContentEditableWarning
         onInput={handleInput}
         data-placeholder={placeholder}
-        dangerouslySetInnerHTML={{ __html: value || '' }}
         style={{
           minHeight: minHeight - 45,
           padding: '10px 12px',
