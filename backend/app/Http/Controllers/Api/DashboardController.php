@@ -17,21 +17,29 @@ class DashboardController extends Controller
      */
     public function getInitData(Request $request): JsonResponse
     {
-        $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
-        $stats = $postController->getDashboardStats($request)->getData(true)['data'] ?? [];
-        $activities = $this->getRecentActivity($request)->getData(true) ?? [];
-        $postsData = $postController->index($request)->getData(true);
-        $departments = \App\Models\Department::where('is_active', true)
-            ->where('display_name', 'LIKE', 'College%')
-            ->pluck('display_name');
+        $user = $request->user();
+        $cacheKey = 'dashboard_init_data_' . ($user ? $user->id : 'guest');
+
+        $data = Cache::remember($cacheKey, 1, function () use ($request) {
+            $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
+            $stats = $postController->getDashboardStats($request)->getData(true)['data'] ?? [];
+            $activities = $this->getRecentActivity($request)->getData(true) ?? [];
+            $request->merge(['per_page' => 1000]);
+            $postsData = $postController->index($request)->getData(true);
+            $departments = \App\Models\Department::where('is_active', true)
+                ->where('display_name', 'LIKE', 'College%')
+                ->pluck('display_name');
+
+            return [
+                'success' => true,
+                'stats' => $stats,
+                'activities' => $activities,
+                'posts' => $postsData,
+                'departments' => $departments,
+            ];
+        });
         
-        return response()->json([
-            'success' => true,
-            'stats' => $stats,
-            'activities' => $activities,
-            'posts' => $postsData,
-            'departments' => $departments,
-        ]);
+        return response()->json($data);
     }
 
     /**
@@ -47,7 +55,7 @@ class DashboardController extends Controller
         // Cache key is role-specific (different roles see different counts)
         $cacheKey = 'dashboard_stats_' . $category . '_' . $user->id;
 
-        $stats = Cache::remember($cacheKey, 60, function () use ($user, $category, $role) {
+        $stats = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
             $query = PostRequest::query();
 
             // Role-based filtering (mirroring PostRequestController visibility)
@@ -136,7 +144,7 @@ class DashboardController extends Controller
 
         $cacheKey = 'dashboard_recent_activity_' . $category . '_' . $user->id;
 
-        $activities = Cache::remember($cacheKey, 60, function () use ($user, $category, $role) {
+        $activities = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
             $query = PostRequest::with(['requestor', 'approvalWorkflows.approver']);
 
             // Scope activity to the user's role so it doesn't leak across roles
@@ -219,7 +227,7 @@ class DashboardController extends Controller
     {
         $cacheKey = 'dashboard_analytics';
 
-        $data = Cache::remember($cacheKey, 120, function () {
+        $data = Cache::remember($cacheKey, 1, function () {
             // ── Total Volume: single count ──
             $totalVolume = PostRequest::count();
 

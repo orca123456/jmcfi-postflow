@@ -244,6 +244,7 @@ export function DashboardShell({
         { id: 'account-settings', label: 'Account', icon: 'settings-outline' as const, active: active === 'account-settings' },
         { id: 'audit-logs', label: 'Audit Logs', icon: 'shield-checkmark-outline' as const, active: active === 'audit-logs' },
         { id: 'tokens', label: 'Tokens', icon: 'key-outline' as const, active: active === 'tokens' },
+        { id: 'developer-api', label: 'Developer API', icon: 'code-slash-outline' as const, active: active === 'developer-api' },
         { id: 'email-settings', label: 'Email Settings', icon: 'mail-outline' as const, active: active === 'email-settings' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
@@ -493,33 +494,7 @@ export function DashboardShell({
                 </View>
               </View>
 
-              {/* Bottom footer */}
-              <View style={styles.sidebarFooter}>
-                <AnimatedTouchable 
-                  style={[
-                    styles.sidebarNavItem, 
-                    {
-                      width: sidebarWidthAnim.interpolate({
-                        inputRange: [MIN_WIDTH, MAX_WIDTH],
-                        outputRange: [48, MAX_WIDTH - 16]
-                      })
-                    }
-                  ]} 
-                  onPress={() => alert('Help Center is under development.')}
-                >
-                  <View style={styles.sidebarNavIconWrapper}>
-                    <Ionicons name="help-circle-outline" size={22} color="rgba(255,255,255,0.8)" />
-                  </View>
-                  <Animated.View style={{ 
-                    opacity: sidebarWidthAnim.interpolate({
-                      inputRange: [MIN_WIDTH, MAX_WIDTH],
-                      outputRange: [0, 1]
-                    }) 
-                  }}>
-                    <Text style={styles.sidebarFooterLabel} numberOfLines={1}>Help Center</Text>
-                  </Animated.View>
-                </AnimatedTouchable>
-              </View>
+
             </View>
           </Animated.View>
         )}

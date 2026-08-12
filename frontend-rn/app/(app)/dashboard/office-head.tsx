@@ -11,11 +11,12 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
+import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { Card } from '../../../components/ui/Card';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { useAuthStore } from '../../../store/auth';
@@ -35,14 +36,35 @@ export default function OfficeHeadDashboard() {
     fetchPolicy();
   }, []);
 
+
+
   // Tab State: 'dashboard' | 'approved' | 'rejected' | 'policy-rules'
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const params = useLocalSearchParams();
+  const [activeTab, setActiveTab] = useState(params.tab || 'dashboard');
+
+  useEffect(() => {
+    if (params.tab && params.tab !== activeTab) {
+      setActiveTab(params.tab as string);
+    }
+  }, [params.tab]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    router.setParams({ tab });
+  };
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
+  
+  const [postsPage, setPostsPage] = useState(1);
+  const [postsPerPage, setPostsPerPage] = useState(10);
   const [departmentOptions, setDepartmentOptions] = useState(['All Departments']);
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    setPostsPage(1);
+  }, [searchQuery, selectedDepartment, activeTab]);
 
   const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
@@ -75,7 +97,7 @@ export default function OfficeHeadDashboard() {
     queryKey: ['officeHeadInitData'],
     queryFn: () => dashboardApi.getInitData(),
     refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 1000,
   });
 
   const isInitialLoading = initLoading;
@@ -246,6 +268,7 @@ export default function OfficeHeadDashboard() {
     const matchesDept =
       selectedDepartment === 'All Departments' || req.dept === selectedDepartment;
     const matchesSearch =
+      searchQuery === '' ||
       req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.category.toLowerCase().includes(searchQuery.toLowerCase());
@@ -279,6 +302,8 @@ export default function OfficeHeadDashboard() {
     return matchesDept && matchesSearch && matchesDate;
   });
 
+  const paginatedRequests = filteredRequests.slice((postsPage - 1) * postsPerPage, postsPage * postsPerPage);
+
   const computedStats = React.useMemo(() => ({
     pending: requestsList.length,
     approved: approvedRequests.length,
@@ -297,8 +322,8 @@ export default function OfficeHeadDashboard() {
   return (
     <DashboardShell
       title={`Content Reviewer Console — ${userPosition}`}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
+      activeTab={activeTab as string}
+      onTabChange={handleTabChange}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
     >
       {/* ── LOADING SKELETON ── */}
@@ -323,7 +348,7 @@ export default function OfficeHeadDashboard() {
           {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
             <View style={styles.metricsGrid}>
               {/* Card 1: Pending Sign-off */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
@@ -337,7 +362,7 @@ export default function OfficeHeadDashboard() {
               </TouchableOpacity>
 
               {/* Card 2: Approved */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('approved')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
@@ -351,7 +376,7 @@ export default function OfficeHeadDashboard() {
               </TouchableOpacity>
 
               {/* Card 3: Rejected */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('rejected')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
@@ -365,7 +390,7 @@ export default function OfficeHeadDashboard() {
               </TouchableOpacity>
 
               {/* Card 4: Forwarded to QA / Total Requests */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
                 <Card style={styles.metricCard}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
@@ -491,7 +516,7 @@ export default function OfficeHeadDashboard() {
                 <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
               </View>
 
-              {filteredRequests.map((req) => (
+              {paginatedRequests.map((req) => (
                 <TouchableOpacity
                   key={req.id}
                   style={styles.tableRow}
@@ -599,31 +624,14 @@ export default function OfficeHeadDashboard() {
               ))}
             </View>
 
-            {/* Table Footer & Pagination */}
-            <View style={styles.tableFooter}>
-              <Text style={styles.tableFooterText}>
-                Showing 1 to {filteredRequests.length} of {filteredRequests.length} requests
-              </Text>
-
-              <View style={styles.paginationRow}>
-                <TouchableOpacity style={styles.arrowBtn} disabled={true}>
-                  <Ionicons name="chevron-back" size={14} color="#9CA3AF" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnActive]}>
-                  <Text style={[styles.pageBtnText, styles.pageBtnTextActive]}>1</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.arrowBtn} disabled={true}>
-                  <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
-                </TouchableOpacity>
-
-                <View style={styles.pageCountSelector}>
-                  <Text style={styles.pageCountSelectorText}>10 / page</Text>
-                  <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
-                </View>
-              </View>
-            </View>
+            <PaginationControl 
+              currentPage={postsPage} 
+              totalItems={filteredRequests.length} 
+              itemsPerPage={postsPerPage} 
+              onPageChange={setPostsPage} 
+              onItemsPerPageChange={setPostsPerPage}
+              itemName="requests" 
+            />
           </Card>
         </View>
       )}

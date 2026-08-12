@@ -21,12 +21,14 @@ interface AuthStore {
   token: string | null;
   isLoading: boolean;
   error: string | null;
+  lockUntil: number | null;
 
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   loadFromStorage: () => Promise<void>;
   clearError: () => void;
   setUser: (user: AuthUser) => Promise<void>;
+  setLockUntil: (time: number | null) => void;
 }
 
 // Cross-platform storage helpers
@@ -58,6 +60,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   token: null,
   isLoading: false,
   error: null,
+  lockUntil: null,
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -92,6 +95,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ user, token, isLoading: false });
       return true;
     } catch (err: any) {
+      if (err.response?.status === 429 && err.response?.data?.retry_after) {
+        const seconds = parseInt(err.response.data.retry_after, 10);
+        set({
+          error: err.response.data.message || `Too many login attempts. Please try again in ${seconds} seconds.`,
+          isLoading: false,
+          lockUntil: Date.now() + seconds * 1000
+        });
+        return false;
+      }
+      
       const errorMessage = err.response?.data?.message || 'Login failed. Please check your credentials.';
       set({ error: errorMessage, isLoading: false });
       return false;
@@ -136,6 +149,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     await storage.set('auth_user', JSON.stringify(user));
     set({ user });
   },
+
+  setLockUntil: (time: number | null) => set({ lockUntil: time }),
 }));
 
 // Role helper

@@ -18,13 +18,42 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request): JsonResponse
     {
+        $throttleKey = \Illuminate\Support\Str::transliterate(\Illuminate\Support\Str::lower($request->input('email')).'|'.$request->ip());
+
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($throttleKey, 6)) {
+            $timerKey = $throttleKey.':timer';
+            if (!\Illuminate\Support\Facades\Cache::has($timerKey)) {
+                // If the lockout just happened but timer isn't set, set it for 59s
+                \Illuminate\Support\Facades\Cache::put($timerKey, \Illuminate\Support\Carbon::now()->addSeconds(59)->getTimestamp(), 59);
+            }
+            
+            $expiresAt = \Illuminate\Support\Facades\Cache::get($timerKey);
+            $seconds = max(1, $expiresAt - \Illuminate\Support\Carbon::now()->getTimestamp());
+
+            return response()->json([
+                'message' => 'Too many login attempts. Please try again in ' . $seconds . ' seconds.',
+                'retry_after' => $seconds
+            ], 429);
+        }
+
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            \Illuminate\Support\Facades\RateLimiter::hit($throttleKey, 59);
+            
+            // If this hit just reached the max attempts (6), we want to lock them out for EXACTLY 59 seconds from right NOW.
+            if (\Illuminate\Support\Facades\RateLimiter::attempts($throttleKey) >= 6) {
+                // To force a fresh 59-second lockout, we can clear the attempts and hit it with a high value, but Laravel doesn't allow overriding TTL easily.
+                // The easiest way is to use the Cache facade to set the exact lockout timer.
+                \Illuminate\Support\Facades\Cache::put($throttleKey.':timer', \Illuminate\Support\Carbon::now()->addSeconds(59)->getTimestamp(), 59);
+            }
+
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
+
+        \Illuminate\Support\Facades\RateLimiter::clear($throttleKey);
 
         if (! $user->isActive()) {
             return response()->json([

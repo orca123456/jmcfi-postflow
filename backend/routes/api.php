@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\PolicySettingController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\TokenSettingController;
+use App\Http\Controllers\Api\ApiTokenController;
+use App\Http\Controllers\Api\ExternalIntegrationController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -37,13 +39,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('posts/dashboard/stats', [PostRequestController::class, 'getDashboardStats']);
 
     // Post Requests
-    Route::apiResource('posts', PostRequestController::class)->parameters(['posts' => 'postRequest'])->only(['index', 'store', 'show', 'update', 'destroy']);
-    Route::post('posts/{postRequest}/submit', [PostRequestController::class, 'submitForApproval']);
-    Route::post('posts/{postRequest}/approve', [PostRequestController::class, 'approve']);
-    Route::post('posts/{postRequest}/reject', [PostRequestController::class, 'reject']);
-    Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision']);
+    Route::apiResource('posts', PostRequestController::class)
+        ->parameters(['posts' => 'postRequest'])
+        ->only(['index', 'store', 'show', 'update', 'destroy'])
+        ->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/submit', [PostRequestController::class, 'submitForApproval'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/approve', [PostRequestController::class, 'approve'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/reject', [PostRequestController::class, 'reject'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision'])->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck']);
-    Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck']);
+    Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck'])->where(['postRequest' => '[0-9]{1,19}']);
 
     // Categories
     Route::get('categories', [CategoryController::class, 'index']);
@@ -103,4 +108,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings'])->middleware('role:it_publisher,it_admin');
     Route::post('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'updateSettings'])->middleware('role:it_publisher,it_admin');
     Route::post('email-settings/test', [App\Http\Controllers\Api\EmailSettingController::class, 'sendTestEmail'])->middleware('role:it_publisher,it_admin');
+
+    // Developer API Tokens (Admin only, or accessible by users)
+    Route::get('api-tokens', [ApiTokenController::class, 'index'])->middleware('role:it_publisher,it_admin');
+    Route::post('api-tokens', [ApiTokenController::class, 'store'])->middleware('role:it_publisher,it_admin');
+    Route::delete('api-tokens/{id}', [ApiTokenController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
+    
+    Route::delete('test-delete/{id}', function($id) {
+        return response()->json(['deleted' => $id]);
+    });
+
+    // External Integration Endpoint
+    Route::post('external/submit-request', [ExternalIntegrationController::class, 'submitRequest']);
 });

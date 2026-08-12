@@ -215,4 +215,11 @@ export const emailSettingsApi = {
   test: () => api.post('/email-settings/test'),
 };
 
+// ── API Tokens endpoints (Developer API) ──────────────────────────────────
+export const apiTokensApi = {
+  list: () => api.get('/api-tokens', { cache: false } as any),
+  create: (name: string) => api.post('/api-tokens', { name }),
+  revoke: (tokenId: number) => api.delete(`/api-tokens/${tokenId}`),
+};
+
 export default api;

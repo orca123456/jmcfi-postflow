@@ -11,10 +11,11 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
+import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
@@ -34,14 +35,35 @@ export default function VPDashboard() {
     fetchPolicy();
   }, []);
 
+
+
   // Tab State: 'dashboard' | 'policy-rules'
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const params = useLocalSearchParams();
+  const [activeTab, _setActiveTab] = useState(params.tab || 'dashboard');
+
+  useEffect(() => {
+    if (params.tab && params.tab !== activeTab) {
+      _setActiveTab(params.tab as string);
+    }
+  }, [params.tab]);
+
+  const setActiveTab = (tab: string) => {
+    _setActiveTab(tab);
+    router.setParams({ tab });
+  };
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
+  
+  const [postsPage, setPostsPage] = useState(1);
+  const [postsPerPage, setPostsPerPage] = useState(10);
   const [departmentOptions, setDepartmentOptions] = useState(['All Departments']);
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    setPostsPage(1);
+  }, [searchQuery, selectedDepartment, activeTab]);
 
   const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
@@ -256,6 +278,8 @@ export default function VPDashboard() {
     return matchesDept && matchesSearch && matchesDate;
   });
 
+  const paginatedRequests = filteredRequests.slice((postsPage - 1) * postsPerPage, postsPage * postsPerPage);
+
   const computedStats = React.useMemo(() => ({
     pending: requestsList.length,
     approved: approvedRequests.length,
@@ -456,7 +480,7 @@ export default function VPDashboard() {
                 <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
               </View>
 
-              {filteredRequests.map((req) => (
+              {paginatedRequests.map((req) => (
                 <TouchableOpacity
                   key={req.id}
                   style={styles.tableRow}
@@ -550,36 +574,14 @@ export default function VPDashboard() {
                   </View>
                 </TouchableOpacity>
               ))}
-            </View>
-
-            {/* Table Footer & Pagination */}
-            <View style={styles.tableFooter}>
-              <Text style={styles.tableFooterText}>
-                Showing 1 to {filteredRequests.length} of 8 requests
-              </Text>
-
-              <View style={styles.paginationRow}>
-                <TouchableOpacity style={styles.arrowBtn} disabled={true}>
-                  <Ionicons name="chevron-back" size={14} color="#9CA3AF" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnActive]}>
-                  <Text style={[styles.pageBtnText, styles.pageBtnTextActive]}>1</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.pageBtn}>
-                  <Text style={styles.pageBtnText}>2</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.arrowBtn}>
-                  <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
-
-                <View style={styles.pageCountSelector}>
-                  <Text style={styles.pageCountSelectorText}>10 / page</Text>
-                  <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
-                </View>
-              </View>
+              <PaginationControl 
+              currentPage={postsPage} 
+              totalItems={filteredRequests.length} 
+              itemsPerPage={postsPerPage} 
+              onPageChange={setPostsPage} 
+              onItemsPerPageChange={setPostsPerPage}
+              itemName="requests" 
+            />
             </View>
           </Card>
         </View>

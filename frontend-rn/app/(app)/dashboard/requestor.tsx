@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ComplianceResultModal } from '../../../components/ui/ComplianceResultModal';
 import { RichTextEditor } from '../../../components/ui/RichTextEditor';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ import { FormattedText } from '../../../components/ui/FormattedText';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, authApi, categoriesApi } from '../../../services/api';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
+import { PaginationControl } from '../../../components/ui/PaginationControl';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -38,7 +39,19 @@ export default function RequestorDashboard() {
   }, []);
 
   // Tab State: 'dashboard' | 'post-requests' | 'approval-queue' | 'analytics' | 'policy-rules'
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const params = useLocalSearchParams();
+  const [activeTab, _setActiveTab] = useState(params.tab || 'dashboard');
+
+  useEffect(() => {
+    if (params.tab && params.tab !== activeTab) {
+      _setActiveTab(params.tab as string);
+    }
+  }, [params.tab]);
+
+  const setActiveTab = (tab: string) => {
+    _setActiveTab(tab);
+    router.setParams({ tab });
+  };
 
   // Form State (New Request)
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -75,6 +88,7 @@ export default function RequestorDashboard() {
 
   // Dashboard Page State
   const [dashboardPage, setDashboardPage] = useState(1);
+  const [dashboardPerPage, setDashboardPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -259,6 +273,33 @@ export default function RequestorDashboard() {
 
   // Posts State
   const [mockRequests, setMockRequests] = useState<any[]>([]);
+  const [newRequestType, setNewRequestType] = useState('News & Updates');
+
+  const filteredRequests = useMemo(() => {
+    return mockRequests
+      .filter(req => (req.title && req.title.toLowerCase().includes(searchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(searchQuery.toLowerCase())))
+      .filter(req => {
+        if (statusFilter === 'All') return true;
+        const st = req.status || '';
+        if (statusFilter === 'PENDING') return st.includes('PENDING');
+        if (statusFilter === 'APPROVED') return st === 'APPROVED' || st === 'PUBLISHED' || st === 'SCHEDULED';
+        return st === statusFilter;
+      })
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+      });
+  }, [mockRequests, searchQuery, statusFilter, sortOrder]);
+
+  useEffect(() => {
+    setDashboardPage(1);
+  }, [searchQuery, statusFilter, sortOrder]);
+
+  const paginatedRequests = useMemo(() => {
+    return filteredRequests.slice((dashboardPage - 1) * dashboardPerPage, dashboardPage * dashboardPerPage);
+  }, [filteredRequests, dashboardPage, dashboardPerPage]);
+
   const [mockQueuePosts, setMockQueuePosts] = useState<any[]>([]);
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -266,7 +307,7 @@ export default function RequestorDashboard() {
   const loadPosts = async (showLoading = true) => {
     if (showLoading) setIsInitialLoading(true);
     try {
-      const res = await postsApi.list();
+      const res = await postsApi.list({ per_page: 1000 });
       const posts = res.data.data;
 
       const mapPost = (p: any) => ({
@@ -677,21 +718,7 @@ export default function RequestorDashboard() {
                 <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
               </View>
 
-              {mockRequests
-                .filter(req => (req.title && req.title.toLowerCase().includes(searchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(searchQuery.toLowerCase())))
-                .filter(req => {
-                  if (statusFilter === 'All') return true;
-                  const st = req.status || '';
-                  if (statusFilter === 'PENDING') return st.includes('PENDING');
-                  if (statusFilter === 'APPROVED') return st === 'APPROVED' || st === 'PUBLISHED' || st === 'SCHEDULED';
-                  return st === statusFilter;
-                })
-                .sort((a, b) => {
-                  const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-                  const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-                  return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
-                })
-                .map((req) => (
+              {paginatedRequests.map((req) => (
                   <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedRow(req)}>
                     <View style={[styles.cellFlex2, styles.titleCellContainer]}>
                       <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
@@ -732,38 +759,14 @@ export default function RequestorDashboard() {
                 ))}
             </View>
 
-            <View style={styles.tableFooter}>
-              <Text style={styles.tableFooterText}>Showing 1-4 of 42 requests</Text>
-              <View style={styles.paginationRow}>
-                <TouchableOpacity
-                  style={styles.arrowBtn}
-                  disabled={dashboardPage === 1}
-                  onPress={() => setDashboardPage(prev => Math.max(prev - 1, 1))}
-                >
-                  <Ionicons name="chevron-back" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
-
-                {[1, 2, 3].map((pNum) => (
-                  <TouchableOpacity
-                    key={pNum}
-                    style={[styles.pageIndexBtn, dashboardPage === pNum && styles.pageIndexBtnActive]}
-                    onPress={() => setDashboardPage(pNum)}
-                  >
-                    <Text style={[styles.pageIndexBtnText, dashboardPage === pNum && styles.pageIndexBtnTextActive]}>
-                      {pNum}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-
-                <TouchableOpacity
-                  style={styles.arrowBtn}
-                  disabled={dashboardPage === 3}
-                  onPress={() => setDashboardPage(prev => Math.min(prev + 1, 3))}
-                >
-                  <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
+            <PaginationControl 
+              currentPage={dashboardPage} 
+              totalItems={filteredRequests.length} 
+              itemsPerPage={dashboardPerPage} 
+              onPageChange={setDashboardPage} 
+              onItemsPerPageChange={setDashboardPerPage}
+              itemName="requests" 
+            />
           </Card>
         </View>
       )}

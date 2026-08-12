@@ -541,7 +541,7 @@ class PostRequestController extends Controller
 
         $cacheKey = "dashboard_stats_{$user->id}_{$category}";
 
-        $stats = Cache::remember($cacheKey, 10, function () use ($user, $category, $role) {
+        $stats = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
             $query = PostRequest::query();
             $this->applyRoleScoping($query, $user);
 
