@@ -1179,9 +1179,9 @@ export default function RequestorDashboard() {
                     </View>
 
                     <View style={styles.mockPostContentArea}>
-                      <Text style={styles.mockPostCaptionText}>
+                      <FormattedText style={styles.mockPostCaptionText}>
                         {caption ? caption : 'Upload media to see your content preview here...'}
-                      </Text>
+                      </FormattedText>
                     </View>
 
                     {mediaFiles && mediaFiles.length > 0 ? (
@@ -1438,9 +1438,9 @@ export default function RequestorDashboard() {
                     <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', marginBottom: 4 }}>
                       CAPTION PREVIEW
                     </Text>
-                    <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary, fontStyle: 'italic' }}>
+                    <FormattedText style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
                       "{draft.caption || 'No caption text provided yet.'}"
-                    </Text>
+                    </FormattedText>
                   </View>
 
                   <View style={styles.queueCardFooter}>
@@ -1581,9 +1581,9 @@ export default function RequestorDashboard() {
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: Colors.textSecondary, letterSpacing: 0.5 }}>
                     SUBMITTED CAPTION PREVIEW
                   </Text>
-                  <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
+                  <FormattedText style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
                     {selectedQueuePost.caption || 'No caption provided.'}
-                  </Text>
+                  </FormattedText>
                   <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
                     Department: {selectedQueuePost.department}
                   </Text>
@@ -1653,7 +1653,7 @@ export default function RequestorDashboard() {
 
                 <View style={styles.detailsSection}>
                   <Text style={styles.detailsLabel}>Caption / Narrative</Text>
-                  <Text style={styles.detailsText}>{selectedRow.caption_narrative || 'No caption provided.'}</Text>
+                  <FormattedText style={styles.detailsText}>{selectedRow.caption_narrative || 'No caption provided.'}</FormattedText>
                 </View>
 
                 {selectedRow.target_platforms && selectedRow.target_platforms.length > 0 && (
@@ -1730,9 +1730,9 @@ export default function RequestorDashboard() {
                   </View>
 
                   <View style={styles.mockPostContentArea}>
-                    <Text style={styles.mockPostCaptionText}>
+                    <FormattedText style={styles.mockPostCaptionText}>
                       {caption ? caption : 'Upload media to see your content preview here...'}
-                    </Text>
+                    </FormattedText>
                   </View>
 
                   {mediaFiles && mediaFiles.length > 0 ? (

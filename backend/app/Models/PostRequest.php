@@ -183,37 +183,35 @@ class PostRequest extends Model
     public function canBeApprovedBy(User $user): bool
     {
         $currentStage = $this->currentApprovalStage();
-        Log::info("canBeApprovedBy called for Post ID: {$this->id} by User ID: {$user->id}");
         if (!$currentStage) {
-            Log::info("No current stage found!");
             return false;
         }
 
-        Log::info("Current stage is: {$currentStage->stage}");
+        $role = $user->getRoleNames()->first();
 
-        // Admin can always approve
-        if ($user->hasRole('admin')) {
+        // Admins (it_publisher / it_admin) can always approve
+        if (in_array($role, ['it_publisher', 'it_admin', 'admin'], true)) {
             return true;
         }
 
-        // Must have the 'approver' role
-        if (!$user->hasRole('approver')) {
-            Log::info("User does not have 'approver' role");
+        // Only approver roles may approve (office_head / vice_president / imc_qa_checker)
+        if (!in_array($role, ['office_head', 'vice_president', 'imc_qa_checker'], true)) {
             return false;
         }
 
-        // Match approval stage to the user's department
-        $canApprove = match ($currentStage->stage) {
-            'office_head' => !in_array($user->department, ['Vice President of Academic Affairs', 'Institutional Marketing Communication', 'Information Technology Office'])
-                && $user->department === $this->requestor?->department,
-            'vice_president' => $user->department === 'Vice President of Academic Affairs',
-            'imc_qa' => $user->department === 'Institutional Marketing Communication',
-            default => false,
+        // Match the approval stage to the user's RAW role — mirrors
+        // PostRequestController::applyPendingApprovalScope. The previous logic
+        // used a non-existent 'approver' role and department strings like
+        // 'Vice President of Academic Affairs' / 'Institutional Marketing
+        // Communication', which never matched the real roles/departments, so
+        // every approver got "Unauthorized to approve this post".
+        return match ($currentStage->stage) {
+            // Office Head approves stage 1 — must belong to the requestor's department
+            'office_head'    => $role === 'office_head' && $user->department === $this->requestor?->department,
+            'vice_president' => $role === 'vice_president',
+            'imc_qa'         => $role === 'imc_qa_checker',
+            default          => false,
         };
-
-        Log::info("User department: {$user->department}, Can approve: " . ($canApprove ? 'Yes' : 'No'));
-
-        return $canApprove;
     }
 
     public function getNextStage(): ?string
