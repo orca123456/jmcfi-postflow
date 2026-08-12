@@ -20,14 +20,15 @@ import {
   Animated,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
+import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { useAuthStore } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
-import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi } from '../../../services/api';
+import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
@@ -118,7 +119,19 @@ export default function ITAdminDashboard() {
   const { user, setUser } = useAuthStore();
 
   // Tab state: 'overview' | 'user-management' | 'all-posts' | 'approval-queue' | 'policy-rules' | 'account-settings'
-  const [activeTab, setActiveTab] = useState('overview');
+  const params = useLocalSearchParams();
+  const [activeTab, setActiveTab] = useState(params.tab || 'overview');
+
+  useEffect(() => {
+    if (params.tab && params.tab !== activeTab) {
+      setActiveTab(params.tab as string);
+    }
+  }, [params.tab]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    router.setParams({ tab });
+  };
 
   const {
     policySections, effectiveDate, lastUpdatedDate,
@@ -129,6 +142,65 @@ export default function ITAdminDashboard() {
   const [editableLastUpdatedDate, setEditableLastUpdatedDate] = useState('');
   const [editableSections, setEditableSections] = useState<any[]>([]);
   const [policySearchQuery, setPolicySearchQuery] = useState('');
+  const [emailSettingsSearchQuery, setEmailSettingsSearchQuery] = useState('');
+
+  // ── API Tokens Logic ──
+  const fetchApiTokens = async () => {
+    try {
+      const res = await (apiTokensApi as any).list();
+      setApiTokens(res.data.data || []);
+    } catch (e) {
+      console.log('Failed to fetch API tokens', e);
+    }
+  };
+
+  const generateApiToken = async () => {
+    if (!newTokenName.trim()) {
+      Alert.alert('Error', 'Please provide a name for the token.');
+      return;
+    }
+    try {
+      const res = await (apiTokensApi as any).create(newTokenName.trim());
+      setGeneratedToken(res.data.data);
+      setNewTokenName('');
+      fetchApiTokens();
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message || e?.message || 'Failed to generate token.');
+    }
+  };
+
+  const requestRevokeToken = (id: number) => {
+    setRevokeConfirmId(id);
+  };
+
+  const executeRevokeToken = async () => {
+    if (!revokeConfirmId) return;
+    const id = revokeConfirmId;
+    setRevokeConfirmId(null);
+    const previousTokens = [...apiTokens];
+    
+    try {
+      // Optimistic UI update for immediate feedback
+      setApiTokens(prev => prev.filter(t => t.id !== id));
+      
+      await (apiTokensApi as any).revoke(id);
+      // Fetch again in background to ensure sync
+      fetchApiTokens();
+    } catch (e: any) {
+      // Rollback if failed
+      setApiTokens(previousTokens);
+      const errorMsg = e?.response?.data?.message || e?.message || 'Failed to revoke token.';
+      // We can use Alert.alert here for errors since it's just a message (1 button)
+      Alert.alert('Error', errorMsg);
+    }
+  };
+
+  useEffect(() => {
+    if (user && activeTab === 'developer-api') {
+      fetchApiTokens();
+    }
+  }, [user, activeTab]);
+
   const [isEditingPolicyMode, setIsEditingPolicyMode] = useState(false);
 
   useEffect(() => { fetchPolicy(); }, []);
@@ -137,6 +209,12 @@ export default function ITAdminDashboard() {
     if (effectiveDate) setEditableEffectiveDate(effectiveDate);
     if (lastUpdatedDate) setEditableLastUpdatedDate(lastUpdatedDate);
   }, [policySections, effectiveDate, lastUpdatedDate]);
+
+  const [apiTokens, setApiTokens] = useState<any[]>([]);
+  const [newTokenName, setNewTokenName] = useState('');
+  const [generatedToken, setGeneratedToken] = useState<{name: string, plain_text_token: string} | null>(null);
+  const [revokeConfirmId, setRevokeConfirmId] = useState<number | null>(null);
+  const [showApiDocs, setShowApiDocs] = useState(false);
 
   // ── Loading state ──
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -167,7 +245,7 @@ export default function ITAdminDashboard() {
     outputRange: ['0deg', '360deg'],
   });
 
-  const { data: initDataRes, isLoading } = useQuery({ queryKey: ['adminInitData'], queryFn: () => dashboardApi.getInitData(), refetchInterval: 10000, staleTime: 5000 });
+  const { data: initDataRes, isLoading } = useQuery({ queryKey: ['adminInitData'], queryFn: () => dashboardApi.getInitData(), refetchInterval: 10000, staleTime: 1000 });
 
   useEffect(() => {
     if (initDataRes?.data) {
@@ -545,6 +623,8 @@ export default function ITAdminDashboard() {
 
   const [allMockPosts, setAllMockPosts] = useState<any[]>([]);
   const [mockTablePosts, setMockTablePosts] = useState<any[]>([]);
+  const [postsPage, setPostsPage] = useState(1);
+  const [postsPerPage, setPostsPerPage] = useState(10);
   const [previewPost, setPreviewPost] = useState<any>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [previewImgSize, setPreviewImgSize] = useState<{ width: number; height: number } | null>(null);
@@ -737,7 +817,7 @@ export default function ITAdminDashboard() {
 
   const loadPostsData = async () => {
     try {
-      const res = await postsApi.list();
+      const res = await postsApi.list({ per_page: 1000 });
       processPostsData(res.data.data);
     } catch (err) {
       console.error(err);
@@ -983,6 +1063,12 @@ export default function ITAdminDashboard() {
     return matchesSearch && matchesStatus && matchesDept && matchesDate;
   });
 
+  const paginatedTablePosts = filteredTablePosts.slice((postsPage - 1) * postsPerPage, postsPage * postsPerPage);
+
+  useEffect(() => {
+    setPostsPage(1);
+  }, [requestsSearch, statusFilter, activeTab]);
+
   const computedStats = React.useMemo(() => {
     return {
       total: mockTablePosts.length,
@@ -995,8 +1081,8 @@ export default function ITAdminDashboard() {
   return (
     <DashboardShell
       title="IT Admin Panel"
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
+      activeTab={activeTab as string}
+      onTabChange={handleTabChange}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       departmentName={user?.department}
       userPhotoUrl={profilePhotoUrl}
@@ -1120,7 +1206,7 @@ export default function ITAdminDashboard() {
                 </View>
 
                 {/* Table Rows */}
-                {filteredTablePosts.map((post) => (
+                {paginatedTablePosts.map((post) => (
                   <TouchableOpacity key={post.id} activeOpacity={0.7} onPress={() => setPreviewPost(post)} style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', alignItems: 'center', cursor: 'pointer' }}>
                     {/* TITLE */}
                     <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingRight: 16 }}>
@@ -1179,26 +1265,14 @@ export default function ITAdminDashboard() {
               </View>
             </ScrollView>
 
-            {/* Pagination Footer */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', flexWrap: 'wrap', gap: 12 }}>
-              <Text style={{ fontSize: 13, color: '#6b7280' }}>Showing {filteredTablePosts.length} requests</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <TouchableOpacity style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="chevron-back" size={16} color="#9ca3af" /></TouchableOpacity>
-                <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>1</Text></TouchableOpacity>
-                <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#4b5563', fontSize: 13 }}>2</Text></TouchableOpacity>
-                <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#4b5563', fontSize: 13 }}>3</Text></TouchableOpacity>
-                <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#4b5563', fontSize: 13 }}>4</Text></TouchableOpacity>
-                <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#4b5563', fontSize: 13 }}>5</Text></TouchableOpacity>
-                <Text style={{ color: '#9ca3af', marginHorizontal: 4 }}>...</Text>
-                <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#4b5563', fontSize: 13 }}>9</Text></TouchableOpacity>
-                <TouchableOpacity style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="chevron-forward" size={16} color="#9ca3af" /></TouchableOpacity>
-
-                <select id="per-page" name="per-page" style={{ marginLeft: 16, height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }}>
-                  <option>10 / page</option>
-                  <option>20 / page</option>
-                </select>
-              </View>
-            </View>
+            <PaginationControl 
+              currentPage={postsPage} 
+              totalItems={filteredTablePosts.length} 
+              itemsPerPage={postsPerPage} 
+              onPageChange={setPostsPage} 
+              onItemsPerPageChange={setPostsPerPage}
+              itemName="requests" 
+            />
           </Card>
         </>
       )}
@@ -1822,6 +1896,214 @@ export default function ITAdminDashboard() {
       )}
 
       {/* ── EMAIL SETTINGS TAB ── */}
+      {activeTab === 'developer-api' && !isInitialLoading && (
+        <View style={{ gap: 20 }}>
+          <Card style={styles.userCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Developer API Tokens</Text>
+                <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>Manage tokens for external system integrations.</Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+              <TextInput
+                style={[styles.searchInput, { flex: 1, backgroundColor: '#F9FAFB' }]}
+                placeholder="Token Name (e.g. Main Website)"
+                value={newTokenName}
+                onChangeText={setNewTokenName}
+              />
+              <TouchableOpacity
+                style={{ backgroundColor: '#0B2545', paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center' }}
+                onPress={generateApiToken}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Generate Token</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                onPress={() => setShowApiDocs(true)}
+              >
+                <Ionicons name="document-text-outline" size={18} color="#4B5563" />
+                <Text style={{ color: '#4B5563', fontWeight: '600' }}>API Docs</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Modal visible={!!generatedToken} transparent animationType="fade">
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 450, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
+                  <View style={{ backgroundColor: '#0B2545', padding: 24, alignItems: 'center' }}>
+                    <Ionicons name="key-outline" size={48} color="#FFC72C" />
+                    <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700', marginTop: 12, fontFamily: 'Kameron_700Bold' }}>Token Generated Successfully!</Text>
+                  </View>
+                  <View style={{ padding: 24 }}>
+                    <Text style={{ color: '#4B5563', fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 22 }}>
+                      Please copy your new developer token now. For your security, <Text style={{ fontWeight: '700', color: '#EF4444' }}>it will never be shown again</Text>.
+                    </Text>
+                    
+                    <View style={{ backgroundColor: '#F3F4F6', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 24 }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#111827', fontSize: 16, textAlign: 'center', fontWeight: '500' }}>
+                        {generatedToken?.plain_text_token}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#0B2545', paddingVertical: 14, borderRadius: 8, alignItems: 'center' }}
+                      onPress={() => setGeneratedToken(null)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>I've copied it</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Revoke Confirmation Modal */}
+            <Modal visible={!!revokeConfirmId} transparent animationType="fade">
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 450, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
+                  <View style={{ backgroundColor: '#DC2626', padding: 24, alignItems: 'center' }}>
+                    <Ionicons name="warning-outline" size={48} color="#FEF2F2" />
+                    <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700', marginTop: 12, fontFamily: 'Kameron_700Bold' }}>Revoke API Token</Text>
+                  </View>
+                  <View style={{ padding: 24 }}>
+                    <Text style={{ color: '#4B5563', fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 22 }}>
+                      Are you sure you want to revoke this API token? Any applications using it will <Text style={{ fontWeight: '700', color: '#DC2626' }}>lose access immediately</Text>. This action cannot be undone.
+                    </Text>
+                    
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#F3F4F6', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
+                        onPress={() => setRevokeConfirmId(null)}
+                      >
+                        <Text style={{ color: '#4B5563', fontWeight: '600', fontSize: 15 }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#DC2626', paddingVertical: 14, borderRadius: 8, alignItems: 'center' }}
+                        onPress={executeRevokeToken}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Yes, Revoke</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* API Documentation Modal */}
+            <Modal visible={showApiDocs} transparent animationType="fade">
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 700, maxHeight: '90%', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0B2545', paddingHorizontal: 24, paddingVertical: 18 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons name="document-text" size={24} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', fontFamily: 'Kameron_700Bold' }}>API Integration Guide</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setShowApiDocs(false)} style={{ padding: 4 }}>
+                      <Ionicons name="close" size={24} color="#CBD5E1" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <ScrollView style={{ padding: 24 }}>
+                    <Text style={{ fontSize: 15, color: '#374151', marginBottom: 20, lineHeight: 24 }}>
+                      To submit a new Post Request automatically from an external system (like a main university website), you must send an HTTP <Text style={{ fontWeight: '700' }}>POST</Text> request to the endpoint below and include a valid Developer API Token in the <Text style={{ fontWeight: '700' }}>Authorization</Text> header.
+                    </Text>
+
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Endpoint URL</Text>
+                    <View style={{ backgroundColor: '#F1F5F9', padding: 12, borderRadius: 8, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#0F172A', fontSize: 14 }}>
+                        POST {(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request
+                      </Text>
+                    </View>
+
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: JavaScript (Fetch)</Text>
+                    <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
+                        {`fetch('${(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': 'Bearer YOUR_TOKEN_HERE'
+  },
+  body: JSON.stringify({
+    title: "Emergency Campus Alert!",
+    caption_narrative: "Campus is closed due to heavy rain.",
+    target_platforms: ["facebook"],
+    image_url: "https://jmcfi.edu.ph/images/alert.jpg",
+    publish_direct: true // <--- Set to true to bypass approvers!
+  })
+})`}
+                      </Text>
+                    </View>
+
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: PHP (cURL)</Text>
+                    <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
+                        {`$ch = curl_init('${(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+  "title" => "New Campus Event!",
+  "caption_narrative" => "Join us this Friday...",
+  "target_platforms" => ["facebook"],
+  "image_url" => "https://example.com/image.jpg"
+]));
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+  'Content-Type: application/json',
+  'Accept: application/json',
+  'Authorization: Bearer YOUR_TOKEN_HERE'
+]);
+$response = curl_exec($ch);`}
+                      </Text>
+                    </View>
+
+                    <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', marginBottom: 20 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Ionicons name="shield-checkmark" size={16} color="#DC2626" />
+                        <Text style={{ fontWeight: '700', color: '#991B1B', fontSize: 13 }}>Security Note</Text>
+                      </View>
+                      <Text style={{ color: '#7F1D1D', fontSize: 13, lineHeight: 20 }}>
+                        If a token is compromised, click "Revoke" on the dashboard. Any applications using that token will instantly lose access and be unable to submit further requests.
+                      </Text>
+                    </View>
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
+
+            <View style={{ backgroundColor: '#F9FAFB', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <View style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                <Text style={{ flex: 2, fontWeight: '600', color: '#374151', fontSize: 12 }}>NAME</Text>
+                <Text style={{ flex: 1, fontWeight: '600', color: '#374151', fontSize: 12 }}>CREATED</Text>
+                <Text style={{ flex: 1, fontWeight: '600', color: '#374151', fontSize: 12 }}>LAST USED</Text>
+                <Text style={{ width: 80, fontWeight: '600', color: '#374151', fontSize: 12, textAlign: 'right' }}>ACTION</Text>
+              </View>
+              
+              {apiTokens.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Ionicons name="key-outline" size={32} color="#9CA3AF" style={{ marginBottom: 8 }} />
+                  <Text style={{ color: '#6B7280' }}>No API tokens generated yet.</Text>
+                </View>
+              ) : (
+                apiTokens.map((token: any) => (
+                  <View key={token.id} style={{ flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', alignItems: 'center' }}>
+                    <Text style={{ flex: 2, color: '#111827', fontWeight: '500' }}>{token.name}</Text>
+                    <Text style={{ flex: 1, color: '#6B7280', fontSize: 13 }}>{new Date(token.created_at).toLocaleDateString()}</Text>
+                    <Text style={{ flex: 1, color: '#6B7280', fontSize: 13 }}>{token.last_used_at ? new Date(token.last_used_at).toLocaleDateString() : 'Never'}</Text>
+                    <TouchableOpacity
+                      style={{ width: 80, alignItems: 'flex-end' }}
+                      onPress={() => requestRevokeToken(token.id)}
+                    >
+                      <Text style={{ color: '#EF4444', fontWeight: '600', fontSize: 13 }}>Revoke</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </View>
+          </Card>
+        </View>
+      )}
+
       {activeTab === 'email-settings' && !isInitialLoading && (
         <View style={{ gap: 20 }}>
           {/* Header */}

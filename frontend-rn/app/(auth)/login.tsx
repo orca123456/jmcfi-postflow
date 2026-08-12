@@ -113,13 +113,42 @@ FloatingLabelInput.displayName = 'FloatingLabelInput';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, error, clearError } = useAuthStore();
-  
+  const { login, error, clearError, lockUntil, setLockUntil } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const passwordRef = useRef<TextInput>(null);
+
+  // Focus tracking for animation (placeholder behavior if needed)
+  const [focusedInput, setFocusedInput] = useState<'email' | 'password' | null>(null);
+
+  useEffect(() => {
+    if (lockUntil) {
+      // Calculate initial countdown
+      const initialRemaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setCountdown(initialRemaining);
+      
+      if (initialRemaining > 0) {
+        const interval = setInterval(() => {
+          const remaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+          setCountdown(remaining);
+          if (remaining <= 0) {
+            setLockUntil(null);
+            clearError();
+            clearInterval(interval);
+          }
+        }, 1000);
+        return () => clearInterval(interval);
+      } else {
+        setLockUntil(null);
+        clearError();
+      }
+    } else {
+      setCountdown(0);
+    }
+  }, [lockUntil, setLockUntil, clearError]);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -131,6 +160,8 @@ export default function LoginScreen() {
       if (user) {
         router.replace(getRoleDashboardPath(user.role) as any);
       }
+    } else {
+      setPassword('');
     }
   };
 
@@ -210,17 +241,23 @@ export default function LoginScreen() {
               {error ? (
                 <View style={styles.errorBox}>
                   <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
-                  <Text style={styles.errorText}>{error}</Text>
+                  <Text style={styles.errorText}>
+                    {countdown > 0 ? `Too many login attempts. Please try again in ${countdown} seconds.` : error}
+                  </Text>
                 </View>
               ) : null}
 
               <View style={styles.field}>
                 <TouchableOpacity
-                  style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                  style={[styles.submitButton, (loading || countdown > 0) && styles.submitButtonDisabled]}
                   onPress={handleLogin}
-                  disabled={loading}
+                  disabled={loading || countdown > 0}
                 >
-                  <Text style={styles.submitText}>{loading ? 'Signing in...' : 'Login'}</Text>
+                  <Text style={styles.submitText}>
+                    {countdown > 0 
+                      ? `Try again in ${countdown}s` 
+                      : (loading ? 'Signing in...' : 'Login')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
