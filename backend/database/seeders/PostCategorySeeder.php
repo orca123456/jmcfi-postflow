@@ -50,6 +50,14 @@ class PostCategorySeeder extends Seeder
                 'color' => '#8B5CF6',
                 'is_active' => true,
             ],
+            [
+                'name' => 'Others',
+                'slug' => 'others',
+                'description' => 'Custom category not listed above',
+                'icon' => 'more-horizontal',
+                'color' => '#64748B',
+                'is_active' => true,
+            ],
         ];
 
         foreach ($categories as $category) {

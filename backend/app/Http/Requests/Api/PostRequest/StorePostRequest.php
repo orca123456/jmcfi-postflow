@@ -20,6 +20,7 @@ class StorePostRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'caption_narrative' => ['required', 'string', 'max:5000'],
             'category_id' => $isDraft ? ['nullable', 'integer', 'exists:post_categories,id'] : ['required', 'integer', 'exists:post_categories,id'],
+            'other_category_name' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'string', 'max:255'],
             'target_platforms' => ['nullable', 'array'],
             'target_platforms.*' => ['string', 'in:facebook,instagram,portal'],

@@ -111,7 +111,8 @@ class PostRequestController extends Controller
             // Handle media uploads
             if ($request->hasFile('media')) {
                 foreach ($request->file('media') as $index => $file) {
-                    $path = $file->store('post-media/' . $post->id, config('filesystems.default'));
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    $path = $file->store('post-media/' . $post->id, $disk);
                     PostMedia::create([
                         'post_request_id' => $post->id,
                         'type' => $this->getMediaType($file->getMimeType()),
@@ -128,7 +129,8 @@ class PostRequestController extends Controller
             // Handle supporting documents
             if ($request->hasFile('supporting_docs')) {
                 foreach ($request->file('supporting_docs') as $index => $file) {
-                    $path = $file->store('post-supporting-docs/' . $post->id, config('filesystems.default'));
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    $path = $file->store('post-supporting-docs/' . $post->id, $disk);
                     PostMedia::create([
                         'post_request_id' => $post->id,
                         'type' => 'document',
@@ -219,7 +221,8 @@ class PostRequestController extends Controller
                 // Add new media
                 $existingCount = $postRequest->media()->whereIn('id', $keepIds)->count();
                 foreach ($request->file('media') as $index => $file) {
-                    $path = $file->store('post-media/' . $postRequest->id, config('filesystems.default'));
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    $path = $file->store('post-media/' . $postRequest->id, $disk);
                     PostMedia::create([
                         'post_request_id' => $postRequest->id,
                         'type' => $this->getMediaType($file->getMimeType()),
@@ -292,10 +295,24 @@ class PostRequestController extends Controller
             ]);
 
             $this->workflowService->initializeWorkflow($postRequest);
-            $this->aiService->checkCompliance($postRequest);
             $this->workflowService->notifyApprovers($postRequest);
 
             $this->clearDashboardCache();
+
+            // Run AI compliance check in background so submit returns instantly
+            // (The DeepSeek API call can take 5-30 seconds, which blocks the user)
+            $aiService = $this->aiService;
+            $postId = $postRequest->id;
+            app()->terminating(function () use ($aiService, $postId) {
+                try {
+                    $post = PostRequest::find($postId);
+                    if ($post) {
+                        $aiService->checkCompliance($post);
+                    }
+                } catch (\Exception $e) {
+                    logger()->warning('Background AI compliance check failed: ' . $e->getMessage());
+                }
+            });
 
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
@@ -348,32 +365,44 @@ class PostRequestController extends Controller
                 $postRequest->update([
                     'status' => $statusMap[$nextStage] ?? PostRequest::STATUS_APPROVED,
                 ]);
-
-                // Notify next approver (with stage info)
-                $this->workflowService->notifyNextApprover($postRequest, $nextStage);
-
-                // Notify requestor that their post moved to the next stage
-                $this->workflowService->notifyRequestorOfStageApproval($postRequest, $approvedStageName, $user->full_name);
             } else {
                 // All approvals done — IMC gave final sign-off
                 $postRequest->update([
                     'status' => PostRequest::STATUS_APPROVED,
                 ]);
-
-                // Notify requestor of full approval
-                $this->workflowService->notifyRequestorOfStageApproval($postRequest, $approvedStageName, $user->full_name);
-
-                // Notify IT Admin that post is ready
-                $this->workflowService->notifyITPublisher($postRequest);
-
-                // Dispatch auto-publish job to background queue
-                AutoPublishJob::dispatch($postRequest)->delay(now()->addSeconds(5));
             }
 
-            // Record audit trail
-            AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $postRequest->title, 'INFO', ['post_id' => $postRequest->id, 'stage' => $approvedStageName, 'remarks' => $request->remarks], $request);
-
             $this->clearDashboardCache();
+
+            // Defer ALL notifications & audit logging to AFTER the response is sent.
+            // This makes the approve endpoint return instantly (~50ms) instead of
+            // waiting for email/notification serialization (~2-5 seconds).
+            $workflowService = $this->workflowService;
+            $postId = $postRequest->id;
+            $remarks = $request->remarks;
+            $userName = $user->full_name;
+            $hasNextStage = (bool) $nextStage;
+            $nextStageName = $nextStage;
+
+            app()->terminating(function () use ($workflowService, $postId, $approvedStageName, $userName, $hasNextStage, $nextStageName, $remarks) {
+                try {
+                    $post = PostRequest::find($postId);
+                    if (!$post) return;
+
+                    if ($hasNextStage) {
+                        $workflowService->notifyNextApprover($post, $nextStageName);
+                        $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
+                    } else {
+                        $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
+                        $workflowService->notifyITPublisher($post);
+                        AutoPublishJob::dispatch($post)->delay(now()->addSeconds(5));
+                    }
+
+                    AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $post->title, 'INFO', ['post_id' => $postId, 'stage' => $approvedStageName, 'remarks' => $remarks]);
+                } catch (\Exception $e) {
+                    logger()->warning('Background approve notifications failed: ' . $e->getMessage());
+                }
+            });
 
             return response()->json([
                 'data'    => new PostRequestResource($postRequest->load([
@@ -682,8 +711,18 @@ class PostRequestController extends Controller
             $query->where('requestor_id', $user->id);
         } elseif ($category === 'approver') {
             if ($role === 'vice_president') {
-                // VP sees all non-draft posts (can monitor the Department Head queue)
-                $query->whereNotIn('status', ['draft']);
+                // VP sees posts that have passed Dept Head, so they don't see Pending Dept Head or Rejected by Dept Head
+                $query->whereNotIn('status', [
+                    PostRequest::STATUS_DRAFT,
+                    PostRequest::STATUS_PENDING_OFFICE_HEAD
+                ])->where(function ($q) {
+                    // Only show rejected posts if they were rejected at VP or IMC level
+                    $q->whereNotIn('status', [PostRequest::STATUS_REJECTED, PostRequest::STATUS_RETURNED_FOR_REVISION])
+                      ->orWhereHas('approvalWorkflows', function ($w) {
+                          $w->whereIn('action', ['rejected', 'returned_for_revision'])
+                            ->whereIn('stage', ['vice_president', 'imc_qa']);
+                      });
+                });
             } elseif ($role === 'imc_qa_checker') {
                 // IMC QA should only see posts that have reached them or passed them
                 $query->whereIn('status', [
@@ -694,7 +733,14 @@ class PostRequestController extends Controller
                     PostRequest::STATUS_PUBLISH_FAILED,
                     PostRequest::STATUS_REJECTED,
                     PostRequest::STATUS_RETURNED_FOR_REVISION,
-                ]);
+                ])->where(function ($q) {
+                    // Only show rejected posts if they were rejected at IMC level
+                    $q->whereNotIn('status', [PostRequest::STATUS_REJECTED, PostRequest::STATUS_RETURNED_FOR_REVISION])
+                      ->orWhereHas('approvalWorkflows', function ($w) {
+                          $w->whereIn('action', ['rejected', 'returned_for_revision'])
+                            ->where('stage', 'imc_qa');
+                      });
+                });
             } else {
                 // Department head (office_head): only posts from the same department
                 $query->whereHas('requestor', function ($q) use ($user) {
@@ -754,17 +800,11 @@ class PostRequestController extends Controller
      */
     private function clearDashboardCache(): void
     {
-        Cache::forget('dashboard_recent_activity');
-        Cache::forget('dashboard_analytics');
-        // Clear per-user dashboard stats caches using known key patterns
-        try {
-            $userIds = \App\Models\User::pluck('id');
-            foreach ($userIds as $userId) {
-                Cache::forget("dashboard_stats_{$userId}");
-            }
-        } catch (\Exception $e) {
-            // If cache clearing fails, log and continue gracefully
-            logger()->warning('Failed to flush dashboard cache: ' . $e->getMessage());
-        }
+        // We now cache dashboard_init_data for exactly 1 second.
+        // Calling Cache::flush() here causes a massive cache stampede when 
+        // 7 users are polling every 100ms, because they all hit the DB at once
+        // on a single-threaded server, causing 2-3 second delays.
+        // By NOT flushing, the 1-second TTL will naturally expire instantly,
+        // but it will only hit the DB once per second instead of 70 times per second.
     }
 }

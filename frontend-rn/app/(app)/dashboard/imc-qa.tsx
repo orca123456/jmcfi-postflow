@@ -23,6 +23,7 @@ import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../co
 import { usePolicyStore } from '../../../store/policy';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, dashboardApi, authApi } from '../../../services/api';
+import { useQuery } from '@tanstack/react-query';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -76,6 +77,9 @@ export default function ImcQaDashboard() {
   // Modal / Selected Request Preview State
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
+  const [modalError, setModalError] = useState<string | null>(null);
+  
+  const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
   // Reject Modal State
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
@@ -135,63 +139,109 @@ export default function ImcQaDashboard() {
     catch { } finally { setSavingAcct(false); }
   };
 
-  const loadData = async (showLoading = true) => {
-    if (showLoading) setIsInitialLoading(true);
-    try {
-      const res = await dashboardApi.getInitData();
-      const posts = res.data.posts?.data || res.data.posts || [];
-      const statsData = res.data.stats || {};
-      setStats(statsData);
+  const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
+    queryKey: ['imc-dashboard-data'],
+    queryFn: dashboardApi.getInitData,
+    refetchInterval: 100,
+    refetchIntervalInBackground: true,
+  });
 
-      const depts = res.data.departments || [];
-      setDepartmentOptions(['All Departments', ...depts]);
-
-      const mapPost = (p: any) => ({
-        ...p,
-        id: p.id.toString(),
-        title: p.title || 'Untitled',
-        category: p.category?.name || 'Category',
-        dept: p.requestor?.department || 'Department',
-        requestedBy: p.requestor?.full_name || 'Unknown',
-        requestedByRole: 'Requestor',
-        date: new Date(p.created_at).toLocaleDateString(),
-        time: new Date(p.created_at).toLocaleTimeString(),
-        rawDate: new Date(p.created_at),
-        platforms: p.target_platforms || [],
-        caption: p.caption_narrative || '',
-        previewBanner: (p.title || '').toUpperCase(),
-        attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
-        attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
-        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
-        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
-        rejectionReason: p.rejection_reason || '',
-      });
+  useEffect(() => {
+    if (initDataRes?.data) {
+      const data = initDataRes.data;
+      const posts = data.posts?.data || data.posts || [];
+      
+      const mapPost = (p: any) => {
+        let rejectedBy = '';
+        if ((p.status === 'rejected' || p.status === 'returned_for_revision') && p.approval_workflows && Array.isArray(p.approval_workflows)) {
+           const rejectionLog = p.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
+           if (rejectionLog && rejectionLog.approver) {
+               let approverTitle = 'Approver';
+               if (rejectionLog.stage === 'office_head') approverTitle = 'Department Head';
+               if (rejectionLog.stage === 'vice_president') approverTitle = 'Vice President';
+               if (rejectionLog.stage === 'imc_qa') approverTitle = 'QA / Branding Checker';
+               
+               rejectedBy = `${approverTitle}, ${rejectionLog.approver.full_name}`;
+           }
+        }
+        
+        return {
+          ...p,
+          id: p.id.toString(),
+          title: p.title || 'Untitled',
+          category: p.category?.name || 'Category',
+          dept: p.requestor?.department || 'Department',
+          requestedBy: p.requestor?.full_name || 'Unknown',
+          requestedByRole: 'Requestor',
+          date: new Date(p.created_at).toLocaleDateString(),
+          time: new Date(p.created_at).toLocaleTimeString(),
+          rawDate: new Date(p.created_at),
+          platforms: p.target_platforms || [],
+          caption: p.caption_narrative || '',
+          previewBanner: (p.title || '').toUpperCase(),
+          attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+          attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+          thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+          status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+          rejectionReason: p.rejection_reason || '',
+          rejectedBy,
+        };
+      };
 
       const mapped = posts.map(mapPost);
-      setRequestsList(mapped.filter((p: any) => p.status === 'PENDING_IMC_QA'));
-      setApprovedRequests(mapped.filter((p: any) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(p.status)));
+      
+      let pendingStatuses = [];
+      let approvedStatuses = [];
+      
+      if (user?.department === 'Vice President for Academic Affairs') {
+        pendingStatuses = ['PENDING_VICE_PRESIDENT'];
+        approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
+      } else if (user?.department === 'Institutional Marketing Communication') {
+        pendingStatuses = ['PENDING_IMC_QA'];
+        approvedStatuses = ['APPROVED', 'SCHEDULED', 'PUBLISHED'];
+      } else {
+        pendingStatuses = ['PENDING_OFFICE_HEAD'];
+        approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
+      }
+
+      setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status) && !optimisticallyRemovedIds.includes(p.id)));
+      setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
       setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      if (showLoading) setIsInitialLoading(false);
+
+      const statsData = data.stats || {};
+      setStats(statsData);
+
+      const depts = data.departments || [];
+      setDepartmentOptions(['All Departments', ...depts]);
+      setIsInitialLoading(false);
     }
+  }, [initDataRes, user?.department, optimisticallyRemovedIds]);
+
+  const loadData = (showLoading = true) => {
+    refetchInitData();
   };
 
   useEffect(() => {
-    loadData(true);
-    const interval = setInterval(() => loadData(false), 10000);
-    return () => clearInterval(interval);
+    if (requestsList.length === 0) {
+      loadData(true);
+    }
   }, [activeTab]);
 
 
   // Handlers for actions
   const handleApprove = async (req: any) => {
+    
+    setRequestsList(prev => prev.filter(r => r.id !== req.id));
+    setOptimisticallyRemovedIds(prev => [...prev, req.id]);
+    setApprovedRequests(prev => [{ ...req, status: 'PUBLISHED' }, ...prev]);
+    setSelectedRequest(null);
+    
+    setTimeout(() => {
+      alert(`QA Clearance Approved: "${req.title}"`);
+    }, 100);
+
     try {
       await postsApi.approve(req.id, {});
-      alert(`QA Clearance Approved: "${req.title}"`);
-      setSelectedRequest(null);
-      loadData();
     } catch (err) {
       alert('Failed to approve request.');
     }
@@ -208,26 +258,41 @@ export default function ImcQaDashboard() {
       alert('Please provide a reason for rejecting the request.');
       return;
     }
+    
+    setRequestsList(prev => prev.filter(r => r.id !== requestToReject?.id));
+    setOptimisticallyRemovedIds(prev => [...prev, requestToReject?.id]);
+    if (requestToReject) setRejectedRequests(prev => [{ ...requestToReject, status: 'REJECTED' }, ...prev]);
+    setIsRejectModalVisible(false);
+    const reqTitle = requestToReject?.title;
+    const reqId = requestToReject?.id;
+    setRequestToReject(null);
+    setSelectedRequest(null);
+    
+    setTimeout(() => {
+      alert(`QA Clearance Rejected: "${reqTitle}"\nReason: ${rejectComment}`);
+    }, 100);
+
     try {
-      await postsApi.reject(requestToReject?.id, { reason: rejectComment });
-      alert(`Request Rejected by QA: "${requestToReject?.title}"\nReason: ${rejectComment}`);
-      setIsRejectModalVisible(false);
-      setRequestToReject(null);
-      setSelectedRequest(null);
-      loadData();
+      await postsApi.reject(reqId, { reason: rejectComment });
     } catch (err) {
       alert('Failed to reject request.');
     }
   };
 
   const handleRequestRevision = async (req: any) => {
+    setRequestsList(prev => prev.filter(r => r.id !== req.id));
+    setOptimisticallyRemovedIds(prev => [...prev, req.id]);
+    setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
+    setSelectedRequest(null);
+    
+    alert(`Revision Requested for: "${req.title}"`);
+
     try {
       await postsApi.returnRevision(req.id, { reason: 'Revision requested by QA' });
-      alert(`Revision Requested for: "${req.title}"`);
-      setSelectedRequest(null);
-      loadData();
+      loadData(false);
     } catch (err) {
       alert('Failed to return for revision.');
+      loadData(false);
     }
   };
 
@@ -288,7 +353,7 @@ export default function ImcQaDashboard() {
   return (
     <DashboardShell
       title="IMC/QA — Institutional Quality Review"
-      activeTab={activeTab}
+      activeTab={activeTab as string}
       onTabChange={setActiveTab}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
     >
@@ -714,6 +779,86 @@ export default function ImcQaDashboard() {
 
               {/* Modal Body Split */}
               <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
+                { (selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
+                  <View style={{ marginBottom: 16 }}>
+                    <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444' }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#EF4444', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Rejected by: {selectedRequest.rejectedBy}</Text>
+                      <Text style={{ fontSize: 15, color: '#EF4444', fontWeight: '500' }}>
+                        {selectedRequest.rejectionReason || 'No reason provided.'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                    
+                <View style={{ marginBottom: 16 }}>
+                  <View style={{ backgroundColor: '#FFFFFF', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#111827' }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#6B7280', textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
+                        {(() => {
+                          const workflows = selectedRequest.approval_workflows || [];
+                          const getStageStatus = (stageName: string) => {
+                            const entry = workflows.find((w: any) => w.stage === stageName);
+                            if (entry) {
+                               if (entry.action === 'approved') return 'Approved';
+                               if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
+                            }
+                            return 'Pending';
+                          };
+
+                          let deptHead = getStageStatus('office_head');
+                          let vpaa = getStageStatus('vice_president');
+                          let imc = getStageStatus('imc_qa');
+                          
+                          if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
+                          if (vpaa === 'Rejected') { imc = 'Waiting'; }
+                          if (imc === 'Approved') { imc = 'Published'; }
+
+                          const getIcon = (state: string) => {
+                            if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
+                            if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
+                            return { name: 'time', color: '#9CA3AF' };
+                          };
+                          const getColor = (state: string) => {
+                            if (state === 'Rejected') return '#DC2626';
+                            if (state === 'Approved' || state === 'Published') return '#059669';
+                            return '#9CA3AF';
+                          };
+                          const getLineColor = (state: string) => {
+                            if (state === 'Approved' || state === 'Published') return '#059669';
+                            if (state === 'Rejected') return '#DC2626';
+                            return '#E5E7EB';
+                          };
+
+                          return (
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
+                              
+                              <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Dept Head</Text>
+                                <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
+                              </View>
+                              
+                              <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+                              
+                              <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>VPAA</Text>
+                                <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
+                              </View>
+                              
+                              <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+                              
+                              <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>IMC / QA</Text>
+                                <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
+                              </View>
+
+                            </View>
+                          );
+                        })()}
+                    </View>
+                  </View>
+                
                 <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
                   {/* Left Side: Social Media Mockup Preview */}
                   <View style={styles.modalLeftColumn}>
@@ -765,7 +910,7 @@ export default function ImcQaDashboard() {
                         <View style={styles.socialHeader}>
                           <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF' }]} resizeMode="contain" />
                           <View>
-                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation, Inc.</Text>
+                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
                             <Text style={styles.socialTimeText}>Sponsored &bull; Public</Text>
                           </View>
                         </View>
@@ -803,7 +948,7 @@ export default function ImcQaDashboard() {
                         <View style={styles.socialHeader}>
                           <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
                           <View style={{ flex: 1 }}>
-                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>jmcfi_official</Text>
+                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
                           </View>
                           <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
                         </View>
@@ -824,7 +969,7 @@ export default function ImcQaDashboard() {
                             <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
                           </View>
                           <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                          <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_official </b>' + (selectedRequest.caption || '')}</FormattedText>
+                          <FormattedText style={styles.socialCaptionText}>{'<b>Jose Maria College Foundation Inc. </b>' + (selectedRequest.caption || '')}</FormattedText>
                         </View>
                       </View>
                     )}
@@ -909,14 +1054,7 @@ export default function ImcQaDashboard() {
                       </View>
                     </View>
 
-                    { (selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
-                      <View style={[styles.metaRow, { backgroundColor: '#FEF2F2', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', marginTop: 12 }]}>
-                        <Text style={[styles.metaLabel, { color: '#B91C1C' }]}>Rejection Reason</Text>
-                        <Text style={{ fontSize: 14, color: '#991B1B', marginTop: 4, fontWeight: '500' }}>
-                          {selectedRequest.rejectionReason || 'No reason provided.'}
-                        </Text>
-                      </View>
-                    )}
+
 
                     <View style={styles.metaDivider} />
 

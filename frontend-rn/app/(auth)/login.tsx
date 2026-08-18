@@ -129,7 +129,7 @@ export default function LoginScreen() {
       // Calculate initial countdown
       const initialRemaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
       setCountdown(initialRemaining);
-      
+
       if (initialRemaining > 0) {
         const interval = setInterval(() => {
           const remaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
@@ -154,7 +154,7 @@ export default function LoginScreen() {
     setLoading(true);
     const success = await login(email, password);
     setLoading(false);
-    
+
     if (success) {
       const user = useAuthStore.getState().user;
       if (user) {
@@ -176,14 +176,14 @@ export default function LoginScreen() {
   };
 
   return (
-    <ImageBackground 
+    <ImageBackground
       source={require('../../assets/images/jmcbg2.jpeg')}
       style={styles.backgroundImage}
       imageStyle={{ opacity: 0.9 }}
       blurRadius={2}
     >
-      <KeyboardAvoidingView 
-        style={styles.container} 
+      <KeyboardAvoidingView
+        style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -196,7 +196,7 @@ export default function LoginScreen() {
               />
               <Text style={styles.headerTitle}>JMCFI PostFLow</Text>
             </View>
-            
+
             <View style={styles.formContainer}>
               <View style={styles.field}>
                 <FloatingLabelInput
@@ -254,8 +254,8 @@ export default function LoginScreen() {
                   disabled={loading || countdown > 0}
                 >
                   <Text style={styles.submitText}>
-                    {countdown > 0 
-                      ? `Try again in ${countdown}s` 
+                    {countdown > 0
+                      ? `Try again in ${countdown}s`
                       : (loading ? 'Signing in...' : 'Login')}
                   </Text>
                 </TouchableOpacity>
@@ -263,7 +263,7 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.footer}>
-              <Text style={styles.footerText}>© 2026 JMCFI POSTFLOW System TechNycDev</Text>
+              <Text style={styles.footerText}>© 2026 JMCFI POSTFLOW SYSTEM</Text>
             </View>
           </View>
         </ScrollView>

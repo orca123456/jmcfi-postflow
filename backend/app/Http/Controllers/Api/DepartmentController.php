@@ -30,13 +30,19 @@ class DepartmentController extends Controller
             'role_categories' => 'nullable|array',
             'role_categories.*' => 'in:admin,approver,requestor',
         ]);
+        // College departments are shared between requestor and approver.
+        // Only 'admin' departments stay role-exclusive.
+        $categories = $validated['role_categories'] ?? [];
+        if (!in_array('admin', $categories, true)) {
+            $categories = ['requestor', 'approver'];
+        }
 
         $department = Department::create([
             'name' => $validated['name'],
             'display_name' => $validated['display_name'],
             'description' => $validated['description'] ?? null,
             'is_active' => true,
-            'role_categories' => $validated['role_categories'] ?? [],
+            'role_categories' => $categories,
         ]);
 
         return response()->json([
@@ -67,6 +73,13 @@ class DepartmentController extends Controller
 
     public function destroy(Request $request, Department $department): JsonResponse
     {
+        // Built-in system departments cannot be removed
+        if ($department->is_system) {
+            return response()->json([
+                'message' => 'This is a built-in system department and cannot be removed.',
+            ], 403);
+        }
+
         // Role-scoped delete: if a role_category is provided, only detach that
         // role from the department. It stays available for other roles that
         // share it (e.g. a college used by both Requestor and Approver).

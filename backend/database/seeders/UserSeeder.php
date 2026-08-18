@@ -19,10 +19,10 @@ class UserSeeder extends Seeder
                 'email' => 'admin@jmc.edu.ph',
                 'password' => 'password123',
                 'phone' => '+639000000001',
-                'department' => 'ICT',
+                'department' => 'Information Technology Office',
                 'position' => 'System Administrator',
                 'status' => 'active',
-                'roles' => ['it_publisher'],
+                'roles' => ['it_admin', 'it_publisher'],
             ],
         ];
 
@@ -35,7 +35,9 @@ class UserSeeder extends Seeder
                 $userData
             );
 
-            $user->assignRole($roles);
+            // syncRoles replaces ALL existing roles — ensures the admin
+            // doesn't accidentally keep a stale 'requestor' role.
+            $user->syncRoles($roles);
         }
     }
 }

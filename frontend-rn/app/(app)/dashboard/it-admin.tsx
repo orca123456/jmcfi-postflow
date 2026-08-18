@@ -203,7 +203,10 @@ export default function ITAdminDashboard() {
 
   const [isEditingPolicyMode, setIsEditingPolicyMode] = useState(false);
 
-  useEffect(() => { fetchPolicy(); }, []);
+  useEffect(() => { 
+    const timer = setTimeout(() => fetchPolicy(), 7000);
+    return () => clearTimeout(timer);
+  }, []);
   useEffect(() => {
     if (policySections) setEditableSections(JSON.parse(JSON.stringify(policySections)));
     if (effectiveDate) setEditableEffectiveDate(effectiveDate);
@@ -217,7 +220,8 @@ export default function ITAdminDashboard() {
   const [showApiDocs, setShowApiDocs] = useState(false);
 
   // ── Loading state ──
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const { data: initDataRes, isLoading } = useQuery({ queryKey: ['adminInitData'], queryFn: () => dashboardApi.getInitData(), refetchInterval: 1000, staleTime: 1000 });
+  const isInitialLoading = isLoading;
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -245,7 +249,7 @@ export default function ITAdminDashboard() {
     outputRange: ['0deg', '360deg'],
   });
 
-  const { data: initDataRes, isLoading } = useQuery({ queryKey: ['adminInitData'], queryFn: () => dashboardApi.getInitData(), refetchInterval: 10000, staleTime: 1000 });
+  // Query moved up
 
   useEffect(() => {
     if (initDataRes?.data) {
@@ -292,18 +296,11 @@ export default function ITAdminDashboard() {
     setMockTablePosts(mappedTable);
   }
 
-  // ── Master data loader: all mount-time fetches in parallel via Promise.allSettled ──
+  // ── Master data loader: fetch background data AFTER overview data loads ──
   useEffect(() => {
+    if (isInitialLoading) return;
+
     const loadAllData = async () => {
-      setIsInitialLoading(true);
-
-      // The single-threaded dev server (php artisan serve) processes requests one
-      // at a time. Firing all 8 requests at once queues the essential overview data
-      // (react-query getInitData) behind the tab-only requests -> ~10s reloads.
-      // Delay these background tab requests so the overview loads first, then the
-      // tabs populate in the background (data + flow are unchanged).
-      await new Promise((r) => setTimeout(r, 600));
-
       // Fire all requests in parallel — a timeout on one won't block the others
       const results = await Promise.allSettled([
         usersApi.list().catch(() => ({ data: { data: [] } })),
@@ -349,11 +346,10 @@ export default function ITAdminDashboard() {
         setAuditLogs(results[4].value.data.data);
       }
 
-      setIsInitialLoading(false);
     };
 
     loadAllData();
-  }, []); // Only runs once on mount, not on every tab change
+  }, [isInitialLoading]); // Run once overview data is loaded
 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -444,9 +440,10 @@ export default function ITAdminDashboard() {
     if (deptName) {
       try {
         const val = deptName.toLowerCase().replace(/\s+/g, '_');
-        // Tag the new department to the currently selected role ONLY, so it
-        // does not leak into other roles' lists.
-        await departmentsApi.create({ name: val, display_name: deptName, role_categories: [newUserRole] });
+        // College departments are shared between requestor and approver roles.
+        // Only 'admin' departments are role-exclusive (system departments).
+        const categories = newUserRole === 'admin' ? ['admin'] : ['requestor', 'approver'];
+        await departmentsApi.create({ name: val, display_name: deptName, role_categories: categories });
         const res = await departmentsApi.listFresh();
         setDepartmentsList(res.data?.data || []);
         setNewUserDepartment(deptName);
@@ -475,7 +472,7 @@ export default function ITAdminDashboard() {
       const res = await departmentsApi.listFresh();
       const fresh = res.data?.data || [];
       setDepartmentsList(fresh);
-      const visible = fresh.filter(d => (d.role_categories || []).includes(newUserRole));
+      const visible = fresh.filter((d: any) => (d.role_categories || []).includes(newUserRole));
       if (visible.length > 0) {
         setNewUserDepartment(visible[0].display_name);
       } else {
@@ -1100,14 +1097,14 @@ export default function ITAdminDashboard() {
       {/* ── LOADING SKELETON ──
         The overview only needs the react-query init fetch (isLoading), while
         the other tabs wait for their background data (isInitialLoading). */}
-      {((isInitialLoading && activeTab !== 'overview') || (activeTab === 'overview' && isLoading)) && (
+      {isInitialLoading && (
         <DashboardSkeleton />
       )}
 
       {/* ── OVERVIEW TAB ──
         Renders as soon as the essential init data arrives (isLoading), without
         waiting for the 5 background tab-requests on the single-threaded server. */}
-      {activeTab === 'overview' && !isLoading && (
+      {activeTab === 'overview' && !isInitialLoading && (
         <>
           <View style={{ flexDirection: 'row', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
             <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.7}>
@@ -1171,7 +1168,7 @@ export default function ITAdminDashboard() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 6, paddingHorizontal: 12, height: 36, borderWidth: 1, borderColor: '#e5e7eb' }}>
                   <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
-                  <TextInput id="search-requests" name="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
+                  <TextInput id="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
                 </View>
                 <select id="filter-status" name="filter-status" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
                   <option>All Status</option>

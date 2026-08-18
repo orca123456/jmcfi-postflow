@@ -32,6 +32,7 @@ class PostRequest extends Model
         'slug',
         'caption_narrative',
         'category_id',
+        'other_category_name',
         'department_id',
         'requestor_id',
         'status',
@@ -120,10 +121,10 @@ class PostRequest extends Model
 
     public function currentApprovalStage(): ?ApprovalWorkflow
     {
-        return $this->approvalWorkflows()
+        // Use the eager-loaded collection to avoid N+1 queries
+        return $this->approvalWorkflows
             ->where('action', 'pending')
-            // No need for a second orderBy since relation already handles it, but we can be explicit
-            ->orderBy('stage_order')
+            ->sortBy('stage_order')
             ->first();
     }
 
@@ -152,9 +153,10 @@ class PostRequest extends Model
         $baseLabel = self::statuses()[$this->status] ?? $this->status;
         
         if ($this->status === 'returned_for_revision' || $this->status === 'rejected') {
-            $latestRejection = $this->approvalWorkflows()
+            // Use the eager-loaded collection to avoid N+1 queries
+            $latestRejection = $this->approvalWorkflows
                 ->whereIn('action', ['rejected', 'returned_for_revision'])
-                ->latest('acted_at')
+                ->sortByDesc('acted_at')
                 ->first();
             
             if ($latestRejection) {

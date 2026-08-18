@@ -40,11 +40,11 @@ export default function OfficeHeadDashboard() {
 
   // Tab State: 'dashboard' | 'approved' | 'rejected' | 'policy-rules'
   const params = useLocalSearchParams();
-  const [activeTab, setActiveTab] = useState(params.tab || 'dashboard');
+  const [activeTab, setActiveTab] = useState((params.tab === 'total' ? 'dashboard' : params.tab) || 'dashboard');
 
   useEffect(() => {
     if (params.tab && params.tab !== activeTab) {
-      setActiveTab(params.tab as string);
+      setActiveTab(params.tab === 'total' ? 'dashboard' : params.tab as string);
     }
   }, [params.tab]);
 
@@ -56,7 +56,7 @@ export default function OfficeHeadDashboard() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
-  
+
   const [postsPage, setPostsPage] = useState(1);
   const [postsPerPage, setPostsPerPage] = useState(10);
   const [departmentOptions, setDepartmentOptions] = useState(['All Departments']);
@@ -79,6 +79,8 @@ export default function OfficeHeadDashboard() {
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [modalError, setModalError] = useState<string | null>(null);
 
+  const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
+
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
@@ -93,14 +95,14 @@ export default function OfficeHeadDashboard() {
     total: 0
   });
 
-  const { data: initDataRes, isLoading: initLoading, refetch: refetchInitData } = useQuery({
-    queryKey: ['officeHeadInitData'],
-    queryFn: () => dashboardApi.getInitData(),
-    refetchInterval: 10000,
-    staleTime: 1000,
+  const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
+    queryKey: ['oh-dashboard-data'],
+    queryFn: dashboardApi.getInitData,
+    refetchInterval: 100,
+    refetchIntervalInBackground: true,
   });
 
-  const isInitialLoading = initLoading;
+  const isInitialLoading = isInitLoading;
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -148,6 +150,12 @@ export default function OfficeHeadDashboard() {
   };
 
   useEffect(() => {
+    if (requestsList.length === 0) {
+      loadData(true);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     if (initDataRes?.data) {
       const data = initDataRes.data;
       if (data.posts) {
@@ -156,34 +164,50 @@ export default function OfficeHeadDashboard() {
           posts = posts.data;
         }
 
-        const mapPost = (p: any) => ({
-          ...p,
-          id: p.id.toString(),
-          title: p.title || 'Untitled',
-          category: p.category?.name || 'Category',
-          dept: p.requestor?.department || 'Department',
-          requestedBy: p.requestor?.full_name || 'Unknown',
-          requestedByRole: 'Requestor',
-          date: new Date(p.created_at).toLocaleDateString(),
-          time: new Date(p.created_at).toLocaleTimeString(),
-          rawDate: new Date(p.created_at),
-          platforms: p.target_platforms || [],
-          caption: p.caption_narrative || '',
-          previewBanner: (p.title || '').toUpperCase(),
-          attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
-          attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
-          thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
-          status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
-          rejectionReason: p.rejection_reason || '',
-        });
+        const mapPost = (p: any) => {
+          let rejectedBy = '';
+          if ((p.status === 'rejected' || p.status === 'returned_for_revision') && p.approval_workflows && Array.isArray(p.approval_workflows)) {
+            const rejectionLog = p.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
+            if (rejectionLog && rejectionLog.approver) {
+              let approverTitle = 'Approver';
+              if (rejectionLog.stage === 'office_head') approverTitle = 'Department Head';
+              if (rejectionLog.stage === 'vice_president') approverTitle = 'Vice President';
+              if (rejectionLog.stage === 'imc_qa') approverTitle = 'QA / Branding Checker';
+
+              rejectedBy = `${approverTitle}, ${rejectionLog.approver.full_name}`;
+            }
+          }
+
+          return {
+            ...p,
+            id: p.id.toString(),
+            title: p.title || 'Untitled',
+            category: p.category?.name || 'Category',
+            dept: p.requestor?.department || 'Department',
+            requestedBy: p.requestor?.full_name || 'Unknown',
+            requestedByRole: 'Requestor',
+            date: new Date(p.created_at).toLocaleDateString(),
+            time: new Date(p.created_at).toLocaleTimeString(),
+            rawDate: new Date(p.created_at),
+            platforms: p.target_platforms || [],
+            caption: p.caption_narrative || '',
+            previewBanner: (p.title || '').toUpperCase(),
+            attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+            attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+            thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+            status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+            rejectionReason: p.rejection_reason || '',
+            rejectedBy,
+          };
+        };
 
         const mapped = posts.map(mapPost);
 
         let pendingStatuses: string[] = [];
         let approvedStatuses: string[] = [];
 
-        if (user?.department === 'Vice President of Academic Affairs') {
-          pendingStatuses = ['PENDING_OFFICE_HEAD', 'PENDING_VICE_PRESIDENT'];
+        if (user?.department === 'Vice President for Academic Affairs') {
+          pendingStatuses = ['PENDING_VICE_PRESIDENT'];
           approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
         } else if (user?.department === 'Institutional Marketing Communication') {
           pendingStatuses = ['PENDING_IMC_QA'];
@@ -193,7 +217,7 @@ export default function OfficeHeadDashboard() {
           approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
         }
 
-        setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status)));
+        setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status) && !optimisticallyRemovedIds.includes(p.id)));
         setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
         setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
       }
@@ -204,22 +228,29 @@ export default function OfficeHeadDashboard() {
       const depts = data.departments || [];
       setDepartmentOptions(['All Departments', ...depts]);
     }
-  }, [initDataRes, user?.department]);
+  }, [initDataRes, user?.department, optimisticallyRemovedIds]);
 
-  const loadData = () => {
+  const loadData = (showLoading = true) => {
     refetchInitData();
   };
 
 
   const handleApprove = async (req: any) => {
     setModalError(null);
+    
+    setRequestsList(prev => prev.filter(r => r.id !== req.id));
+    setOptimisticallyRemovedIds(prev => [...prev, req.id]);
+    setApprovedRequests(prev => [{ ...req, status: 'APPROVED' }, ...prev]);
+    setSelectedRequest(null);
+    
+    setTimeout(() => {
+      alert(`Request Approved: "${req.title}"`);
+    }, 100);
+
     try {
       await postsApi.approve(req.id, {});
-      alert(`Request Approved: "${req.title}"\nForwarded to VPAA for approval.`);
-      setSelectedRequest(null);
-      loadData();
     } catch (err: any) {
-      setModalError(err.response?.data?.message || 'Failed to approve request.');
+      alert(err.response?.data?.message || 'Failed to approve request.');
     }
   };
 
@@ -235,26 +266,41 @@ export default function OfficeHeadDashboard() {
       return;
     }
     setModalError(null);
+    
+    setRequestsList(prev => prev.filter(r => r.id !== requestToReject?.id));
+    setOptimisticallyRemovedIds(prev => [...prev, requestToReject?.id]);
+    if (requestToReject) setRejectedRequests(prev => [{ ...requestToReject, status: 'REJECTED' }, ...prev]);
+    setIsRejectModalVisible(false);
+    const reqTitle = requestToReject?.title;
+    const reqId = requestToReject?.id;
+    setRequestToReject(null);
+    setSelectedRequest(null);
+    
+    setTimeout(() => {
+      alert(`Request Rejected: "${reqTitle}"\nReason: ${rejectComment}`);
+    }, 100);
+
     try {
-      await postsApi.reject(requestToReject?.id, { reason: rejectComment });
-      alert(`Request Rejected: "${requestToReject?.title}"\nReason: ${rejectComment}`);
-      setIsRejectModalVisible(false);
-      setRequestToReject(null);
-      setSelectedRequest(null);
-      loadData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to reject request.');
+      await postsApi.reject(reqId, { reason: rejectComment });
+    } catch (err) {
+      alert('Failed to reject request.');
     }
   };
 
   const handleRequestRevision = async (req: any) => {
+    setRequestsList(prev => prev.filter(r => r.id !== req.id));
+    setOptimisticallyRemovedIds(prev => [...prev, req.id]);
+    setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
+    setSelectedRequest(null);
+    
+    alert(`Revision Requested for: "${req.title}"`);
+
     try {
       await postsApi.returnRevision(req.id, { reason: 'Revision requested by Office Head' });
-      alert(`Revision Requested for: "${req.title}"`);
-      setSelectedRequest(null);
-      loadData();
+      loadData(false);
     } catch (err) {
       alert('Failed to return for revision.');
+      loadData(false);
     }
   };
 
@@ -272,7 +318,7 @@ export default function OfficeHeadDashboard() {
       req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.category.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     let matchesDate = true;
     if (dateFilter !== 'All Time') {
       const today = new Date();
@@ -281,7 +327,7 @@ export default function OfficeHeadDashboard() {
       postDate.setHours(0, 0, 0, 0);
       const diffTime = today.getTime() - postDate.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-      
+
       if (dateFilter === 'Today') {
         matchesDate = diffDays === 0;
       } else if (dateFilter === 'Yesterday') {
@@ -294,7 +340,7 @@ export default function OfficeHeadDashboard() {
         const start = new Date(customStartDate);
         const end = new Date(customEndDate);
         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-            matchesDate = req.rawDate >= start && req.rawDate <= new Date(end.getTime() + 86400000);
+          matchesDate = req.rawDate >= start && req.rawDate <= new Date(end.getTime() + 86400000);
         }
       }
     }
@@ -314,7 +360,7 @@ export default function OfficeHeadDashboard() {
   const isLargeScreen = width > 1024;
 
   let userPosition = user?.position || 'Department Head';
-  if (user?.department === 'Vice President of Academic Affairs') userPosition = 'Vice President';
+  if (user?.department === 'Vice President for Academic Affairs') userPosition = 'Vice President';
   if (user?.department === 'Institutional Marketing Communication') userPosition = 'QA / Branding Checker';
 
   const greetingName = user?.name ? `${userPosition} ${user.name}` : userPosition;
@@ -389,8 +435,8 @@ export default function OfficeHeadDashboard() {
                 </Card>
               </TouchableOpacity>
 
-              {/* Card 4: Forwarded to QA / Total Requests */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
+              {/* Card 4: Total Requests (Static Metric) */}
+              <View style={{ flex: 1, minWidth: 220 }}>
                 <Card style={styles.metricCard}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
@@ -401,7 +447,7 @@ export default function OfficeHeadDashboard() {
                   <Text style={styles.metricCount}>{computedStats.total}</Text>
                   <Text style={styles.metricSubtext}>All requests</Text>
                 </Card>
-              </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -430,7 +476,7 @@ export default function OfficeHeadDashboard() {
                 </View>
 
                 {/* Department Dropdown - Only show for VP and IMC who can see multiple departments */}
-                {(user?.department === 'Vice President of Academic Affairs' || user?.department === 'Institutional Marketing Communication') && (
+                {(user?.department === 'Vice President for Academic Affairs' || user?.department === 'Institutional Marketing Communication') && (
                   <View style={{ position: 'relative', zIndex: 10 }}>
                     <TouchableOpacity
                       style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
@@ -484,14 +530,14 @@ export default function OfficeHeadDashboard() {
                           <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
                         </TouchableOpacity>
                       ))}
-                      
+
                       {dateFilter === 'Custom Range' && (
                         <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
                           <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
                           <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
                           <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
                           <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
                             onPress={() => setIsDateDropdownOpen(false)}
                           >
@@ -624,13 +670,13 @@ export default function OfficeHeadDashboard() {
               ))}
             </View>
 
-            <PaginationControl 
-              currentPage={postsPage} 
-              totalItems={filteredRequests.length} 
-              itemsPerPage={postsPerPage} 
-              onPageChange={setPostsPage} 
+            <PaginationControl
+              currentPage={postsPage}
+              totalItems={filteredRequests.length}
+              itemsPerPage={postsPerPage}
+              onPageChange={setPostsPage}
               onItemsPerPageChange={setPostsPerPage}
-              itemName="requests" 
+              itemName="requests"
             />
           </Card>
         </View>
@@ -704,7 +750,7 @@ export default function OfficeHeadDashboard() {
                   <TextInput style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]} value={user?.department || ''} editable={false} />
                 </View>
 
-                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center' }} onPress={handleSaveDetails} disabled={savingAcct}>
+                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center' }} onPress={handleSaveProfile} disabled={savingAcct}>
                   <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Saving...' : 'Save Details'}</Text>
                 </TouchableOpacity>
               </Card>
@@ -776,6 +822,86 @@ export default function OfficeHeadDashboard() {
 
               {/* Modal Body Split */}
               <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
+                {(selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
+                  <View style={{ marginBottom: 16 }}>
+                    <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444' }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#EF4444', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Rejected by: {selectedRequest.rejectedBy}</Text>
+                      <Text style={{ fontSize: 15, color: '#EF4444', fontWeight: '500' }}>
+                        {selectedRequest.rejectionReason || 'No reason provided.'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={{ marginBottom: 16 }}>
+                  <View style={{ backgroundColor: '#FFFFFF', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#111827' }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#6B7280', textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
+                      {(() => {
+                        const workflows = selectedRequest.approval_workflows || [];
+                        const getStageStatus = (stageName: string) => {
+                          const entry = workflows.find((w: any) => w.stage === stageName);
+                          if (entry) {
+                            if (entry.action === 'approved') return 'Approved';
+                            if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
+                          }
+                          return 'Pending';
+                        };
+
+                        let deptHead = getStageStatus('office_head');
+                        let vpaa = getStageStatus('vice_president');
+                        let imc = getStageStatus('imc_qa');
+
+                        if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
+                        if (vpaa === 'Rejected') { imc = 'Waiting'; }
+                        if (imc === 'Approved') { imc = 'Published'; }
+
+                        const getIcon = (state: string) => {
+                          if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
+                          if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
+                          return { name: 'time', color: '#9CA3AF' };
+                        };
+                        const getColor = (state: string) => {
+                          if (state === 'Rejected') return '#DC2626';
+                          if (state === 'Approved' || state === 'Published') return '#059669';
+                          return '#9CA3AF';
+                        };
+                        const getLineColor = (state: string) => {
+                          if (state === 'Approved' || state === 'Published') return '#059669';
+                          if (state === 'Rejected') return '#DC2626';
+                          return '#E5E7EB';
+                        };
+
+                        return (
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
+
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Dept Head</Text>
+                              <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
+                            </View>
+
+                            <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>VPAA</Text>
+                              <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
+                            </View>
+
+                            <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>IMC / QA</Text>
+                              <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
+                            </View>
+
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  </View>
+
                 <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
                   {/* Left Side: Social Media Mockup Preview */}
                   <View style={styles.modalLeftColumn}>
@@ -827,7 +953,7 @@ export default function OfficeHeadDashboard() {
                         <View style={styles.socialHeader}>
                           <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF' }]} resizeMode="contain" />
                           <View>
-                            <Text style={styles.socialAuthorName}>College of Computing Studies (CITE)</Text>
+                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
                             <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
                           </View>
                         </View>
@@ -865,7 +991,7 @@ export default function OfficeHeadDashboard() {
                         <View style={styles.socialHeader}>
                           <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
                           <View style={{ flex: 1 }}>
-                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>jmcfi_cite</Text>
+                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
                           </View>
                           <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
                         </View>
@@ -913,6 +1039,7 @@ export default function OfficeHeadDashboard() {
 
                   {/* Right Side: Request Details Metadata */}
                   <View style={styles.modalRightColumn}>
+
                     <View style={styles.metaRow}>
                       <Text style={styles.metaLabel}>Request Title</Text>
                       <Text style={styles.metaTitleVal}>{selectedRequest.title}</Text>
@@ -948,6 +1075,8 @@ export default function OfficeHeadDashboard() {
                       </View>
                     </View>
 
+
+
                     <View style={styles.metaRowGrid}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.metaLabel}>Target Platforms</Text>
@@ -971,14 +1100,7 @@ export default function OfficeHeadDashboard() {
                       </View>
                     </View>
 
-                    { (selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
-                      <View style={[styles.metaRow, { backgroundColor: '#FEF2F2', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', marginTop: 12 }]}>
-                        <Text style={[styles.metaLabel, { color: '#B91C1C' }]}>Rejection Reason</Text>
-                        <Text style={{ fontSize: 14, color: '#991B1B', marginTop: 4, fontWeight: '500' }}>
-                          {selectedRequest.rejectionReason || 'No reason provided.'}
-                        </Text>
-                      </View>
-                    )}
+
 
                     <View style={styles.metaDivider} />
 
