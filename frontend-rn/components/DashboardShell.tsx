@@ -60,32 +60,38 @@ export function DashboardShell({
   React.useEffect(() => {
     const deptName = user?.department;
     if (!deptName) return;
-    departmentsApi.list().then(res => {
-      const depts = res.data?.data || [];
-      const match = depts.find((d: any) =>
-        d.display_name === deptName || d.name === deptName
-      );
-      if (match?.logo_url) {
-        setAutoDeptLogo(match.logo_url);
-      }
-    }).catch(() => {});
+    const timer = setTimeout(() => {
+      departmentsApi.list().then(res => {
+        const depts = res.data?.data || [];
+        const match = depts.find((d: any) =>
+          d.display_name === deptName || d.name === deptName
+        );
+        if (match?.logo_url) {
+          setAutoDeptLogo(match.logo_url);
+        }
+      }).catch(() => {});
+    }, 6000); // Delay so it doesn't block dashboard init on single-threaded dev server
+    return () => clearTimeout(timer);
   }, [user?.department]);
 
   // Auto-fetch user photo from API (in case it was uploaded after login)
   const [apiUserPhoto, setApiUserPhoto] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (!user) return;
-    authApi.getUser().then(res => {
-      const userData = res.data?.user || res.data;
-      if (userData?.photo_url && userData.photo_url !== '') {
-        setApiUserPhoto(userData.photo_url);
-      }
-      if (userData?.department_logo_url) {
-        setAutoDeptLogo(userData.department_logo_url);
-        // Also update the global user object so it's cached in local storage for next time
-        useAuthStore.getState().setUser({ ...user, ...userData });
-      }
-    }).catch(() => {});
+    const timer = setTimeout(() => {
+      authApi.getUser().then(res => {
+        const userData = res.data?.user || res.data;
+        if (userData?.photo_url && userData.photo_url !== '') {
+          setApiUserPhoto(userData.photo_url);
+        }
+        if (userData?.department_logo_url) {
+          setAutoDeptLogo(userData.department_logo_url);
+          // Also update the global user object so it's cached in local storage for next time
+          useAuthStore.getState().setUser({ ...user, ...userData });
+        }
+      }).catch(() => {});
+    }, 6500); // Delay so it doesn't block dashboard init
+    return () => clearTimeout(timer);
   }, [user?.id]);
 
   const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;

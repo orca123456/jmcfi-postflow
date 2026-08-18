@@ -60,14 +60,14 @@ export default function AppLayout() {
     }
 
     // Determine the user's role (raw DB role preferred, normalized role as fallback)
-    const rawRole = (user.roles && user.roles[0]) || user.role || 'requestor';
+    const rawRole = ((user as any).roles && (user as any).roles[0]) || user.role || 'requestor';
     const allowed = ROLE_PATHS[rawRole] || ROLE_PATHS[user.role || ''] || ['/dashboard/requestor'];
 
     // Block URL manipulation: if the requested path is a dashboard the role
     // cannot access, send them to their own dashboard instead.
     if (ALL_DASHBOARDS.includes(pathname) && !allowed.includes(pathname)) {
       const home = ROLE_HOME[rawRole] || ROLE_HOME[user.role || ''] || '/dashboard/requestor';
-      router.replace(home);
+      router.replace(home as any);
     }
   }, [pathname, user, router]);
 

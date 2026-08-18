@@ -21,6 +21,12 @@ class PostMedia extends Model
         'is_featured',
     ];
 
+    protected $appends = [
+        'url',
+        'type_label',
+        'formatted_size'
+    ];
+
     protected function casts(): array
     {
         return [

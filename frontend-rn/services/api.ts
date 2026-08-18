@@ -1,12 +1,11 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { setupCache, type AxiosCacheInstance } from 'axios-cache-interceptor';
 
-// For web, use localStorage fallback since SecureStore is native-only
+// For web, use sessionStorage fallback since SecureStore is native-only
 const getToken = async (): Promise<string | null> => {
   if (Platform.OS === 'web') {
-    return localStorage.getItem('auth_token');
+    return sessionStorage.getItem('auth_token');
   }
   return SecureStore.getItemAsync('auth_token');
 };
@@ -15,39 +14,16 @@ const API_BASE_URL = Platform.OS === 'web' && process.env.NODE_ENV === 'producti
   ? '/api' 
   : (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api');
 
-// NOTE: Accept-Encoding is a forbidden header in browsers (browsers set it
-// automatically). Setting it manually made the browser log
-// "Refused to set unsafe header" on EVERY request, so it was removed.
-
-const api: AxiosCacheInstance = setupCache(
-  axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    timeout: 60000,
-  }),
-  {
-    // Faster fetching: keep an in-memory cache of GET responses for 30s.
-    // - Only GET requests are cached; creates/updates/deletes never are.
-    // - The backend sends "Cache-Control: no-cache, private", so we force a short TTL
-    //   instead of letting the header interpreter disable caching entirely.
-    // - The cache key includes the auth token, so one user's data can never be
-    //   served to another user.
-    ttl: 30_000,
-    methods: ['get'],
-    headerInterpreter: () => 30_000,
-    generateKey: (request) => {
-      const token = (request.headers?.Authorization as string) || 'anon';
-      return `${request.method}:${request.url}:${token}`;
-    },
-  }
-);
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+  timeout: 60000,
+});
 
 // Attach Bearer token to every request.
-// NOTE: registered AFTER setupCache so it runs BEFORE the cache interceptor,
-// guaranteeing the Authorization header is present when the cache key is computed.
 api.interceptors.request.use(async (config) => {
   const token = await getToken();
   if (token) {
@@ -56,32 +32,15 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Global handlers: invalidate the cache on mutations and auth loss
-function clearAxiosCache() {
-  try {
-    (api as any).cache?.clear?.();
-    (api as any).cache?.storage?.clear?.();
-  } catch (_) {
-    /* noop */
-  }
-}
-
 api.interceptors.response.use(
   (response) => {
-    const method = (response.config.method || 'get').toLowerCase();
-    if (method !== 'get' && response.status >= 200 && response.status < 300) {
-      // Any create/update/delete invalidates cached reads so the UI never shows stale data
-      clearAxiosCache();
-    }
     return response;
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired — clear cache + storage and redirect
-      clearAxiosCache();
       if (Platform.OS === 'web') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('auth_user');
       }
     }
     return Promise.reject(error);
@@ -171,7 +130,7 @@ export const departmentsApi = {
   list: () => api.get('/departments'),
   // Bypass the 30s GET cache — used right after an add/delete so the UI shows
   // the freshly persisted department list without needing a page reload.
-  listFresh: () => api.get('/departments', { cache: false }),
+  listFresh: () => api.get('/departments'),
   create: (data: { name: string; display_name: string; description?: string; role_categories?: string[] }) =>
     api.post('/departments', data),
   update: (id: number, data: object) => api.put(`/departments/${id}`, data),

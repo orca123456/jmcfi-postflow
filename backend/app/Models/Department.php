@@ -16,6 +16,7 @@ class Department extends Model
         'description',
         'logo_path',
         'is_active',
+        'is_system',
         'role_categories',
     ];
 
@@ -23,6 +24,7 @@ class Department extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_system' => 'boolean',
             'role_categories' => 'array',
         ];
     }
