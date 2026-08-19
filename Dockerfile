@@ -21,6 +21,7 @@ RUN apk add --no-cache \
     zip \
     unzip \
     postgresql-dev \
+    linux-headers \
     && docker-php-ext-install pdo pdo_pgsql bcmath pcntl sockets
 
 # Install Composer securely
