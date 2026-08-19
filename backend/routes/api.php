@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\RoleController;
 // use App\Http\Controllers\Api\PublishingController;
 // use App\Http\Controllers\Api\ViolationController;
 // use App\Http\Controllers\Api\AIComplianceController;
+use App\Http\Controllers\Api\ChatbotController;
 
 use App\Http\Controllers\Api\PolicySettingController;
 use App\Http\Controllers\Api\AuditLogController;
@@ -99,7 +100,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('roles/list', [RoleController::class, 'store'])->middleware('role:it_publisher,it_admin');
     Route::delete('roles/list/{role}', [RoleController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
 
-    // AI Compliance
+
+    Route::post('chatbot/message', [ChatbotController::class, 'handleMessage'])->middleware('auth:sanctum');
+
+// AI Compliance
     // Route::post('ai/check/{post}', [AIComplianceController::class, 'checkCompliance']);
     // Route::post('ai/generate-rejection-reason/{post}', [AIComplianceController::class, 'generateRejectionReason']);
     // Route::post('ai/improve-caption/{post}', [AIComplianceController::class, 'improveCaption']);

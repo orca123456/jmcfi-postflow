@@ -77,6 +77,7 @@ export default function VPDashboard() {
   // Modal / Selected Request Preview State
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
@@ -932,7 +933,9 @@ export default function VPDashboard() {
                         <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
 
                         {selectedRequest.thumbnailUrl ? (
-                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
+                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={styles.socialMediaBanner}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -968,7 +971,9 @@ export default function VPDashboard() {
                         </View>
 
                         {selectedRequest.thumbnailUrl ? (
-                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
+                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -991,7 +996,9 @@ export default function VPDashboard() {
                     {modalPlatformTab === 'website' && (
                       <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
                         {selectedRequest.thumbnailUrl ? (
-                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
+                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -1186,6 +1193,30 @@ export default function VPDashboard() {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Full Screen Image Modal */}
+      {fullScreenImage && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setFullScreenImage(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Ionicons name="close" size={32} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={{ width: '90%', height: '90%' }}
+              resizeMode="contain"
+            />
           </View>
         </Modal>
       )}

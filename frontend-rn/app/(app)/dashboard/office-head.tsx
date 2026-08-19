@@ -77,6 +77,7 @@ export default function OfficeHeadDashboard() {
   // Modal / Selected Request Preview State
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
 
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
@@ -533,10 +534,10 @@ export default function OfficeHeadDashboard() {
 
                       {dateFilter === 'Custom Range' && (
                         <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} />
                           <TouchableOpacity
                             style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
                             onPress={() => setIsDateDropdownOpen(false)}
@@ -961,7 +962,9 @@ export default function OfficeHeadDashboard() {
                         <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
 
                         {selectedRequest.thumbnailUrl ? (
-                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
+                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={styles.socialMediaBanner}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -997,7 +1000,9 @@ export default function OfficeHeadDashboard() {
                         </View>
 
                         {selectedRequest.thumbnailUrl ? (
-                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
+                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -1020,7 +1025,9 @@ export default function OfficeHeadDashboard() {
                     {modalPlatformTab === 'website' && (
                       <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
                         {selectedRequest.thumbnailUrl ? (
-                          <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
+                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -1217,6 +1224,30 @@ export default function OfficeHeadDashboard() {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Full Screen Image Modal */}
+      {fullScreenImage && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={true}
+          onRequestClose={() => setFullScreenImage(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Ionicons name="close" size={32} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={{ width: '90%', height: '90%' }}
+              resizeMode="contain"
+            />
           </View>
         </Modal>
       )}

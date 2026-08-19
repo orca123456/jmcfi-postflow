@@ -360,6 +360,7 @@ export default function ITAdminDashboard() {
   const [newUserRole, setNewUserRole] = useState('requestor');
   const [newUserDepartment, setNewUserDepartment] = useState('');
   const [newUserPosition, setNewUserPosition] = useState('');
+  const [uploadingDeptId, setUploadingDeptId] = useState<number | null>(null);
 
   // Filtered dept list based on selected role category (Admin/Approver/Requestor)
   const filteredDepts = React.useMemo(() => {
@@ -484,6 +485,51 @@ export default function ITAdminDashboard() {
       showToast('Failed to delete department: ' + msg, 'error');
     }
   };
+
+  const handleUploadDeptLogo = (deptId: number) => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingDeptId(deptId);
+        try {
+          await departmentsApi.uploadLogo(deptId, file);
+          const res = await departmentsApi.listFresh();
+          setDepartmentsList(res.data?.data || []);
+          showToast('Department logo uploaded successfully.', 'success');
+        } catch (e: any) {
+          showToast('Failed to upload department logo.', 'error');
+        } finally {
+          setUploadingDeptId(null);
+        }
+      };
+      input.click();
+    }
+  };
+
+  const handleDeleteDepartmentFromSystem = async (deptId: number) => {
+    if (!window.confirm('Are you sure you want to permanently delete this department?')) return;
+    try {
+      await departmentsApi.delete(deptId);
+      const res = await departmentsApi.listFresh();
+      setDepartmentsList(res.data?.data || []);
+      
+      // Update form default if the currently selected one was deleted
+      if (res.data?.data?.length > 0) {
+        setNewUserDepartment(res.data.data[0].display_name);
+      } else {
+        setNewUserDepartment('');
+      }
+      
+      showToast('Department deleted successfully.', 'success');
+    } catch (e: any) {
+      showToast('Failed to delete department.', 'error');
+    }
+  };
+
   const [showPassword, setShowPassword] = useState(false);
   const [userFilter, setUserFilter] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -614,8 +660,14 @@ export default function ITAdminDashboard() {
   // Requests Table Filters
   const [requestsSearch, setRequestsSearch] = useState('');
   const [requestsStatus, setRequestsStatus] = useState('All Status');
+  const [isRequestsStatusDropdownOpen, setIsRequestsStatusDropdownOpen] = useState(false);
   const [requestsDept, setRequestsDept] = useState('All Departments');
-  const [requestsDate, setRequestsDate] = useState('');
+  const [isRequestsDeptDropdownOpen, setIsRequestsDeptDropdownOpen] = useState(false);
+  const [requestsDate, setRequestsDate] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
+  const [isRequestsDateDropdownOpen, setIsRequestsDateDropdownOpen] = useState(false);
+  const [requestsCustomStartDate, setRequestsCustomStartDate] = useState('');
+  const [requestsCustomEndDate, setRequestsCustomEndDate] = useState('');
+  const [requestsSortOrder, setRequestsSortOrder] = useState<'desc' | 'asc'>('desc');
 
 
   const [allMockPosts, setAllMockPosts] = useState<any[]>([]);
@@ -1048,16 +1100,45 @@ export default function ITAdminDashboard() {
         matchesStatus = ['published', 'approved'].includes(post.rawStatus);
       } else if (requestsStatus === 'Rejected') {
         matchesStatus = ['rejected', 'returned_for_revision'].includes(post.rawStatus);
-      } else if (requestsStatus === 'Drafts') {
+      } else if (requestsStatus === 'Draft') {
         matchesStatus = post.rawStatus === 'draft';
       }
     }
 
     const matchesDept = requestsDept === 'All Departments' || post.department === requestsDept;
 
-    const matchesDate = requestsDate === '' || post.rawDate === requestsDate;
+    let matchesDate = true;
+    if (requestsDate !== 'All Time') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const postDate = new Date(post.rawDate || Date.now());
+      postDate.setHours(0, 0, 0, 0);
+      const diffTime = today.getTime() - postDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+      
+      if (requestsDate === 'Today') {
+        matchesDate = diffDays === 0;
+      } else if (requestsDate === 'Yesterday') {
+        matchesDate = diffDays === 1;
+      } else if (requestsDate === 'Last 7 Days') {
+        matchesDate = diffDays >= 0 && diffDays <= 7;
+      } else if (requestsDate === 'Last 30 Days') {
+        matchesDate = diffDays >= 0 && diffDays <= 30;
+      } else if (requestsDate === 'Custom Range') {
+        const start = new Date(requestsCustomStartDate);
+        const end = new Date(requestsCustomEndDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const raw = new Date(post.rawDate || Date.now());
+            matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
+        }
+      }
+    }
 
     return matchesSearch && matchesStatus && matchesDept && matchesDate;
+  }).sort((a, b) => {
+    const timeA = a.rawDate ? new Date(a.rawDate).getTime() : 0;
+    const timeB = b.rawDate ? new Date(b.rawDate).getTime() : 0;
+    return requestsSortOrder === 'desc' ? timeB - timeA : timeA - timeB;
   });
 
   const paginatedTablePosts = filteredTablePosts.slice((postsPage - 1) * postsPerPage, postsPage * postsPerPage);
@@ -1161,31 +1242,119 @@ export default function ITAdminDashboard() {
           </View>
 
           {/* ── ALL CONTENT REQUESTS TABLE ── */}
-          <Card style={{ padding: 0, overflow: 'hidden', borderWidth: 1, borderColor: '#e5e7eb' }}>
+          <Card style={{ padding: 0, overflow: 'visible', borderWidth: 1, borderColor: '#e5e7eb', zIndex: 10 }}>
             {/* Table Controls */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', flexWrap: 'wrap', gap: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', flexWrap: 'wrap', gap: 12, zIndex: 20 }}>
               <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>All Content Requests</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', zIndex: 30 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 6, paddingHorizontal: 12, height: 36, borderWidth: 1, borderColor: '#e5e7eb' }}>
                   <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
                   <TextInput id="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
                 </View>
-                <select id="filter-status" name="filter-status" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: Colors.textPrimary }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
-                  <option>All Status</option>
-                  <option>Pending</option>
-                  <option>Published</option>
-                  <option>Rejected</option>
-                </select>
-                <select id="filter-department" name="filter-department" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: Colors.textPrimary }} value={requestsDept} onChange={(e) => setRequestsDept(e.target.value)}>
-                  <option>All Departments</option>
-                  {departmentsList.map(d => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
-                </select>
-                <View style={{ flexDirection: 'row', alignItems: 'center', height: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 12, backgroundColor: '#fff' }}>
-                  <input id="filter-date" name="filter-date" type="date" style={{ fontSize: 13, color: Colors.textPrimary, border: 'none', outline: 'none', backgroundColor: 'transparent' }} value={requestsDate} onChange={(e) => setRequestsDate(e.target.value)} />
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' }}
+                    onPress={() => setIsRequestsDeptDropdownOpen(!isRequestsDeptDropdownOpen)}
+                  >
+                    <Text style={{ fontSize: 13, color: Colors.textPrimary, marginRight: 8 }}>{requestsDept}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isRequestsDeptDropdownOpen && (
+                    <ScrollView style={{ position: 'absolute', top: 40, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb', minWidth: 180, maxHeight: 300, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 }} nestedScrollEnabled>
+                      <TouchableOpacity
+                        style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsDept === 'All Departments' ? '#f3f4f6' : 'transparent' }}
+                        onPress={() => {
+                          setRequestsDept('All Departments');
+                          setIsRequestsDeptDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, color: requestsDept === 'All Departments' ? Colors.primary : Colors.textPrimary, fontWeight: requestsDept === 'All Departments' ? '600' : '400' }}>All Departments</Text>
+                      </TouchableOpacity>
+                      {departmentsList.filter((d: any) => !d.is_system).map((d: any) => (
+                        <TouchableOpacity
+                          key={d.id}
+                          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsDept === d.display_name ? '#f3f4f6' : 'transparent' }}
+                          onPress={() => {
+                            setRequestsDept(d.display_name);
+                            setIsRequestsDeptDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, color: requestsDept === d.display_name ? Colors.primary : Colors.textPrimary, fontWeight: requestsDept === d.display_name ? '600' : '400' }}>{d.display_name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
                 </View>
-                <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-                  <Ionicons name="options-outline" size={16} color="#374151" />
-                </TouchableOpacity>
+
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' }}
+                    onPress={() => setIsRequestsStatusDropdownOpen(!isRequestsStatusDropdownOpen)}
+                  >
+                    <Text style={{ fontSize: 13, color: Colors.textPrimary, marginRight: 8 }}>{requestsStatus}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isRequestsStatusDropdownOpen && (
+                    <View style={{ position: 'absolute', top: 40, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb', minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 }}>
+                      {['All Status', 'Pending', 'Published', 'Rejected', 'Draft'].map((opt: any) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsStatus === opt ? '#f3f4f6' : 'transparent' }}
+                          onPress={() => {
+                            setRequestsStatus(opt);
+                            setIsRequestsStatusDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, color: requestsStatus === opt ? Colors.primary : Colors.textPrimary, fontWeight: requestsStatus === opt ? '600' : '400' }}>{opt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' }}
+                    onPress={() => setIsRequestsDateDropdownOpen(!isRequestsDateDropdownOpen)}
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={{ fontSize: 13, color: Colors.textPrimary, marginRight: 8 }}>{requestsDate}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isRequestsDateDropdownOpen && (
+                    <View style={{ position: 'absolute', top: 40, right: 0, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb', minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 }}>
+                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsDate === opt ? '#f3f4f6' : 'transparent' }}
+                          onPress={() => {
+                            setRequestsDate(opt);
+                            if (opt !== 'Custom Range') setIsRequestsDateDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, color: requestsDate === opt ? Colors.primary : Colors.textPrimary, fontWeight: requestsDate === opt ? '600' : '400' }}>{opt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      
+                      {requestsDate === 'Custom Range' && (
+                        <View style={{ padding: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={requestsCustomStartDate} onChange={(e) => setRequestsCustomStartDate(e.target.value)} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={requestsCustomEndDate} onChange={(e) => setRequestsCustomEndDate(e.target.value)} />
+                          <TouchableOpacity 
+                            style={{ backgroundColor: Colors.primary, paddingVertical: 8, borderRadius: 6, alignItems: 'center', marginTop: 4 }}
+                            onPress={() => setIsRequestsDateDropdownOpen(false)}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -1283,11 +1452,11 @@ export default function ITAdminDashboard() {
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>First Name</Text>
-                <TextInput style={styles.formInput} placeholder="Juan" value={newUserFirstName} onChangeText={setNewUserFirstName} />
+                <TextInput style={styles.formInput} placeholder="e.g. Juan" value={newUserFirstName} onChangeText={setNewUserFirstName} />
               </View>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Last Name</Text>
-                <TextInput style={styles.formInput} placeholder="Dela Cruz" value={newUserLastName} onChangeText={setNewUserLastName} />
+                <TextInput style={styles.formInput} placeholder="e.g. Dela Cruz" value={newUserLastName} onChangeText={setNewUserLastName} />
               </View>
             </View>
             {/* Row 2: Email + Password */}
@@ -1297,7 +1466,7 @@ export default function ITAdminDashboard() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', height: 38, borderWidth: 1, borderColor: Colors.border, borderRadius: 4, backgroundColor: '#fff', overflow: 'hidden' }}>
                   <TextInput
                     style={{ flex: 1, height: 38, paddingHorizontal: 10, fontSize: 13, color: '#1A1A2E', outlineStyle: 'none' } as any}
-                    placeholder="juan.delacruz"
+                    placeholder="e.g. juan.delacruz"
                     value={newUserEmail}
                     onChangeText={setNewUserEmail}
                     autoCapitalize="none"
@@ -1326,7 +1495,7 @@ export default function ITAdminDashboard() {
                   onChange={(e: any) => setNewUserRole(e.target.value)}
                   style={{ height: 38, fontSize: 13, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', color: '#1A1A2E', paddingLeft: 10, outline: 'none', cursor: 'pointer', width: '100%' }}
                 >
-                  {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  {ROLE_CATEGORIES.filter(opt => opt.value !== 'admin').map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </View>
               <View style={styles.formField}>
@@ -1387,6 +1556,43 @@ export default function ITAdminDashboard() {
             </TouchableOpacity>
           </Card>
 
+          {/* Department Logos Section */}
+          <Card style={[styles.userCard, { marginBottom: Spacing.xl }]}>
+            <View style={styles.userListHeader}>
+              <Text style={styles.sectionHeader}>Department Logos</Text>
+            </View>
+            <Text style={{ color: Colors.textSecondary, marginBottom: 16 }}>Upload a logo for each department. Used across the platform.</Text>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+              {departmentsList.filter((d: any) => !d.is_system).map((dept: any) => (
+                <View key={dept.id} style={{ width: 140, height: 160, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' }}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' }}
+                    onPress={() => handleUploadDeptLogo(dept.id)}
+                    disabled={uploadingDeptId === dept.id}
+                  >
+                    {uploadingDeptId === dept.id ? (
+                      <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>Uploading...</Text>
+                    ) : dept.logo_url ? (
+                      <Image source={{ uri: dept.logo_url }} style={{ width: '80%', height: '80%' }} resizeMode="contain" />
+                    ) : (
+                      <>
+                        <Ionicons name="cloud-upload-outline" size={24} color={Colors.textMuted} style={{ marginBottom: 8 }} />
+                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>Tap to upload</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, borderTopWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={1}>{dept.display_name}</Text>
+                    <TouchableOpacity onPress={() => handleDeleteDepartmentFromSystem(dept.id)}>
+                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </Card>
+
           <Card style={styles.userCard}>
             <View style={styles.userListHeader}>
               <Text style={styles.sectionHeader}>Institutional Accounts ({filteredUsers.length})</Text>
@@ -1421,48 +1627,15 @@ export default function ITAdminDashboard() {
                     </View>
                   </View>
                   <View style={styles.userActions}>
-                    {editingUserId === u.id ? (
-                      <>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <select
-                            value={editingUserRole}
-                            onChange={(e) => setEditingUserRole(e.target.value)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: 6,
-                              border: '1px solid #d1d5db',
-                              fontSize: 12,
-                              backgroundColor: '#fff',
-                              color: Colors.textPrimary,
-                              outline: 'none',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {ROLE_CATEGORIES.map(r => (
-                              <option key={r.value} value={r.value}>{r.label}</option>
-                            ))}
-                          </select>
-                          <TouchableOpacity onPress={() => handleSaveEditedRole(u.id)} style={{ padding: 6, backgroundColor: '#16a34a', borderRadius: 6 }}>
-                            <Ionicons name="checkmark" size={14} color="#fff" />
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => setEditingUserId(null)} style={{ padding: 6, backgroundColor: '#ef4444', borderRadius: 6 }}>
-                            <Ionicons name="close" size={14} color="#fff" />
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
-                          <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
-                        </View>
-                        <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); setEditingUserId(u.id); setEditingUserRole(roleCategoryOf(u.role)); setEditingUserOriginalRole(u.role); setEditingUserDept(u.department || ''); }}>
-                          <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.deleteBtn} onPress={(e: any) => { e.stopPropagation?.(); handleDeleteUser(u.id); }}>
-                          <Ionicons name="trash-outline" size={15} color="#DC2626" />
-                        </TouchableOpacity>
-                      </>
-                    )}
+                    <View style={[styles.roleBadge, { backgroundColor: badge.bgColor }]}>
+                      <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.editBtn} onPress={(e: any) => { e.stopPropagation?.(); handleOpenProfile(u); }}>
+                      <Ionicons name="pencil-outline" size={15} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={(e: any) => { e.stopPropagation?.(); handleDeleteUser(u.id); }}>
+                      <Ionicons name="trash-outline" size={15} color="#DC2626" />
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               );
@@ -1610,7 +1783,7 @@ export default function ITAdminDashboard() {
                             onChange={(e: any) => setProfileRole(e.target.value)}
                             style={styles.wideFieldSelect}
                           >
-                            {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            {ROLE_CATEGORIES.filter(opt => opt.value !== 'admin').map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                           </select>
                         </View>
                       </View>
@@ -2642,13 +2815,13 @@ $response = curl_exec($ch);`}
               </View>
             </View>
 
-            {/* NEW: Mini Stat Cards Row */}
+            {/* Functional Stats Row */}
             <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 16 }}>
               {[
-                { title: 'Total Reach', value: 'N/A', trend: '0%', icon: 'people', color: '#1877F2', bg: '#EBF4FF' },
-                { title: 'Avg. Engagement', value: 'N/A', trend: '0%', icon: 'heart', color: '#E4405F', bg: '#FCEBF0' },
-                { title: 'Content Published', value: analyticsOverview?.contentPublished || '0', trend: 'Active', icon: 'document-text', color: '#7C3AED', bg: '#F3E8FF' },
-                { title: 'Pending Approval', value: analyticsOverview?.pendingApproval || '0', trend: 'Action Needed', icon: 'time', color: '#F59E0B', bg: '#FEF3C7', isNegative: true }
+                { title: 'Total Submissions', value: analyticsOverview?.totalVolume || '0', subTitle: 'All time volume', icon: 'document-text', color: '#3B82F6', bg: '#EFF6FF' },
+                { title: 'Compliance Rate', value: analyticsOverview?.complianceRate || '0%', subTitle: 'Approved vs Rejected', icon: 'shield-checkmark', color: '#10B981', bg: '#ECFDF5' },
+                { title: 'Pending Reviews', value: analyticsOverview?.pendingApproval || '0', subTitle: 'Awaiting action', icon: 'time', color: '#F59E0B', bg: '#FEF3C7' },
+                { title: 'Active Requestors', value: analyticsOverview?.activeUsers || '0', subTitle: 'Users who submitted posts', icon: 'people', color: '#8B5CF6', bg: '#F5F3FF' }
               ].map(stat => (
                 <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: Colors.surface, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                   <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -2657,7 +2830,7 @@ $response = curl_exec($ch);`}
                   <View>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textSecondary }}>{stat.title}</Text>
                     <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary, marginVertical: 2 }}>{stat.value}</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: stat.isNegative ? '#DC2626' : '#16A34A' }}>{stat.trend} this month</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.textMuted }}>{stat.subTitle}</Text>
                   </View>
                 </Card>
               ))}
@@ -2667,76 +2840,94 @@ $response = curl_exec($ch);`}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { gap: 24 }]}>
 
               {/* Yearly Bar Chart */}
-              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
+              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, borderTopWidth: 4, borderTopColor: '#7C3AED' }] as any}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
                   <View>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Publication Volume</Text>
-                    <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2 }}>Monthly posts created in 2026</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Publication Volume Overview</Text>
+                    <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 4 }}>Monthly post submissions for the current year</Text>
                   </View>
-                  <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                    <Text style={{ color: '#7C3AED', fontWeight: 'bold', fontSize: 12 }}>Total: {analyticsOverview?.totalVolume || '0'}</Text>
+                  <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
+                    <Text style={{ color: '#7C3AED', fontWeight: 'bold', fontSize: 13 }}>Total Submissions: {analyticsOverview?.totalVolume || '0'}</Text>
                   </View>
                 </View>
 
-                {/* Bar Chart Canvas */}
-                <View style={{ height: 220, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: Colors.background, position: 'relative' }}>
-                  {/* Grid lines */}
-                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: Colors.background, borderStyle: 'dashed' }} />
-                  <View style={{ position: 'absolute', top: 110, left: 0, right: 0, borderTopWidth: 1, borderTopColor: Colors.background, borderStyle: 'dashed' }} />
+                {/* Modern Bar Chart Canvas */}
+                <View style={{ height: 240, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', position: 'relative' }}>
+                  {/* Grid lines with labels */}
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}><Text style={{ position: 'absolute', top: -8, left: -30, fontSize: 10, color: Colors.textMuted }}>{maxPosts}</Text></View>
+                  <View style={{ position: 'absolute', top: 70, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}><Text style={{ position: 'absolute', top: -8, left: -30, fontSize: 10, color: Colors.textMuted }}>{Math.floor(maxPosts * 0.66)}</Text></View>
+                  <View style={{ position: 'absolute', top: 140, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}><Text style={{ position: 'absolute', top: -8, left: -30, fontSize: 10, color: Colors.textMuted }}>{Math.floor(maxPosts * 0.33)}</Text></View>
+                  <Text style={{ position: 'absolute', bottom: 30, left: -20, fontSize: 10, color: Colors.textMuted }}>0</Text>
 
                   {monthsData.map((item: any, index: number) => {
-                    const heightPercent = (item.posts / maxPosts) * 100;
+                    const heightPercent = maxPosts > 0 ? (item.posts / maxPosts) * 100 : 0;
                     return (
-                      <View key={item.month} style={{ alignItems: 'center', width: '7%', gap: 8 }}>
-                        <Text style={{ fontSize: 10, color: Colors.textMuted, fontWeight: '600' }}>{item.posts}</Text>
-                        <View style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: '#8B5CF6', borderRadius: 6, opacity: index === 11 ? 1 : 0.7 }} />
-                        <Text style={{ position: 'absolute', bottom: -24, fontSize: 11, color: Colors.textSecondary, fontWeight: '500' }}>{item.month}</Text>
+                      <View key={item.month} style={{ alignItems: 'center', width: '7%', height: '100%', justifyContent: 'flex-end', zIndex: 10 }}>
+                        <Text style={{ fontSize: 11, color: Colors.textSecondary, fontWeight: '700', marginBottom: 8 }}>{item.posts > 0 ? item.posts : ''}</Text>
+                        <View style={{ width: '100%', height: `${Math.max(heightPercent, 2)}%`, backgroundColor: index === new Date().getMonth() ? '#7C3AED' : '#C4B5FD', borderRadius: 6, minHeight: 4 }} />
+                        <Text style={{ position: 'absolute', bottom: -28, fontSize: 12, color: index === new Date().getMonth() ? '#7C3AED' : Colors.textSecondary, fontWeight: index === new Date().getMonth() ? 'bold' : '500' }}>{item.month}</Text>
                       </View>
                     );
                   })}
                 </View>
               </Card>
 
-              {/* Round Data / Circular Distribution */}
-              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
-                <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 20 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Platform Reach</Text>
-                  <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2 }}>Audience distribution</Text>
+              {/* Department Breakdown */}
+              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
+                <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 24 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Top Departments</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 4 }}>Submission share by department</Text>
                 </View>
 
-                {/* Simulated 4-Color Donut Chart */}
-                <View style={{
-                  width: 180, height: 180, borderRadius: 90, borderWidth: 24,
-                  borderTopColor: '#1877F2',    // Facebook
-                  borderRightColor: '#E4405F',  // Instagram
-                  borderBottomColor: '#1DA1F2', // Twitter
-                  borderLeftColor: Colors.textMuted,   // Other/Website
-                  alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 10
-                }}>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 24, fontWeight: '900', color: Colors.textPrimary }}>Total</Text>
-                    <Text style={{ fontSize: 11, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 }}>PLATFORMS</Text>
-                  </View>
-                </View>
-
-                {/* Legend */}
-                <View style={{ width: '100%', marginTop: 32, gap: 12 }}>
-                  {[
-                    { name: 'Facebook', color: '#1877F2', percent: (analyticsOverview?.platformReach?.facebook || 0) + '%' },
-                    { name: 'Instagram', color: '#E4405F', percent: (analyticsOverview?.platformReach?.instagram || 0) + '%' },
-                    { name: 'Other', color: Colors.textMuted, percent: (analyticsOverview?.platformReach?.other || 0) + '%' }
-                  ].map(platform => (
-                    <View key={platform.name} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: platform.color }} />
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>{platform.name}</Text>
+                <ScrollView style={{ width: '100%', maxHeight: 250 }} showsVerticalScrollIndicator={false}>
+                  {(analyticsOverview?.departmentBreakdown || [])
+                    .filter((dept: any) => !['IT Office', 'Information Technology Office', 'Vice President for Academic Affairs', 'Institutional Marketing Communication'].includes(dept.name))
+                    .sort((a:any, b:any) => b.count - a.count).map((dept: any, idx: number) => (
+                    <View key={idx} style={{ marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={1}>{dept.name}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textSecondary }}>{dept.percentage}%</Text>
                       </View>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textPrimary }}>{platform.percent}</Text>
+                      <View style={{ width: '100%', height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
+                        <View style={{ width: `${dept.percentage}%`, height: '100%', backgroundColor: dept.barColor || '#3B82F6', borderRadius: 4 }} />
+                      </View>
+                      <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>{dept.count} Submissions</Text>
                     </View>
                   ))}
-                </View>
+                  {(!analyticsOverview?.departmentBreakdown || analyticsOverview.departmentBreakdown.length === 0) && (
+                    <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: 20 }}>No department data available</Text>
+                  )}
+                </ScrollView>
               </Card>
 
+            </View>
+
+            {/* Platform Stats Row */}
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 16 }}>Platform Targets Breakdown</Text>
+              <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 16 }}>
+                {(analyticsOverview?.platformStats || []).map((platform: any, idx: number) => (
+                  <Card key={idx} style={{ flex: 1, padding: 20, backgroundColor: Colors.surface, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: platform.bgColor || '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name={platform.icon || 'globe-outline' as any} size={20} color={platform.color || Colors.primary} />
+                        </View>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>{platform.name}</Text>
+                      </View>
+                      <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary }}>{analyticsOverview?.platformReach?.[platform.name.toLowerCase()] || 0}%</Text>
+                    </View>
+                    <View style={{ height: 1, backgroundColor: '#F3F4F6', marginBottom: 16 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 13, color: Colors.textSecondary }}>Total Posts Targeted</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: platform.color }}>{platform.posts}</Text>
+                    </View>
+                  </Card>
+                ))}
+                {(!analyticsOverview?.platformStats || analyticsOverview.platformStats.length === 0) && (
+                  <Text style={{ color: Colors.textMuted, padding: 20 }}>No platform data available yet.</Text>
+                )}
+              </View>
             </View>
           </View>
         );

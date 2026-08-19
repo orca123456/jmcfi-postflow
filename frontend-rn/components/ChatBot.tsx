@@ -11,47 +11,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../constants/theme';
+import { chatbotApi } from '../services/api';
 
 interface Message {
   id: string;
   role: 'user' | 'bot';
   text: string;
   timestamp: Date;
-}
-
-const BOT_RESPONSES: Record<string, string> = {
-  hello: "Hello! 👋 I'm the PostFlow Assistant. I can help you with the JMCFI content approval workflow. What can I assist you with today?",
-  hi: "Hi there! 👋 I'm here to help with PostFlow. Ask me anything about content submission, approvals, or the workflow!",
-  hey: "Hey! How can I help you with JMCFI PostFlow today?",
-  workflow: "The JMCFI PostFlow approval workflow follows these steps:\n1️⃣ Submitted — Requestor creates post\n2️⃣ Dept Head — Department Head reviews\n3️⃣ VP — Vice President approves\n4️⃣ IMC QA — Quality assurance check\n5️⃣ Publisher — IT/Publisher schedules & publishes",
-  steps: "The approval has 5 stages: Submitted → Dept Head → VP → IMC QA → Publisher. Each approver must review before it moves forward.",
-  process: "Posts go through: Requestor submits → Dept Head → VP → IMC QA → IT Publisher. Would you like details on any specific stage?",
-  roles: "PostFlow has these roles:\n👤 Requestor — Submits content requests\n👤 Dept Head — First-level approver\n👤 VP — Executive approver\n👤 IMC QA — Quality assurance\n👤 IT Publisher — Publishes to platforms\n👤 Admin — System administration",
-  admin: "Admins manage system users, view all posts in pipeline, and monitor analytics. They can create accounts, assign roles, and view platform distribution stats.",
-  requestor: "Requestors create and submit post requests. They can track approval status through the approval queue and view analytics.",
-  publisher: "IT Publishers handle the final step — scheduling and publishing approved content to platforms like Facebook, Instagram, and Twitter/X.",
-  "imc qa": "IMC QA reviewers are the 4th step in the workflow. They check content quality, compliance, and ensure it meets JMCFI standards before publishing.",
-  "dept head": "Department Heads are the first approvers. They review content from their team before it moves up to the VP.",
-  analytics: "The Analytics tab shows platform distribution (Facebook, Instagram, Twitter/X), approval timelines, and content performance metrics.",
-  platforms: "PostFlow supports publishing to:\n📘 Facebook\n📸 Instagram\n🐦 Twitter/X\n📝 WordPress\nPlatforms are configured per post request.",
-  schedule: "Publishers can schedule posts using the datetime picker in the Publishing Queue. Click the calendar icon next to a post to set the publish date and time.",
-  status: "Post statuses include:\n🟡 Pending — Awaiting review\n✅ Approved — Cleared for next stage\n🔴 Rejected — Declined\n🔵 Revision Requested — Changes needed\n🟢 Published — Live on platforms",
-  pending: "Pending posts are waiting for the current approver to review them. Check your Approval Queue to see items awaiting your action.",
-  approved: "Approved posts move to the next stage in the workflow automatically. Once all stages are approved, it reaches the Publisher.",
-  rejected: "Rejected posts are sent back to the Requestor. The requestor will be notified and can revise and resubmit the content.",
-  help: "I can help you with:\n• 📋 Understanding the approval workflow\n• 👥 Role responsibilities\n• 📊 Analytics and reporting\n• 📅 Scheduling posts\n• 🔐 Account management\n\nJust ask me anything!",
-  account: "Accounts can be created by Admins in the User Management section. Go to Admin Dashboard → User Management → Create New Institutional Account.",
-  password: "If you need to reset your password, contact your system administrator. Admins can manage accounts from the User Management panel.",
-};
-
-function getBotResponse(input: string): string {
-  const lower = input.toLowerCase().trim();
-  for (const key of Object.keys(BOT_RESPONSES)) {
-    if (lower.includes(key)) {
-      return BOT_RESPONSES[key];
-    }
-  }
-  return "I'm not sure about that specific topic, but I'm here to help with PostFlow! Try asking about:\n• The approval workflow\n• User roles\n• Post statuses\n• Publishing platforms\n• Account management";
 }
 
 const QUICK_REPLIES = [
@@ -103,7 +69,7 @@ export function ChatBot() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  const sendMessage = (text?: string) => {
+  const sendMessage = async (text?: string) => {
     const msgText = (text ?? inputText).trim();
     if (!msgText) return;
 
@@ -114,22 +80,41 @@ export function ChatBot() {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInputText('');
     setIsTyping(true);
     scrollToBottom();
 
-    setTimeout(() => {
+    try {
+      const apiPayload = updatedMessages.map(m => ({
+        role: m.role === 'bot' ? 'assistant' : 'user',
+        content: m.text
+      }));
+
+      const response = await chatbotApi.sendMessage(apiPayload);
+      const reply = response?.data?.reply || 'Sorry, I did not understand that.';
+
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
-        text: getBotResponse(msgText),
+        text: reply,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMsg]);
+    } catch (error) {
+      console.error('Chatbot API Error:', error);
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'bot',
+        text: 'Sorry, the Chatbot service is currently unavailable. Please try again later.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
       scrollToBottom();
-    }, 800);
+    }
   };
 
   const chatTranslateY = slideAnim.interpolate({

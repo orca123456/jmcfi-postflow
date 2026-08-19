@@ -14,6 +14,7 @@ export interface AuthUser {
   department?: string;
   position?: string;
   photo_url?: string;
+  department_logo_url?: string;
 }
 
 interface AuthStore {

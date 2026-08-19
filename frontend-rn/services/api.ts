@@ -148,6 +148,12 @@ export const departmentsApi = {
   removeLogo: (id: number) => api.delete(`/departments/${id}/logo`),
 };
 
+// ── Chatbot endpoints ───────────────────────────────────────────────────────
+export const chatbotApi = {
+  sendMessage: (messages: { role: string; content: string }[]) =>
+    api.post('/chatbot/message', { messages }),
+};
+
 // ── Roles management endpoints ──────────────────────────────────────────────
 export const rolesApi = {
   list: () => api.get('/roles/list'),
