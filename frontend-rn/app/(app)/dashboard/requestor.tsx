@@ -94,6 +94,7 @@ export default function RequestorDashboard() {
   const [dashboardPerPage, setDashboardPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
@@ -326,7 +327,7 @@ export default function RequestorDashboard() {
           postDate.setHours(0, 0, 0, 0);
           const diffTime = today.getTime() - postDate.getTime();
           const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-          
+
           if (dateFilter === 'Today') {
             matchesDate = diffDays === 0;
           } else if (dateFilter === 'Yesterday') {
@@ -339,8 +340,8 @@ export default function RequestorDashboard() {
             const start = new Date(customStartDate);
             const end = new Date(customEndDate);
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                const raw = new Date(req.created_at || Date.now());
-                matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
+              const raw = new Date(req.created_at || Date.now());
+              matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
             }
           }
         }
@@ -373,7 +374,7 @@ export default function RequestorDashboard() {
           postDate.setHours(0, 0, 0, 0);
           const diffTime = today.getTime() - postDate.getTime();
           const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-          
+
           if (rejectedDateFilter === 'Today') {
             matchesDate = diffDays === 0;
           } else if (rejectedDateFilter === 'Yesterday') {
@@ -386,8 +387,8 @@ export default function RequestorDashboard() {
             const start = new Date(customRejectedStartDate);
             const end = new Date(customRejectedEndDate);
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                const raw = new Date(req.created_at || Date.now());
-                matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
+              const raw = new Date(req.created_at || Date.now());
+              matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
             }
           }
         }
@@ -495,7 +496,7 @@ export default function RequestorDashboard() {
     }
     try {
       const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
-      const payload = {
+      const payload: any = {
         title: postTitle,
         caption_narrative: caption,
         category_id: categoryId,
@@ -504,12 +505,67 @@ export default function RequestorDashboard() {
         is_draft: true,
       };
 
-      if (editingPostId) {
-        await postsApi.update(Number(editingPostId), payload);
-        alert('Draft updated successfully!');
+      if (publishDate) {
+        const timePart = publishTime || '08:00';
+        const [d, m, y] = publishDate.split('/');
+        payload.preferred_schedule_at = `${y}-${m}-${d} ${timePart}:00`;
+      }
+
+      if (mediaFiles.length > 0 || supportingDocs.length > 0) {
+        const formData = new FormData();
+        formData.append('title', payload.title);
+        formData.append('caption_narrative', payload.caption_narrative);
+        if (payload.category_id) formData.append('category_id', String(payload.category_id));
+        if (payload.other_category_name) formData.append('other_category_name', payload.other_category_name);
+        if (payload.target_platforms) {
+          payload.target_platforms.forEach((p: string) => {
+            formData.append('target_platforms[]', p);
+          });
+        }
+        formData.append('is_draft', '1');
+        if (payload.preferred_schedule_at) {
+          formData.append('preferred_schedule_at', payload.preferred_schedule_at);
+        }
+
+        mediaFiles.forEach((file: any, idx: number) => {
+          if (Platform.OS === 'web' && file.file) {
+            formData.append('media[]', file.file);
+          } else {
+            formData.append('media[]', {
+              uri: file.uri,
+              name: file.name,
+              type: file.mimeType || 'image/jpeg',
+            } as any);
+          }
+        });
+
+        supportingDocs.forEach((file: any, idx: number) => {
+          if (Platform.OS === 'web' && file.file) {
+            formData.append('supporting_docs[]', file.file);
+          } else {
+            formData.append('supporting_docs[]', {
+              uri: file.uri,
+              name: file.name,
+              type: file.mimeType || 'application/pdf',
+            } as any);
+          }
+        });
+
+        if (editingPostId) {
+          await postsApi.updateWithFiles(Number(editingPostId), formData as any);
+          alert('Draft updated successfully!');
+        } else {
+          await postsApi.createWithFiles(formData as any);
+          alert('Content request saved as draft!');
+        }
       } else {
-        await postsApi.create(payload);
-        alert('Content request saved as draft!');
+        if (editingPostId) {
+          await postsApi.update(Number(editingPostId), payload);
+          alert('Draft updated successfully!');
+        } else {
+          await postsApi.create(payload);
+          alert('Content request saved as draft!');
+        }
       }
 
       setEditingPostId(null);
@@ -612,7 +668,7 @@ export default function RequestorDashboard() {
       // Optimistically add to queue so it shows instantly
       const submittedPost = { ...res.data.data, status: 'PENDING_OFFICE_HEAD' };
       setMockQueuePosts((prev: any) => [submittedPost, ...prev.filter((p: any) => p.id !== submittedPost.id)]);
-      
+
       showToast('✅ Content request submitted successfully!');
       setEditingPostId(null);
       setPostTitle('');
@@ -622,7 +678,7 @@ export default function RequestorDashboard() {
       setPlatforms({ facebook: false, instagram: false, portal: false });
       setMediaFiles([]);
       setSupportingDocs([]);
-      
+
       // Reload silently in background
       loadPosts(false);
       setActiveTab('dashboard');
@@ -815,26 +871,35 @@ export default function RequestorDashboard() {
                   />
                 </View>
 
-                {Platform.OS === 'web' ? (
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #E5E7EB',
-                      backgroundColor: Colors.background,
-                      color: Colors.textPrimary,
-                      fontSize: '14px',
-                      outline: 'none',
-                      cursor: 'pointer',
-                      marginRight: '8px'
-                    }}
-                  >
-                    <option value="All">All Status</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="APPROVED">Approved</option>
-                  </select>
+                {activeTab === 'dashboard' ? (
+                  <View style={{ position: 'relative', zIndex: 40, marginRight: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
+                      onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                    >
+                      <Text style={styles.departmentDropdownText}>
+                        {statusFilter === 'All' ? 'All Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).toLowerCase()}
+                      </Text>
+                      <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {isStatusDropdownOpen && (
+                      <View style={[styles.dropdownMenu, { minWidth: 140, right: 0, top: 40 }]}>
+                        {[{ label: 'All Status', value: 'All' }, { label: 'Pending', value: 'PENDING' }, { label: 'Approved', value: 'APPROVED' }].map((opt: any) => (
+                          <TouchableOpacity
+                            key={opt.value}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setStatusFilter(opt.value);
+                              setIsStatusDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={[styles.dropdownItemText, statusFilter === opt.value && { fontWeight: 'bold', color: Colors.primary }]}>{opt.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                 ) : null}
 
                 <View style={{ position: 'relative', zIndex: 40 }}>
@@ -861,14 +926,14 @@ export default function RequestorDashboard() {
                           <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
                         </TouchableOpacity>
                       ))}
-                      
+
                       {dateFilter === 'Custom Range' && (
                         <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
-                          <TouchableOpacity 
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} />
+                          <TouchableOpacity
                             style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
                             onPress={() => setIsDateDropdownOpen(false)}
                           >
@@ -887,9 +952,9 @@ export default function RequestorDashboard() {
               <View style={styles.tableHeaderRow}>
                 <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Request Title</Text>
                 <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Category</Text>
+                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Platform</Text>
                 <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Date Submitted</Text>
                 <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Status</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
               </View>
 
               {paginatedRequests.map((req) => (
@@ -909,21 +974,22 @@ export default function RequestorDashboard() {
                     </View>
                     <View>
                       <Text style={styles.postTitleText}>{req.title}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
-                        {(Array.isArray(req.platforms) ? req.platforms : String(req.platforms || '').split(',')).map((p: any, idx: number) => {
-                          const platform = p.trim().toLowerCase();
-                          if (platform === 'facebook') return <Ionicons key={idx} name="logo-facebook" size={16} color="#1877F2" />;
-                          if (platform === 'instagram') return <Ionicons key={idx} name="logo-instagram" size={16} color="#E1306C" />;
-                          if (platform === 'twitter' || platform === 'x') return <Ionicons key={idx} name="logo-twitter" size={16} color="#1DA1F2" />;
-                          if (platform === 'linkedin') return <Ionicons key={idx} name="logo-linkedin" size={16} color="#0077B5" />;
-                          if (platform === 'tiktok') return <Ionicons key={idx} name="logo-tiktok" size={16} color="#000000" />;
-                          if (platform === 'youtube') return <Ionicons key={idx} name="logo-youtube" size={16} color="#FF0000" />;
-                          return <Text key={idx} style={styles.postPlatformsText}>{p}</Text>;
-                        })}
-                      </View>
                     </View>
                   </View>
                   <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.other_category_name || req.category}</Text>
+                  <View style={[styles.cellFlex1, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    {(Array.isArray(req.platforms) ? req.platforms : String(req.platforms || '').split(',')).map((p: any, idx: number) => {
+                      const platform = p.trim().toLowerCase();
+                      if (platform === 'facebook') return <Ionicons key={idx} name="logo-facebook" size={16} color="#1877F2" />;
+                      if (platform === 'instagram') return <Ionicons key={idx} name="logo-instagram" size={16} color="#E1306C" />;
+                      if (platform === 'twitter' || platform === 'x') return <Ionicons key={idx} name="logo-twitter" size={16} color="#1DA1F2" />;
+                      if (platform === 'linkedin') return <Ionicons key={idx} name="logo-linkedin" size={16} color="#0077B5" />;
+                      if (platform === 'tiktok') return <Ionicons key={idx} name="logo-tiktok" size={16} color="#000000" />;
+                      if (platform === 'youtube') return <Ionicons key={idx} name="logo-youtube" size={16} color="#FF0000" />;
+                      if (platform === 'website' || platform === 'web') return <Ionicons key={idx} name="globe-outline" size={16} color="#3B82F6" />;
+                      return <Text key={idx} style={styles.postPlatformsText}>{p}</Text>;
+                    })}
+                  </View>
                   <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.date}</Text>
                   <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
                     <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
@@ -931,14 +997,6 @@ export default function RequestorDashboard() {
                         {req.status}
                       </Text>
                     </View>
-                  </View>
-                  <View style={[styles.cellFlex1, styles.actionsCell]}>
-                    <TouchableOpacity onPress={() => alert(`Previewing ${req.title}`)}>
-                      <Ionicons name={req.actionIcon1} size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => alert(`Executing action on ${req.title}`)}>
-                      <Ionicons name={req.actionIcon2} size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -1389,9 +1447,9 @@ export default function RequestorDashboard() {
                     </View>
 
                     {mediaFiles && mediaFiles.length > 0 ? (
-                      <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(mediaFiles[0].uri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
                         <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                      </View>
+                      </TouchableOpacity>
                     ) : (
                       <View style={styles.mockPostMediaPlaceholder}>
                         <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
@@ -1621,61 +1679,58 @@ export default function RequestorDashboard() {
               </View>
             </Card>
           ) : (
-            <View style={{ gap: Spacing.md }}>
-              {drafts.map((draft) => (
-                <Card key={draft.id} style={styles.formCard}>
-                  <View style={styles.queueCardHeader}>
-                    <View style={styles.queueCardTitleCol}>
-                      <Text style={styles.queuePostTitle}>{draft.title}</Text>
-                      <Text style={styles.queuePostMeta}>
-                        Last Saved: {draft.dateSaved} &bull; Category: {draft.category}
-                      </Text>
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9' }]}>
-                      <Text style={[styles.statusBadgeText, { color: '#475569' }]}>
-                        DRAFT
-                      </Text>
-                    </View>
-                  </View>
+            <Card style={styles.tableCard}>
+              <View style={styles.table}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Request Title</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Category</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Date Saved</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
+                </View>
 
-                  <View style={{ backgroundColor: '#F8FAFC', padding: Spacing.md, borderRadius: 6, marginVertical: Spacing.xs }}>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: 'bold', marginBottom: 4 }}>
-                      CAPTION PREVIEW
-                    </Text>
-                    <FormattedText style={{ fontSize: FontSize.sm, color: Colors.textPrimary }}>
-                      "{draft.caption || 'No caption text provided yet.'}"
-                    </FormattedText>
-                  </View>
-
-                  <View style={styles.queueCardFooter}>
-                    <View style={styles.actionNoteContainer}>
-                      <Ionicons name="folder-open-outline" size={16} color={Colors.textPrimary} />
-                      <Text style={styles.actionNoteText}>
-                        <Text style={{ fontWeight: 'bold' }}>Department: </Text>
-                        {draft.department}
-                      </Text>
+                {drafts.map((draft) => (
+                  <TouchableOpacity key={draft.id} style={styles.tableRow} onPress={() => handleEditDraft(draft)}>
+                    <View style={[styles.cellFlex2, styles.titleCellContainer]}>
+                      <View style={[styles.thumbnailPlaceholder, { backgroundColor: draft.thumbnailBg || '#F1F5F9' }]}>
+                        {draft.thumbnailUrl ? (
+                          <Image
+                            source={{ uri: draft.thumbnailUrl }}
+                            style={{ width: '100%', height: '100%', borderRadius: 4 }}
+                            resizeMode="cover"
+                            onError={() => { }}
+                          />
+                        ) : (
+                          <Ionicons name={draft.thumbnailIcon || "document-text-outline"} size={16} color={Colors.textSecondary} />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.postTitleText}>{draft.title}</Text>
+                        <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textSecondary, marginTop: 4 }}>
+                          {draft.caption ? draft.caption : 'No caption provided'}
+                        </Text>
+                      </View>
                     </View>
-
-                    <View style={styles.queueCardActions}>
-                      <TouchableOpacity
-                        style={[styles.queueActionBtn, { backgroundColor: Colors.primary }]}
-                        onPress={() => handleEditDraft(draft)}
-                      >
-                        <Ionicons name="create-outline" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={[styles.queueActionBtnText, { color: Colors.surface, fontWeight: 'bold' }]}>Edit & Submit</Text>
+                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{draft.category}</Text>
+                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{draft.dateSaved}</Text>
+                    <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
+                      <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9' }]}>
+                        <Text style={[styles.statusBadgeText, { color: '#475569' }]}>DRAFT</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.cellFlex1, styles.actionsCell, { gap: 8, justifyContent: 'flex-end' }]}>
+                      <TouchableOpacity onPress={() => handleEditDraft(draft)} style={{ paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#FFC72C', borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="create-outline" size={14} color="#1A1A2E" />
+                        <Text style={{ color: '#1A1A2E', fontSize: 11, fontWeight: 'bold' }}>Edit & Submit</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.queueActionBtn}
-                        onPress={() => handleDeleteDraft(draft.id)}
-                      >
-                        <Ionicons name="trash-outline" size={15} color="#DC2626" style={{ marginRight: 4 }} />
-                        <Text style={[styles.queueActionBtnText, { color: '#DC2626' }]}>Delete</Text>
+                      <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDeleteDraft(draft.id); }} style={{ padding: 6, backgroundColor: '#FEF2F2', borderRadius: 6, borderWidth: 1, borderColor: '#FCA5A5' }}>
+                        <Ionicons name="trash-outline" size={14} color="#DC2626" />
                       </TouchableOpacity>
                     </View>
-                  </View>
-                </Card>
-              ))}
-            </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Card>
           )}
         </View>
       )}
@@ -1722,14 +1777,14 @@ export default function RequestorDashboard() {
                           <Text style={[styles.dropdownItemText, rejectedDateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
                         </TouchableOpacity>
                       ))}
-                      
+
                       {rejectedDateFilter === 'Custom Range' && (
                         <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customRejectedStartDate} onChangeText={setCustomRejectedStartDate} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customRejectedEndDate} onChangeText={setCustomRejectedEndDate} />
-                          <TouchableOpacity 
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customRejectedStartDate} onChange={(e) => setCustomRejectedStartDate(e.target.value)} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customRejectedEndDate} onChange={(e) => setCustomRejectedEndDate(e.target.value)} />
+                          <TouchableOpacity
                             style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
                             onPress={() => setIsRejectedDateDropdownOpen(false)}
                           >
@@ -1756,7 +1811,6 @@ export default function RequestorDashboard() {
                 <View style={styles.table}>
                   <View style={styles.tableHeaderRow}>
                     <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
-                    <Text style={[styles.tableHeaderCell, styles.flexDept]}>DEPARTMENT</Text>
                     <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
                     <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
                     <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
@@ -1784,11 +1838,6 @@ export default function RequestorDashboard() {
                             <Text style={styles.categoryPillText}>{post.other_category_name || post.category}</Text>
                           </View>
                         </View>
-                      </View>
-
-                      {/* DEPARTMENT */}
-                      <View style={[styles.cellContainer, styles.flexDept]}>
-                        <Text style={styles.rowDeptText}>{post.department}</Text>
                       </View>
 
                       {/* REQUESTED BY */}
@@ -1889,83 +1938,83 @@ export default function RequestorDashboard() {
                 <View style={{ marginBottom: 16 }}>
                   <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
-                      {(() => {
-                        const workflows = selectedQueuePost.approval_workflows || [];
-                        const getStageStatus = (stageName: string) => {
-                          const entry = workflows.find((w: any) => w.stage === stageName);
-                          if (entry) {
-                            if (entry.action === 'approved') return 'Approved';
-                            if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
-                          }
-                          return 'Pending';
-                        };
+                    {(() => {
+                      const workflows = selectedQueuePost.approval_workflows || [];
+                      const getStageStatus = (stageName: string) => {
+                        const entry = workflows.find((w: any) => w.stage === stageName);
+                        if (entry) {
+                          if (entry.action === 'approved') return 'Approved';
+                          if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
+                        }
+                        return 'Pending';
+                      };
 
-                        let submitted = 'Approved'; // Always approved since it exists
-                        let deptHead = getStageStatus('office_head');
-                        let vpaa = getStageStatus('vice_president');
-                        let imc = getStageStatus('imc_qa');
+                      let submitted = 'Approved'; // Always approved since it exists
+                      let deptHead = getStageStatus('office_head');
+                      let vpaa = getStageStatus('vice_president');
+                      let imc = getStageStatus('imc_qa');
 
-                        if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
-                        if (vpaa === 'Rejected') { imc = 'Waiting'; }
-                        if (imc === 'Approved') { imc = 'Published'; }
+                      if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
+                      if (vpaa === 'Rejected') { imc = 'Waiting'; }
+                      if (imc === 'Approved') { imc = 'Published'; }
 
-                        const getIcon = (state: string) => {
-                          if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
-                          if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
-                          return { name: 'time', color: Colors.textMuted };
-                        };
-                        const getColor = (state: string) => {
-                          if (state === 'Rejected') return '#DC2626';
-                          if (state === 'Approved' || state === 'Published') return '#059669';
-                          return Colors.textMuted;
-                        };
-                        const getLineColor = (state: string) => {
-                          if (state === 'Approved' || state === 'Published') return '#059669';
-                          if (state === 'Rejected') return '#DC2626';
-                          return Colors.border;
-                        };
+                      const getIcon = (state: string) => {
+                        if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
+                        if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
+                        return { name: 'time', color: Colors.textMuted };
+                      };
+                      const getColor = (state: string) => {
+                        if (state === 'Rejected') return '#DC2626';
+                        if (state === 'Approved' || state === 'Published') return '#059669';
+                        return Colors.textMuted;
+                      };
+                      const getLineColor = (state: string) => {
+                        if (state === 'Approved' || state === 'Published') return '#059669';
+                        if (state === 'Rejected') return '#DC2626';
+                        return Colors.border;
+                      };
 
-                        return (
-                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
+                      return (
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
 
-                            {selectedQueuePost.rawStatus !== 'rejected' && selectedQueuePost.rawStatus !== 'returned_for_revision' && (
-                              <>
-                                <View style={{ alignItems: 'center', flex: 1.2 }}>
-                                  <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
-                                  <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
-                                </View>
+                          {selectedQueuePost.rawStatus !== 'rejected' && selectedQueuePost.rawStatus !== 'returned_for_revision' && (
+                            <>
+                              <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
+                              </View>
 
-                                <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-                              </>
-                            )}
+                              <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+                            </>
+                          )}
 
-                            <View style={{ alignItems: 'center', flex: 1.2 }}>
-                              <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
-                              <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
-                            </View>
-
-                            <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-
-                            <View style={{ alignItems: 'center', flex: 1.2 }}>
-                              <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
-                              <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
-                            </View>
-
-                            <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-
-                            <View style={{ alignItems: 'center', flex: 1.2 }}>
-                              <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
-                              <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
-                            </View>
-
+                          <View style={{ alignItems: 'center', flex: 1.2 }}>
+                            <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
+                            <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
                           </View>
-                        );
-                      })()}
-                    </View>
+
+                          <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                          <View style={{ alignItems: 'center', flex: 1.2 }}>
+                            <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
+                            <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
+                          </View>
+
+                          <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                          <View style={{ alignItems: 'center', flex: 1.2 }}>
+                            <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
+                            <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
+                          </View>
+
+                        </View>
+                      );
+                    })()}
                   </View>
+                </View>
 
                 <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
                   {/* Left Side: Social Media Mockup Preview */}
@@ -2026,7 +2075,9 @@ export default function RequestorDashboard() {
                         <FormattedText style={styles.socialCaptionText}>{selectedQueuePost.caption}</FormattedText>
 
                         {selectedQueuePost.thumbnailUrl ? (
-                          <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedQueuePost.thumbnailUrl)}>
+                            <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={styles.socialMediaBanner}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -2062,7 +2113,9 @@ export default function RequestorDashboard() {
                         </View>
 
                         {selectedQueuePost.thumbnailUrl ? (
-                          <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedQueuePost.thumbnailUrl)}>
+                            <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -2085,7 +2138,9 @@ export default function RequestorDashboard() {
                     {modalPlatformTab === 'website' && (
                       <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
                         {selectedQueuePost.thumbnailUrl ? (
-                          <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedQueuePost.thumbnailUrl)}>
+                            <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                          </TouchableOpacity>
                         ) : (
                           <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
                             <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
@@ -2217,8 +2272,8 @@ export default function RequestorDashboard() {
                     const getStageStatus = (stageName: string) => {
                       const entry = workflows.find((w: any) => w.stage === stageName);
                       if (entry) {
-                         if (entry.action === 'approved') return 'Approved';
-                         if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
+                        if (entry.action === 'approved') return 'Approved';
+                        if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
                       }
                       return 'Pending';
                     };
@@ -2227,7 +2282,7 @@ export default function RequestorDashboard() {
                     let deptHead = getStageStatus('office_head');
                     let vpaa = getStageStatus('vice_president');
                     let imc = getStageStatus('imc_qa');
-                    
+
                     if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
                     if (vpaa === 'Rejected') { imc = 'Waiting'; }
 
@@ -2249,14 +2304,14 @@ export default function RequestorDashboard() {
 
                     return (
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 16 }}>
-                        
+
                         {/* Step 0: Submitted */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
                           <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
                           <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase' }}>{submitted}</Text>
                         </View>
-                        
+
                         <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
 
                         {/* Step 1: Dept Head */}
@@ -2265,18 +2320,18 @@ export default function RequestorDashboard() {
                           <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
                           <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
                         </View>
-                        
+
                         <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-                        
+
                         {/* Step 2: VPAA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
                           <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
                           <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
                         </View>
-                        
+
                         <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-                        
+
                         {/* Step 3: IMC/QA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
@@ -2378,9 +2433,9 @@ export default function RequestorDashboard() {
                   </View>
 
                   {mediaFiles && mediaFiles.length > 0 ? (
-                    <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(mediaFiles[0].uri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
                       <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    </View>
+                    </TouchableOpacity>
                   ) : (
                     <View style={styles.mockPostMediaPlaceholder}>
                       <Ionicons name="image-outline" size={32} color={Colors.textMuted} />

@@ -22,6 +22,7 @@ class UserResource extends JsonResource
             'position' => $this->position,
             'status' => $this->status,
             'photo_url' => $this->photo_url,
+            'department_logo_url' => $this->department_logo_url,
             'roles' => $this->whenLoaded('roles', function () {
                 return $this->roles->pluck('name');
             }),

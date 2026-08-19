@@ -242,7 +242,10 @@ class DashboardController extends Controller
 
             // ── Department Breakdown: single query with join, no N+1 ──
             // Note: users.department is a string column (not a FK), so we join on the name match
-            $departmentBreakdown = \App\Models\Department::leftJoin('users', 'departments.name', '=', 'users.department')
+            $departmentBreakdown = \App\Models\Department::leftJoin('users', function ($join) {
+                    $join->on('departments.name', '=', 'users.department')
+                         ->orOn('departments.display_name', '=', 'users.department');
+                })
                 ->leftJoin('post_requests', 'users.id', '=', 'post_requests.requestor_id')
                 ->selectRaw('departments.id, departments.name, departments.display_name, COUNT(post_requests.id) as count')
                 ->groupBy('departments.id', 'departments.name', 'departments.display_name')

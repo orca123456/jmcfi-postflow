@@ -41,6 +41,8 @@ const ROLE_HOME: Record<string, string> = {
   imc_qa_checker: '/dashboard/imc-qa',
   content_requestor: '/dashboard/requestor',
   requestor: '/dashboard/requestor',
+  admin: '/dashboard/it-admin',
+  approver: '/dashboard/office-head',
 };
 
 export default function AppLayout() {
