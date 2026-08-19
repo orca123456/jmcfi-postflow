@@ -9,30 +9,30 @@ COPY frontend-rn/ ./
 RUN npx expo export -p web
 
 # ==========================================
-# STAGE 2: Setup Vanilla PHP and Laravel
+# STAGE 2: Setup FrankenPHP and Laravel
 # ==========================================
-FROM php:8.2-alpine
+FROM dunglas/frankenphp:1-php8.2-alpine
 
-# Install system dependencies and PHP extensions for Laravel
-RUN apk add --no-cache \
-    curl \
-    libpng-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    postgresql-dev \
-    linux-headers \
-    && docker-php-ext-install pdo pdo_pgsql bcmath pcntl sockets
+# Install PHP extensions required by your Laravel app
+RUN install-php-extensions \
+    pdo_pgsql \
+    bcmath \
+    pcntl \
+    sockets \
+    redis \
+    gd \
+    zip
 
 # Install Composer securely
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/html
+# FrankenPHP expects the app to be in /app
+WORKDIR /app
 
 # Copy backend files
 COPY backend/ ./
 
-# Ensure required Laravel directories exist and are writable before composer install
+# Ensure required Laravel directories exist and are writable
 RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views \
     && chmod -R 777 bootstrap/cache storage
 
@@ -45,9 +45,9 @@ COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
 # Create storage symlink
 RUN php artisan storage:link
 
-# Explicitly tell Railway's Edge Proxy which port we use
+# Explicitly tell Railway to route to port 8080
 EXPOSE 8080
 
-# Start the application using raw PHP built-in server bound to IPv6 ([::])
-# Railway's internal network connects via IPv6, binding to 0.0.0.0 causes 502s
-CMD php -S [::]:${PORT:-8080} -t public server.php
+# Configure FrankenPHP to listen on the port Railway provides, or 8080 as fallback
+# FrankenPHP automatically serves the /app/public directory perfectly using Caddy (HTTP/2, Keep-Alive, etc.)
+CMD ["sh", "-c", "SERVER_NAME=\":${PORT:-8080}\" frankenphp run --config /etc/caddy/Caddyfile"]
