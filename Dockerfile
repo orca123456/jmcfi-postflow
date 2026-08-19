@@ -26,6 +26,9 @@ USER root
 
 WORKDIR /var/www/html
 
+# Install required PHP extensions (like sockets for amqplib)
+RUN install-php-extensions sockets
+
 # Copy backend files
 COPY backend/ ./
 
