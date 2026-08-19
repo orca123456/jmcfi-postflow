@@ -43,6 +43,10 @@ RUN chown -R application:application /app \
 # Create storage symlink so images are accessible from frontend
 RUN php artisan storage:link
 
+# Fix Nginx to listen on IPv6 (required for Railway's internal network)
+RUN sed -i 's/listen 80;/listen 80; listen [::]:80;/' /opt/docker/etc/nginx/vhost.common.d/10-location-root.conf || true \
+    && sed -i 's/listen 80 default_server;/listen 80 default_server;\n    listen [::]:80 default_server;/' /opt/docker/etc/nginx/vhost.conf || true
+
 # (Config caching is skipped during build because ENV variables are not available yet)
 
 # Expose port 80 (default for webdevops)
