@@ -1187,8 +1187,8 @@ export default function ITAdminDashboard() {
         waiting for the 5 background tab-requests on the single-threaded server. */}
       {activeTab === 'overview' && !isInitialLoading && (
         <>
-          <View style={{ flexDirection: 'row', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
-            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.7}>
+          <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: isTablet ? 20 : 12, flexWrap: 'wrap', marginBottom: 24 }}>
+            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.7}>
               <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'All Status' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="document-text" size={24} color="#7e22ce" />
@@ -1201,7 +1201,7 @@ export default function ITAdminDashboard() {
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('Published')} activeOpacity={0.7}>
+            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('Published')} activeOpacity={0.7}>
               <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Published' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="checkmark-circle" size={24} color="#1877F2" />
@@ -1214,7 +1214,7 @@ export default function ITAdminDashboard() {
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('Pending')} activeOpacity={0.7}>
+            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('Pending')} activeOpacity={0.7}>
               <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Pending' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#fdf2f8', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="time" size={24} color="#E1306C" />
@@ -1227,7 +1227,7 @@ export default function ITAdminDashboard() {
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setRequestsStatus('Drafts')} activeOpacity={0.7}>
+            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('Drafts')} activeOpacity={0.7}>
               <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Drafts' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="document" size={24} color="#16a34a" />
@@ -1244,9 +1244,9 @@ export default function ITAdminDashboard() {
           {/* ── ALL CONTENT REQUESTS TABLE ── */}
           <Card style={{ padding: 0, overflow: 'visible', borderWidth: 1, borderColor: '#e5e7eb', zIndex: 10 }}>
             {/* Table Controls */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', flexWrap: 'wrap', gap: 12, zIndex: 20 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>All Content Requests</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', zIndex: 30 }}>
+            <View style={{ flexDirection: isTablet ? 'row' : 'column', justifyContent: 'space-between', alignItems: isTablet ? 'center' : 'stretch', padding: isTablet ? 20 : 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', flexWrap: 'wrap', gap: 12, zIndex: 20 }}>
+              <Text style={{ fontSize: isTablet ? 18 : 16, fontWeight: '700', color: Colors.textPrimary }}>All Content Requests</Text>
+              <View style={{ flexDirection: isTablet ? 'row' : 'column', alignItems: isTablet ? 'center' : 'stretch', gap: 12, flexWrap: 'wrap', zIndex: 30 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 6, paddingHorizontal: 12, height: 36, borderWidth: 1, borderColor: '#e5e7eb' }}>
                   <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
                   <TextInput id="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
@@ -1359,71 +1359,119 @@ export default function ITAdminDashboard() {
             </View>
 
             {/* Table Header */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
-              <View style={{ flex: 1, minWidth: 1000 }}>
-                <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
-                  <Text style={{ flex: 2, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUEST TITLE</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>DEPARTMENT</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUESTED BY</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>STATUS</Text>
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>PLATFORMS</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUESTED ON</Text>
-                  <Text style={{ width: 80, fontSize: 11, fontWeight: '600', color: '#6b7280', textAlign: 'center' }}>ACTIONS</Text>
-                </View>
+            <ScrollView horizontal={isTablet} showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1 }}>
+              <View style={{ flex: 1, minWidth: isTablet ? 1000 : 'auto' }}>
+                {isTablet && (
+                  <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
+                    <Text style={{ flex: 2, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUEST TITLE</Text>
+                    <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>DEPARTMENT</Text>
+                    <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUESTED BY</Text>
+                    <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>STATUS</Text>
+                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>PLATFORMS</Text>
+                    <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '600', color: '#6b7280' }}>REQUESTED ON</Text>
+                    <Text style={{ width: 80, fontSize: 11, fontWeight: '600', color: '#6b7280', textAlign: 'center' }}>ACTIONS</Text>
+                  </View>
+                )}
 
                 {/* Table Rows */}
                 {paginatedTablePosts.map((post) => (
-                  <TouchableOpacity key={post.id} activeOpacity={0.7} onPress={() => setPreviewPost(post)} style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', alignItems: 'center', cursor: 'pointer' }}>
+                  <TouchableOpacity key={post.id} activeOpacity={0.7} onPress={() => setPreviewPost(post)} style={[
+                    { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', cursor: 'pointer' },
+                    isTablet ? { flexDirection: 'row', alignItems: 'center' } : { flexDirection: 'column', gap: 12 }
+                  ]}>
                     {/* TITLE */}
-                    <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingRight: 16 }}>
+                    <View style={[{ flexDirection: 'row', alignItems: 'center' }, isTablet ? { flex: 2, paddingRight: 16 } : { width: '100%' }]}>
                       <Image source={{ uri: post.image }} style={{ width: 48, height: 32, borderRadius: 4, marginRight: 12 }} />
                       <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={2}>{post.title}</Text>
                     </View>
 
-                    {/* DEPT */}
-                    <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.department}</Text>
-                    </View>
+                    <View style={[isTablet ? { flexDirection: 'row', flex: 7 } : { flexDirection: 'column', gap: 8, paddingLeft: 60 }]}>
+                      {/* DEPT & REQ BY (Combined on mobile) */}
+                      {!isTablet && (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{post.department}</Text>
+                          <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.requestedBy}</Text>
+                        </View>
+                      )}
+                      
+                      {isTablet && (
+                        <>
+                          <View style={{ flex: 1.5, paddingRight: 12 }}>
+                            <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.department}</Text>
+                          </View>
+                          <View style={{ flex: 1.5, paddingRight: 12 }}>
+                            <Text style={{ fontSize: 13, color: Colors.textPrimary }}>{post.requestedBy}</Text>
+                          </View>
+                        </>
+                      )}
 
-                    {/* REQ BY */}
-                    <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <Text style={{ fontSize: 13, color: Colors.textPrimary }}>{post.requestedBy}</Text>
-                    </View>
+                      {/* STATUS & PLATFORMS (Combined on mobile) */}
+                      {!isTablet ? (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                          <View style={{
+                            backgroundColor: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#dcfce7' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                            paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4
+                          }}>
+                            <Text style={{
+                              fontSize: 10, fontWeight: '600', textTransform: 'uppercase',
+                              color: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#16a34a' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309'
+                            }}>{post.status}</Text>
+                          </View>
+                          
+                          <View style={{ flexDirection: 'row', gap: 6 }}>
+                            {post.platforms.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
+                            {post.platforms.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
+                            {post.platforms.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                          </View>
+                        </View>
+                      ) : (
+                        <>
+                          {/* STATUS (Tablet) */}
+                          <View style={{ flex: 1.5, paddingRight: 12 }}>
+                            <View style={{
+                              backgroundColor: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#dcfce7' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                              paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start'
+                            }}>
+                              <Text style={{
+                                fontSize: 10, fontWeight: '600', textTransform: 'uppercase',
+                                color: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#16a34a' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309'
+                              }}>{post.status}</Text>
+                            </View>
+                          </View>
 
-                    {/* STATUS */}
-                    <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <View style={{
-                        backgroundColor: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#dcfce7' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
-                        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start'
-                      }}>
-                        <Text style={{
-                          fontSize: 10, fontWeight: '600', textTransform: 'uppercase',
-                          color: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#16a34a' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309'
-                        }}>{post.status}</Text>
-                      </View>
-                    </View>
+                          {/* PLATFORMS (Tablet) */}
+                          <View style={{ flex: 1, flexDirection: 'row', gap: 6, paddingRight: 12 }}>
+                            {post.platforms.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
+                            {post.platforms.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
+                            {post.platforms.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                          </View>
+                        </>
+                      )}
 
-                    {/* PLATFORMS */}
-                    <View style={{ flex: 1, flexDirection: 'row', gap: 6, paddingRight: 12 }}>
-                      {post.platforms.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
-                      {post.platforms.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                      {post.platforms.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
-                    </View>
+                      {/* DATE */}
+                      {!isTablet ? (
+                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={{ fontSize: 11, color: Colors.textSecondary }}>Requested on {post.requestedOn} at {post.requestedTime}</Text>
+                            <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                            </TouchableOpacity>
+                         </View>
+                      ) : (
+                        <>
+                          {/* DATE (Tablet) */}
+                          <View style={{ flex: 1.5, paddingRight: 12 }}>
+                            <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.requestedOn}</Text>
+                            <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{post.requestedTime}</Text>
+                          </View>
 
-                    {/* DATE */}
-                    <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.requestedOn}</Text>
-                      <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{post.requestedTime}</Text>
-                    </View>
-
-                    {/* ACTIONS */}
-                    <View style={{ width: 80, flexDirection: 'row', justifyContent: 'center' }}>
-                      <TouchableOpacity
-                        onPress={(e) => { e.stopPropagation?.(); handlePublish(post.id); }}
-                        style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#3b0764', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <Ionicons name="paper-plane-outline" size={14} color="#fff" />
-                      </TouchableOpacity>
+                          {/* ACTIONS (Tablet) */}
+                          <View style={{ width: 80, flexDirection: 'row', justifyContent: 'center' }}>
+                            <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      )}
                     </View>
                   </TouchableOpacity>
                 ))}

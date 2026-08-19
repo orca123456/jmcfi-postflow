@@ -837,15 +837,15 @@ export default function RequestorDashboard() {
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
       {activeTab === 'dashboard' && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
-          <View style={styles.dashboardHeaderRow}>
+          <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
             <View>
-              <Text style={styles.welcomeTitle}>Welcome, Requestor</Text>
+              <Text style={[styles.welcomeTitle, !isTablet && { fontSize: 18 }]}>Welcome, Requestor</Text>
               <Text style={styles.welcomeSubtitle}>
                 Here is an overview of your department's content activity for this semester.
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.createRequestBtnGold}
+              style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
               onPress={() => setActiveTab('post-requests')}
             >
               <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
@@ -857,11 +857,11 @@ export default function RequestorDashboard() {
 
 
           {/* Recent Post Requests Table */}
-          <Card style={styles.tableCard}>
-            <View style={styles.tableHeaderArea}>
+          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
+            <View style={[styles.tableHeaderArea, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
               <Text style={styles.tableCardTitle}>Recent Post Requests</Text>
-              <View style={styles.tableHeaderActions}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 200, borderWidth: 1, borderColor: Colors.border }}>
+              <View style={[styles.tableHeaderActions, !isTablet && { flexDirection: 'column', gap: 8 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: isTablet ? 8 : 0, flex: isTablet ? undefined : 1, width: isTablet ? 200 : undefined, borderWidth: 1, borderColor: Colors.border }}>
                   <Ionicons name="search" size={16} color={Colors.textSecondary} />
                   <TextInput
                     style={{ flex: 1, marginLeft: 8, fontSize: 14, color: Colors.textPrimary, ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
@@ -871,8 +871,9 @@ export default function RequestorDashboard() {
                   />
                 </View>
 
+                <View style={{ flexDirection: 'row', gap: 8 }}>
                 {activeTab === 'dashboard' ? (
-                  <View style={{ position: 'relative', zIndex: 40, marginRight: 8 }}>
+                  <View style={{ position: 'relative', zIndex: 40, flex: isTablet ? undefined : 1 }}>
                     <TouchableOpacity
                       style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
                       onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
@@ -902,7 +903,7 @@ export default function RequestorDashboard() {
                   </View>
                 ) : null}
 
-                <View style={{ position: 'relative', zIndex: 40 }}>
+                <View style={{ position: 'relative', zIndex: 40, flex: isTablet ? undefined : 1 }}>
                   <TouchableOpacity
                     style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
                     onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
@@ -944,22 +945,25 @@ export default function RequestorDashboard() {
                     </View>
                   )}
                 </View>
+                </View>
               </View>
             </View>
 
             {/* Table */}
-            <View style={styles.table}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Request Title</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Category</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Platform</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Date Submitted</Text>
-                <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Status</Text>
-              </View>
+            <View style={[styles.table, !isTablet && { borderWidth: 0, backgroundColor: 'transparent' }]}>
+              {isTablet && (
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Request Title</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Category</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Platform</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Date</Text>
+                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Status</Text>
+                </View>
+              )}
 
               {paginatedRequests.map((req) => (
-                <TouchableOpacity key={req.id} style={styles.tableRow} onPress={() => setSelectedQueuePost(req)}>
-                  <View style={[styles.cellFlex2, styles.titleCellContainer]}>
+                <TouchableOpacity key={req.id} style={[styles.tableRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start', padding: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border }]} onPress={() => setSelectedQueuePost(req)}>
+                  <View style={[styles.cellFlex2, styles.titleCellContainer, !isTablet && { width: '100%', marginBottom: 12 }]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
                       {req.thumbnailUrl ? (
                         <Image
@@ -972,11 +976,15 @@ export default function RequestorDashboard() {
                         <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
                       )}
                     </View>
-                    <View>
-                      <Text style={styles.postTitleText}>{req.title}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.postTitleText, !isTablet && { fontSize: 16, marginBottom: 4 }]} numberOfLines={2}>{req.title}</Text>
+                      {!isTablet && <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{req.other_category_name || req.category}</Text>}
                     </View>
                   </View>
-                  <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.other_category_name || req.category}</Text>
+                  
+                  {isTablet && <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.other_category_name || req.category}</Text>}
+                  
+                  {isTablet && (
                   <View style={[styles.cellFlex1, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     {(Array.isArray(req.platforms) ? req.platforms : String(req.platforms || '').split(',')).map((p: any, idx: number) => {
                       const platform = p.trim().toLowerCase();
@@ -990,14 +998,29 @@ export default function RequestorDashboard() {
                       return <Text key={idx} style={styles.postPlatformsText}>{p}</Text>;
                     })}
                   </View>
-                  <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.date}</Text>
-                  <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
-                    <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
-                      <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
-                        {req.status}
-                      </Text>
+                  )}
+                  
+                  {!isTablet ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: 8 }}>
+                      <Text style={[styles.tableCellText, { fontSize: 12, color: Colors.textSecondary }]}>{req.date}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
+                        <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
+                          {req.status}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
+                  ) : (
+                    <>
+                      <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.date}</Text>
+                      <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
+                        <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
+                          <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
+                            {req.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>

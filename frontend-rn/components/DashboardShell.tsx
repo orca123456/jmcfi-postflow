@@ -55,6 +55,46 @@ export function DashboardShell({
   const [sidebarOpenedByHover, setSidebarOpenedByHover] = React.useState(false);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
 
+  // Mobile drawer state
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = React.useState(false);
+  const mobileDrawerAnim = React.useRef(new Animated.Value(-300)).current;
+  const mobileBackdropAnim = React.useRef(new Animated.Value(0)).current;
+
+  const openMobileDrawer = React.useCallback(() => {
+    setIsMobileDrawerOpen(true);
+    Animated.parallel([
+      Animated.spring(mobileDrawerAnim, {
+        toValue: 0,
+        useNativeDriver: false,
+        tension: 65,
+        friction: 11,
+      }),
+      Animated.timing(mobileBackdropAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [mobileDrawerAnim, mobileBackdropAnim]);
+
+  const closeMobileDrawer = React.useCallback(() => {
+    Animated.parallel([
+      Animated.spring(mobileDrawerAnim, {
+        toValue: -300,
+        useNativeDriver: false,
+        tension: 65,
+        friction: 11,
+      }),
+      Animated.timing(mobileBackdropAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      setIsMobileDrawerOpen(false);
+    });
+  }, [mobileDrawerAnim, mobileBackdropAnim]);
+
   // Auto-fetch department logo for the current user
   const [autoDeptLogo, setAutoDeptLogo] = React.useState<string | undefined>(undefined);
   React.useEffect(() => {
@@ -126,6 +166,15 @@ export function DashboardShell({
   }, [sidebarWidthAnim]);
 
   const toggleSidebar = () => {
+    if (!isDesktop) {
+      // On mobile, use the drawer instead
+      if (isMobileDrawerOpen) {
+        closeMobileDrawer();
+      } else {
+        openMobileDrawer();
+      }
+      return;
+    }
     if (isSidebarOpen) {
       closeSidebar();
     } else {
@@ -414,7 +463,7 @@ export function DashboardShell({
 
       {/* Main Layout Container */}
       <View style={styles.mainContainer}>
-        {/* ── Animated Sidebar (Pushes content, Google Classroom style) ── */}
+        {/* ── Animated Sidebar (Desktop only — Pushes content, Google Classroom style) ── */}
         {isDesktop && (
           <Animated.View
             style={[
@@ -516,7 +565,7 @@ export function DashboardShell({
             >
               <ScrollView
                 style={styles.content}
-                contentContainerStyle={styles.contentContainer}
+                contentContainerStyle={[styles.contentContainer, !isDesktop && styles.contentContainerMobile]}
                 showsVerticalScrollIndicator={false}
               >
                 {children}
@@ -525,7 +574,7 @@ export function DashboardShell({
           ) : (
             <ScrollView
               style={styles.content}
-              contentContainerStyle={styles.contentContainer}
+              contentContainerStyle={[styles.contentContainer, !isDesktop && styles.contentContainerMobile]}
               showsVerticalScrollIndicator={false}
             >
               {children}
@@ -534,21 +583,88 @@ export function DashboardShell({
         </View>
       </View>
 
-      {/* Bottom Nav - Mobile only */}
-      {!isDesktop && (
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem} onPress={() => alert('Dashboard is under development.')}>
-            <Ionicons name="grid-outline" size={22} color={Colors.textSecondary} />
-            <Text style={styles.navLabel}>Dashboard</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => alert('Post Requests is under development.')}>
-            <Ionicons name="document-text-outline" size={22} color={Colors.primary} />
-            <Text style={styles.navLabel}>Requests</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color={Colors.textSecondary} />
-            <Text style={styles.navLabel}>Logout</Text>
-          </TouchableOpacity>
+      {/* ── Mobile Slide-Out Drawer ── */}
+      {!isDesktop && isMobileDrawerOpen && (
+        <View style={styles.mobileDrawerOverlay}>
+          {/* Backdrop */}
+          <TouchableWithoutFeedback onPress={closeMobileDrawer}>
+            <Animated.View style={[styles.mobileDrawerBackdrop, { opacity: mobileBackdropAnim }]} />
+          </TouchableWithoutFeedback>
+
+          {/* Drawer Panel */}
+          <Animated.View style={[styles.mobileDrawerPanel, { left: mobileDrawerAnim }]}>
+            {/* Drawer Header */}
+            <View style={styles.mobileDrawerHeader}>
+              <Image
+                source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
+                style={{ width: 44, height: 44, borderRadius: 22 }}
+                resizeMode="contain"
+              />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.mobileDrawerDeptName} numberOfLines={2}>{finalDeptName}</Text>
+                <Text style={styles.mobileDrawerUserName}>{user?.name ?? 'User'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.mobileDrawerDivider} />
+
+            {/* Nav Items */}
+            <ScrollView style={styles.mobileDrawerNavList} showsVerticalScrollIndicator={false}>
+              {sidebarNavItems.map((item, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.mobileDrawerNavItem,
+                    item.active && styles.mobileDrawerNavItemActive,
+                  ]}
+                  onPress={() => {
+                    if (onTabChange) onTabChange(item.id);
+                    closeMobileDrawer();
+                  }}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={22}
+                    color={item.active ? '#FFC72C' : '#FFFFFF'}
+                  />
+                  <Text
+                    style={[
+                      styles.mobileDrawerNavLabel,
+                      item.active && styles.mobileDrawerNavLabelActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.mobileDrawerDivider} />
+
+            {/* Footer Actions */}
+            <View style={styles.mobileDrawerFooter}>
+              <TouchableOpacity
+                style={styles.mobileDrawerNavItem}
+                onPress={() => {
+                  closeMobileDrawer();
+                  if (onTabChange) onTabChange('account-settings');
+                }}
+              >
+                <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.mobileDrawerNavLabel}>Account Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.mobileDrawerNavItem}
+                onPress={() => {
+                  closeMobileDrawer();
+                  handleLogout();
+                }}
+              >
+                <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.mobileDrawerNavLabel}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </View>
       )}
 
@@ -864,21 +980,91 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
     paddingBottom: Spacing.xxl,
   },
-  bottomNav: {
+  contentContainerMobile: {
+    padding: 12,
+    gap: 12,
+    paddingBottom: 24,
+  },
+  // ── Mobile Drawer Styles ──
+  mobileDrawerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  mobileDrawerBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  mobileDrawerPanel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 280,
+    backgroundColor: '#4C007C',
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  mobileDrawerHeader: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingBottom: 8,
-  },
-  navItem: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    gap: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  navLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
+  mobileDrawerDeptName: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  mobileDrawerUserName: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
+  },
+  mobileDrawerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginHorizontal: 16,
+    marginVertical: 8,
+  },
+  mobileDrawerNavList: {
+    flex: 1,
+    paddingHorizontal: 12,
+  },
+  mobileDrawerNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  mobileDrawerNavItemActive: {
+    backgroundColor: 'rgba(255, 199, 44, 0.15)',
+  },
+  mobileDrawerNavLabel: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    fontWeight: '500' as const,
+  },
+  mobileDrawerNavLabelActive: {
+    color: '#FFC72C',
+    fontWeight: '700' as const,
+  },
+  mobileDrawerFooter: {
+    paddingHorizontal: 12,
+    paddingBottom: 24,
   },
 });
