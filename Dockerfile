@@ -31,15 +31,15 @@ WORKDIR /var/www/html
 # Copy backend files
 COPY backend/ ./
 
+# Ensure required Laravel directories exist and are writable before composer install
+RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views \
+    && chmod -R 777 bootstrap/cache storage
+
 # Install Composer Dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
 # Copy the built frontend from STAGE 1 into Laravel's public directory
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
-
-# Ensure required Laravel directories exist and are writable
-RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views \
-    && chmod -R 777 bootstrap/cache storage
 
 # Create storage symlink
 RUN php artisan storage:link
