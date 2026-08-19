@@ -45,6 +45,9 @@ COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
 # Create storage symlink
 RUN php artisan storage:link
 
-# Start the application using Laravel's built-in server
-# This bypasses all Nginx/FPM socket bugs and natively reads Railway's dynamic PORT
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+# Explicitly tell Railway's Edge Proxy which port we use
+EXPOSE 8080
+
+# Start the application using raw PHP built-in server bound to IPv6 ([::])
+# Railway's internal network connects via IPv6, binding to 0.0.0.0 causes 502s
+CMD php -S [::]:${PORT:-8080} -t public server.php
