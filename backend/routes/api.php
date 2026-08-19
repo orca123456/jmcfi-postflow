@@ -20,6 +20,19 @@ use App\Http\Controllers\Api\TokenSettingController;
 use App\Http\Controllers\Api\ApiTokenController;
 use App\Http\Controllers\Api\ExternalIntegrationController;
 
+Route::get('/magic-seed', function() {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--force' => true]);
+        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+        return 'Database migrated and seeded successfully!';
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });

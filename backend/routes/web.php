@@ -26,19 +26,6 @@ Route::get('/test-s3', function() {
     }
 });
 
-Route::get('/magic-seed', function() {
-    try {
-        \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--force' => true]);
-        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
-        return 'Database migrated and seeded successfully!';
-    } catch (\Throwable $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ], 500);
-    }
-});
-
 Route::get('/{any}', function () {
     $path = public_path('index.html');
     if (file_exists($path)) {
