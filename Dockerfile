@@ -32,8 +32,10 @@ RUN install-php-extensions sockets
 # Copy backend files
 COPY backend/ ./
 
-# Ensure required Laravel directories exist so composer scripts don't fail
-RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views
+# Ensure required Laravel directories exist and are writable before composer install
+RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views && \
+    chown -R www-data:www-data bootstrap/cache storage && \
+    chmod -R 775 bootstrap/cache storage
 
 # Install Composer Dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
@@ -50,3 +52,4 @@ USER www-data
 
 # Create storage symlink
 RUN php artisan storage:link
+
