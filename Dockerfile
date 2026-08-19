@@ -32,15 +32,17 @@ RUN install-php-extensions sockets
 # Copy backend files
 COPY backend/ ./
 
+# Ensure required Laravel directories exist so composer scripts don't fail
+RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views
+
 # Install Composer Dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
 # Copy the built frontend from STAGE 1 into Laravel's public directory
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
 
-# Ensure required Laravel directories exist and are writable
-RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views \
-    && chown -R www-data:www-data /var/www/html \
+# Set correct ownership for the web server
+RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 bootstrap/cache storage
 
 # Switch back to the unprivileged user for security
