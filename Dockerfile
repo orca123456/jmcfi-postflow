@@ -11,9 +11,9 @@ COPY frontend-rn/ ./
 RUN npx expo export -p web
 
 # ==========================================
-# STAGE 2: Setup PHP/Nginx and Laravel
+# STAGE 2: Setup PHP and Laravel
 # ==========================================
-FROM serversideup/php:8.2-fpm-nginx
+FROM serversideup/php:8.2-cli
 
 # Configure for production
 ENV PHP_OPCACHE_ENABLE=1 \
@@ -50,3 +50,6 @@ USER www-data
 
 # Create storage symlink
 RUN php artisan storage:link
+
+# Start the application using Laravel's built-in server on Railway's dynamic port
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
