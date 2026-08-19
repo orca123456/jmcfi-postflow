@@ -43,7 +43,13 @@ RUN chown -R application:application /app \
 # Create storage symlink so images are accessible from frontend
 RUN php artisan storage:link
 
-# (Config caching is skipped during build because ENV variables are not available yet)
+# Railway assigns a dynamic $PORT. We need to tell Nginx to listen on it.
+RUN echo '#!/bin/bash' > /opt/docker/provision/entrypoint.d/00-railway-port.sh \
+    && echo 'if [ -n "$PORT" ]; then' >> /opt/docker/provision/entrypoint.d/00-railway-port.sh \
+    && echo '  sed -i "s/listen 80/listen $PORT/g" /opt/docker/etc/nginx/vhost.conf' >> /opt/docker/provision/entrypoint.d/00-railway-port.sh \
+    && echo '  sed -i "s/listen \[::\]:80/listen \[::\]:$PORT/g" /opt/docker/etc/nginx/vhost.conf' >> /opt/docker/provision/entrypoint.d/00-railway-port.sh \
+    && echo '  sed -i "s/listen 80/listen $PORT/g" /opt/docker/etc/nginx/vhost.common.d/10-location-root.conf' >> /opt/docker/provision/entrypoint.d/00-railway-port.sh \
+    && echo 'fi' >> /opt/docker/provision/entrypoint.d/00-railway-port.sh \
+    && chmod +x /opt/docker/provision/entrypoint.d/00-railway-port.sh
 
-# Expose port 80 (default for webdevops)
-EXPOSE 80
+# (Config caching is skipped during build because ENV variables are not available yet)
