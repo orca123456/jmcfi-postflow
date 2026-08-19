@@ -359,6 +359,7 @@ export default function OfficeHeadDashboard() {
   }), [requestsList, approvedRequests, rejectedRequests]);
 
   const isLargeScreen = width > 1024;
+  const isTablet = width > 768;
 
   let userPosition = user?.position || 'Department Head';
   if (user?.department === 'Vice President for Academic Affairs') userPosition = 'Vice President';
@@ -381,9 +382,9 @@ export default function OfficeHeadDashboard() {
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
-            <View style={styles.dashboardHeaderRow}>
+            <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
               <View>
-                <Text style={styles.greetingTitle}>Welcome {greetingName}! 👋</Text>
+                <Text style={[styles.greetingTitle, !isTablet && { fontSize: 18 }]}>Welcome {greetingName}! 👋</Text>
                 <Text style={styles.greetingSubtitle}>
                   Overview of departmental content submissions, approvals, and quality clearance queues.
                 </Text>
@@ -393,9 +394,9 @@ export default function OfficeHeadDashboard() {
 
           {/* Metric Summary Cards Row */}
           {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
-            <View style={styles.metricsGrid}>
+            <View style={[styles.metricsGrid, !isTablet && { flexDirection: 'column' }]}>
               {/* Card 1: Pending Sign-off */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
@@ -409,7 +410,7 @@ export default function OfficeHeadDashboard() {
               </TouchableOpacity>
 
               {/* Card 2: Approved */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('approved')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => handleTabChange('approved')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
@@ -423,7 +424,7 @@ export default function OfficeHeadDashboard() {
               </TouchableOpacity>
 
               {/* Card 3: Rejected */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => handleTabChange('rejected')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => handleTabChange('rejected')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
@@ -437,7 +438,7 @@ export default function OfficeHeadDashboard() {
               </TouchableOpacity>
 
               {/* Card 4: Total Requests (Static Metric) */}
-              <View style={{ flex: 1, minWidth: 220 }}>
+              <View style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }}>
                 <Card style={styles.metricCard}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
