@@ -224,7 +224,7 @@ export function DashboardShell({
       const active = activeTab ?? 'dashboard';
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
-        { id: 'request', label: 'Request', icon: 'document-text-outline' as const, active: active === 'request' || active === 'post-requests' },
+        { id: 'request', label: 'Create Request', icon: 'document-text-outline' as const, active: active === 'request' || active === 'post-requests' },
         { id: 'draft', label: 'Draft', icon: 'create-outline' as const, active: active === 'draft' },
         { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },

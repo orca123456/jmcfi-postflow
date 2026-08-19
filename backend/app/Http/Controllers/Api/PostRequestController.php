@@ -701,7 +701,7 @@ class PostRequestController extends Controller
      *   - requestor (requestor / content_requestor)     -> only their own posts
      *   - approver  (office_head / vice_president / imc_qa_checker) -> stage/department scoped
      */
-    private function applyRoleScoping($query, \App\Models\User $user): void
+    private function applyRoleScoping(\Illuminate\Database\Eloquent\Builder $query, \App\Models\User $user): void
     {
         $category = $user->roleCategory();
         $role = $user->getRoleNames()->first();
@@ -755,7 +755,7 @@ class PostRequestController extends Controller
     /**
      * Scope a query to the posts currently pending the user's approval stage.
      */
-    private function applyPendingApprovalScope($query, \App\Models\User $user): void
+    private function applyPendingApprovalScope(\Illuminate\Database\Eloquent\Builder $query, \App\Models\User $user): void
     {
         if ($user->roleCategory() !== 'approver') {
             return;

@@ -516,7 +516,7 @@ export default function VPDashboard() {
                       ))}
                       
                       {dateFilter === 'Custom Range' && (
-                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
                           <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
                           <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
                           <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
@@ -674,7 +674,7 @@ export default function VPDashboard() {
             {/* Left settings card */}
             <View style={{ flex: 1.5 }}>
               <Card style={styles.tableCard}>
-                <View style={[styles.tableCardHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10, marginBottom: 12 }]}>
+                <View style={[styles.tableCardHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.background, paddingBottom: 10, marginBottom: 12 }]}>
                   <Ionicons name="person-outline" size={18} color="#7C3AED" />
                   <Text style={styles.tableTitle}>Profile Information</Text>
                 </View>
@@ -713,12 +713,12 @@ export default function VPDashboard() {
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]} value={user?.email ?? ''} editable={false} />
+                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.email ?? ''} editable={false} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT / ROLE</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]} value={user?.department || ''} editable={false} />
+                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.department || ''} editable={false} />
                 </View>
 
                 <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center' }} onPress={handleSaveDetails} disabled={savingAcct}>
@@ -805,8 +805,8 @@ export default function VPDashboard() {
                 )}
                     
                 <View style={{ marginBottom: 16 }}>
-                  <View style={{ backgroundColor: '#FFFFFF', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#111827' }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#6B7280', textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
+                  <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
                         {(() => {
                           const workflows = selectedRequest.approval_workflows || [];
                           const getStageStatus = (stageName: string) => {
@@ -829,17 +829,17 @@ export default function VPDashboard() {
                           const getIcon = (state: string) => {
                             if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
                             if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
-                            return { name: 'time', color: '#9CA3AF' };
+                            return { name: 'time', color: Colors.textMuted };
                           };
                           const getColor = (state: string) => {
                             if (state === 'Rejected') return '#DC2626';
                             if (state === 'Approved' || state === 'Published') return '#059669';
-                            return '#9CA3AF';
+                            return Colors.textMuted;
                           };
                           const getLineColor = (state: string) => {
                             if (state === 'Approved' || state === 'Published') return '#059669';
                             if (state === 'Rejected') return '#DC2626';
-                            return '#E5E7EB';
+                            return Colors.border;
                           };
 
                           return (
@@ -847,7 +847,7 @@ export default function VPDashboard() {
                               
                               <View style={{ alignItems: 'center', flex: 1.2 }}>
                                 <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Dept Head</Text>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
                                 <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
                               </View>
                               
@@ -855,7 +855,7 @@ export default function VPDashboard() {
                               
                               <View style={{ alignItems: 'center', flex: 1.2 }}>
                                 <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>VPAA</Text>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
                                 <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
                               </View>
                               
@@ -863,7 +863,7 @@ export default function VPDashboard() {
                               
                               <View style={{ alignItems: 'center', flex: 1.2 }}>
                                 <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>IMC / QA</Text>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
                                 <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
                               </View>
 
@@ -922,7 +922,7 @@ export default function VPDashboard() {
                     {modalPlatformTab === 'facebook' && (
                       <View style={styles.socialMockupCard}>
                         <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF' }]} resizeMode="contain" />
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
                           <View>
                             <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
                             <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
@@ -960,7 +960,7 @@ export default function VPDashboard() {
                     {modalPlatformTab === 'instagram' && (
                       <View style={styles.socialMockupCard}>
                         <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
                           <View style={{ flex: 1 }}>
                             <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
                           </View>
@@ -1156,7 +1156,7 @@ export default function VPDashboard() {
                 <TextInput
                   style={{
                     borderWidth: 1,
-                    borderColor: '#E5E7EB',
+                    borderColor: Colors.border,
                     borderRadius: BorderRadius.md,
                     padding: 12,
                     minHeight: 100,
@@ -1210,11 +1210,11 @@ const styles = StyleSheet.create({
   greetingTitle: {
     fontSize: FontSize.xl + 2,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   greetingSubtitle: {
     fontSize: FontSize.sm,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     marginTop: 2,
   },
 
@@ -1223,9 +1223,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: BorderRadius.md,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -1233,17 +1233,17 @@ const styles = StyleSheet.create({
   departmentDropdownText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   dropdownMenu: {
     position: 'absolute',
     top: 42,
     right: 0,
     minWidth: 240,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -1255,11 +1255,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
   },
   dropdownItemText: {
     fontSize: FontSize.sm,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
 
   // Metrics Grid (4 Cards)
@@ -1273,9 +1273,9 @@ const styles = StyleSheet.create({
     minWidth: 200,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: Colors.background,
   },
   metricCardHeader: {
     marginBottom: 8,
@@ -1290,27 +1290,27 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: '#374151',
+    color: Colors.textPrimary,
     textTransform: 'uppercase',
   },
   metricCount: {
     fontSize: FontSize.xxl + 4,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
     marginVertical: 2,
   },
   metricSubtext: {
     fontSize: FontSize.xs - 1,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
   },
 
   // Main Table Card
   tableCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: Colors.background,
   },
   tableCardHeaderRow: {
     flexDirection: 'row',
@@ -1324,7 +1324,7 @@ const styles = StyleSheet.create({
   tableTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   tableControlsRight: {
     flexDirection: 'row',
@@ -1336,7 +1336,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: BorderRadius.md,
     paddingHorizontal: 10,
     height: 36,
@@ -1345,13 +1345,13 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: FontSize.xs + 1,
-    color: '#111827',
+    color: Colors.textPrimary,
     outlineStyle: 'none',
   } as any,
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     borderRadius: BorderRadius.md,
     paddingHorizontal: 12,
     height: 36,
@@ -1359,7 +1359,7 @@ const styles = StyleSheet.create({
   filterBtnText: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
 
   // Table Layout
@@ -1371,14 +1371,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: Colors.border,
     backgroundColor: '#F9FAFB',
     borderRadius: BorderRadius.sm,
   },
   tableHeaderCell: {
     fontSize: FontSize.xs - 1,
     fontWeight: FontWeight.bold,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
 
@@ -1397,7 +1397,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
   },
   cellContainer: {
     justifyContent: 'center',
@@ -1406,7 +1406,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -1414,11 +1414,11 @@ const styles = StyleSheet.create({
   rowTitleText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   categoryPill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1437,20 +1437,20 @@ const styles = StyleSheet.create({
   rowUserName: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   rowUserRole: {
     fontSize: FontSize.xs - 1,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   rowDateText: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   rowTimeText: {
     fontSize: FontSize.xs - 1,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
   },
   platformIconCircle: {
     width: 24,
@@ -1471,7 +1471,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1479,7 +1479,7 @@ const styles = StyleSheet.create({
   btnViewRowText: {
     fontSize: 11,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   btnApproveRow: {
     flexDirection: 'row',
@@ -1520,11 +1520,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
   },
   tableFooterText: {
     fontSize: FontSize.xs,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   paginationRow: {
     flexDirection: 'row',
@@ -1536,7 +1536,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1552,10 +1552,10 @@ const styles = StyleSheet.create({
   },
   pageBtnText: {
     fontSize: FontSize.xs,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   pageBtnTextActive: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontWeight: FontWeight.bold,
   },
   pageCountSelector: {
@@ -1563,7 +1563,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
   },
   pageCountSelectorText: {
     fontSize: FontSize.xs,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
 
   // Modal Overlay & Container
@@ -1586,7 +1586,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 780,
     maxHeight: '90%',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1602,12 +1602,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
   },
   modalHeaderTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   modalCloseIconBtn: {
     padding: 4,
@@ -1654,7 +1654,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: BorderRadius.md,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
   },
   modalPlatformTabActive: {
     backgroundColor: '#EFF6FF',
@@ -1664,7 +1664,7 @@ const styles = StyleSheet.create({
   modalPlatformTabText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   modalPlatformTabTextActive: {
     color: '#1D4ED8',
@@ -1673,10 +1673,10 @@ const styles = StyleSheet.create({
 
   socialMockupCard: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   socialHeader: {
     flexDirection: 'row',
@@ -1695,15 +1695,15 @@ const styles = StyleSheet.create({
   socialAuthorName: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   socialTimeText: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
   },
   socialCaptionText: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
     lineHeight: 18,
     marginBottom: 12,
   },
@@ -1720,14 +1720,14 @@ const styles = StyleSheet.create({
   socialMediaBannerText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
+    color: Colors.surface,
     textAlign: 'center',
     letterSpacing: 1,
   },
   socialFooterActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
     paddingTop: 8,
     justifyContent: 'space-around',
   },
@@ -1738,7 +1738,7 @@ const styles = StyleSheet.create({
   },
   socialActionText: {
     fontSize: FontSize.xs,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
 
   // Right Details Column
@@ -1753,18 +1753,18 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: FontSize.xs - 1,
     fontWeight: FontWeight.bold,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   metaTitleVal: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   metaVal: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   deptBadge: {
     alignSelf: 'flex-start',
@@ -1780,18 +1780,18 @@ const styles = StyleSheet.create({
   },
   metaDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
     marginVertical: 8,
   },
   metaCaptionBox: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
     lineHeight: 18,
     backgroundColor: '#F9FAFB',
     padding: 10,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: Colors.background,
   },
   attachmentCard: {
     flexDirection: 'row',
@@ -1831,7 +1831,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
     backgroundColor: '#FAFAFA',
   },
   btnModalClose: {
@@ -1840,12 +1840,12 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   btnModalCloseText: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   btnModalRevision: {
     paddingHorizontal: 16,
@@ -1895,7 +1895,7 @@ const styles = StyleSheet.create({
   policySidebarTitle: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
     marginBottom: 6,
   },
   policySidebarItem: {
@@ -1906,7 +1906,7 @@ const styles = StyleSheet.create({
   },
   policySidebarItemText: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   policyContentArea: {
     flex: 1,
@@ -1918,7 +1918,7 @@ const styles = StyleSheet.create({
   policyCardTitle: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   policyContentText: {
@@ -1933,7 +1933,7 @@ const styles = StyleSheet.create({
   bulletTitle: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   bulletDesc: {
     fontSize: FontSize.xs + 1,
@@ -1947,7 +1947,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
     marginBottom: 12,
   },
   profilePicLarge: {
@@ -1959,7 +1959,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profilePicLargeText: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontSize: 20,
     fontWeight: FontWeight.bold,
   },
@@ -1970,11 +1970,11 @@ const styles = StyleSheet.create({
   profilePicTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   profilePicSubtitle: {
     fontSize: FontSize.xs,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   profilePicButtonsRow: {
     flexDirection: 'row',
@@ -1990,7 +1990,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profilePicUploadBtnText: {
-    color: '#111827',
+    color: Colors.textPrimary,
     fontSize: 11,
     fontWeight: FontWeight.bold,
   },
@@ -2015,17 +2015,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 10,
     fontWeight: FontWeight.bold,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 4,
     height: 36,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#ffffff',
-    color: '#111827',
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
   },
 });

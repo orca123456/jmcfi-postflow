@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { Colors } from '../../constants/theme';
 
 interface RichTextEditorProps {
   value: string;
@@ -89,7 +90,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   return (
     <View style={[styles.container, { minHeight }]}>
       {/* @ts-ignore */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', background: '#F9FAFB', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', background: Colors.background, borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
         {[
           { cmd: 'bold', label: <b>B</b>, title: 'Bold' },
           { cmd: 'italic', label: <i>I</i>, title: 'Italic' },
@@ -100,13 +101,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             key={cmd}
             title={title}
             onMouseDown={(e: any) => { e.preventDefault(); execFormat(cmd); }}
-            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 14, color: '#374151', fontWeight: cmd === 'bold' ? 'bold' : 'normal' }}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 14, color: Colors.textPrimary, fontWeight: cmd === 'bold' ? 'bold' : 'normal' }}
           >
             {label}
           </button>
         ))}
         {/* @ts-ignore */}
-        <div style={{ width: 1, height: 20, background: '#E5E7EB', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, background: Colors.border, margin: '0 4px' }} />
         {[
           { cmd: 'insertUnorderedList', label: '≡', title: 'Bullet List' },
           { cmd: 'insertOrderedList', label: '⊟', title: 'Ordered List' },
@@ -116,45 +117,20 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             key={cmd}
             title={title}
             onMouseDown={(e: any) => { e.preventDefault(); execFormat(cmd); }}
-            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 16, color: '#374151' }}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 16, color: Colors.textPrimary }}
           >
             {label}
           </button>
         ))}
         {/* @ts-ignore */}
-        <div style={{ width: 1, height: 20, background: '#E5E7EB', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, background: Colors.border, margin: '0 4px' }} />
         {/* @ts-ignore */}
         <button
           title="Remove Formatting"
           onMouseDown={(e: any) => { e.preventDefault(); execFormat('removeFormat'); }}
-          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 12, color: '#6B7280' }}
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 12, color: Colors.textSecondary }}
         >
           ✕
-        </button>
-      </div>
-      {/* Font Toolbar */}
-      {/* @ts-ignore */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F3F4F6', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
-        {/* @ts-ignore */}
-        <button
-          onMouseDown={(e: any) => { e.preventDefault(); execFormat('fontName', 'Montserrat'); }}
-          style={{ border: '1px solid #D1D5DB', background: '#ffffff', cursor: 'pointer', padding: '6px 12px', borderRadius: 4, fontSize: 12, color: '#374151', fontFamily: 'Montserrat', fontWeight: 'bold' }}
-        >
-          Sans Serif (Montserrat)
-        </button>
-        {/* @ts-ignore */}
-        <button
-          onMouseDown={(e: any) => { e.preventDefault(); execFormat('fontName', 'Book Antiqua'); }}
-          style={{ border: '1px solid #D1D5DB', background: '#ffffff', cursor: 'pointer', padding: '6px 12px', borderRadius: 4, fontSize: 12, color: '#374151', fontFamily: 'Book Antiqua' }}
-        >
-          Serif (Book Antiqua)
-        </button>
-        {/* @ts-ignore */}
-        <button
-          onMouseDown={(e: any) => { e.preventDefault(); execFormat('fontName', 'Old English Text MT'); }}
-          style={{ border: '1px solid #D1D5DB', background: '#ffffff', cursor: 'pointer', padding: '6px 12px', borderRadius: 4, fontSize: 12, color: '#374151', fontFamily: 'Old English Text MT' }}
-        >
-          Headers (Old English)
         </button>
       </div>
       {/* @ts-ignore */}
@@ -168,7 +144,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           minHeight: minHeight - 45,
           padding: '10px 12px',
           fontSize: 14,
-          color: '#1F2937',
+          color: Colors.textPrimary,
           outline: 'none',
           fontFamily: 'sans-serif',
           lineHeight: 1.6,
@@ -195,9 +171,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 const styles = StyleSheet.create({
   container: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
 });
