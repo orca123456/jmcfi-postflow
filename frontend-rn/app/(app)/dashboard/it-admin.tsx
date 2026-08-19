@@ -49,7 +49,7 @@ interface StatCardProps {
 const CustomStatCard: React.FC<StatCardProps> = ({
   label, value, icon, iconColor, iconBgColor,
   badgeText, badgeColor = Colors.textSecondary,
-  badgeBgColor = '#F3F4F6', valueColor = Colors.textPrimary,
+  badgeBgColor = Colors.background, valueColor = Colors.textPrimary,
 }) => (
   <Card style={styles.statCard}>
     <View style={styles.statCardHeader}>
@@ -824,7 +824,7 @@ export default function ITAdminDashboard() {
   const platforms = [
     { name: 'Facebook', percentage: 65, barColor: Colors.primary },
     { name: 'Instagram', percentage: 15, barColor: '#B45309' },
-    { name: 'Twitter/X', percentage: 10, barColor: '#6B7280' },
+    { name: 'Twitter/X', percentage: 10, barColor: Colors.textSecondary },
     { name: 'Portal', percentage: 10, barColor: '#3B82F6' },
   ];
 
@@ -1019,7 +1019,7 @@ export default function ITAdminDashboard() {
       case 'vice_president': return { label: 'VICE PRESIDENT', color: '#B45309', bgColor: '#FEF3C7' };
       case 'office_head': return { label: 'OFFICE HEAD', color: '#92400E', bgColor: '#FEF3C7' };
       case 'imc_qa_checker': return { label: 'IMC / QA', color: '#6366F1', bgColor: '#E0E7FF' };
-      default: return { label: role.toUpperCase(), color: Colors.textPrimary, bgColor: '#F3F4F6' };
+      default: return { label: role.toUpperCase(), color: Colors.textPrimary, bgColor: Colors.background };
     }
   };
 
@@ -1028,7 +1028,7 @@ export default function ITAdminDashboard() {
       case 'pending_review': return { dotColor: '#D97706', textColor: '#854D0E' };
       case 'approved': return { dotColor: '#16A34A', textColor: '#15803D' };
       case 'revision_requested': return { dotColor: '#DC2626', textColor: '#B91C1C' };
-      default: return { dotColor: '#6B7280', textColor: '#374151' };
+      default: return { dotColor: Colors.textSecondary, textColor: Colors.textPrimary };
     }
   };
 
@@ -1170,18 +1170,18 @@ export default function ITAdminDashboard() {
                   <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
                   <TextInput id="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
                 </View>
-                <select id="filter-status" name="filter-status" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
+                <select id="filter-status" name="filter-status" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: Colors.textPrimary }} value={requestsStatus} onChange={(e) => setRequestsStatus(e.target.value)}>
                   <option>All Status</option>
                   <option>Pending</option>
                   <option>Published</option>
                   <option>Rejected</option>
                 </select>
-                <select id="filter-department" name="filter-department" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: '#374151' }} value={requestsDept} onChange={(e) => setRequestsDept(e.target.value)}>
+                <select id="filter-department" name="filter-department" style={{ height: 36, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 12, paddingRight: 24, outline: 'none', backgroundColor: '#fff', color: Colors.textPrimary }} value={requestsDept} onChange={(e) => setRequestsDept(e.target.value)}>
                   <option>All Departments</option>
                   {departmentsList.map(d => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                 </select>
                 <View style={{ flexDirection: 'row', alignItems: 'center', height: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 12, backgroundColor: '#fff' }}>
-                  <input id="filter-date" name="filter-date" type="date" style={{ fontSize: 13, color: '#374151', border: 'none', outline: 'none', backgroundColor: 'transparent' }} value={requestsDate} onChange={(e) => setRequestsDate(e.target.value)} />
+                  <input id="filter-date" name="filter-date" type="date" style={{ fontSize: 13, color: Colors.textPrimary, border: 'none', outline: 'none', backgroundColor: 'transparent' }} value={requestsDate} onChange={(e) => setRequestsDate(e.target.value)} />
                 </View>
                 <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
                   <Ionicons name="options-outline" size={16} color="#374151" />
@@ -1208,17 +1208,17 @@ export default function ITAdminDashboard() {
                     {/* TITLE */}
                     <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', paddingRight: 16 }}>
                       <Image source={{ uri: post.image }} style={{ width: 48, height: 32, borderRadius: 4, marginRight: 12 }} />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827', flex: 1 }} numberOfLines={2}>{post.title}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={2}>{post.title}</Text>
                     </View>
 
                     {/* DEPT */}
                     <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <Text style={{ fontSize: 12, color: '#374151' }}>{post.department}</Text>
+                      <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.department}</Text>
                     </View>
 
                     {/* REQ BY */}
                     <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <Text style={{ fontSize: 13, color: '#374151' }}>{post.requestedBy}</Text>
+                      <Text style={{ fontSize: 13, color: Colors.textPrimary }}>{post.requestedBy}</Text>
                     </View>
 
                     {/* STATUS */}
@@ -1243,7 +1243,7 @@ export default function ITAdminDashboard() {
 
                     {/* DATE */}
                     <View style={{ flex: 1.5, paddingRight: 12 }}>
-                      <Text style={{ fontSize: 12, color: '#374151' }}>{post.requestedOn}</Text>
+                      <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{post.requestedOn}</Text>
                       <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{post.requestedTime}</Text>
                     </View>
 
@@ -1294,7 +1294,7 @@ export default function ITAdminDashboard() {
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Email Username</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', height: 38, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 4, backgroundColor: '#fff', overflow: 'hidden' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', height: 38, borderWidth: 1, borderColor: Colors.border, borderRadius: 4, backgroundColor: '#fff', overflow: 'hidden' }}>
                   <TextInput
                     style={{ flex: 1, height: 38, paddingHorizontal: 10, fontSize: 13, color: '#1A1A2E', outlineStyle: 'none' } as any}
                     placeholder="juan.delacruz"
@@ -1302,8 +1302,8 @@ export default function ITAdminDashboard() {
                     onChangeText={setNewUserEmail}
                     autoCapitalize="none"
                   />
-                  <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 8, height: '100%', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: '#E5E7EB' }}>
-                    <Text style={{ fontSize: 12, color: '#6B7280' }}>@jmc.edu.ph</Text>
+                  <View style={{ backgroundColor: Colors.background, paddingHorizontal: 8, height: '100%', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: Colors.border }}>
+                    <Text style={{ fontSize: 12, color: Colors.textSecondary }}>@jmc.edu.ph</Text>
                   </View>
                 </View>
               </View>
@@ -1373,9 +1373,9 @@ export default function ITAdminDashboard() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => setAddingDept(false)}
-                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 4 }}
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: Colors.background, borderRadius: 4 }}
                     >
-                      <Text style={{ color: '#374151', fontSize: 12 }}>Cancel</Text>
+                      <Text style={{ color: Colors.textPrimary, fontSize: 12 }}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1433,7 +1433,7 @@ export default function ITAdminDashboard() {
                               border: '1px solid #d1d5db',
                               fontSize: 12,
                               backgroundColor: '#fff',
-                              color: '#111827',
+                              color: Colors.textPrimary,
                               outline: 'none',
                               cursor: 'pointer',
                             }}
@@ -1482,19 +1482,19 @@ export default function ITAdminDashboard() {
                   <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                     <Ionicons name="trash-outline" size={24} color="#DC2626" />
                   </View>
-                  <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 }}>Delete Account?</Text>
-                  <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center' }}>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: Colors.textPrimary, marginBottom: 6 }}>Delete Account?</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSecondary, textAlign: 'center' }}>
                     <Text>Are you sure you want to delete </Text>
-                    <Text style={{ fontWeight: '600', color: '#374151' }}>{confirmDeleteUserEmail}</Text>
+                    <Text style={{ fontWeight: '600', color: Colors.textPrimary }}>{confirmDeleteUserEmail}</Text>
                     <Text>? This action cannot be undone.</Text>
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={() => setConfirmDeleteUserId(null)}
-                    style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#F3F4F6', alignItems: 'center' }}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: Colors.background, alignItems: 'center' }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Cancel</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleConfirmDeleteUser}
@@ -1518,8 +1518,8 @@ export default function ITAdminDashboard() {
               <View style={[styles.wideModalCard, { width: width > 900 ? 860 : width > 600 ? '92%' : '94%', maxHeight: width > 600 ? '88%' : '90%' }]}>
                 {/* ── Header ── */}
                 <View style={styles.wideModalHeader}>
-                  <View style={[styles.wideModalAvatar, { backgroundColor: selectedUser ? getRoleBadgeDetails(selectedUser.role).bgColor : '#F3F4F6' }]}>
-                    <Text style={[styles.wideModalAvatarText, { color: selectedUser ? getRoleBadgeDetails(selectedUser.role).color : '#374151' }]}>
+                  <View style={[styles.wideModalAvatar, { backgroundColor: selectedUser ? getRoleBadgeDetails(selectedUser.role).bgColor : Colors.background }]}>
+                    <Text style={[styles.wideModalAvatarText, { color: selectedUser ? getRoleBadgeDetails(selectedUser.role).color : Colors.textPrimary }]}>
                       {selectedUser
                         ? (selectedUser.first_name
                           ? (selectedUser.first_name[0] + (selectedUser.last_name?.[0] || '')).toUpperCase()
@@ -1717,7 +1717,7 @@ export default function ITAdminDashboard() {
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Facebook</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Facebook</Text>
             </View>
             <View style={{ gap: 14 }}>
               {[
@@ -1725,7 +1725,7 @@ export default function ITAdminDashboard() {
                 { key: 'facebook_access_token', label: 'Access Token', icon: 'lock-closed-outline' as const, placeholder: 'Enter your Facebook page access token', sensitive: true },
               ].map(field => (
                 <View key={field.key} style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'uppercase' }}>{field.label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textTransform: 'uppercase' }}>{field.label}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TextInput
                       style={{
@@ -1737,7 +1737,7 @@ export default function ITAdminDashboard() {
                         paddingHorizontal: 14,
                         paddingVertical: 12,
                         fontSize: 14,
-                        color: '#111827',
+                        color: Colors.textPrimary,
                         outlineStyle: 'none',
                       } as any}
                       placeholder={field.placeholder}
@@ -1775,7 +1775,7 @@ export default function ITAdminDashboard() {
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <Ionicons name="logo-instagram" size={24} color="#E1306C" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Instagram</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Instagram</Text>
             </View>
             <View style={{ gap: 14 }}>
               {[
@@ -1783,7 +1783,7 @@ export default function ITAdminDashboard() {
                 { key: 'instagram_access_token', label: 'Access Token', icon: 'lock-closed-outline' as const, placeholder: 'Enter your Instagram access token', sensitive: true },
               ].map(field => (
                 <View key={field.key} style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'uppercase' }}>{field.label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textTransform: 'uppercase' }}>{field.label}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TextInput
                       style={{
@@ -1795,7 +1795,7 @@ export default function ITAdminDashboard() {
                         paddingHorizontal: 14,
                         paddingVertical: 12,
                         fontSize: 14,
-                        color: '#111827',
+                        color: Colors.textPrimary,
                         outlineStyle: 'none',
                       } as any}
                       placeholder={field.placeholder}
@@ -1833,7 +1833,7 @@ export default function ITAdminDashboard() {
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <Ionicons name="globe-outline" size={24} color="#3B82F6" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>WordPress</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>WordPress</Text>
             </View>
             <View style={{ gap: 14 }}>
               {[
@@ -1842,7 +1842,7 @@ export default function ITAdminDashboard() {
                 { key: 'wordpress_app_password', label: 'Application Password', icon: 'lock-closed-outline' as const, placeholder: 'Enter WordPress app password', sensitive: true },
               ].map(field => (
                 <View key={field.key} style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'uppercase' }}>{field.label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textTransform: 'uppercase' }}>{field.label}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TextInput
                       style={{
@@ -1854,7 +1854,7 @@ export default function ITAdminDashboard() {
                         paddingHorizontal: 14,
                         paddingVertical: 12,
                         fontSize: 14,
-                        color: '#111827',
+                        color: Colors.textPrimary,
                         outlineStyle: 'none',
                       } as any}
                       placeholder={field.placeholder}
@@ -1898,8 +1898,8 @@ export default function ITAdminDashboard() {
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <View>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Developer API Tokens</Text>
-                <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>Manage tokens for external system integrations.</Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Developer API Tokens</Text>
+                <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 4 }}>Manage tokens for external system integrations.</Text>
               </View>
             </View>
 
@@ -1917,7 +1917,7 @@ export default function ITAdminDashboard() {
                 <Text style={{ color: '#fff', fontWeight: '600' }}>Generate Token</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                style={{ backgroundColor: Colors.background, paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}
                 onPress={() => setShowApiDocs(true)}
               >
                 <Ionicons name="document-text-outline" size={18} color="#4B5563" />
@@ -1937,8 +1937,8 @@ export default function ITAdminDashboard() {
                       Please copy your new developer token now. For your security, <Text style={{ fontWeight: '700', color: '#EF4444' }}>it will never be shown again</Text>.
                     </Text>
                     
-                    <View style={{ backgroundColor: '#F3F4F6', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 24 }}>
-                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#111827', fontSize: 16, textAlign: 'center', fontWeight: '500' }}>
+                    <View style={{ backgroundColor: Colors.background, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: Colors.textPrimary, fontSize: 16, textAlign: 'center', fontWeight: '500' }}>
                         {generatedToken?.plain_text_token}
                       </Text>
                     </View>
@@ -1969,7 +1969,7 @@ export default function ITAdminDashboard() {
                     
                     <View style={{ flexDirection: 'row', gap: 12 }}>
                       <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#F3F4F6', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
+                        style={{ flex: 1, backgroundColor: Colors.background, paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: Colors.border }}
                         onPress={() => setRevokeConfirmId(null)}
                       >
                         <Text style={{ color: '#4B5563', fontWeight: '600', fontSize: 15 }}>Cancel</Text>
@@ -2001,18 +2001,18 @@ export default function ITAdminDashboard() {
                   </View>
                   
                   <ScrollView style={{ padding: 24 }}>
-                    <Text style={{ fontSize: 15, color: '#374151', marginBottom: 20, lineHeight: 24 }}>
+                    <Text style={{ fontSize: 15, color: Colors.textPrimary, marginBottom: 20, lineHeight: 24 }}>
                       To submit a new Post Request automatically from an external system (like a main university website), you must send an HTTP <Text style={{ fontWeight: '700' }}>POST</Text> request to the endpoint below and include a valid Developer API Token in the <Text style={{ fontWeight: '700' }}>Authorization</Text> header.
                     </Text>
 
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Endpoint URL</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Endpoint URL</Text>
                     <View style={{ backgroundColor: '#F1F5F9', padding: 12, borderRadius: 8, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
                       <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#0F172A', fontSize: 14 }}>
                         POST {(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request
                       </Text>
                     </View>
 
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: JavaScript (Fetch)</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: JavaScript (Fetch)</Text>
                     <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
                       <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
                         {`fetch('${(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request', {
@@ -2033,7 +2033,7 @@ export default function ITAdminDashboard() {
                       </Text>
                     </View>
 
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: PHP (cURL)</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: PHP (cURL)</Text>
                     <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
                       <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
                         {`$ch = curl_init('${(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request');
@@ -2068,25 +2068,25 @@ $response = curl_exec($ch);`}
               </View>
             </Modal>
 
-            <View style={{ backgroundColor: '#F9FAFB', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
-              <View style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
-                <Text style={{ flex: 2, fontWeight: '600', color: '#374151', fontSize: 12 }}>NAME</Text>
-                <Text style={{ flex: 1, fontWeight: '600', color: '#374151', fontSize: 12 }}>CREATED</Text>
-                <Text style={{ flex: 1, fontWeight: '600', color: '#374151', fontSize: 12 }}>LAST USED</Text>
-                <Text style={{ width: 80, fontWeight: '600', color: '#374151', fontSize: 12, textAlign: 'right' }}>ACTION</Text>
+            <View style={{ backgroundColor: '#F9FAFB', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
+              <View style={{ flexDirection: 'row', padding: 12, backgroundColor: Colors.background, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                <Text style={{ flex: 2, fontWeight: '600', color: Colors.textPrimary, fontSize: 12 }}>NAME</Text>
+                <Text style={{ flex: 1, fontWeight: '600', color: Colors.textPrimary, fontSize: 12 }}>CREATED</Text>
+                <Text style={{ flex: 1, fontWeight: '600', color: Colors.textPrimary, fontSize: 12 }}>LAST USED</Text>
+                <Text style={{ width: 80, fontWeight: '600', color: Colors.textPrimary, fontSize: 12, textAlign: 'right' }}>ACTION</Text>
               </View>
               
               {apiTokens.length === 0 ? (
                 <View style={{ padding: 24, alignItems: 'center' }}>
                   <Ionicons name="key-outline" size={32} color="#9CA3AF" style={{ marginBottom: 8 }} />
-                  <Text style={{ color: '#6B7280' }}>No API tokens generated yet.</Text>
+                  <Text style={{ color: Colors.textSecondary }}>No API tokens generated yet.</Text>
                 </View>
               ) : (
                 apiTokens.map((token: any) => (
-                  <View key={token.id} style={{ flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', alignItems: 'center' }}>
-                    <Text style={{ flex: 2, color: '#111827', fontWeight: '500' }}>{token.name}</Text>
-                    <Text style={{ flex: 1, color: '#6B7280', fontSize: 13 }}>{new Date(token.created_at).toLocaleDateString()}</Text>
-                    <Text style={{ flex: 1, color: '#6B7280', fontSize: 13 }}>{token.last_used_at ? new Date(token.last_used_at).toLocaleDateString() : 'Never'}</Text>
+                  <View key={token.id} style={{ flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.background, alignItems: 'center' }}>
+                    <Text style={{ flex: 2, color: Colors.textPrimary, fontWeight: '500' }}>{token.name}</Text>
+                    <Text style={{ flex: 1, color: Colors.textSecondary, fontSize: 13 }}>{new Date(token.created_at).toLocaleDateString()}</Text>
+                    <Text style={{ flex: 1, color: Colors.textSecondary, fontSize: 13 }}>{token.last_used_at ? new Date(token.last_used_at).toLocaleDateString() : 'Never'}</Text>
                     <TouchableOpacity
                       style={{ width: 80, alignItems: 'flex-end' }}
                       onPress={() => requestRevokeToken(token.id)}
@@ -2637,8 +2637,8 @@ $response = curl_exec($ch);`}
           <View style={{ gap: Spacing.xl }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <View>
-                <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>System Analytics</Text>
-                <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>Content creation trends and performance metrics across the year.</Text>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary }}>System Analytics</Text>
+                <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 4 }}>Content creation trends and performance metrics across the year.</Text>
               </View>
             </View>
 
@@ -2650,13 +2650,13 @@ $response = curl_exec($ch);`}
                 { title: 'Content Published', value: analyticsOverview?.contentPublished || '0', trend: 'Active', icon: 'document-text', color: '#7C3AED', bg: '#F3E8FF' },
                 { title: 'Pending Approval', value: analyticsOverview?.pendingApproval || '0', trend: 'Action Needed', icon: 'time', color: '#F59E0B', bg: '#FEF3C7', isNegative: true }
               ].map(stat => (
-                <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#ffffff', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: Colors.surface, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                   <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name={stat.icon as any} size={24} color={stat.color} />
                   </View>
                   <View>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280' }}>{stat.title}</Text>
-                    <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827', marginVertical: 2 }}>{stat.value}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textSecondary }}>{stat.title}</Text>
+                    <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary, marginVertical: 2 }}>{stat.value}</Text>
                     <Text style={{ fontSize: 12, fontWeight: '600', color: stat.isNegative ? '#DC2626' : '#16A34A' }}>{stat.trend} this month</Text>
                   </View>
                 </Card>
@@ -2667,11 +2667,11 @@ $response = curl_exec($ch);`}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { gap: 24 }]}>
 
               {/* Yearly Bar Chart */}
-              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: '#ffffff', borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
+              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
                   <View>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Publication Volume</Text>
-                    <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Monthly posts created in 2026</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Publication Volume</Text>
+                    <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2 }}>Monthly posts created in 2026</Text>
                   </View>
                   <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
                     <Text style={{ color: '#7C3AED', fontWeight: 'bold', fontSize: 12 }}>Total: {analyticsOverview?.totalVolume || '0'}</Text>
@@ -2679,18 +2679,18 @@ $response = curl_exec($ch);`}
                 </View>
 
                 {/* Bar Chart Canvas */}
-                <View style={{ height: 220, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', position: 'relative' }}>
+                <View style={{ height: 220, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: Colors.background, position: 'relative' }}>
                   {/* Grid lines */}
-                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#F3F4F6', borderStyle: 'dashed' }} />
-                  <View style={{ position: 'absolute', top: 110, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#F3F4F6', borderStyle: 'dashed' }} />
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: Colors.background, borderStyle: 'dashed' }} />
+                  <View style={{ position: 'absolute', top: 110, left: 0, right: 0, borderTopWidth: 1, borderTopColor: Colors.background, borderStyle: 'dashed' }} />
 
                   {monthsData.map((item: any, index: number) => {
                     const heightPercent = (item.posts / maxPosts) * 100;
                     return (
                       <View key={item.month} style={{ alignItems: 'center', width: '7%', gap: 8 }}>
-                        <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600' }}>{item.posts}</Text>
+                        <Text style={{ fontSize: 10, color: Colors.textMuted, fontWeight: '600' }}>{item.posts}</Text>
                         <View style={{ width: '100%', height: `${heightPercent}%`, backgroundColor: '#8B5CF6', borderRadius: 6, opacity: index === 11 ? 1 : 0.7 }} />
-                        <Text style={{ position: 'absolute', bottom: -24, fontSize: 11, color: '#6B7280', fontWeight: '500' }}>{item.month}</Text>
+                        <Text style={{ position: 'absolute', bottom: -24, fontSize: 11, color: Colors.textSecondary, fontWeight: '500' }}>{item.month}</Text>
                       </View>
                     );
                   })}
@@ -2698,10 +2698,10 @@ $response = curl_exec($ch);`}
               </Card>
 
               {/* Round Data / Circular Distribution */}
-              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: '#ffffff', borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
+              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
                 <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 20 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Platform Reach</Text>
-                  <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Audience distribution</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Platform Reach</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2 }}>Audience distribution</Text>
                 </View>
 
                 {/* Simulated 4-Color Donut Chart */}
@@ -2710,12 +2710,12 @@ $response = curl_exec($ch);`}
                   borderTopColor: '#1877F2',    // Facebook
                   borderRightColor: '#E4405F',  // Instagram
                   borderBottomColor: '#1DA1F2', // Twitter
-                  borderLeftColor: '#9CA3AF',   // Other/Website
+                  borderLeftColor: Colors.textMuted,   // Other/Website
                   alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 10
                 }}>
                   <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 24, fontWeight: '900', color: '#111827' }}>Total</Text>
-                    <Text style={{ fontSize: 11, color: '#6B7280', fontWeight: '600', marginTop: 2 }}>PLATFORMS</Text>
+                    <Text style={{ fontSize: 24, fontWeight: '900', color: Colors.textPrimary }}>Total</Text>
+                    <Text style={{ fontSize: 11, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 }}>PLATFORMS</Text>
                   </View>
                 </View>
 
@@ -2724,14 +2724,14 @@ $response = curl_exec($ch);`}
                   {[
                     { name: 'Facebook', color: '#1877F2', percent: (analyticsOverview?.platformReach?.facebook || 0) + '%' },
                     { name: 'Instagram', color: '#E4405F', percent: (analyticsOverview?.platformReach?.instagram || 0) + '%' },
-                    { name: 'Other', color: '#9CA3AF', percent: (analyticsOverview?.platformReach?.other || 0) + '%' }
+                    { name: 'Other', color: Colors.textMuted, percent: (analyticsOverview?.platformReach?.other || 0) + '%' }
                   ].map(platform => (
                     <View key={platform.name} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: platform.color }} />
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>{platform.name}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>{platform.name}</Text>
                       </View>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#111827' }}>{platform.percent}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textPrimary }}>{platform.percent}</Text>
                     </View>
                   ))}
                 </View>
@@ -2774,7 +2774,7 @@ $response = curl_exec($ch);`}
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   {/* Search input */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', width: 240, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', width: 240, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
                     <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
                       style={{ flex: 1, fontSize: 14, color: Colors.textPrimary, outlineStyle: 'none' } as any}
@@ -2786,9 +2786,9 @@ $response = curl_exec($ch);`}
                   </View>
 
                   {/* Export Button */}
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => showToast('Exporting audit log records as CSV...', 'success')}>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => showToast('Exporting audit log records as CSV...', 'success')}>
                     <Ionicons name="download-outline" size={16} color="#374151" style={{ marginRight: 8 }} />
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Export CSV</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Export CSV</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2797,20 +2797,20 @@ $response = curl_exec($ch);`}
 
               {/* Logs Table Matching Screenshot */}
               <View style={styles.table}>
-                <View style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingVertical: 12 }]}>
-                  <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#374151' }}>Timestamp</Text>
-                  <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#374151' }}>User</Text>
-                  <Text style={{ flex: 1.5, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#374151' }}>Action</Text>
-                  <Text style={{ flex: 4, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#374151' }}>Details</Text>
+                <View style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 12 }]}>
+                  <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Timestamp</Text>
+                  <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>User</Text>
+                  <Text style={{ flex: 1.5, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Action</Text>
+                  <Text style={{ flex: 4, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Details</Text>
                 </View>
 
                 {filteredLogs.map((log) => (
-                  <View key={log.id} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }]}>
+                  <View key={log.id} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.background }]}>
                     {/* Timestamp */}
-                    <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: '#6B7280' }}>{log.timestamp}</Text>
+                    <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: Colors.textSecondary }}>{log.timestamp}</Text>
 
                     {/* User */}
-                    <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: '#111827' }}>{log.userName}</Text>
+                    <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>{log.userName}</Text>
 
                     {/* Action */}
                     <View style={{ flex: 1.5 }}>
@@ -2820,7 +2820,7 @@ $response = curl_exec($ch);`}
                     </View>
 
                     {/* Details */}
-                    <Text style={{ flex: 4, fontSize: FontSize.xs + 1, color: '#374151', lineHeight: 20 }}>{log.description}</Text>
+                    <Text style={{ flex: 4, fontSize: FontSize.xs + 1, color: Colors.textPrimary, lineHeight: 20 }}>{log.description}</Text>
                   </View>
                 ))}
               </View>
@@ -2833,9 +2833,9 @@ $response = curl_exec($ch);`}
       {selectedAuditLog && (
         <Modal visible={!!selectedAuditLog} transparent animationType="fade">
           <View style={{ flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-            <View style={{ width: '100%', maxWidth: 580, backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                <Text style={{ fontSize: FontSize.md + 1, fontWeight: 'bold', color: '#111827' }}>Audit Log Entry Inspection</Text>
+            <View style={{ width: '100%', maxWidth: 580, backgroundColor: Colors.surface, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.background }}>
+                <Text style={{ fontSize: FontSize.md + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Audit Log Entry Inspection</Text>
                 <TouchableOpacity onPress={() => setSelectedAuditLog(null)}>
                   <Ionicons name="close" size={20} color={Colors.textPrimary} />
                 </TouchableOpacity>
@@ -2849,15 +2849,15 @@ $response = curl_exec($ch);`}
                   <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary }}>{selectedAuditLog.timestamp}</Text>
                 </View>
 
-                <View style={{ padding: 12, backgroundColor: '#F9FAFB', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#E5E7EB', gap: 6 }}>
+                <View style={{ padding: 12, backgroundColor: '#F9FAFB', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, gap: 6 }}>
                   <Text style={{ fontSize: 10, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase' }}>Actor Details</Text>
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: '#111827' }}>{selectedAuditLog.userName} ({selectedAuditLog.userRole})</Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: Colors.textPrimary }}>{selectedAuditLog.userName} ({selectedAuditLog.userRole})</Text>
                   <Text style={{ fontSize: FontSize.xs, color: Colors.textSecondary }}>{selectedAuditLog.userEmail}</Text>
                 </View>
 
                 <View style={{ gap: 4 }}>
                   <Text style={{ fontSize: 10, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase' }}>Description</Text>
-                  <Text style={{ fontSize: FontSize.sm, color: '#374151', lineHeight: 20 }}>{selectedAuditLog.description}</Text>
+                  <Text style={{ fontSize: FontSize.sm, color: Colors.textPrimary, lineHeight: 20 }}>{selectedAuditLog.description}</Text>
                 </View>
 
                 <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -2883,9 +2883,9 @@ $response = curl_exec($ch);`}
                 )}
               </ScrollView>
 
-              <View style={{ paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', backgroundColor: '#FAFAFA', alignItems: 'flex-end' }}>
-                <TouchableOpacity onPress={() => setSelectedAuditLog(null)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#ffffff' }}>
-                  <Text style={{ fontSize: FontSize.xs + 1, fontWeight: 'medium', color: '#374151' }}>Close</Text>
+              <View style={{ paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: Colors.background, backgroundColor: '#FAFAFA', alignItems: 'flex-end' }}>
+                <TouchableOpacity onPress={() => setSelectedAuditLog(null)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: Colors.surface }}>
+                  <Text style={{ fontSize: FontSize.xs + 1, fontWeight: 'medium', color: Colors.textPrimary }}>Close</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2899,7 +2899,7 @@ $response = curl_exec($ch);`}
           <View style={{ width: '100%', maxWidth: 720, maxHeight: '90%', backgroundColor: '#fff', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Content Request Preview</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Content Request Preview</Text>
               <TouchableOpacity onPress={() => setPreviewPost(null)}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
@@ -2924,7 +2924,7 @@ $response = curl_exec($ch);`}
                   </TouchableOpacity>
                 </View>
                 <View style={{ flex: 1, gap: 12 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{previewPost?.title}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>{previewPost?.title}</Text>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
@@ -2936,18 +2936,18 @@ $response = curl_exec($ch);`}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Department</Text>
                     <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>{previewPost?.department}</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.textPrimary }}>{previewPost?.department}</Text>
                     </View>
                   </View>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested By</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '500', color: '#111827' }}>{previewPost?.requestedBy}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.textPrimary }}>{previewPost?.requestedBy}</Text>
                   </View>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested On</Text>
-                    <Text style={{ fontSize: 12, color: '#374151' }}>{previewPost?.requestedOn} {previewPost?.requestedTime}</Text>
+                    <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{previewPost?.requestedOn} {previewPost?.requestedTime}</Text>
                   </View>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -2976,21 +2976,21 @@ $response = curl_exec($ch);`}
               {/* Caption / Description / Approval Timeline */}
               <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Caption / Narrative</Text>
-                  <FormattedText style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Caption / Narrative</Text>
+                  <FormattedText style={{ fontSize: 13, color: Colors.textPrimary, marginBottom: 16 }}>
                     {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
                   </FormattedText>
 
                   {previewPost?.rawPost?.description ? (
                     <>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Description</Text>
-                      <Text style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Description</Text>
+                      <Text style={{ fontSize: 13, color: Colors.textPrimary, marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
                     </>
                   ) : null}
 
                   {previewPost?.rawPost?.rejection_reason ? (
                     <>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Rejection Reason</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Rejection Reason</Text>
                       <Text style={{ fontSize: 13, color: '#dc2626' }}>{previewPost?.rawPost?.rejection_reason}</Text>
                     </>
                   ) : null}
@@ -2998,7 +2998,7 @@ $response = curl_exec($ch);`}
 
                 <View style={{ flex: 1, gap: 16 }}>
                   <View>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 12 }}>Approval Timeline</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 12 }}>Approval Timeline</Text>
                     {(previewPost?.rawPost?.approval_workflows && previewPost?.rawPost?.approval_workflows.length > 0) ? (
                       <View style={{ gap: 8 }}>
                         {previewPost.rawPost.approval_workflows.map((wf: any, i: number) => (
@@ -3007,7 +3007,7 @@ $response = curl_exec($ch);`}
                               <Ionicons name={wf.action === 'approved' || wf.action === 'published' ? 'checkmark' : wf.action === 'rejected' || wf.action === 'returned' ? 'close' : 'time-outline'} size={12} color={wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#9ca3af'} />
                             </View>
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '600', color: '#111827' }}>{wf.stage_label || wf.stage}</Text>
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.textPrimary }}>{wf.stage_label || wf.stage}</Text>
                               <Text style={{ fontSize: 10, color: '#6b7280' }}>
                                 {wf.approver?.full_name || 'Unknown'} {wf.acted_at ? '• ' + new Date(wf.acted_at).toLocaleDateString() : ''}
                               </Text>
@@ -3031,7 +3031,7 @@ $response = curl_exec($ch);`}
             {/* Footer Buttons */}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
               <TouchableOpacity onPress={() => setPreviewPost(null)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb' }}>
-                <Text style={{ fontSize: 13, fontWeight: '500', color: '#374151' }}>Close</Text>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: Colors.textPrimary }}>Close</Text>
               </TouchableOpacity>
             </View>
 
@@ -3128,7 +3128,7 @@ const styles = StyleSheet.create({
   platformInfo: { flexDirection: 'row', justifyContent: 'space-between' },
   platformName: { fontSize: FontSize.sm, color: Colors.textPrimary },
   platformPercentage: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  progressBarBg: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' },
+  progressBarBg: { height: 8, backgroundColor: Colors.background, borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: 8, borderRadius: 4 },
 
   // User management
@@ -3141,10 +3141,10 @@ const styles = StyleSheet.create({
   formColumnLayout: { flexDirection: 'column' },
   formField: { flex: 1, minWidth: 180, gap: 6, justifyContent: 'flex-end' },
   formLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textSecondary },
-  formInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm, backgroundColor: '#ffffff' },
+  formInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm, backgroundColor: Colors.surface },
   fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textSecondary, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: FontSize.sm, backgroundColor: '#ffffff' },
-  passwordInputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: '#ffffff', alignItems: 'center' },
+  input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: FontSize.sm, backgroundColor: Colors.surface },
+  passwordInputWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: Colors.surface, alignItems: 'center' },
   passwordInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm },
   passwordToggle: { padding: 8 },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0F172A', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignSelf: 'flex-start' },
@@ -3159,19 +3159,19 @@ const styles = StyleSheet.create({
   userActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   roleBadge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
   roleBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  editBtn: { padding: 6, borderRadius: 6, backgroundColor: '#F3F4F6' },
+  editBtn: { padding: 6, borderRadius: 6, backgroundColor: Colors.background },
   deleteBtn: { padding: 6, borderRadius: 6, backgroundColor: '#FEF2F2' },
   inlineEditRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   saveBtn: { backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   saveBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  cancelBtn: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  cancelBtn: { backgroundColor: Colors.background, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   cancelBtnText: { color: Colors.textSecondary, fontSize: 12 },
 
   // All posts
   postListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   statusFilterBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   statusFilterText: { fontSize: FontSize.sm, color: Colors.textPrimary },
-  statusDropdown: { position: 'absolute', top: 38, right: 0, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, zIndex: 100, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+  statusDropdown: { position: 'absolute', top: 38, right: 0, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, zIndex: 100, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
   statusDropdownItem: { paddingHorizontal: 14, paddingVertical: 10 },
   statusDropdownText: { fontSize: FontSize.sm, color: Colors.textPrimary },
   postRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
@@ -3275,32 +3275,32 @@ const styles = StyleSheet.create({
   wideModalAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   wideModalAvatarText: { fontSize: 15, fontWeight: '800' },
   wideModalTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  wideModalSubtitle: { fontSize: 11, fontWeight: '500', color: '#9CA3AF', marginTop: 1 },
+  wideModalSubtitle: { fontSize: 11, fontWeight: '500', color: Colors.textMuted, marginTop: 1 },
   wideModalCloseBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
   wideModalBody: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6, overflow: 'hidden' },
   wideModalColumn: { flex: 1, paddingHorizontal: 10 },
-  wideModalColumnRight: { borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: 16 },
+  wideModalColumnRight: { borderLeftWidth: 1, borderLeftColor: Colors.border, paddingLeft: 16 },
   wideModalSection: { marginBottom: 18 },
-  wideSectionTitle: { fontSize: 12, fontWeight: '700', color: '#374151', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  wideSectionTitle: { fontSize: 12, fontWeight: '700', color: Colors.textPrimary, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: Colors.background },
   wideFieldRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   wideFieldHalf: { flex: 1, minWidth: 0 },
   wideFieldFull: { flex: 1 },
-  wideFieldLabel: { fontSize: 10, fontWeight: '700', color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
-  wideFieldInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', backgroundColor: '#F9FAFB', outlineStyle: 'none' } as any,
-  wideFieldSelect: { height: 36, fontSize: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', color: '#111827', paddingLeft: 8, width: '100%', outlineStyle: 'none' } as any,
-  wideFormHint: { fontSize: 10, color: '#9CA3AF', marginBottom: 10, marginTop: -4 },
-  widePasswordWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, backgroundColor: '#F9FAFB', alignItems: 'center' },
-  widePasswordInput: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827', outlineStyle: 'none' } as any,
+  wideFieldLabel: { fontSize: 10, fontWeight: '700', color: Colors.textSecondary, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
+  wideFieldInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: Colors.textPrimary, backgroundColor: '#F9FAFB', outlineStyle: 'none' } as any,
+  wideFieldSelect: { height: 36, fontSize: 12, borderRadius: 6, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#F9FAFB', color: Colors.textPrimary, paddingLeft: 8, width: '100%', outlineStyle: 'none' } as any,
+  wideFormHint: { fontSize: 10, color: Colors.textMuted, marginBottom: 10, marginTop: -4 },
+  widePasswordWrapper: { flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 6, backgroundColor: '#F9FAFB', alignItems: 'center' },
+  widePasswordInput: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: Colors.textPrimary, outlineStyle: 'none' } as any,
   widePasswordToggle: { padding: 6 },
   wideStatusRow: { flexDirection: 'row', gap: 8 },
-  wideStatusToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  wideStatusToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#F9FAFB' },
   wideStatusActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
   wideStatusInactive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
   wideStatusDot: { width: 7, height: 7, borderRadius: 3.5 },
-  wideStatusText: { fontSize: 11, fontWeight: '600', color: '#374151' },
-  wideModalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingHorizontal: 24, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', marginTop: 4 },
-  wideCancelBtn: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, backgroundColor: '#F3F4F6' },
-  wideCancelBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  wideStatusText: { fontSize: 11, fontWeight: '600', color: Colors.textPrimary },
+  wideModalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingHorizontal: 24, paddingVertical: 14, borderTopWidth: 1, borderTopColor: Colors.background, marginTop: 4 },
+  wideCancelBtn: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, backgroundColor: Colors.background },
+  wideCancelBtnText: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
   wideSaveBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, backgroundColor: '#0F172A' },
   wideSaveBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
@@ -3382,12 +3382,12 @@ const styles = StyleSheet.create({
   policyMainTitle: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#111827',
+    color: Colors.textPrimary,
     letterSpacing: 0.5,
   },
   policySubTitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   policyHeaderActions: {
@@ -3405,7 +3405,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   editRulesBtnText: {
     fontSize: 12,
@@ -3416,9 +3416,9 @@ const styles = StyleSheet.create({
   policySearchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 8,
     paddingHorizontal: 14,
     height: 38,
@@ -3427,7 +3427,7 @@ const styles = StyleSheet.create({
   policySearchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#111827',
+    color: Colors.textPrimary,
     outlineStyle: 'none',
   } as any,
   policySectionBlock: {
@@ -3446,14 +3446,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   policyNumberBadgeText: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontSize: 13,
     fontWeight: '800',
   },
   policySectionTitleText: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   policyStatementCard: {
     flexDirection: 'row',
@@ -3461,14 +3461,14 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 20,
     borderRadius: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
   },
   policyStatementTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 4,
   },
   policyStatementBody: {
@@ -3486,9 +3486,9 @@ const styles = StyleSheet.create({
     minWidth: 220,
     padding: 18,
     borderRadius: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     gap: 10,
   },
   policyCardIconSquare: {
@@ -3501,7 +3501,7 @@ const styles = StyleSheet.create({
   policyCardTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   policyCardAccentBar: {
     height: 3,
@@ -3541,7 +3541,7 @@ const styles = StyleSheet.create({
   },
   editingModeSubText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   cancelEditBtn: {
     flexDirection: 'row',
@@ -3552,7 +3552,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   cancelEditBtnText: {
     fontSize: 12,
@@ -3572,7 +3572,7 @@ const styles = StyleSheet.create({
   saveChangesBtnText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.surface,
     letterSpacing: 0.5,
   },
   policyMiniToolbar: {
@@ -3581,7 +3581,7 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -3596,12 +3596,12 @@ const styles = StyleSheet.create({
   toolbarFormatBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   toolbarDivider: {
     width: 1,
     height: 12,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
     marginHorizontal: 4,
   },
   toolbarIconBtn: {
@@ -3611,13 +3611,13 @@ const styles = StyleSheet.create({
   },
   toolbarTextBtn: {
     fontSize: 12,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   policyInlineTitleInput: {
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
     borderBottomWidth: 1,
     borderBottomColor: '#7C3AED',
     paddingVertical: 2,
@@ -3625,25 +3625,25 @@ const styles = StyleSheet.create({
   } as any,
   policyInlineInputGrid: {
     fontSize: 12,
-    color: '#374151',
+    color: Colors.textPrimary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: 8,
     minHeight: 60,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     textAlignVertical: 'top',
     outlineStyle: 'none',
   } as any,
   policyInlineInputMultiline: {
     fontSize: 13,
-    color: '#374151',
+    color: Colors.textPrimary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 6,
     padding: 10,
     minHeight: 80,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     textAlignVertical: 'top',
     outlineStyle: 'none',
     marginTop: 8,

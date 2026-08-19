@@ -95,6 +95,16 @@ export default function RequestorDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  const [rejectedSearchQuery, setRejectedSearchQuery] = useState('');
+  const [rejectedDateFilter, setRejectedDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
+  const [isRejectedDateDropdownOpen, setIsRejectedDateDropdownOpen] = useState(false);
+  const [customRejectedStartDate, setCustomRejectedStartDate] = useState('');
+  const [customRejectedEndDate, setCustomRejectedEndDate] = useState('');
 
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
@@ -299,26 +309,96 @@ export default function RequestorDashboard() {
     return mockRequests
       .filter(req => (req.title && req.title.toLowerCase().includes(searchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(searchQuery.toLowerCase())))
       .filter(req => {
-        if (statusFilter === 'All') return true;
-        const st = req.status || '';
-        if (statusFilter === 'PENDING') return st.includes('PENDING');
-        if (statusFilter === 'APPROVED') return st === 'APPROVED' || st === 'PUBLISHED' || st === 'SCHEDULED';
-        return st === statusFilter;
+        let statusMatch = true;
+        if (statusFilter !== 'All') {
+          const st = req.status || '';
+          if (statusFilter === 'PENDING') statusMatch = st.includes('PENDING');
+          else if (statusFilter === 'APPROVED') statusMatch = (st === 'APPROVED' || st === 'PUBLISHED' || st === 'SCHEDULED');
+          else statusMatch = (st === statusFilter);
+        }
+        if (!statusMatch) return false;
+
+        let matchesDate = true;
+        if (dateFilter !== 'All Time') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const postDate = new Date(req.created_at || Date.now());
+          postDate.setHours(0, 0, 0, 0);
+          const diffTime = today.getTime() - postDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+          
+          if (dateFilter === 'Today') {
+            matchesDate = diffDays === 0;
+          } else if (dateFilter === 'Yesterday') {
+            matchesDate = diffDays === 1;
+          } else if (dateFilter === 'Last 7 Days') {
+            matchesDate = diffDays >= 0 && diffDays <= 7;
+          } else if (dateFilter === 'Last 30 Days') {
+            matchesDate = diffDays >= 0 && diffDays <= 30;
+          } else if (dateFilter === 'Custom Range') {
+            const start = new Date(customStartDate);
+            const end = new Date(customEndDate);
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const raw = new Date(req.created_at || Date.now());
+                matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
+            }
+          }
+        }
+        return matchesDate;
       })
       .sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
         return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
       });
-  }, [mockRequests, searchQuery, statusFilter, sortOrder]);
+  }, [mockRequests, searchQuery, statusFilter, sortOrder, dateFilter, customStartDate, customEndDate]);
 
   useEffect(() => {
     setDashboardPage(1);
-  }, [searchQuery, statusFilter, sortOrder]);
+  }, [searchQuery, statusFilter, sortOrder, dateFilter, customStartDate, customEndDate]);
 
   const paginatedRequests = useMemo(() => {
     return filteredRequests.slice((dashboardPage - 1) * dashboardPerPage, dashboardPage * dashboardPerPage);
   }, [filteredRequests, dashboardPage, dashboardPerPage]);
+
+  const filteredRejectedPosts = useMemo(() => {
+    return rejectedPosts
+      .filter(req => (req.title && req.title.toLowerCase().includes(rejectedSearchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(rejectedSearchQuery.toLowerCase())))
+      .filter(req => {
+        let matchesDate = true;
+        if (rejectedDateFilter !== 'All Time') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const postDate = new Date(req.created_at || Date.now());
+          postDate.setHours(0, 0, 0, 0);
+          const diffTime = today.getTime() - postDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+          
+          if (rejectedDateFilter === 'Today') {
+            matchesDate = diffDays === 0;
+          } else if (rejectedDateFilter === 'Yesterday') {
+            matchesDate = diffDays === 1;
+          } else if (rejectedDateFilter === 'Last 7 Days') {
+            matchesDate = diffDays >= 0 && diffDays <= 7;
+          } else if (rejectedDateFilter === 'Last 30 Days') {
+            matchesDate = diffDays >= 0 && diffDays <= 30;
+          } else if (rejectedDateFilter === 'Custom Range') {
+            const start = new Date(customRejectedStartDate);
+            const end = new Date(customRejectedEndDate);
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const raw = new Date(req.created_at || Date.now());
+                matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
+            }
+          }
+        }
+        return matchesDate;
+      })
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+  }, [rejectedPosts, rejectedSearchQuery, rejectedDateFilter, customRejectedStartDate, customRejectedEndDate]);
 
   const [mockQueuePosts, setMockQueuePosts] = useState<any[]>([]);
 
@@ -595,21 +675,21 @@ export default function RequestorDashboard() {
     let circleStyle = styles.stepCircleUpcoming;
     let lineStyle = styles.stepLineUpcoming;
     let iconName: keyof typeof Ionicons.glyphMap = 'ellipse';
-    let iconColor = '#9CA3AF';
+    let iconColor = Colors.textMuted;
 
     if (step.state === 'completed') {
       circleStyle = styles.stepCircleCompleted;
       lineStyle = styles.stepLineCompleted;
       iconName = 'checkmark';
-      iconColor = '#FFFFFF';
+      iconColor = Colors.surface;
     } else if (step.state === 'active') {
       circleStyle = styles.stepCircleActive;
       iconName = 'hourglass-outline';
-      iconColor = '#FFFFFF';
+      iconColor = Colors.surface;
     } else if (step.state === 'revision') {
       circleStyle = styles.stepCircleRevision;
       iconName = 'alert-circle-outline';
-      iconColor = '#FFFFFF';
+      iconColor = Colors.surface;
     }
 
     return (
@@ -725,10 +805,10 @@ export default function RequestorDashboard() {
             <View style={styles.tableHeaderArea}>
               <Text style={styles.tableCardTitle}>Recent Post Requests</Text>
               <View style={styles.tableHeaderActions}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 200, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 200, borderWidth: 1, borderColor: Colors.border }}>
                   <Ionicons name="search" size={16} color={Colors.textSecondary} />
                   <TextInput
-                    style={{ flex: 1, marginLeft: 8, fontSize: 14, color: '#111827', ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
+                    style={{ flex: 1, marginLeft: 8, fontSize: 14, color: Colors.textPrimary, ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
                     placeholder="Search requests..."
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -743,8 +823,8 @@ export default function RequestorDashboard() {
                       padding: '6px 12px',
                       borderRadius: '8px',
                       border: '1px solid #E5E7EB',
-                      backgroundColor: '#F3F4F6',
-                      color: '#374151',
+                      backgroundColor: Colors.background,
+                      color: Colors.textPrimary,
                       fontSize: '14px',
                       outline: 'none',
                       cursor: 'pointer',
@@ -757,9 +837,48 @@ export default function RequestorDashboard() {
                   </select>
                 ) : null}
 
-                <TouchableOpacity style={styles.tableHeaderActionBtn} onPress={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
-                  <Ionicons name={sortOrder === 'desc' ? 'filter' : 'filter-outline'} size={16} color={Colors.textSecondary} />
-                </TouchableOpacity>
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
+                    onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isDateDropdownOpen && (
+                    <View style={[styles.dropdownMenu, { minWidth: 200, right: 0, top: 40 }]}>
+                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setDateFilter(opt);
+                            if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      
+                      {dateFilter === 'Custom Range' && (
+                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
+                          <TouchableOpacity 
+                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
+                            onPress={() => setIsDateDropdownOpen(false)}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -790,7 +909,18 @@ export default function RequestorDashboard() {
                     </View>
                     <View>
                       <Text style={styles.postTitleText}>{req.title}</Text>
-                      <Text style={styles.postPlatformsText}>{Array.isArray(req.platforms) ? req.platforms.join(', ') : req.platforms}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                        {(Array.isArray(req.platforms) ? req.platforms : String(req.platforms || '').split(',')).map((p: any, idx: number) => {
+                          const platform = p.trim().toLowerCase();
+                          if (platform === 'facebook') return <Ionicons key={idx} name="logo-facebook" size={16} color="#1877F2" />;
+                          if (platform === 'instagram') return <Ionicons key={idx} name="logo-instagram" size={16} color="#E1306C" />;
+                          if (platform === 'twitter' || platform === 'x') return <Ionicons key={idx} name="logo-twitter" size={16} color="#1DA1F2" />;
+                          if (platform === 'linkedin') return <Ionicons key={idx} name="logo-linkedin" size={16} color="#0077B5" />;
+                          if (platform === 'tiktok') return <Ionicons key={idx} name="logo-tiktok" size={16} color="#000000" />;
+                          if (platform === 'youtube') return <Ionicons key={idx} name="logo-youtube" size={16} color="#FF0000" />;
+                          return <Text key={idx} style={styles.postPlatformsText}>{p}</Text>;
+                        })}
+                      </View>
                     </View>
                   </View>
                   <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.other_category_name || req.category}</Text>
@@ -845,7 +975,7 @@ export default function RequestorDashboard() {
                 <Text style={styles.draftButtonText}>Save as Draft</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitButton} onPress={handleSubmitRequest}>
-                <Ionicons name="paper-plane-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Ionicons name="paper-plane-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
                 <Text style={styles.submitButtonText}>Submit Request</Text>
               </TouchableOpacity>
             </View>
@@ -883,7 +1013,7 @@ export default function RequestorDashboard() {
                           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                             <Text style={styles.dropdownSelectorText}>Others: </Text>
                             <TextInput
-                              style={[{ flex: 1, fontSize: 14, color: '#111827', padding: 0, height: 20 }, { outlineStyle: 'none' } as any]}
+                              style={[{ flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0, height: 20 }, { outlineStyle: 'none' } as any]}
                               placeholder="Type category here..."
                               value={otherCategoryName}
                               onChangeText={setOtherCategoryName}
@@ -1051,7 +1181,7 @@ export default function RequestorDashboard() {
                             outline: 'none',
                             fontSize: '14px',
                             fontFamily: 'inherit',
-                            color: '#1F2937',
+                            color: Colors.textPrimary,
                             padding: '12px 40px 12px 16px',
                             background: 'transparent',
                             width: '100%',
@@ -1084,7 +1214,7 @@ export default function RequestorDashboard() {
                             outline: 'none',
                             fontSize: '14px',
                             fontFamily: 'inherit',
-                            color: '#1F2937',
+                            color: Colors.textPrimary,
                             padding: '12px 40px 12px 16px',
                             background: 'transparent',
                             width: '100%',
@@ -1242,7 +1372,7 @@ export default function RequestorDashboard() {
 
                   <View style={[styles.previewMockupFrame, previewMode === 'mobile' ? { maxWidth: 360, alignSelf: 'center', width: '100%' } : { width: '100%' }]}>
                     <View style={styles.mockPostHeader}>
-                      <View style={[styles.mockPostAvatarCircle, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+                      <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
                         <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       </View>
                       <View style={{ flex: 1 }}>
@@ -1259,7 +1389,7 @@ export default function RequestorDashboard() {
                     </View>
 
                     {mediaFiles && mediaFiles.length > 0 ? (
-                      <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
                         <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       </View>
                     ) : (
@@ -1532,7 +1662,7 @@ export default function RequestorDashboard() {
                         onPress={() => handleEditDraft(draft)}
                       >
                         <Ionicons name="create-outline" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={[styles.queueActionBtnText, { color: '#FFFFFF', fontWeight: 'bold' }]}>Edit & Submit</Text>
+                        <Text style={[styles.queueActionBtnText, { color: Colors.surface, fontWeight: 'bold' }]}>Edit & Submit</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.queueActionBtn}
@@ -1558,23 +1688,62 @@ export default function RequestorDashboard() {
               <Text style={styles.tableCardTitle}>Rejected Requests</Text>
 
               <View style={styles.tableHeaderActions}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 220, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 220, borderWidth: 1, borderColor: Colors.border }}>
                   <Ionicons name="search" size={16} color={Colors.textSecondary} />
                   <TextInput
-                    style={{ flex: 1, marginLeft: 8, fontSize: 13, color: '#111827', ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
+                    style={{ flex: 1, marginLeft: 8, fontSize: 13, color: Colors.textPrimary, ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
                     placeholder="Search requests..."
+                    value={rejectedSearchQuery}
+                    onChangeText={setRejectedSearchQuery}
                   />
                 </View>
 
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, height: 36, minWidth: 120 }}>
-                  <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '500', color: '#374151', flex: 1 }}>All Time</Text>
-                  <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
+                <View style={{ position: 'relative', zIndex: 40 }}>
+                  <TouchableOpacity
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
+                    onPress={() => setIsRejectedDateDropdownOpen(!isRejectedDateDropdownOpen)}
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={styles.departmentDropdownText}>{rejectedDateFilter}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  {isRejectedDateDropdownOpen && (
+                    <View style={[styles.dropdownMenu, { minWidth: 200, right: 0, top: 40 }]}>
+                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setRejectedDateFilter(opt);
+                            if (opt !== 'Custom Range') setIsRejectedDateDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, rejectedDateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      
+                      {rejectedDateFilter === 'Custom Range' && (
+                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customRejectedStartDate} onChangeText={setCustomRejectedStartDate} />
+                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
+                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customRejectedEndDate} onChangeText={setCustomRejectedEndDate} />
+                          <TouchableOpacity 
+                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
+                            onPress={() => setIsRejectedDateDropdownOpen(false)}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
-            {rejectedPosts.length === 0 ? (
+            {filteredRejectedPosts.length === 0 ? (
               <Card style={styles.formCard}>
                 <View style={{ alignItems: 'center', padding: Spacing.xl, gap: Spacing.sm }}>
                   <Ionicons name="checkmark-circle-outline" size={48} color="#16A34A" />
@@ -1593,7 +1762,7 @@ export default function RequestorDashboard() {
                     <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
                     <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
                   </View>
-                  {rejectedPosts.map((post) => (
+                  {filteredRejectedPosts.map((post) => (
                     <TouchableOpacity
                       key={post.id}
                       style={styles.tableRow}
@@ -1696,8 +1865,8 @@ export default function RequestorDashboard() {
               <View style={styles.modalHeaderRow}>
                 <Text style={styles.modalHeaderTitle}>Request Details</Text>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={[styles.statusBadge, { backgroundColor: selectedQueuePost.statusBg || '#E5E7EB' }]}>
-                    <Text style={[styles.statusBadgeText, { color: selectedQueuePost.statusColor || '#374151' }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: selectedQueuePost.statusBg || Colors.border }]}>
+                    <Text style={[styles.statusBadgeText, { color: selectedQueuePost.statusColor || Colors.textPrimary }]}>
                       {selectedQueuePost.status}
                     </Text>
                   </View>
@@ -1718,8 +1887,8 @@ export default function RequestorDashboard() {
                 )}
 
                 <View style={{ marginBottom: 16 }}>
-                  <View style={{ backgroundColor: '#FFFFFF', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#111827' }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#6B7280', textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
+                  <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
                       {(() => {
                         const workflows = selectedQueuePost.approval_workflows || [];
                         const getStageStatus = (stageName: string) => {
@@ -1743,17 +1912,17 @@ export default function RequestorDashboard() {
                         const getIcon = (state: string) => {
                           if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
                           if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
-                          return { name: 'time', color: '#9CA3AF' };
+                          return { name: 'time', color: Colors.textMuted };
                         };
                         const getColor = (state: string) => {
                           if (state === 'Rejected') return '#DC2626';
                           if (state === 'Approved' || state === 'Published') return '#059669';
-                          return '#9CA3AF';
+                          return Colors.textMuted;
                         };
                         const getLineColor = (state: string) => {
                           if (state === 'Approved' || state === 'Published') return '#059669';
                           if (state === 'Rejected') return '#DC2626';
-                          return '#E5E7EB';
+                          return Colors.border;
                         };
 
                         return (
@@ -1763,7 +1932,7 @@ export default function RequestorDashboard() {
                               <>
                                 <View style={{ alignItems: 'center', flex: 1.2 }}>
                                   <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
-                                  <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Submitted</Text>
+                                  <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
                                 </View>
 
                                 <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
@@ -1772,7 +1941,7 @@ export default function RequestorDashboard() {
 
                             <View style={{ alignItems: 'center', flex: 1.2 }}>
                               <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Dept Head</Text>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
                               <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
                             </View>
 
@@ -1780,7 +1949,7 @@ export default function RequestorDashboard() {
 
                             <View style={{ alignItems: 'center', flex: 1.2 }}>
                               <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>VPAA</Text>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
                               <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
                             </View>
 
@@ -1788,7 +1957,7 @@ export default function RequestorDashboard() {
 
                             <View style={{ alignItems: 'center', flex: 1.2 }}>
                               <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>IMC / QA</Text>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
                               <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
                             </View>
 
@@ -1847,7 +2016,7 @@ export default function RequestorDashboard() {
                     {modalPlatformTab === 'facebook' && (
                       <View style={styles.socialMockupCard}>
                         <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF' }]} resizeMode="contain" />
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
                           <View>
                             <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
                             <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
@@ -1885,7 +2054,7 @@ export default function RequestorDashboard() {
                     {modalPlatformTab === 'instagram' && (
                       <View style={styles.socialMockupCard}>
                         <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
                           <View style={{ flex: 1 }}>
                             <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
                           </View>
@@ -2065,17 +2234,17 @@ export default function RequestorDashboard() {
                     const getIcon = (state: string) => {
                       if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
                       if (state === 'Approved') return { name: 'checkmark-circle', color: '#059669' };
-                      return { name: 'time', color: '#9CA3AF' };
+                      return { name: 'time', color: Colors.textMuted };
                     };
                     const getColor = (state: string) => {
                       if (state === 'Rejected') return '#DC2626';
                       if (state === 'Approved') return '#059669';
-                      return '#9CA3AF';
+                      return Colors.textMuted;
                     };
                     const getLineColor = (state: string) => {
                       if (state === 'Approved') return '#059669';
                       if (state === 'Rejected') return '#DC2626';
-                      return '#E5E7EB';
+                      return Colors.border;
                     };
 
                     return (
@@ -2084,7 +2253,7 @@ export default function RequestorDashboard() {
                         {/* Step 0: Submitted */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Submitted</Text>
+                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
                           <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase' }}>{submitted}</Text>
                         </View>
                         
@@ -2093,7 +2262,7 @@ export default function RequestorDashboard() {
                         {/* Step 1: Dept Head */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>Dept Head</Text>
+                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
                           <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
                         </View>
                         
@@ -2102,7 +2271,7 @@ export default function RequestorDashboard() {
                         {/* Step 2: VPAA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>VPAA</Text>
+                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
                           <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
                         </View>
                         
@@ -2111,7 +2280,7 @@ export default function RequestorDashboard() {
                         {/* Step 3: IMC/QA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: '#374151', marginTop: 6, height: 28 }}>IMC / QA</Text>
+                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
                           <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
                         </View>
 
@@ -2187,10 +2356,10 @@ export default function RequestorDashboard() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 400 : 800, padding: 0, backgroundColor: 'transparent', shadowColor: 'transparent', elevation: 0 }]}>
 
-              <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: '#ffffff', maxHeight: '90%' }]}>
+              <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: Colors.surface, maxHeight: '90%' }]}>
                 <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
                   <View style={styles.mockPostHeader}>
-                    <View style={[styles.mockPostAvatarCircle, { backgroundColor: '#ffffff', overflow: 'hidden' }]}>
+                    <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
                       <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -2209,7 +2378,7 @@ export default function RequestorDashboard() {
                   </View>
 
                   {mediaFiles && mediaFiles.length > 0 ? (
-                    <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                    <View style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
                       <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     </View>
                   ) : (
@@ -2268,7 +2437,7 @@ export default function RequestorDashboard() {
               </View>
               <View style={{ flexDirection: 'row', gap: Spacing.md }}>
                 <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 12, borderRadius: 6, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', backgroundColor: '#ffffff' }}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 6, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', backgroundColor: Colors.surface }}
                   onPress={() => setDraftToDelete(null)}
                 >
                   <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: Colors.textPrimary }}>Cancel</Text>
@@ -2277,7 +2446,7 @@ export default function RequestorDashboard() {
                   style={{ flex: 1, paddingVertical: 12, borderRadius: 6, backgroundColor: '#DC2626', alignItems: 'center' }}
                   onPress={executeDeleteDraft}
                 >
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: '#FFFFFF' }}>Yes, Delete</Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: 'bold', color: Colors.surface }}>Yes, Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2363,7 +2532,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 150,
     padding: Spacing.md,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderLeftWidth: 4,
@@ -2394,7 +2563,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   tableCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2410,10 +2579,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    zIndex: 50,
   },
   tableHeaderActions: {
     flexDirection: 'row',
     gap: Spacing.sm,
+  },
+  departmentDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  departmentDropdownText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    color: Colors.textPrimary,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    backgroundColor: Colors.background,
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  dropdownItemText: {
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
   },
   tableHeaderActionBtn: {
     width: 32,
@@ -2423,7 +2628,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   table: {
     borderWidth: 1,
@@ -2433,11 +2638,11 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: Colors.border,
   },
   tableHeaderCell: {
     fontSize: FontSize.xs + 1,
@@ -2449,7 +2654,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: Colors.border,
     alignItems: 'center',
   },
   tableCellText: {
@@ -2472,7 +2677,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -2480,11 +2685,11 @@ const styles = StyleSheet.create({
   rowTitleText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   categoryPill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -2503,20 +2708,20 @@ const styles = StyleSheet.create({
   rowUserName: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   rowUserRole: {
     fontSize: FontSize.xs - 1,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   rowDateText: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   rowTimeText: {
     fontSize: FontSize.xs - 1,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
   },
   platformIconCircle: {
     width: 24,
@@ -2601,7 +2806,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   pageIndexBtn: {
     width: 28,
@@ -2611,7 +2816,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   pageIndexBtnActive: {
     backgroundColor: Colors.primary,
@@ -2622,7 +2827,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   pageIndexBtnTextActive: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontWeight: 'bold',
   },
 
@@ -2637,7 +2842,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: Colors.border,
     paddingBottom: Spacing.md,
   },
   breadcrumbColumn: {
@@ -2671,7 +2876,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   draftButtonText: {
     fontSize: FontSize.sm,
@@ -2684,11 +2889,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 16,
     height: 38,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FFC72C', // Changed to Gold
   },
   submitButtonText: {
     fontSize: FontSize.sm,
-    color: '#FFFFFF',
+    color: Colors.textPrimary, // Changed to dark text for contrast on gold
     fontWeight: FontWeight.bold,
   },
   splitLayout: {
@@ -2710,7 +2915,7 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   formCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2718,7 +2923,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   configCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -2730,14 +2935,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
     paddingBottom: Spacing.sm,
   },
   headerIconWrapper: {
     width: 28,
     height: 28,
     borderRadius: 4,
-    backgroundColor: '#EEF4F8',
+    backgroundColor: Colors.surfaceSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2762,7 +2967,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   inlineFieldsRow: {
     gap: Spacing.md,
@@ -2776,7 +2981,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   dropdownSelectorText: {
     fontSize: FontSize.sm,
@@ -2788,9 +2993,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginTop: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 8,
     zIndex: 9999,
     shadowColor: '#000',
@@ -2799,23 +3004,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  dropdownItemText: {
-    fontSize: FontSize.sm,
-    color: Colors.textPrimary,
-  },
   textArea: {
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
     padding: 12,
     fontSize: FontSize.sm,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     minHeight: 120,
     textAlignVertical: 'top',
   },
@@ -2832,7 +3027,7 @@ const styles = StyleSheet.create({
   checkPolicyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF4F8',
+    backgroundColor: Colors.surfaceSecondary,
     paddingHorizontal: 10,
     height: 26,
     borderRadius: 4,
@@ -2893,7 +3088,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 6,
     padding: Spacing.sm,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   platformLeft: {
     flexDirection: 'row',
@@ -2920,7 +3115,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   checkboxChecked: {
     backgroundColor: Colors.primary,
@@ -2940,7 +3135,7 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 36,
     fontSize: FontSize.sm,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   inputFieldIcon: {
     position: 'absolute',
@@ -2949,7 +3144,7 @@ const styles = StyleSheet.create({
   scheduleInfoBox: {
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: '#EEF4F8',
+    backgroundColor: Colors.surfaceSecondary,
     padding: Spacing.md,
     borderRadius: 6,
     marginTop: Spacing.xs,
@@ -2974,7 +3169,7 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   previewToggleBtnActive: {
     backgroundColor: Colors.primary,
@@ -2985,7 +3180,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   previewToggleTextActive: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontWeight: 'bold',
   },
   previewMockupFrame: {
@@ -2993,7 +3188,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     paddingBottom: Spacing.sm,
   },
   mockPostHeader: {
@@ -3002,7 +3197,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
   },
   mockPostAvatarCircle: {
     width: 28,
@@ -3052,7 +3247,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
     marginTop: 12,
   },
   mockActionGroup: {
@@ -3062,7 +3257,7 @@ const styles = StyleSheet.create({
 
   // Approval Queue Tab Styles
   queueCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -3117,7 +3312,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DC2626',
   },
   stepCircleUpcoming: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
   },
   stepLabel: {
     fontSize: 9,
@@ -3136,11 +3331,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
   },
   stepLineUpcoming: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
   },
   queueCardFooter: {
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
     paddingTop: Spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3172,7 +3367,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     height: 28,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   queueActionBtnText: {
     fontSize: FontSize.xs,
@@ -3184,7 +3379,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: 6,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -3216,7 +3411,7 @@ const styles = StyleSheet.create({
   },
   modalDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
     marginVertical: Spacing.sm,
   },
   detailsHeader: {
@@ -3279,7 +3474,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   mediaDocText: {
     fontSize: 9,
@@ -3289,7 +3484,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   commentItem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
@@ -3321,7 +3516,7 @@ const styles = StyleSheet.create({
   },
   modalFooter: {
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: Colors.border,
     paddingTop: Spacing.sm,
     alignItems: 'flex-end',
   },
@@ -3334,7 +3529,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCloseText: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semiBold,
   },
@@ -3344,7 +3539,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
     marginBottom: 12,
   },
   profilePicLarge: {
@@ -3356,7 +3551,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profilePicLargeText: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontSize: 20,
     fontWeight: FontWeight.bold,
   },
@@ -3419,7 +3614,7 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     paddingRight: 6,
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    borderRightColor: Colors.border,
   },
   chartAxisLabel: {
     fontSize: 9,
@@ -3455,7 +3650,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   chartBarTooltip: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontSize: 8,
     fontWeight: 'bold',
   },
@@ -3465,7 +3660,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 12,
     gap: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     marginBottom: 10,
   },
   platformProgressSubtext: {
@@ -3490,13 +3685,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     paddingHorizontal: 8,
   },
   // Policy Dashboard Styles
   policySidebar: {
     width: 220,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -3529,7 +3724,7 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   policySectionCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderLeftWidth: 4,
@@ -3589,14 +3784,14 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   policyFlowDotText: {
-    color: '#FFFFFF',
+    color: Colors.surface,
     fontSize: 9,
     fontWeight: 'bold',
   },
   policyFlowLine: {
     flex: 1,
     width: 2,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
     zIndex: 1,
     marginVertical: 2,
   },
@@ -3622,7 +3817,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   policyEmptyState: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
@@ -3651,7 +3846,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 780,
     maxHeight: '90%',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -3667,12 +3862,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.background,
   },
   modalHeaderTitle: {
     fontSize: FontSize.md + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   modalCloseIconBtn: {
     padding: 4,
@@ -3710,7 +3905,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: BorderRadius.md,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.background,
   },
   modalPlatformTabActive: {
     backgroundColor: '#FEF3C7',
@@ -3720,7 +3915,7 @@ const styles = StyleSheet.create({
   modalPlatformTabText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
   modalPlatformTabTextActive: {
     color: '#B45309',
@@ -3729,10 +3924,10 @@ const styles = StyleSheet.create({
 
   socialMockupCard: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   socialHeader: {
     flexDirection: 'row',
@@ -3751,15 +3946,15 @@ const styles = StyleSheet.create({
   socialAuthorName: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   socialTimeText: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
   },
   socialCaptionText: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
     lineHeight: 18,
     marginBottom: 12,
   },
@@ -3776,14 +3971,14 @@ const styles = StyleSheet.create({
   socialMediaBannerText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
+    color: Colors.surface,
     textAlign: 'center',
     letterSpacing: 1,
   },
   socialFooterActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
     paddingTop: 8,
     justifyContent: 'space-around',
   },
@@ -3794,7 +3989,7 @@ const styles = StyleSheet.create({
   },
   socialActionText: {
     fontSize: FontSize.xs,
-    color: '#6B7280',
+    color: Colors.textSecondary,
   },
 
   // Right Details Column
@@ -3809,18 +4004,18 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: FontSize.xs - 1,
     fontWeight: FontWeight.bold,
-    color: '#6B7280',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   metaTitleVal: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   metaVal: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
   deptBadge: {
     alignSelf: 'flex-start',
@@ -3836,18 +4031,18 @@ const styles = StyleSheet.create({
   },
   metaDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.border,
     marginVertical: 8,
   },
   metaCaptionBox: {
     fontSize: FontSize.xs + 1,
-    color: '#374151',
+    color: Colors.textPrimary,
     lineHeight: 18,
     backgroundColor: '#F9FAFB',
     padding: 10,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: Colors.background,
   },
   attachmentCard: {
     flexDirection: 'row',
@@ -3887,7 +4082,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: Colors.background,
     backgroundColor: '#FAFAFA',
   },
   btnModalClose: {
@@ -3896,11 +4091,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
   },
   btnModalCloseText: {
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.medium,
-    color: '#374151',
+    color: Colors.textPrimary,
   },
 });
