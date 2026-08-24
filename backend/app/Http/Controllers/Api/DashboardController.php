@@ -81,10 +81,10 @@ class DashboardController extends Controller
             ])
             ->with([
                 'category:id,name,slug,color,icon',
-                'requestor:id,first_name,last_name,email,department',
+                'requestor:id,first_name,middle_name,last_name,email,department',
                 'media:id,post_request_id,type,original_name,file_path,mime_type,file_size,is_featured,sort_order',
                 'approvalWorkflows:id,post_request_id,stage,approver_id,action,remarks,acted_at,stage_order',
-                'approvalWorkflows.approver:id,first_name,last_name,email',
+                'approvalWorkflows.approver:id,first_name,middle_name,last_name,email',
             ])
             ->orderByDesc('updated_at')
             ->limit(15)
