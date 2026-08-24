@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
@@ -329,10 +330,10 @@ class DashboardController extends Controller
             return Storage::disk($disk)->url($normalizedPath);
         }
 
-        if (
-            Storage::disk('public')->exists($normalizedPath) ||
-            \App\Models\PostMedia::where('file_path', $normalizedPath)->whereHas('file')->exists()
-        ) {
+        $hasFallbackFile = Schema::hasTable('post_media_files')
+            && \App\Models\PostMedia::where('file_path', $normalizedPath)->whereHas('file')->exists();
+
+        if (Storage::disk('public')->exists($normalizedPath) || $hasFallbackFile) {
             return asset('storage/' . $normalizedPath);
         }
 

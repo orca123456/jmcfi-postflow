@@ -10,6 +10,7 @@ use App\Services\ApprovalWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
@@ -125,9 +126,11 @@ class ExternalIntegrationController extends Controller
                             'is_featured' => true,
                         ]);
 
-                        $media->file()->create([
-                            'content' => $response->body(),
-                        ]);
+                        if (Schema::hasTable('post_media_files')) {
+                            $media->file()->create([
+                                'content' => $response->body(),
+                            ]);
+                        }
 
                         $disk = config('filesystems.default');
                         if ($disk === 's3' || $disk === 'b2') {

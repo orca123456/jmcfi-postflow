@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -800,9 +801,11 @@ class PostRequestController extends Controller
             'is_featured' => $isFeatured,
         ]);
 
-        $media->file()->create([
-            'content' => file_get_contents($file->getRealPath()),
-        ]);
+        if (Schema::hasTable('post_media_files')) {
+            $media->file()->create([
+                'content' => file_get_contents($file->getRealPath()),
+            ]);
+        }
 
         return $media;
     }
