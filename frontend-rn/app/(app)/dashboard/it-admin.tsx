@@ -2226,14 +2226,14 @@ export default function ITAdminDashboard() {
                     <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Endpoint URL</Text>
                     <View style={{ backgroundColor: '#F1F5F9', padding: 12, borderRadius: 8, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
                       <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#0F172A', fontSize: 14 }}>
-                        POST {(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request
+                        POST {typeof window !== 'undefined' ? window.location.origin : 'https://jmcfi-postflow-production-f5e6.up.railway.app'}/api/external/submit-request
                       </Text>
                     </View>
 
                     <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: JavaScript (Fetch)</Text>
                     <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
                       <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
-                        {`fetch('${(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request', {
+                        {`fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://jmcfi-postflow-production-f5e6.up.railway.app'}/api/external/submit-request', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
