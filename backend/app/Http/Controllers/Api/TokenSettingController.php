@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class TokenSettingController extends Controller
 {
@@ -62,6 +63,11 @@ class TokenSettingController extends Controller
                     ]
                 );
             }
+        }
+
+        if (array_key_exists('facebook_page_id', $validated) || array_key_exists('facebook_access_token', $validated)) {
+            Cache::forget('facebook_page_id');
+            Cache::forget('facebook_access_token');
         }
 
         // Update timestamp
