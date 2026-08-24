@@ -102,7 +102,7 @@ export default function OfficeHeadDashboard() {
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    refetchInterval: 5000,
+    refetchInterval: 2000,
     refetchIntervalInBackground: true,
   });
 
@@ -643,35 +643,23 @@ export default function OfficeHeadDashboard() {
                   <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
 
                     {activeTab === 'dashboard' ? (
-                      req.status === (
-                        viewerIsVicePresident ? 'PENDING_VICE_PRESIDENT' :
-                          viewerIsImcQa ? 'PENDING_IMC_QA' :
-                            'PENDING_OFFICE_HEAD'
-                      ) ? (
-                        <>
-                          <TouchableOpacity
-                            style={styles.btnApproveRow}
-                            onPress={() => handleApprove(req)}
-                          >
-                            <Ionicons name="checkmark" size={13} color="#16A34A" style={{ marginRight: 3 }} />
-                            <Text style={styles.btnApproveRowText}>Approve</Text>
-                          </TouchableOpacity>
+                      <>
+                        <TouchableOpacity
+                          style={styles.btnApproveRow}
+                          onPress={() => handleApprove(req)}
+                        >
+                          <Ionicons name="checkmark" size={13} color="#16A34A" style={{ marginRight: 3 }} />
+                          <Text style={styles.btnApproveRowText}>Approve</Text>
+                        </TouchableOpacity>
 
-                          <TouchableOpacity
-                            style={styles.btnRejectRow}
-                            onPress={() => handleRejectClick(req)}
-                          >
-                            <Ionicons name="close" size={13} color="#DC2626" style={{ marginRight: 3 }} />
-                            <Text style={styles.btnRejectRowText}>Reject</Text>
-                          </TouchableOpacity>
-                        </>
-                      ) : (
-                        <View style={{ backgroundColor: Colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                          <Text style={{ color: Colors.textSecondary, fontWeight: '600', fontSize: 10, textTransform: 'uppercase' }}>
-                            WAITING
-                          </Text>
-                        </View>
-                      )
+                        <TouchableOpacity
+                          style={styles.btnRejectRow}
+                          onPress={() => handleRejectClick(req)}
+                        >
+                          <Ionicons name="close" size={13} color="#DC2626" style={{ marginRight: 3 }} />
+                          <Text style={styles.btnRejectRowText}>Reject</Text>
+                        </TouchableOpacity>
+                      </>
                     ) : (
                       <View style={{ backgroundColor: activeTab === 'approved' ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
                         <Text style={{ color: activeTab === 'approved' ? '#15803D' : '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>

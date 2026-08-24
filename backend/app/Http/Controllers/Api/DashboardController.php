@@ -18,24 +18,252 @@ class DashboardController extends Controller
     public function getInitData(Request $request): JsonResponse
     {
         $user = $request->user();
-        $stats = $this->getStats($request)->getData(true)['data'] ?? [];
-        $activities = $this->getRecentActivity($request)->getData(true) ?? [];
-        $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
-        
-        $request->merge(['per_page' => 15]);
-        $postsData = $postController->index($request)->getData(true);
-        
-        $departments = \App\Models\Department::where('is_active', true)
-            ->where('display_name', 'LIKE', 'College%')
-            ->pluck('display_name');
+        $category = $user->roleCategory();
+        $role = $user->workflowRole();
+
+        $baseQuery = $this->scopedPostQuery($user, $category, $role);
+
+        $stats = Cache::remember("dashboard_init_stats_{$category}_{$role}_{$user->id}", 1, function () use ($baseQuery, $category, $role) {
+            return $this->buildStats($baseQuery, $category, $role);
+        });
+
+        $posts = (clone $baseQuery)
+            ->select([
+                'id',
+                'title',
+                'slug',
+                'caption_narrative',
+                'category_id',
+                'requestor_id',
+                'status',
+                'target_platforms',
+                'preferred_schedule_at',
+                'published_at',
+                'rejection_reason',
+                'revision_notes',
+                'revision_count',
+                'created_at',
+                'updated_at',
+            ])
+            ->with([
+                'category:id,name,slug,color,icon',
+                'requestor:id,first_name,last_name,email,department',
+                'media:id,post_request_id,type,original_name,file_path,mime_type,file_size,is_featured,sort_order',
+                'approvalWorkflows:id,post_request_id,stage,approver_id,action,remarks,acted_at,stage_order',
+                'approvalWorkflows.approver:id,first_name,last_name,email',
+            ])
+            ->orderByDesc('updated_at')
+            ->limit(15)
+            ->get();
+
+        $departments = Cache::remember('dashboard_college_departments', 60, function () {
+            return \App\Models\Department::where('is_active', true)
+                ->where('display_name', 'LIKE', 'College%')
+                ->orderBy('display_name')
+                ->pluck('display_name');
+        });
 
         return response()->json([
             'success' => true,
             'stats' => $stats,
-            'activities' => $activities,
-            'posts' => $postsData,
+            'activities' => $this->buildActivities($posts),
+            'posts' => [
+                'data' => $posts->map(fn (PostRequest $post) => $this->postSummary($post, $user)),
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 15,
+                    'total' => $posts->count(),
+                ],
+            ],
             'departments' => $departments,
         ]);
+    }
+
+    private function scopedPostQuery(User $user, string $category, ?string $role): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = PostRequest::query();
+
+        if ($category === 'requestor') {
+            return $query->where('requestor_id', $user->id);
+        }
+
+        if ($category !== 'approver') {
+            return $query;
+        }
+
+        if ($role === 'vice_president') {
+            return $query->whereNotIn('status', [
+                PostRequest::STATUS_DRAFT,
+                PostRequest::STATUS_PENDING_OFFICE_HEAD,
+            ])->where(function ($q) {
+                $q->whereNotIn('status', [
+                    PostRequest::STATUS_REJECTED,
+                    PostRequest::STATUS_RETURNED_FOR_REVISION,
+                ])->orWhereHas('approvalWorkflows', function ($w) {
+                    $w->whereIn('action', ['rejected', 'returned_for_revision'])
+                        ->whereIn('stage', ['vice_president', 'imc_qa']);
+                });
+            });
+        }
+
+        if ($role === 'imc_qa_checker') {
+            return $query->whereIn('status', [
+                PostRequest::STATUS_PENDING_IMC_QA,
+                PostRequest::STATUS_APPROVED,
+                PostRequest::STATUS_SCHEDULED,
+                PostRequest::STATUS_PUBLISHED,
+                PostRequest::STATUS_PUBLISH_FAILED,
+                PostRequest::STATUS_REJECTED,
+                PostRequest::STATUS_RETURNED_FOR_REVISION,
+            ])->where(function ($q) {
+                $q->whereNotIn('status', [
+                    PostRequest::STATUS_REJECTED,
+                    PostRequest::STATUS_RETURNED_FOR_REVISION,
+                ])->orWhereHas('approvalWorkflows', function ($w) {
+                    $w->whereIn('action', ['rejected', 'returned_for_revision'])
+                        ->where('stage', 'imc_qa');
+                });
+            });
+        }
+
+        return $query->whereHas('requestor', function ($q) use ($user) {
+            $q->where('department', $user->department);
+        })->where('status', '!=', PostRequest::STATUS_DRAFT);
+    }
+
+    private function buildStats(\Illuminate\Database\Eloquent\Builder $query, string $category, ?string $role): array
+    {
+        $counts = (clone $query)
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $pendingOfficeHead = $counts[PostRequest::STATUS_PENDING_OFFICE_HEAD] ?? 0;
+        $pendingVP = $counts[PostRequest::STATUS_PENDING_VICE_PRESIDENT] ?? 0;
+        $pendingImcQa = $counts[PostRequest::STATUS_PENDING_IMC_QA] ?? 0;
+        $pendingPresident = $counts[PostRequest::STATUS_PENDING_PRESIDENT] ?? 0;
+
+        $pendingReview = $pendingOfficeHead + $pendingVP + $pendingPresident + $pendingImcQa;
+        if ($category === 'approver') {
+            $pendingReview = match ($role) {
+                'vice_president' => $pendingVP,
+                'imc_qa_checker' => $pendingImcQa,
+                default => $pendingOfficeHead,
+            };
+        }
+
+        return [
+            'total_users' => $category === 'admin' ? User::count() : 0,
+            'total_submissions' => array_sum($counts),
+            'total' => array_sum($counts),
+            'draft' => $counts[PostRequest::STATUS_DRAFT] ?? 0,
+            'pending_review' => $pendingReview,
+            'pending' => $pendingReview,
+            'approved_posts' => $counts[PostRequest::STATUS_APPROVED] ?? 0,
+            'approved' => $counts[PostRequest::STATUS_APPROVED] ?? 0,
+            'rejected' => $counts[PostRequest::STATUS_REJECTED] ?? 0,
+            'returned_revision' => $counts[PostRequest::STATUS_RETURNED_FOR_REVISION] ?? 0,
+            'returned_for_revision' => $counts[PostRequest::STATUS_RETURNED_FOR_REVISION] ?? 0,
+            'scheduled' => $counts[PostRequest::STATUS_SCHEDULED] ?? 0,
+            'published_posts' => $counts[PostRequest::STATUS_PUBLISHED] ?? 0,
+            'published' => $counts[PostRequest::STATUS_PUBLISHED] ?? 0,
+        ];
+    }
+
+    private function buildActivities(\Illuminate\Support\Collection $posts): \Illuminate\Support\Collection
+    {
+        return $posts->take(10)->map(function (PostRequest $post) {
+            $requestorName = $post->requestor
+                ? trim(($post->requestor->first_name ?? '') . ' ' . ($post->requestor->last_name ?? ''))
+                : 'Unknown User';
+            $initials = $post->requestor
+                ? strtoupper(substr($post->requestor->first_name ?? 'U', 0, 1) . substr($post->requestor->last_name ?? 'N', 0, 1))
+                : 'UN';
+
+            return [
+                'id' => $post->id,
+                'userInitials' => $initials,
+                'userName' => $requestorName,
+                'action' => match ($post->status) {
+                    PostRequest::STATUS_PUBLISHED => 'published a post',
+                    PostRequest::STATUS_APPROVED => 'approved a submission for',
+                    PostRequest::STATUS_PENDING_OFFICE_HEAD => 'submitted for office head review',
+                    PostRequest::STATUS_PENDING_VICE_PRESIDENT => 'forwarded to vice president for',
+                    PostRequest::STATUS_PENDING_IMC_QA => 'submitted for IMC/QA review for',
+                    PostRequest::STATUS_REJECTED => 'rejected a submission for',
+                    PostRequest::STATUS_RETURNED_FOR_REVISION => 'requested revision for',
+                    default => 'updated',
+                },
+                'target' => $post->title,
+                'time' => $post->updated_at?->diffForHumans() ?? 'recently',
+                'platform' => 'Status: ' . ($post->status_label ?? $post->status),
+            ];
+        });
+    }
+
+    private function postSummary(PostRequest $post, User $user): array
+    {
+        return [
+            'id' => $post->id,
+            'title' => $post->title,
+            'slug' => $post->slug,
+            'caption_narrative' => $post->caption_narrative,
+            'category' => $post->category ? [
+                'id' => $post->category->id,
+                'name' => $post->category->name,
+                'slug' => $post->category->slug,
+                'color' => $post->category->color,
+                'icon' => $post->category->icon,
+            ] : null,
+            'requestor' => $post->requestor ? [
+                'id' => $post->requestor->id,
+                'full_name' => $post->requestor->full_name,
+                'email' => $post->requestor->email,
+                'department' => $post->requestor->department,
+            ] : null,
+            'status' => $post->status,
+            'status_label' => $post->status_label,
+            'target_platforms' => $post->target_platforms ?? [],
+            'preferred_schedule_at' => $post->preferred_schedule_at?->toISOString(),
+            'published_at' => $post->published_at?->toISOString(),
+            'rejection_reason' => $post->rejection_reason,
+            'revision_notes' => $post->revision_notes ?? [],
+            'revision_count' => $post->revision_count,
+            'media' => $post->media->map(fn ($media) => [
+                'id' => $media->id,
+                'type' => $media->type,
+                'original_filename' => $media->original_name,
+                'url' => $media->url,
+                'mime_type' => $media->mime_type,
+                'size' => $media->file_size,
+                'formatted_size' => $media->formatted_size,
+                'is_featured' => $media->is_featured,
+                'sort_order' => $media->sort_order,
+            ]),
+            'approval_workflows' => $post->approvalWorkflows->map(fn ($workflow) => [
+                'id' => $workflow->id,
+                'stage' => $workflow->stage,
+                'stage_label' => $workflow->stage_label,
+                'action' => $workflow->action,
+                'action_label' => $workflow->action_label,
+                'approver' => $workflow->approver ? [
+                    'id' => $workflow->approver->id,
+                    'full_name' => $workflow->approver->full_name,
+                    'email' => $workflow->approver->email,
+                ] : null,
+                'remarks' => $workflow->remarks,
+                'acted_at' => $workflow->acted_at?->toISOString(),
+                'stage_order' => $workflow->stage_order,
+            ]),
+            'current_approval_stage' => $post->current_approval_stage,
+            'current_stage_label' => $post->current_stage_label,
+            'can_edit' => $post->canBeEditedBy($user),
+            'can_approve' => $post->canBeApprovedBy($user),
+            'created_at' => $post->created_at?->toISOString(),
+            'updated_at' => $post->updated_at?->toISOString(),
+        ];
     }
 
     /**
