@@ -81,7 +81,7 @@ class ExternalIntegrationController extends Controller
                 'category_id' => $categoryId,
                 'department_id' => $user->id,
                 'requestor_id' => $user->id,
-                'status' => $request->boolean('publish_direct') ? PostRequest::STATUS_PUBLISHED : PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                'status' => $request->boolean('publish_direct') ? PostRequest::STATUS_APPROVED : PostRequest::STATUS_PENDING_OFFICE_HEAD,
                 'target_platforms' => $request->target_platforms ?? ['facebook'],
                 'revision_count' => 0,
             ]);
@@ -154,9 +154,11 @@ class ExternalIntegrationController extends Controller
                         $message = $post->caption_narrative ?? '';
                         $fbResponse = $facebookService->publishPost($message, $mediaPath);
                         $publishResults['facebook'] = $fbResponse;
+                        $post->update(['status' => PostRequest::STATUS_PUBLISHED]);
                     } catch (\Exception $e) {
                         \Illuminate\Support\Facades\Log::error('Direct API Publish to Facebook failed: ' . $e->getMessage());
                         $publishResults['facebook'] = ['error' => $e->getMessage()];
+                        $post->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
                     }
                 }
 
@@ -179,8 +181,10 @@ class ExternalIntegrationController extends Controller
                         'publish_results' => $publishResults,
                         'created_at' => $post->created_at,
                     ],
-                    'message' => 'Post successfully published directly from external source.',
-                ], 201);
+                    'message' => $post->status === PostRequest::STATUS_PUBLISHED
+                        ? 'Post successfully published directly from external source.'
+                        : 'Post was created, but publishing to Facebook failed. Please verify the Page ID, Page Access Token, and page permissions.',
+                ], $post->status === PostRequest::STATUS_PUBLISHED ? 201 : 502);
             }
 
             // Normal Flow: Create approval workflow stages
