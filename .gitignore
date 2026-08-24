@@ -10,6 +10,7 @@ frontend-rn/build/
 
 # Environment files
 backend/.env
+backend/token.txt
 frontend-rn/.env
 frontend-rn/.env.local
 
