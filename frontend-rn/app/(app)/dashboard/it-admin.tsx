@@ -2254,7 +2254,7 @@ export default function ITAdminDashboard() {
                     <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: PHP (cURL)</Text>
                     <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
                       <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
-                        {`$ch = curl_init('${(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api').replace('/api', '')}/api/external/submit-request');
+                        {`$ch = curl_init('${typeof window !== 'undefined' ? window.location.origin : 'https://jmcfi-postflow-production-f5e6.up.railway.app'}/api/external/submit-request');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
