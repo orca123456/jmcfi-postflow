@@ -301,60 +301,52 @@ export default function ITAdminDashboard() {
     setMockTablePosts(mappedTable);
   }
 
-  // ── Master data loader: fetch background data AFTER overview data loads ──
+  // ── Lazy Loader State ──
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [overviewLoaded, setOverviewLoaded] = useState(false);
+
+  // ── Master data loader: fetch background data ONLY when needed ──
   useEffect(() => {
     if (isInitialLoading) return;
+    
+    if (activeTab === 'overview' && !overviewLoaded) {
+      setOverviewLoaded(true);
+      dashboardApi.getAnalyticsOverview().then(res => {
+        if (res.data?.data) setAnalyticsOverview(res.data.data);
+      }).catch(() => {});
+      
+      auditLogsApi.list().then(res => {
+        if (res.data?.data) setAuditLogs(res.data.data);
+      }).catch(() => {});
+    }
 
-    const loadAllData = async () => {
-      // Fire all requests in parallel — a timeout on one won't block the others
-      const results = await Promise.allSettled([
-        usersApi.list().catch(() => ({ data: { data: [] } })),
-        rolesApi.list().catch(() => ({ data: { data: [] } })),
-        departmentsApi.list().catch(() => ({ data: { data: [] } })),
-        dashboardApi.getAnalyticsOverview().catch(() => ({ data: { data: null } })),
-        auditLogsApi.list().catch(() => ({ data: { data: [] } })),
-      ]);
-
-      // Note: Stats, Posts, and Recent Activity are now handled by React Query auto-polling.
-
-      // 1. Users (index 0) — always fetch on mount for user management tab
-      if (results[0].status === 'fulfilled') {
-        const raw = results[0].value.data.data;
+    if (activeTab === 'user-management' && !usersLoaded) {
+      setUsersLoaded(true);
+      
+      usersApi.list().then(res => {
+        const raw = res.data?.data;
         const mappedUsers = (raw || []).map((u: any) => ({
           ...u,
           role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
           created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
         }));
         setUsers(mappedUsers);
-      }
+      }).catch(() => {});
 
-      // 2. Roles — the picker uses the 3 fixed categories (Admin/Approver/Requestor)
-      setRolesList(ROLE_CATEGORIES);
-      setNewUserRole('requestor');
+      rolesApi.list().then(() => {
+        setRolesList(ROLE_CATEGORIES);
+        setNewUserRole('requestor');
+      }).catch(() => {});
 
-      // 3. Departments (index 2)
-      if (results[2].status === 'fulfilled') {
-        const fetchedDepts = results[2].value.data?.data;
+      departmentsApi.list().then(res => {
+        const fetchedDepts = res.data?.data;
         if (fetchedDepts && fetchedDepts.length > 0) {
           setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
           setNewUserDepartment(fetchedDepts[0].display_name);
         }
-      }
-
-      // 4. Analytics (index 3)
-      if (results[3].status === 'fulfilled' && results[3].value.data?.data) {
-        setAnalyticsOverview(results[3].value.data.data);
-      }
-
-      // 5. Audit logs (index 4)
-      if (results[4].status === 'fulfilled' && results[4].value.data?.data) {
-        setAuditLogs(results[4].value.data.data);
-      }
-
-    };
-
-    loadAllData();
-  }, [isInitialLoading]); // Run once overview data is loaded
+      }).catch(() => {});
+    }
+  }, [isInitialLoading, activeTab, overviewLoaded, usersLoaded]);
 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
