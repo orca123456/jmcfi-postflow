@@ -167,16 +167,18 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if ($user->photo_path && Storage::disk('public')->exists($user->photo_path)) {
-            Storage::disk('public')->delete($user->photo_path);
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+
+        if ($user->photo_path && Storage::disk($disk)->exists($user->photo_path)) {
+            Storage::disk($disk)->delete($user->photo_path);
         }
 
-        $path = $request->file('photo')->store('profile-photos', 'public');
+        $path = $request->file('photo')->store('profile-photos', $disk);
         $user->update(['photo_path' => $path]);
 
         return response()->json([
             'message' => 'Photo uploaded.',
-            'photo_url' => asset('storage/' . $path),
+            'photo_url' => Storage::disk($disk)->url($path),
         ]);
     }
 
