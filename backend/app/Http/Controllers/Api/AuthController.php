@@ -178,7 +178,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Photo uploaded.',
-            'photo_url' => Storage::disk($disk)->url($path),
+            'photo_url' => asset('storage/' . str_replace('\\', '/', $path)),
         ]);
     }
 

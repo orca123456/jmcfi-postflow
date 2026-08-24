@@ -77,14 +77,6 @@ class PostMedia extends Model
             return rtrim($renderUrl, '/') . '/storage/' . $normalizedPath;
         }
 
-        // 2. Use the configured public disk URL
-        $diskUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($normalizedPath);
-
-        // Fallback: if APP_URL is still localhost but real host differs (e.g. Render w/o RENDER_EXTERNAL_URL)
-        if (str_contains($diskUrl, 'localhost') && request()->getHost() !== 'localhost') {
-            return request()->getSchemeAndHttpHost() . '/storage/' . $normalizedPath;
-        }
-
-        return $diskUrl;
+        return asset('storage/' . $normalizedPath);
     }
 }
