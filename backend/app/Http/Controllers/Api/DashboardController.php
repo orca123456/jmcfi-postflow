@@ -46,12 +46,12 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $category = $user->roleCategory();
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         // Cache key is role-specific (different roles see different counts)
         $cacheKey = 'dashboard_stats_' . $category . '_' . $user->id;
 
-        $stats = Cache::remember($cacheKey, 3600, function () use ($user, $category, $role) {
+        $stats = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
             $query = PostRequest::query();
 
             // Role-based filtering (mirroring PostRequestController visibility)
@@ -148,11 +148,11 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $category = $user->roleCategory();
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         $cacheKey = 'dashboard_recent_activity_' . $category . '_' . $user->id;
 
-        $activities = Cache::remember($cacheKey, 3600, function () use ($user, $category, $role) {
+        $activities = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
             $query = PostRequest::with(['requestor', 'approvalWorkflows.approver']);
 
             // Scope activity to the user's role so it doesn't leak across roles

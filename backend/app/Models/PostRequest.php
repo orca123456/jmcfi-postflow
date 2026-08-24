@@ -201,7 +201,7 @@ class PostRequest extends Model
             return false;
         }
 
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         // Admins (it_publisher / it_admin) can always approve
         if (in_array($role, ['it_publisher', 'it_admin', 'admin'], true)) {

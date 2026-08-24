@@ -330,10 +330,10 @@ class PostRequestController extends Controller
         if (!$postRequest->canBeApprovedBy($user)) {
             $currentStage = $postRequest->currentApprovalStage();
             if ($currentStage) {
-                if ($currentStage->stage === 'office_head' && $user->department === 'Vice President of Academic Affairs') {
+                if ($currentStage->stage === 'office_head' && str_contains(strtolower($user->department ?? ''), 'vice president')) {
                     return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
                 }
-                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && $user->department === 'Institutional Marketing Communication') {
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && str_contains(strtolower($user->department ?? ''), 'institutional marketing communication')) {
                     $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
                     return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
                 }
@@ -443,10 +443,10 @@ class PostRequestController extends Controller
         if (!$postRequest->canBeApprovedBy($user)) {
             $currentStage = $postRequest->currentApprovalStage();
             if ($currentStage) {
-                if ($currentStage->stage === 'office_head' && $user->department === 'Vice President of Academic Affairs') {
+                if ($currentStage->stage === 'office_head' && str_contains(strtolower($user->department ?? ''), 'vice president')) {
                     return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
                 }
-                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && $user->department === 'Institutional Marketing Communication') {
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && str_contains(strtolower($user->department ?? ''), 'institutional marketing communication')) {
                     $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
                     return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
                 }
@@ -510,10 +510,10 @@ class PostRequestController extends Controller
         if (!$postRequest->canBeApprovedBy($user)) {
             $currentStage = $postRequest->currentApprovalStage();
             if ($currentStage) {
-                if ($currentStage->stage === 'office_head' && $user->department === 'Vice President of Academic Affairs') {
+                if ($currentStage->stage === 'office_head' && str_contains(strtolower($user->department ?? ''), 'vice president')) {
                     return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
                 }
-                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && $user->department === 'Institutional Marketing Communication') {
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && str_contains(strtolower($user->department ?? ''), 'institutional marketing communication')) {
                     $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
                     return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
                 }
@@ -589,7 +589,7 @@ class PostRequestController extends Controller
     {
         $user = $request->user();
         $category = $user->roleCategory();
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         $cacheKey = "dashboard_stats_{$user->id}_{$category}";
 
@@ -695,7 +695,7 @@ class PostRequestController extends Controller
         }
 
         $category = $user->roleCategory();
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         // Admin sees everything
         if ($category === 'admin') return true;
@@ -727,7 +727,7 @@ class PostRequestController extends Controller
     private function applyRoleScoping(\Illuminate\Database\Eloquent\Builder $query, \App\Models\User $user): void
     {
         $category = $user->roleCategory();
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         if ($category === 'requestor') {
             // Requestors should only see their own requests
@@ -783,7 +783,7 @@ class PostRequestController extends Controller
         if ($user->roleCategory() !== 'approver') {
             return;
         }
-        $role = $user->getRoleNames()->first();
+        $role = $user->workflowRole();
 
         if ($role === 'vice_president') {
             $query->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT);

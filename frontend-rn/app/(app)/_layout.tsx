@@ -45,6 +45,21 @@ const ROLE_HOME: Record<string, string> = {
   approver: '/dashboard/office-head',
 };
 
+const resolveRawRole = (user: any): string => {
+  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'requestor';
+  const department = (user?.department || '').toLowerCase();
+
+  if (rawRole === 'office_head' && department.includes('vice president')) {
+    return 'vice_president';
+  }
+
+  if (rawRole === 'office_head' && department.includes('institutional marketing communication')) {
+    return 'imc_qa_checker';
+  }
+
+  return rawRole;
+};
+
 export default function AppLayout() {
   const { user } = useAuthStore();
   const pathname = usePathname();
@@ -62,7 +77,7 @@ export default function AppLayout() {
     }
 
     // Determine the user's role (raw DB role preferred, normalized role as fallback)
-    const rawRole = ((user as any).roles && (user as any).roles[0]) || user.role || 'requestor';
+    const rawRole = resolveRawRole(user);
     const allowed = ROLE_PATHS[rawRole] || ROLE_PATHS[user.role || ''] || ['/dashboard/requestor'];
 
     // Block URL manipulation: if the requested path is a dashboard the role
