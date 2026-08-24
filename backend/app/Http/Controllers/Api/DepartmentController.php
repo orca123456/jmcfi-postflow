@@ -105,11 +105,13 @@ class DepartmentController extends Controller
         ]);
 
         // Delete old logo if exists
-        if ($department->logo_path && Storage::disk('public')->exists($department->logo_path)) {
-            Storage::disk('public')->delete($department->logo_path);
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        if ($department->logo_path && Storage::disk($disk)->exists($department->logo_path)) {
+            Storage::disk($disk)->delete($department->logo_path);
         }
 
-        $path = $request->file('logo')->store('department-logos', 'public');
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        $path = $request->file('logo')->store('department-logos', $disk);
         $department->update(['logo_path' => $path]);
 
         return response()->json([
