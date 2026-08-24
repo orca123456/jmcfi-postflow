@@ -107,7 +107,7 @@ export default function VPDashboard() {
   const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
     queryKey: ['vp-dashboard-data'],
     queryFn: dashboardApi.getInitData,
-    refetchInterval: 100,
+    refetchInterval: 30000,
     refetchIntervalInBackground: true,
   });
 

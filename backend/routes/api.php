@@ -20,18 +20,11 @@ use App\Http\Controllers\Api\TokenSettingController;
 use App\Http\Controllers\Api\ApiTokenController;
 use App\Http\Controllers\Api\ExternalIntegrationController;
 
-Route::get('/magic-seed', function() {
-    try {
-        \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--force' => true]);
-        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
-        return 'Database migrated and seeded successfully!';
-    } catch (\Throwable $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ], 500);
-    }
-});
+// NOTE: the former unauthenticated GET /api/magic-seed route ran
+// `migrate:fresh` + `db:seed`, i.e. any request to that URL dropped every
+// table. Schema changes now run through Railway's pre-deploy command
+// (`php artisan migrate --force`) instead. Do not reintroduce a route that
+// mutates the schema.
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -131,10 +124,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('api-tokens', [ApiTokenController::class, 'store'])->middleware('role:it_publisher,it_admin');
     Route::delete('api-tokens/{id}', [ApiTokenController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
     
-    Route::delete('test-delete/{id}', function($id) {
-        return response()->json(['deleted' => $id]);
-    });
-
     // External Integration Endpoint
     Route::post('external/submit-request', [ExternalIntegrationController::class, 'submitRequest']);
 });

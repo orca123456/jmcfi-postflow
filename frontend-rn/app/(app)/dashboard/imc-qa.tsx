@@ -143,7 +143,7 @@ export default function ImcQaDashboard() {
   const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
     queryKey: ['imc-dashboard-data'],
     queryFn: dashboardApi.getInitData,
-    refetchInterval: 100,
+    refetchInterval: 30000,
     refetchIntervalInBackground: true,
   });
 
