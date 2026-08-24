@@ -13,6 +13,13 @@ RUN npx expo export -p web
 # ==========================================
 FROM dunglas/frankenphp:1-php8.2-alpine
 
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_NO_INTERACTION=1 \
+    COMPOSER_PROCESS_TIMEOUT=1200 \
+    COMPOSER_MAX_PARALLEL_HTTP=6
+
+RUN apk add --no-cache git unzip
+
 # Install PHP extensions required by your Laravel app
 RUN install-php-extensions \
     pdo_pgsql \
@@ -51,7 +58,11 @@ RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framew
     && chmod -R 777 bootstrap/cache storage
 
 # Install Composer Dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN for attempt in 1 2 3; do \
+        composer install --no-dev --optimize-autoloader --prefer-dist --no-progress && break; \
+        if [ "$attempt" = "3" ]; then exit 1; fi; \
+        sleep $((attempt * 10)); \
+    done
 
 # Copy the built frontend from STAGE 1 into Laravel's public directory
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
