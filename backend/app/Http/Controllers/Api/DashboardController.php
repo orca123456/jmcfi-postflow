@@ -64,6 +64,7 @@ class DashboardController extends Controller
                 'slug',
                 'caption_narrative',
                 'category_id',
+                'department_id',
                 'requestor_id',
                 'status',
                 'target_platforms',
@@ -77,6 +78,7 @@ class DashboardController extends Controller
             ])
             ->with([
                 'category:id,name,slug,color,icon',
+                'department:id,first_name,middle_name,last_name,email,department',
                 'requestor:id,first_name,middle_name,last_name,email,department',
                 'media:id,post_request_id,type,original_name,file_path,mime_type,file_size,is_featured,sort_order',
                 'approvalWorkflows:id,post_request_id,stage,approver_id,action,remarks,acted_at,stage_order',
@@ -88,7 +90,7 @@ class DashboardController extends Controller
 
         $stats = [];
         if ($category === 'admin') {
-            $stats = Cache::remember("dashboard_init_stats_{$category}_{$role}_{$user->id}", 1, function () use ($baseQuery, $category, $role) {
+            $stats = Cache::remember('dashboard_stats_user_' . $user->id, 60, function () use ($baseQuery, $category, $role) {
                 return $this->buildStats($baseQuery, $category, $role);
             });
         }
@@ -333,9 +335,9 @@ class DashboardController extends Controller
         $role = $user->workflowRole();
 
         // Cache key is role-specific (different roles see different counts)
-        $cacheKey = 'dashboard_stats_' . $category . '_' . $user->id;
+        $cacheKey = 'dashboard_stats_user_' . $user->id;
 
-        $stats = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
+        $stats = Cache::remember($cacheKey, 60, function () use ($user, $category, $role) {
             $query = PostRequest::query();
 
             // Role-based filtering (mirroring PostRequestController visibility)
@@ -436,8 +438,12 @@ class DashboardController extends Controller
 
         $cacheKey = 'dashboard_recent_activity_' . $category . '_' . $user->id;
 
-        $activities = Cache::remember($cacheKey, 1, function () use ($user, $category, $role) {
-            $query = PostRequest::with(['requestor', 'approvalWorkflows.approver']);
+        $activities = Cache::remember($cacheKey, 60, function () use ($user, $category, $role) {
+            $query = PostRequest::with([
+                'department',
+                'requestor',
+                'approvalWorkflows.approver',
+            ]);
 
             // Scope activity to the user's role so it doesn't leak across roles
             if ($category === 'requestor') {
@@ -519,7 +525,7 @@ class DashboardController extends Controller
     {
         $cacheKey = 'dashboard_analytics';
 
-        $data = Cache::remember($cacheKey, 1, function () {
+        $data = Cache::remember($cacheKey, 120, function () {
             // ── Total Volume: single count ──
             $totalVolume = PostRequest::count();
 

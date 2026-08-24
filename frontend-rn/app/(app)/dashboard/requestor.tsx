@@ -405,8 +405,10 @@ export default function RequestorDashboard() {
 
   const { data: postsDataRes, isLoading: isInitLoading, refetch: refetchPosts } = useQuery({
     queryKey: ['requestor-posts'],
-    queryFn: () => postsApi.list({ per_page: 1000 }),
-    refetchInterval: 30000,
+    queryFn: () => postsApi.list({ per_page: 15 }),
+    staleTime: 5000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
 
