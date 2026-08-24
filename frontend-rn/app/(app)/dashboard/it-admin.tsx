@@ -226,7 +226,7 @@ export default function ITAdminDashboard() {
   const [showApiDocs, setShowApiDocs] = useState(false);
 
   // ── Loading state ──
-  const { data: initDataRes, isLoading } = useQuery({ 
+  const { data: initDataRes, isLoading, refetch: refetchInitData } = useQuery({
     queryKey: ['adminInitData'], 
     queryFn: () => dashboardApi.getInitData(), 
     refetchInterval: 5000,
@@ -238,10 +238,13 @@ export default function ITAdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [publishingPostId, setPublishingPostId] = useState<string | number | null>(null);
 
   const handleAction = (type: string, title: string) => {
     alert(`IT Action: "${type}" executed for post:\n"${title}"`);
   };
+
+  const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled';
 
   // ── Animated spinner rotation ──
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -862,12 +865,17 @@ export default function ITAdminDashboard() {
   };
 
   const handlePublish = async (id: string | number) => {
+    setPublishingPostId(id);
     try {
       await publishingApi.publish(Number(id));
       showToast('Post published successfully!', 'success');
+      setPreviewPost(null);
+      await refetchInitData();
       loadPostsData();
     } catch (error: any) {
       showToast('Failed to publish: ' + (error.response?.data?.message || error.message), 'error');
+    } finally {
+      setPublishingPostId(null);
     }
   };
 
@@ -1465,8 +1473,31 @@ export default function ITAdminDashboard() {
                       {!isTablet ? (
                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                             <Text style={{ fontSize: 11, color: Colors.textSecondary }}>Requested on {post.requestedOn} at {post.requestedTime}</Text>
-                            <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-                              <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                            <TouchableOpacity
+                              disabled={publishingPostId === post.id}
+                              onPress={(event: any) => {
+                                event?.stopPropagation?.();
+                                canPublishStatus(post.rawStatus) ? handlePublish(post.id) : setPreviewPost(post);
+                              }}
+                              style={{
+                                minWidth: canPublishStatus(post.rawStatus) ? 88 : 32,
+                                height: 32,
+                                borderRadius: 16,
+                                backgroundColor: canPublishStatus(post.rawStatus) ? '#DCFCE7' : '#f3f4f6',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                gap: 6,
+                                paddingHorizontal: canPublishStatus(post.rawStatus) ? 12 : 0,
+                                opacity: publishingPostId === post.id ? 0.6 : 1,
+                              }}
+                            >
+                              <Ionicons name={canPublishStatus(post.rawStatus) ? 'send-outline' : 'chevron-forward'} size={16} color={canPublishStatus(post.rawStatus) ? '#15803D' : '#6b7280'} />
+                              {canPublishStatus(post.rawStatus) && (
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>
+                                  {publishingPostId === post.id ? 'Publishing' : 'Publish'}
+                                </Text>
+                              )}
                             </TouchableOpacity>
                          </View>
                       ) : (
@@ -1479,8 +1510,30 @@ export default function ITAdminDashboard() {
 
                           {/* ACTIONS (Tablet) */}
                           <View style={{ width: 80, flexDirection: 'row', justifyContent: 'center' }}>
-                            <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-                              <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                            <TouchableOpacity
+                              disabled={publishingPostId === post.id}
+                              onPress={(event: any) => {
+                                event?.stopPropagation?.();
+                                canPublishStatus(post.rawStatus) ? handlePublish(post.id) : setPreviewPost(post);
+                              }}
+                              style={{
+                                width: canPublishStatus(post.rawStatus) ? 74 : 32,
+                                height: 32,
+                                borderRadius: 16,
+                                backgroundColor: canPublishStatus(post.rawStatus) ? '#DCFCE7' : '#f3f4f6',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                gap: 4,
+                                opacity: publishingPostId === post.id ? 0.6 : 1,
+                              }}
+                            >
+                              <Ionicons name={canPublishStatus(post.rawStatus) ? 'send-outline' : 'chevron-forward'} size={16} color={canPublishStatus(post.rawStatus) ? '#15803D' : '#6b7280'} />
+                              {canPublishStatus(post.rawStatus) && (
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#15803D' }}>
+                                  {publishingPostId === post.id ? '...' : 'Publish'}
+                                </Text>
+                              )}
                             </TouchableOpacity>
                           </View>
                         </>
@@ -3285,6 +3338,27 @@ $response = curl_exec($ch);`}
               <TouchableOpacity onPress={() => setPreviewPost(null)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb' }}>
                 <Text style={{ fontSize: 13, fontWeight: '500', color: Colors.textPrimary }}>Close</Text>
               </TouchableOpacity>
+              {canPublishStatus(previewPost?.rawStatus) && (
+                <TouchableOpacity
+                  disabled={publishingPostId === previewPost?.id}
+                  onPress={() => handlePublish(previewPost.id)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 6,
+                    backgroundColor: '#16A34A',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    opacity: publishingPostId === previewPost?.id ? 0.6 : 1,
+                  }}
+                >
+                  <Ionicons name="send-outline" size={16} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                    {publishingPostId === previewPost?.id ? 'Publishing...' : 'Publish'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
           </View>
