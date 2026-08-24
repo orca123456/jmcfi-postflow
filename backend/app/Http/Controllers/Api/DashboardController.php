@@ -33,13 +33,20 @@ class DashboardController extends Controller
                 ->where('display_name', 'LIKE', 'College%')
                 ->pluck('display_name');
 
-            return response()->json([
+            $payload = [
                 'success' => true,
+                'init_mode' => 'fallback',
                 'stats' => $stats,
                 'activities' => $activities,
                 'posts' => $postsData,
                 'departments' => $departments,
-            ]);
+            ];
+
+            if ($request->boolean('debug_dashboard')) {
+                $payload['fallback_error'] = $e->getMessage();
+            }
+
+            return response()->json($payload);
         }
     }
 
@@ -92,6 +99,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'success' => true,
+            'init_mode' => 'fast',
             'stats' => $stats,
             'activities' => $this->buildActivities($posts),
             'posts' => [
