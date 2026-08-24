@@ -319,7 +319,7 @@ class DashboardController extends Controller
             return null;
         }
 
-        return $request->getSchemeAndHttpHost() . '/storage/' . str_replace('\\', '/', $path);
+        return asset('storage/' . str_replace('\\', '/', $path));
     }
 
     /**
