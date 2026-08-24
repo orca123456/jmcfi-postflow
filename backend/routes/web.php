@@ -13,18 +13,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/test-posts', function() {
-    return \App\Http\Resources\Api\PostRequestResource::collection(\App\Models\PostRequest::with('media')->get());
-});
-
-Route::get('/test-s3', function() {
-    try {
-        $result = \Illuminate\Support\Facades\Storage::disk('s3')->put('test.txt', 'Hello S3');
-        return "Upload success: " . ($result ? 'true' : 'false');
-    } catch (\Exception $e) {
-        return "Exception: " . $e->getMessage();
-    }
-});
+// NOTE: two debug routes used to live here — GET /test-posts, which returned
+// every PostRequest with its media to anyone on the internet, and GET /test-s3,
+// which wrote to the S3 disk. Both were unauthenticated. Do not add debug
+// routes to this file; it is served publicly alongside the SPA.
 
 Route::get('/{any}', function () {
     $path = public_path('index.html');

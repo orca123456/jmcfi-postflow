@@ -18,12 +18,11 @@ class DashboardController extends Controller
     public function getInitData(Request $request): JsonResponse
     {
         $user = $request->user();
-
-        $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
-        $stats = $postController->getDashboardStats($request)->getData(true)['data'] ?? [];
+        $stats = $this->getStats($request)->getData(true)['data'] ?? [];
         $activities = $this->getRecentActivity($request)->getData(true) ?? [];
+        $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
         
-        $request->merge(['per_page' => 1000]);
+        $request->merge(['per_page' => 15]);
         $postsData = $postController->index($request)->getData(true);
         
         $departments = \App\Models\Department::where('is_active', true)
@@ -104,7 +103,19 @@ class DashboardController extends Controller
             $published           = $counts[PostRequest::STATUS_PUBLISHED] ?? 0;
 
             $totalSubmissions = array_sum($counts);
-            $pendingReview    = $pendingOfficeHead + $pendingVP + $pendingPresident + $pendingImcQa;
+            
+            $pendingReview = 0;
+            if ($category === 'approver') {
+                if ($role === 'vice_president') {
+                    $pendingReview = $pendingVP;
+                } elseif ($role === 'imc_qa_checker') {
+                    $pendingReview = $pendingImcQa;
+                } else { // office_head
+                    $pendingReview = $pendingOfficeHead;
+                }
+            } else {
+                $pendingReview = $pendingOfficeHead + $pendingVP + $pendingPresident + $pendingImcQa;
+            }
 
             return [
                 'total_users'        => $totalUsers,

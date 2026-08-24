@@ -99,7 +99,7 @@ export default function OfficeHeadDashboard() {
   const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
     queryKey: ['oh-dashboard-data'],
     queryFn: dashboardApi.getInitData,
-    refetchInterval: 100,
+    refetchInterval: 30000,
     refetchIntervalInBackground: true,
   });
 

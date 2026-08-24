@@ -98,7 +98,7 @@ export const categoriesApi = {
 // ── Dashboard endpoints ────────────────────────────────────────────────────
 export const dashboardApi = {
   getInitData: () => api.get('/dashboard/init'),
-  getStats: () => api.get('/posts/dashboard/stats'),
+  getStats: () => api.get('/dashboard/stats'),
   getRecentActivity: () => api.get('/dashboard/recent-activity'),
   getAnalyticsOverview: () => api.get('/dashboard/analytics'),
 };
