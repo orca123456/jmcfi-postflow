@@ -42,12 +42,15 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 # Copy the built frontend from STAGE 1 into Laravel's public directory
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
 
+# Use the app's Caddyfile instead of the image default so startup logs stay clean.
+COPY Caddyfile /etc/caddy/Caddyfile
+
 # Create storage symlink
-RUN php artisan storage:link
+RUN php artisan storage:link --force
 
 # Explicitly tell Railway to route to port 8080
 EXPOSE 8080
 
 # Configure FrankenPHP to listen on the port Railway provides, or 8080 as fallback
 # FrankenPHP automatically serves the /app/public directory perfectly using Caddy (HTTP/2, Keep-Alive, etc.)
-CMD ["sh", "-c", "SERVER_NAME=\":${PORT:-8080}\" frankenphp run --config /etc/caddy/Caddyfile"]
+CMD ["sh", "-c", "php artisan storage:link --force >/dev/null 2>&1 || true; frankenphp run --config /etc/caddy/Caddyfile"]
