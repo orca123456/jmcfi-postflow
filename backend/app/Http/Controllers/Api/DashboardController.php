@@ -57,10 +57,6 @@ class DashboardController extends Controller
         $role = $user->workflowRole();
         $baseQuery = $this->scopedPostQuery($user, $category, $role);
 
-        $stats = Cache::remember("dashboard_init_stats_{$category}_{$role}_{$user->id}", 1, function () use ($baseQuery, $category, $role) {
-            return $this->buildStats($baseQuery, $category, $role);
-        });
-
         $posts = (clone $baseQuery)
             ->select([
                 'id',
@@ -90,18 +86,28 @@ class DashboardController extends Controller
             ->limit(15)
             ->get();
 
-        $departments = Cache::remember('dashboard_college_departments', 60, function () {
-            return \App\Models\Department::where('is_active', true)
-                ->where('display_name', 'LIKE', 'College%')
-                ->orderBy('display_name')
-                ->pluck('display_name');
-        });
+        $stats = [];
+        if ($category === 'admin') {
+            $stats = Cache::remember("dashboard_init_stats_{$category}_{$role}_{$user->id}", 1, function () use ($baseQuery, $category, $role) {
+                return $this->buildStats($baseQuery, $category, $role);
+            });
+        }
+
+        $departments = collect();
+        if ($category === 'admin' || in_array($role, ['vice_president', 'imc_qa_checker'], true)) {
+            $departments = Cache::remember('dashboard_college_departments', 60, function () {
+                return \App\Models\Department::where('is_active', true)
+                    ->where('display_name', 'LIKE', 'College%')
+                    ->orderBy('display_name')
+                    ->pluck('display_name');
+            });
+        }
 
         return response()->json([
             'success' => true,
             'init_mode' => 'fast',
             'stats' => $stats,
-            'activities' => $this->buildActivities($posts),
+            'activities' => $category === 'admin' ? $this->buildActivities($posts) : [],
             'posts' => [
                 'data' => $posts->map(fn (PostRequest $post) => $this->postSummary($post, $request)),
                 'meta' => [
