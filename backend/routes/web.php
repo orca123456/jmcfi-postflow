@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use App\Models\PostMedia;
 
@@ -31,6 +32,10 @@ Route::get('/storage/{path}', function (string $path) {
         return response()->file(Storage::disk('public')->path($path), [
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
+    }
+
+    if (!Schema::hasTable('post_media_files')) {
+        abort(404);
     }
 
     $media = PostMedia::query()
