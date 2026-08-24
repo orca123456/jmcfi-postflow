@@ -33,6 +33,7 @@ class PostRequestController extends Controller
     {
         $query = PostRequest::with([
             'category',
+            'department',
             'requestor',
             'media',
             'approvalWorkflows.approver',
@@ -74,7 +75,7 @@ class PostRequestController extends Controller
         $query->orderBy($sortBy, $sortDir);
 
         // Paginate
-        $perPage = min($request->get('per_page', 15), 100);
+        $perPage = min(max((int) $request->get('per_page', 15), 1), 15);
         $posts = $query->paginate($perPage);
 
         return response()->json([

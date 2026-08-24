@@ -23,6 +23,20 @@ RUN install-php-extensions \
     gd \
     zip
 
+# Keep PHP predictable on a 1GB container and reserve memory for the OS/database
+# connection overhead. FrankenPHP does not use php-fpm, so pm.max_children is not
+# applicable here; these limits are the effective low-memory tuning for this image.
+RUN printf '%s\n' \
+    'memory_limit=128M' \
+    'opcache.enable=1' \
+    'opcache.enable_cli=1' \
+    'opcache.memory_consumption=64' \
+    'opcache.max_accelerated_files=10000' \
+    'opcache.validate_timestamps=0' \
+    'realpath_cache_size=4096K' \
+    'realpath_cache_ttl=600' \
+    > /usr/local/etc/php/conf.d/zz-production.ini
+
 # Install Composer securely
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -53,4 +67,4 @@ EXPOSE 8080
 
 # Configure FrankenPHP to listen on the port Railway provides, or 8080 as fallback
 # FrankenPHP automatically serves the /app/public directory perfectly using Caddy (HTTP/2, Keep-Alive, etc.)
-CMD ["sh", "-c", "php artisan storage:link --force >/dev/null 2>&1 || true; frankenphp run --config /etc/caddy/Caddyfile"]
+CMD ["sh", "-c", "php artisan storage:link --force >/dev/null 2>&1 || true; php artisan config:cache --quiet; php artisan view:cache --quiet; php artisan optimize --quiet; frankenphp run --config /etc/caddy/Caddyfile"]

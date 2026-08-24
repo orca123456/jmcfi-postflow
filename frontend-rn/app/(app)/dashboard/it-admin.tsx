@@ -229,8 +229,10 @@ export default function ITAdminDashboard() {
   const { data: initDataRes, isLoading } = useQuery({ 
     queryKey: ['adminInitData'], 
     queryFn: () => dashboardApi.getInitData(), 
-    refetchInterval: 30000, 
-    staleTime: 30000 
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: true,
+    staleTime: 5000
   });
   const isInitialLoading = isLoading;
   const [stats, setStats] = useState<any>(null);
