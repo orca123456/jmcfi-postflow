@@ -343,15 +343,38 @@ class PostRequestController extends Controller
 
         return DB::transaction(function () use ($request, $postRequest, $user) {
             $currentStage = $postRequest->currentApprovalStage();
+            
+            // If the workflow row is missing (e.g. approver didn't exist at the time), infer the stage from status
+            if (!$currentStage) {
+                $inferredStage = match ($postRequest->status) {
+                    PostRequest::STATUS_PENDING_OFFICE_HEAD => 'office_head',
+                    PostRequest::STATUS_PENDING_VICE_PRESIDENT => 'vice_president',
+                    PostRequest::STATUS_PENDING_PRESIDENT => 'president',
+                    PostRequest::STATUS_PENDING_IMC_QA => 'imc_qa',
+                    default => null,
+                };
+                
+                if ($inferredStage) {
+                    $currentStage = $postRequest->approvalWorkflows()->create([
+                        'stage' => $inferredStage,
+                        'approver_id' => $user->id,
+                        'action' => 'pending',
+                        'stage_order' => $postRequest->approvalWorkflows()->count() + 1,
+                    ]);
+                }
+            }
+
             $nextStage = $postRequest->getNextStage();
             $approvedStageName = $currentStage?->stage;
 
-            $currentStage->update([
-                'action'      => 'approved',
-                'approver_id' => $user->id,
-                'remarks'     => $request->remarks,
-                'acted_at'    => now(),
-            ]);
+            if ($currentStage) {
+                $currentStage->update([
+                    'action'      => 'approved',
+                    'approver_id' => $user->id,
+                    'remarks'     => $request->remarks,
+                    'acted_at'    => now(),
+                ]);
+            }
 
             if ($nextStage) {
                 // Move to next stage
