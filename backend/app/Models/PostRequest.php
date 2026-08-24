@@ -185,7 +185,19 @@ class PostRequest extends Model
     public function canBeApprovedBy(User $user): bool
     {
         $currentStage = $this->currentApprovalStage();
-        if (!$currentStage) {
+        $stageName = $currentStage?->stage;
+
+        if (!$stageName) {
+            $stageName = match ($this->status) {
+                self::STATUS_PENDING_OFFICE_HEAD => 'office_head',
+                self::STATUS_PENDING_VICE_PRESIDENT => 'vice_president',
+                self::STATUS_PENDING_PRESIDENT => 'president',
+                self::STATUS_PENDING_IMC_QA => 'imc_qa',
+                default => null,
+            };
+        }
+
+        if (!$stageName) {
             return false;
         }
 
@@ -201,15 +213,14 @@ class PostRequest extends Model
             return false;
         }
 
-        // Match the approval stage to the user's RAW role — mirrors
-        // PostRequestController::applyPendingApprovalScope. The previous logic
-        // used a non-existent 'approver' role and department strings like
-        // 'Vice President of Academic Affairs' / 'Institutional Marketing
-        // Communication', which never matched the real roles/departments, so
-        // every approver got "Unauthorized to approve this post".
-        return match ($currentStage->stage) {
-            // Office Head approves stage 1 — must belong to the requestor's department
-            'office_head'    => $role === 'office_head' && $user->department === $this->requestor?->department,
+        if ($currentStage?->approver_id === $user->id) {
+            return true;
+        }
+
+        // Match the approval stage to the user's RAW role
+        return match ($stageName) {
+            // Office Head approves stage 1 — must belong to the requestor's department (case-insensitive)
+            'office_head'    => $role === 'office_head' && strcasecmp(trim($user->department ?? ''), trim($this->requestor?->department ?? '')) === 0,
             'vice_president' => $role === 'vice_president',
             'imc_qa'         => $role === 'imc_qa_checker',
             default          => false,
@@ -219,13 +230,23 @@ class PostRequest extends Model
     public function getNextStage(): ?string
     {
         $stages = array_keys(self::approvalStages());
-        $currentStage = $this->currentApprovalStage()?->stage;
+        $currentStageName = $this->currentApprovalStage()?->stage;
         
-        if (!$currentStage) {
+        if (!$currentStageName) {
+            $currentStageName = match ($this->status) {
+                self::STATUS_PENDING_OFFICE_HEAD => 'office_head',
+                self::STATUS_PENDING_VICE_PRESIDENT => 'vice_president',
+                self::STATUS_PENDING_PRESIDENT => 'president',
+                self::STATUS_PENDING_IMC_QA => 'imc_qa',
+                default => null,
+            };
+        }
+
+        if (!$currentStageName) {
             return $stages[0] ?? null;
         }
 
-        $currentIndex = array_search($currentStage, $stages);
+        $currentIndex = array_search($currentStageName, $stages);
         if ($currentIndex !== false && $currentIndex < count($stages) - 1) {
             return $stages[$currentIndex + 1];
         }

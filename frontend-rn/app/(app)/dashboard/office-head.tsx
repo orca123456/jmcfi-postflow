@@ -238,20 +238,20 @@ export default function OfficeHeadDashboard() {
 
   const handleApprove = async (req: any) => {
     setModalError(null);
-    
-    setRequestsList(prev => prev.filter(r => r.id !== req.id));
-    setOptimisticallyRemovedIds(prev => [...prev, req.id]);
-    setApprovedRequests(prev => [{ ...req, status: 'APPROVED' }, ...prev]);
-    setSelectedRequest(null);
-    
-    setTimeout(() => {
-      alert(`Request Approved: "${req.title}"`);
-    }, 100);
 
     try {
       await postsApi.approve(req.id, {});
+      setRequestsList(prev => prev.filter(r => r.id !== req.id));
+      setOptimisticallyRemovedIds(prev => [...prev, req.id]);
+      setApprovedRequests(prev => [{ ...req, status: 'APPROVED' }, ...prev]);
+      setSelectedRequest(null);
+      loadData(false);
+      setTimeout(() => {
+        alert(`Request Approved: "${req.title}"`);
+      }, 100);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to approve request.');
+      loadData(false);
     }
   };
 
@@ -267,40 +267,40 @@ export default function OfficeHeadDashboard() {
       return;
     }
     setModalError(null);
-    
-    setRequestsList(prev => prev.filter(r => r.id !== requestToReject?.id));
-    setOptimisticallyRemovedIds(prev => [...prev, requestToReject?.id]);
-    if (requestToReject) setRejectedRequests(prev => [{ ...requestToReject, status: 'REJECTED' }, ...prev]);
-    setIsRejectModalVisible(false);
+
     const reqTitle = requestToReject?.title;
     const reqId = requestToReject?.id;
-    setRequestToReject(null);
-    setSelectedRequest(null);
-    
-    setTimeout(() => {
-      alert(`Request Rejected: "${reqTitle}"\nReason: ${rejectComment}`);
-    }, 100);
+    const reason = rejectComment;
 
     try {
-      await postsApi.reject(reqId, { reason: rejectComment });
-    } catch (err) {
-      alert('Failed to reject request.');
+      await postsApi.reject(reqId, { reason });
+      setRequestsList(prev => prev.filter(r => r.id !== reqId));
+      setOptimisticallyRemovedIds(prev => [...prev, reqId]);
+      if (requestToReject) setRejectedRequests(prev => [{ ...requestToReject, status: 'REJECTED' }, ...prev]);
+      setIsRejectModalVisible(false);
+      setRequestToReject(null);
+      setSelectedRequest(null);
+      loadData(false);
+      setTimeout(() => {
+        alert(`Request Rejected: "${reqTitle}"\nReason: ${reason}`);
+      }, 100);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject request.');
+      loadData(false);
     }
   };
 
   const handleRequestRevision = async (req: any) => {
-    setRequestsList(prev => prev.filter(r => r.id !== req.id));
-    setOptimisticallyRemovedIds(prev => [...prev, req.id]);
-    setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
-    setSelectedRequest(null);
-    
-    alert(`Revision Requested for: "${req.title}"`);
-
     try {
       await postsApi.returnRevision(req.id, { reason: 'Revision requested by Office Head' });
+      setRequestsList(prev => prev.filter(r => r.id !== req.id));
+      setOptimisticallyRemovedIds(prev => [...prev, req.id]);
+      setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
+      setSelectedRequest(null);
       loadData(false);
-    } catch (err) {
-      alert('Failed to return for revision.');
+      alert(`Revision Requested for: "${req.title}"`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to return for revision.');
       loadData(false);
     }
   };
