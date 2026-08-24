@@ -113,16 +113,7 @@ class PostRequestController extends Controller
                 foreach ($request->file('media') as $index => $file) {
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                     $path = $file->store('post-media/' . $post->id, $disk);
-                    PostMedia::create([
-                        'post_request_id' => $post->id,
-                        'type' => $this->getMediaType($file->getMimeType()),
-                        'original_name' => $file->getClientOriginalName(),
-                        'file_path' => $path,
-                        'mime_type' => $file->getMimeType(),
-                        'file_size' => $file->getSize(),
-                        'sort_order' => $index,
-                        'is_featured' => $index === 0,
-                    ]);
+                    $this->createMediaRecord($post, $file, $path, $this->getMediaType($file->getMimeType()), $index, $index === 0);
                 }
             }
 
@@ -131,16 +122,7 @@ class PostRequestController extends Controller
                 foreach ($request->file('supporting_docs') as $index => $file) {
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                     $path = $file->store('post-supporting-docs/' . $post->id, $disk);
-                    PostMedia::create([
-                        'post_request_id' => $post->id,
-                        'type' => 'document',
-                        'original_name' => $file->getClientOriginalName(),
-                        'file_path' => $path,
-                        'mime_type' => $file->getMimeType(),
-                        'file_size' => $file->getSize(),
-                        'sort_order' => 100 + $index,
-                        'is_featured' => false,
-                    ]);
+                    $this->createMediaRecord($post, $file, $path, 'document', 100 + $index, false);
                 }
             }
 
@@ -214,7 +196,8 @@ class PostRequestController extends Controller
                 // Delete old media not in keep list
                 $keepIds = $request->input('keep_media_ids', []);
                 $postRequest->media()->whereNotIn('id', $keepIds)->each(function ($media) {
-                    Storage::disk(config('filesystems.default'))->delete($media->path);
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    Storage::disk($disk)->delete($media->file_path);
                     $media->delete();
                 });
 
@@ -223,16 +206,8 @@ class PostRequestController extends Controller
                 foreach ($request->file('media') as $index => $file) {
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                     $path = $file->store('post-media/' . $postRequest->id, $disk);
-                    PostMedia::create([
-                        'post_request_id' => $postRequest->id,
-                        'type' => $this->getMediaType($file->getMimeType()),
-                        'original_name' => $file->getClientOriginalName(),
-                        'file_path' => $path,
-                        'mime_type' => $file->getMimeType(),
-                        'file_size' => $file->getSize(),
-                        'sort_order' => $existingCount + $index,
-                        'is_featured' => ($existingCount + $index) === 0,
-                    ]);
+                    $sortOrder = $existingCount + $index;
+                    $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($file->getMimeType()), $sortOrder, $sortOrder === 0);
                 }
             }
 
@@ -269,7 +244,8 @@ class PostRequestController extends Controller
 
         // Delete media files
         foreach ($postRequest->media as $media) {
-            Storage::disk(config('filesystems.default'))->delete($media->path);
+            $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+            Storage::disk($disk)->delete($media->file_path);
         }
 
         $postRequest->delete();
@@ -802,6 +778,32 @@ class PostRequestController extends Controller
         if (str_starts_with($mimeType, 'image/')) return 'image';
         if (str_starts_with($mimeType, 'video/')) return 'video';
         return 'document';
+    }
+
+    private function createMediaRecord(
+        PostRequest $post,
+        \Illuminate\Http\UploadedFile $file,
+        string $path,
+        string $type,
+        int $sortOrder,
+        bool $isFeatured
+    ): PostMedia {
+        $media = PostMedia::create([
+            'post_request_id' => $post->id,
+            'type' => $type,
+            'original_name' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'mime_type' => $file->getMimeType(),
+            'file_size' => $file->getSize(),
+            'sort_order' => $sortOrder,
+            'is_featured' => $isFeatured,
+        ]);
+
+        $media->file()->create([
+            'content' => file_get_contents($file->getRealPath()),
+        ]);
+
+        return $media;
     }
 
     private function recordAuditTrail(PostRequest $post, string $event, \App\Models\User $user, ?string $remarks = null): void
