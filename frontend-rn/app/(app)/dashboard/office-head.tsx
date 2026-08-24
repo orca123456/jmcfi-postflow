@@ -99,7 +99,10 @@ export default function OfficeHeadDashboard() {
   const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
     queryKey: ['oh-dashboard-data'],
     queryFn: dashboardApi.getInitData,
-    refetchInterval: 30000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
 
@@ -207,10 +210,15 @@ export default function OfficeHeadDashboard() {
         let pendingStatuses: string[] = [];
         let approvedStatuses: string[] = [];
 
-        if (user?.department === 'Vice President for Academic Affairs') {
+        const rawRole = ((user as any)?.roles && (user as any).roles[0]) || user?.role;
+        const department = (user?.department || '').toLowerCase();
+        const isVicePresident = rawRole === 'vice_president' || department.includes('vice president');
+        const isImcQa = rawRole === 'imc_qa_checker' || department.includes('institutional marketing communication');
+
+        if (isVicePresident) {
           pendingStatuses = ['PENDING_VICE_PRESIDENT'];
           approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
-        } else if (user?.department === 'Institutional Marketing Communication') {
+        } else if (isImcQa) {
           pendingStatuses = ['PENDING_IMC_QA'];
           approvedStatuses = ['APPROVED', 'SCHEDULED', 'PUBLISHED'];
         } else {
@@ -360,10 +368,14 @@ export default function OfficeHeadDashboard() {
 
   const isLargeScreen = width > 1024;
   const isTablet = width > 768;
+  const viewerRawRole = ((user as any)?.roles && (user as any).roles[0]) || user?.role;
+  const viewerDepartment = (user?.department || '').toLowerCase();
+  const viewerIsVicePresident = viewerRawRole === 'vice_president' || viewerDepartment.includes('vice president');
+  const viewerIsImcQa = viewerRawRole === 'imc_qa_checker' || viewerDepartment.includes('institutional marketing communication');
 
   let userPosition = user?.position || 'Department Head';
-  if (user?.department === 'Vice President for Academic Affairs') userPosition = 'Vice President';
-  if (user?.department === 'Institutional Marketing Communication') userPosition = 'QA / Branding Checker';
+  if (viewerIsVicePresident) userPosition = 'Vice President';
+  if (viewerIsImcQa) userPosition = 'QA / Branding Checker';
 
   const greetingName = user?.name ? `${userPosition} ${user.name}` : userPosition;
 
@@ -478,7 +490,7 @@ export default function OfficeHeadDashboard() {
                 </View>
 
                 {/* Department Dropdown - Only show for VP and IMC who can see multiple departments */}
-                {(user?.department === 'Vice President for Academic Affairs' || user?.department === 'Institutional Marketing Communication') && (
+                {(viewerIsVicePresident || viewerIsImcQa) && (
                   <View style={{ position: 'relative', zIndex: 10 }}>
                     <TouchableOpacity
                       style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
@@ -632,8 +644,8 @@ export default function OfficeHeadDashboard() {
 
                     {activeTab === 'dashboard' ? (
                       req.status === (
-                        user?.department === 'Vice President of Academic Affairs' ? 'PENDING_VICE_PRESIDENT' :
-                          user?.department === 'Institutional Marketing Communication' ? 'PENDING_IMC_QA' :
+                        viewerIsVicePresident ? 'PENDING_VICE_PRESIDENT' :
+                          viewerIsImcQa ? 'PENDING_IMC_QA' :
                             'PENDING_OFFICE_HEAD'
                       ) ? (
                         <>

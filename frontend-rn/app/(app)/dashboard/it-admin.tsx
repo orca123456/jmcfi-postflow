@@ -84,13 +84,19 @@ const roleCategoryOf = (role: string): string => {
   return 'requestor'; // requestor, content_requestor, or unknown -> safest
 };
 
+const isVicePresidentDepartment = (department: string): boolean =>
+  department.toLowerCase().includes('vice president') || department === 'Academic Affairs';
+
+const isImcDepartment = (department: string): boolean =>
+  department.toLowerCase().includes('institutional marketing');
+
 // Map category + department -> exact granular role to assign (mirrors backend)
 const granularRoleFor = (category: string, department: string): string => {
   if (category === 'admin') return 'it_publisher';
   if (category === 'requestor') return 'requestor';
   // approver -> department picks the sub-role
-  if (department === 'Institutional Marketing & Communications') return 'imc_qa_checker';
-  if (department === 'Office of the President' || department === 'Vice President of Academic Affairs' || department === 'Academic Affairs') return 'vice_president';
+  if (isImcDepartment(department)) return 'imc_qa_checker';
+  if (department === 'Office of the President' || isVicePresidentDepartment(department)) return 'vice_president';
   return 'office_head';
 };
 
@@ -105,8 +111,8 @@ const departmentsForRole = (category: string, departments: any[]): any[] => {
 const autoPositionFor = (category: string, department: string): string => {
   if (category === 'admin') return 'IT Administrator';
   if (category === 'approver') {
-    if (department === 'Institutional Marketing & Communications') return 'QA / Branding Checker';
-    if (department === 'Office of the President' || department === 'Vice President of Academic Affairs' || department === 'Academic Affairs') return 'Vice President';
+    if (isImcDepartment(department)) return 'QA / Branding Checker';
+    if (department === 'Office of the President' || isVicePresidentDepartment(department)) return 'Vice President';
     return 'Department Head';
   }
   return '';

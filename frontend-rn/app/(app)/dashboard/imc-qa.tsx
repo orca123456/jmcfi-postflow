@@ -143,7 +143,10 @@ export default function ImcQaDashboard() {
   const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
     queryKey: ['imc-dashboard-data'],
     queryFn: dashboardApi.getInitData,
-    refetchInterval: 30000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
 
@@ -194,10 +197,15 @@ export default function ImcQaDashboard() {
       let pendingStatuses = [];
       let approvedStatuses = [];
       
-      if (user?.department === 'Vice President for Academic Affairs') {
+      const rawRole = ((user as any)?.roles && (user as any).roles[0]) || user?.role;
+      const department = (user?.department || '').toLowerCase();
+      const isVicePresident = rawRole === 'vice_president' || department.includes('vice president');
+      const isImcQa = rawRole === 'imc_qa_checker' || department.includes('institutional marketing communication');
+
+      if (isVicePresident) {
         pendingStatuses = ['PENDING_VICE_PRESIDENT'];
         approvedStatuses = ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
-      } else if (user?.department === 'Institutional Marketing Communication') {
+      } else if (isImcQa) {
         pendingStatuses = ['PENDING_IMC_QA'];
         approvedStatuses = ['APPROVED', 'SCHEDULED', 'PUBLISHED'];
       } else {

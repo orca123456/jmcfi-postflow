@@ -118,7 +118,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function roleCategory(): string
     {
-        $role = $this->getRoleNames()->first();
+        $role = $this->workflowRole();
 
         return match ($role) {
             'it_publisher', 'it_admin' => 'admin',
@@ -126,6 +126,22 @@ class User extends Authenticatable implements MustVerifyEmail
             'requestor', 'content_requestor' => 'requestor',
             default => $role ?? 'requestor',
         };
+    }
+
+    public function workflowRole(): ?string
+    {
+        $role = $this->getRoleNames()->first();
+        $department = strtolower($this->department ?? '');
+
+        if ($role === 'office_head' && str_contains($department, 'vice president')) {
+            return 'vice_president';
+        }
+
+        if ($role === 'office_head' && str_contains($department, 'institutional marketing communication')) {
+            return 'imc_qa_checker';
+        }
+
+        return $role;
     }
 
     // NOTE: hasAnyRole() intentionally not overridden — Spatie's HasRoles trait
