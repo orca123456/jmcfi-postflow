@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PostMedia extends Model
 {
@@ -39,6 +40,11 @@ class PostMedia extends Model
     public function postRequest(): BelongsTo
     {
         return $this->belongsTo(PostRequest::class);
+    }
+
+    public function file(): HasOne
+    {
+        return $this->hasOne(PostMediaFile::class);
     }
 
     public function getTypeLabelAttribute(): string

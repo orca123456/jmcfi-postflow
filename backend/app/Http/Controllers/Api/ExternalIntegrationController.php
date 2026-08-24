@@ -111,7 +111,8 @@ class ExternalIntegrationController extends Controller
                         $filename = 'external_' . Str::random(10) . '.' . $extension;
                         $path = 'post-media/' . $post->id . '/' . $filename;
 
-                        Storage::disk(config('filesystems.default'))->put($path, $response->body());
+                        $storageDisk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                        Storage::disk($storageDisk)->put($path, $response->body());
 
                         $media = PostMedia::create([
                             'post_request_id' => $post->id,
@@ -122,6 +123,10 @@ class ExternalIntegrationController extends Controller
                             'file_size' => $bytes,
                             'sort_order' => 0,
                             'is_featured' => true,
+                        ]);
+
+                        $media->file()->create([
+                            'content' => $response->body(),
                         ]);
 
                         $disk = config('filesystems.default');

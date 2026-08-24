@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use App\Models\PostMedia;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,11 +27,29 @@ Route::get('/storage/{path}', function (string $path) {
         abort(404);
     }
 
-    if (!Storage::disk('public')->exists($path)) {
+    if (Storage::disk('public')->exists($path)) {
+        return response()->file(Storage::disk('public')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
+    }
+
+    $media = PostMedia::query()
+        ->where('file_path', $path)
+        ->with('file:id,post_media_id,content')
+        ->first();
+
+    $content = $media?->file?->content;
+    if (is_resource($content)) {
+        $content = stream_get_contents($content);
+    }
+
+    if ($content === null) {
         abort(404);
     }
 
-    return response()->file(Storage::disk('public')->path($path), [
+    return response($content, 200, [
+        'Content-Type' => $media->mime_type,
+        'Content-Length' => (string) strlen($content),
         'Cache-Control' => 'public, max-age=31536000, immutable',
     ]);
 })->where('path', '.*');
