@@ -7,6 +7,7 @@ use App\Models\PostRequest;
 use App\Models\PostCategory;
 use App\Models\PostMedia;
 use App\Services\ApprovalWorkflowService;
+use App\Services\InstagramPublishingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,11 @@ class ExternalIntegrationController extends Controller
     /**
      * Submit a new content request from an external application.
      */
-    public function submitRequest(Request $request, \App\Services\FacebookPublishingService $facebookService): JsonResponse
+    public function submitRequest(
+        Request $request,
+        \App\Services\FacebookPublishingService $facebookService,
+        InstagramPublishingService $instagramService
+    ): JsonResponse
     {
         if (!$request->isJson()) {
             return response()->json(['message' => 'Only JSON payloads are accepted. Please set Content-Type to application/json.'], 415);
@@ -88,6 +93,7 @@ class ExternalIntegrationController extends Controller
             ]);
 
             $mediaPath = null;
+            $mediaUrl = null;
 
             // Handle external image download
             if ($request->image_url) {
@@ -138,6 +144,7 @@ class ExternalIntegrationController extends Controller
                         } else {
                             $mediaPath = Storage::disk('public')->path($media->file_path);
                         }
+                        $mediaUrl = $media->url;
                     }
                 } catch (\Exception $e) {
                     // Log error but don't fail the request
@@ -157,12 +164,33 @@ class ExternalIntegrationController extends Controller
                         $message = $post->caption_narrative ?? '';
                         $fbResponse = $facebookService->publishPost($message, $mediaPath);
                         $publishResults['facebook'] = $fbResponse;
-                        $post->update(['status' => PostRequest::STATUS_PUBLISHED]);
                     } catch (\Exception $e) {
                         \Illuminate\Support\Facades\Log::error('Direct API Publish to Facebook failed: ' . $e->getMessage());
                         $publishResults['facebook'] = ['error' => $e->getMessage()];
-                        $post->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
                     }
+                }
+
+                if (in_array('instagram', $lowerPlatforms) || in_array('ig', $lowerPlatforms)) {
+                    try {
+                        $message = $post->caption_narrative ?? '';
+                        $igResponse = $instagramService->publishPost($message, $mediaUrl);
+                        $publishResults['instagram'] = $igResponse;
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('Direct API Publish to Instagram failed: ' . $e->getMessage());
+                        $publishResults['instagram'] = ['error' => $e->getMessage()];
+                    }
+                }
+
+                $hasPublishFailures = collect($publishResults)->contains(function ($result) {
+                    return is_array($result) && array_key_exists('error', $result);
+                });
+
+                if ($publishResults !== []) {
+                    $post->update([
+                        'status' => $hasPublishFailures
+                            ? PostRequest::STATUS_PUBLISH_FAILED
+                            : PostRequest::STATUS_PUBLISHED,
+                    ]);
                 }
 
                 \App\Services\AuditLogService::log(
@@ -186,7 +214,7 @@ class ExternalIntegrationController extends Controller
                     ],
                     'message' => $post->status === PostRequest::STATUS_PUBLISHED
                         ? 'Post successfully published directly from external source.'
-                        : 'Post was created, but publishing to Facebook failed. Please verify the Page ID, Page Access Token, and page permissions.',
+                        : 'Post was created, but publishing to one or more platforms failed. Please verify the saved platform IDs, access tokens, and permissions.',
                 ], $post->status === PostRequest::STATUS_PUBLISHED ? 201 : 502);
             }
 

@@ -70,6 +70,11 @@ class TokenSettingController extends Controller
             Cache::forget('facebook_access_token');
         }
 
+        if (array_key_exists('instagram_business_account_id', $validated) || array_key_exists('instagram_access_token', $validated)) {
+            Cache::forget('instagram_business_account_id');
+            Cache::forget('instagram_access_token');
+        }
+
         // Update timestamp
         SystemSetting::updateOrCreate(
             ['key' => 'tokens_last_updated'],

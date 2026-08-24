@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\PostPublishedSuccessNotification;
 use App\Notifications\PostPublishingFailedNotification;
 use App\Services\FacebookPublishingService;
+use App\Services\InstagramPublishingService;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class PublishingController extends Controller
 {
     public function __construct(
         private FacebookPublishingService $facebookService,
+        private InstagramPublishingService $instagramService,
         private AuditLogService $auditLogService
     ) {}
 
@@ -52,10 +54,16 @@ class PublishingController extends Controller
             $lowerPlatforms = array_map('strtolower', $platforms);
 
             $publishResults = [];
+            $media = $post->media()
+                ->where(function ($query) {
+                    $query->where('type', 'image')
+                        ->orWhere('mime_type', 'like', 'image/%');
+                })
+                ->orderBy('sort_order')
+                ->first();
 
             // 3. Publish to Facebook if it is in the target platforms
             if (in_array('facebook', $lowerPlatforms) || in_array('fb', $lowerPlatforms)) {
-                $media = $post->media()->first();
                 $mediaPath = null;
                 if ($media && $media->file_path) {
                     $disk = config('filesystems.default');
@@ -69,6 +77,13 @@ class PublishingController extends Controller
                 $message = $post->caption_narrative ?? '';
                 $fbResponse = $this->facebookService->publishPost($message, $mediaPath);
                 $publishResults['facebook'] = $fbResponse;
+            }
+
+            if (in_array('instagram', $lowerPlatforms) || in_array('ig', $lowerPlatforms)) {
+                $message = $post->caption_narrative ?? '';
+                $imageUrl = $media?->url;
+                $igResponse = $this->instagramService->publishPost($message, $imageUrl);
+                $publishResults['instagram'] = $igResponse;
             }
 
             // 4. Update the post status to published
