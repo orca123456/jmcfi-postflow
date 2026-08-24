@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
 {
@@ -321,7 +322,21 @@ class DashboardController extends Controller
             return null;
         }
 
-        return asset('storage/' . str_replace('\\', '/', $path));
+        $normalizedPath = str_replace('\\', '/', $path);
+        $disk = config('filesystems.default');
+
+        if (in_array($disk, ['s3', 'b2'], true)) {
+            return Storage::disk($disk)->url($normalizedPath);
+        }
+
+        if (
+            Storage::disk('public')->exists($normalizedPath) ||
+            \App\Models\PostMedia::where('file_path', $normalizedPath)->whereHas('file')->exists()
+        ) {
+            return asset('storage/' . $normalizedPath);
+        }
+
+        return null;
     }
 
     /**

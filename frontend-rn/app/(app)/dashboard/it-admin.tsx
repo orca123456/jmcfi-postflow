@@ -303,7 +303,9 @@ export default function ITAdminDashboard() {
       requestedOn: new Date(p.created_at).toLocaleDateString(),
       requestedTime: new Date(p.created_at).toLocaleTimeString(),
       rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : '',
-      image: p.media && p.media.length > 0 ? p.media[0].url : 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?auto=format&fit=crop&w=150&q=80',
+      image: Array.isArray(p.media)
+        ? (p.media.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url || null)
+        : null,
       rawPost: p,
     }));
     setMockTablePosts(mappedTable);
@@ -1386,7 +1388,13 @@ export default function ITAdminDashboard() {
                   ]}>
                     {/* TITLE */}
                     <View style={[{ flexDirection: 'row', alignItems: 'center' }, isTablet ? { flex: 2, paddingRight: 16 } : { width: '100%' }]}>
-                      <Image source={{ uri: post.image }} style={{ width: 48, height: 32, borderRadius: 4, marginRight: 12 }} />
+                      {post.image ? (
+                        <Image source={{ uri: post.image }} style={{ width: 48, height: 32, borderRadius: 4, marginRight: 12, backgroundColor: '#F3F4F6' }} resizeMode="cover" />
+                      ) : (
+                        <View style={{ width: 48, height: 32, borderRadius: 4, marginRight: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name="image-outline" size={16} color="#9CA3AF" />
+                        </View>
+                      )}
                       <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={2}>{post.title}</Text>
                     </View>
 

@@ -149,7 +149,9 @@ export default function VPDashboard() {
         previewBanner: (p.title || '').toUpperCase(),
         attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
         attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
-        thumbnailUrl: p.media && p.media.length > 0 ? p.media[0].url : null,
+        thumbnailUrl: Array.isArray(p.media)
+          ? (p.media.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url || null)
+          : null,
         status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
         rejectionReason: p.rejection_reason || '',
         rejectedBy,
