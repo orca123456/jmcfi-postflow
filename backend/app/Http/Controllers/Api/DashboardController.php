@@ -17,10 +17,37 @@ class DashboardController extends Controller
      */
     public function getInitData(Request $request): JsonResponse
     {
+        try {
+            return $this->getFastInitData($request);
+        } catch (\Throwable $e) {
+            logger()->warning('Fast dashboard init failed; using stable fallback. ' . $e->getMessage());
+
+            $stats = $this->getStats($request)->getData(true)['data'] ?? [];
+            $activities = $this->getRecentActivity($request)->getData(true) ?? [];
+            $postController = app(\App\Http\Controllers\Api\PostRequestController::class);
+
+            $request->merge(['per_page' => 15]);
+            $postsData = $postController->index($request)->getData(true);
+
+            $departments = \App\Models\Department::where('is_active', true)
+                ->where('display_name', 'LIKE', 'College%')
+                ->pluck('display_name');
+
+            return response()->json([
+                'success' => true,
+                'stats' => $stats,
+                'activities' => $activities,
+                'posts' => $postsData,
+                'departments' => $departments,
+            ]);
+        }
+    }
+
+    private function getFastInitData(Request $request): JsonResponse
+    {
         $user = $request->user();
         $category = $user->roleCategory();
         $role = $user->workflowRole();
-
         $baseQuery = $this->scopedPostQuery($user, $category, $role);
 
         $stats = Cache::remember("dashboard_init_stats_{$category}_{$role}_{$user->id}", 1, function () use ($baseQuery, $category, $role) {
@@ -68,7 +95,7 @@ class DashboardController extends Controller
             'stats' => $stats,
             'activities' => $this->buildActivities($posts),
             'posts' => [
-                'data' => $posts->map(fn (PostRequest $post) => $this->postSummary($post, $user)),
+                'data' => $posts->map(fn (PostRequest $post) => $this->postSummary($post, $request)),
                 'meta' => [
                     'current_page' => 1,
                     'last_page' => 1,
@@ -198,13 +225,19 @@ class DashboardController extends Controller
                 },
                 'target' => $post->title,
                 'time' => $post->updated_at?->diffForHumans() ?? 'recently',
-                'platform' => 'Status: ' . ($post->status_label ?? $post->status),
+                'platform' => 'Status: ' . (PostRequest::statuses()[$post->status] ?? $post->status),
             ];
         });
     }
 
-    private function postSummary(PostRequest $post, User $user): array
+    private function postSummary(PostRequest $post, Request $request): array
     {
+        $statusLabels = PostRequest::statuses();
+        $currentStage = $post->approvalWorkflows
+            ->where('action', 'pending')
+            ->sortBy('stage_order')
+            ->first();
+
         return [
             'id' => $post->id,
             'title' => $post->title,
@@ -224,7 +257,7 @@ class DashboardController extends Controller
                 'department' => $post->requestor->department,
             ] : null,
             'status' => $post->status,
-            'status_label' => $post->status_label,
+            'status_label' => $statusLabels[$post->status] ?? $post->status,
             'target_platforms' => $post->target_platforms ?? [],
             'preferred_schedule_at' => $post->preferred_schedule_at?->toISOString(),
             'published_at' => $post->published_at?->toISOString(),
@@ -235,7 +268,7 @@ class DashboardController extends Controller
                 'id' => $media->id,
                 'type' => $media->type,
                 'original_filename' => $media->original_name,
-                'url' => $media->url,
+                'url' => $this->mediaUrl($media->file_path, $request),
                 'mime_type' => $media->mime_type,
                 'size' => $media->file_size,
                 'formatted_size' => $media->formatted_size,
@@ -257,13 +290,22 @@ class DashboardController extends Controller
                 'acted_at' => $workflow->acted_at?->toISOString(),
                 'stage_order' => $workflow->stage_order,
             ]),
-            'current_approval_stage' => $post->current_approval_stage,
-            'current_stage_label' => $post->current_stage_label,
-            'can_edit' => $post->canBeEditedBy($user),
-            'can_approve' => $post->canBeApprovedBy($user),
+            'current_approval_stage' => $currentStage?->stage,
+            'current_stage_label' => $currentStage ? (PostRequest::approvalStages()[$currentStage->stage] ?? $currentStage->stage) : null,
+            'can_edit' => false,
+            'can_approve' => $currentStage !== null,
             'created_at' => $post->created_at?->toISOString(),
             'updated_at' => $post->updated_at?->toISOString(),
         ];
+    }
+
+    private function mediaUrl(?string $path, Request $request): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return $request->getSchemeAndHttpHost() . '/storage/' . str_replace('\\', '/', $path);
     }
 
     /**
