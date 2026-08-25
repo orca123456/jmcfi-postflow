@@ -17,11 +17,13 @@ class InstagramPublishingService
     public function __construct()
     {
         $this->businessAccountId = Cache::remember('instagram_business_account_id', 3600, function () {
-            return SystemSetting::where('key', 'instagram_business_account_id')->value('value') ?? env('INSTAGRAM_BUSINESS_ACCOUNT_ID', '');
+            $setting = SystemSetting::where('key', 'instagram_business_account_id')->first();
+            return $setting ? (string) $setting->value : env('INSTAGRAM_BUSINESS_ACCOUNT_ID', '');
         });
 
         $this->accessToken = Cache::remember('instagram_access_token', 3600, function () {
-            return SystemSetting::where('key', 'instagram_access_token')->value('value') ?? env('INSTAGRAM_ACCESS_TOKEN', '');
+            $setting = SystemSetting::where('key', 'instagram_access_token')->first();
+            return $setting ? (string) $setting->value : env('INSTAGRAM_ACCESS_TOKEN', '');
         });
 
         $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');

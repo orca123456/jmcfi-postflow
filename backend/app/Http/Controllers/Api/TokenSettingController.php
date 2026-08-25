@@ -54,6 +54,8 @@ class TokenSettingController extends Controller
 
         foreach ($validated as $key => $value) {
             if ($value !== null) {
+                $value = is_string($value) ? trim($value) : $value;
+
                 SystemSetting::updateOrCreate(
                     ['key' => $key],
                     [
