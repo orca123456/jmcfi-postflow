@@ -779,6 +779,36 @@ export default function ITAdminDashboard() {
     }
   };
 
+  const handleClearPlatformTokens = async (platform: 'facebook' | 'instagram' | 'wordpress') => {
+    const platformFields: Record<string, string[]> = {
+      facebook: ['facebook_page_id', 'facebook_access_token'],
+      instagram: ['instagram_business_account_id', 'instagram_access_token'],
+      wordpress: ['wordpress_url', 'wordpress_username', 'wordpress_app_password'],
+    };
+    const keys = platformFields[platform];
+    const payload: Record<string, string> = {};
+    keys.forEach(k => { payload[k] = ''; });
+
+    setTokenFields(prev => {
+      const next = { ...prev };
+      keys.forEach(k => { (next as any)[k] = ''; });
+      return next;
+    });
+
+    setSavingTokens(true);
+    setSavingTokenPlatform(platform);
+    try {
+      const res = await tokenSettingsApi.update(payload);
+      showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens cleared!`, 'success');
+      setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
+    } catch (e: any) {
+      showToast('Failed to clear: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingTokens(false);
+      setSavingTokenPlatform(null);
+    }
+  };
+
   const toggleTokenVisibility = (key: string) => {
     setShowTokenField(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -2130,22 +2160,40 @@ export default function ITAdminDashboard() {
                 </View>
               ))}
             </View>
-            <TouchableOpacity
-              onPress={() => handleSavePlatformTokens('facebook')}
-              disabled={savingTokens}
-              style={{
-                marginTop: 16,
-                backgroundColor: '#1877F2',
-                paddingVertical: 11,
-                borderRadius: 8,
-                alignItems: 'center',
-                opacity: savingTokens ? (savingTokenPlatform === 'facebook' ? 0.7 : 0.55) : 1,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                {savingTokenPlatform === 'facebook' ? 'Saving...' : 'Save Facebook Tokens'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => handleSavePlatformTokens('facebook')}
+                disabled={savingTokens}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#1877F2',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: savingTokens ? (savingTokenPlatform === 'facebook' ? 0.7 : 0.55) : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                  {savingTokenPlatform === 'facebook' ? 'Saving...' : 'Save Facebook Tokens'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleClearPlatformTokens('facebook')}
+                disabled={savingTokens}
+                style={{
+                  minWidth: 120,
+                  backgroundColor: '#EFF6FF',
+                  borderWidth: 1,
+                  borderColor: '#93C5FD',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: savingTokens ? 0.55 : 1,
+                }}
+              >
+                <Text style={{ color: '#1D4ED8', fontSize: 13, fontWeight: '700' }}>Clear</Text>
+              </TouchableOpacity>
+            </View>
           </Card>
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -2188,22 +2236,40 @@ export default function ITAdminDashboard() {
                 </View>
               ))}
             </View>
-            <TouchableOpacity
-              onPress={() => handleSavePlatformTokens('instagram')}
-              disabled={savingTokens}
-              style={{
-                marginTop: 16,
-                backgroundColor: '#E1306C',
-                paddingVertical: 11,
-                borderRadius: 8,
-                alignItems: 'center',
-                opacity: savingTokens ? (savingTokenPlatform === 'instagram' ? 0.7 : 0.55) : 1,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                {savingTokenPlatform === 'instagram' ? 'Saving...' : 'Save Instagram Tokens'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => handleSavePlatformTokens('instagram')}
+                disabled={savingTokens}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#E1306C',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: savingTokens ? (savingTokenPlatform === 'instagram' ? 0.7 : 0.55) : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                  {savingTokenPlatform === 'instagram' ? 'Saving...' : 'Save Instagram Tokens'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleClearPlatformTokens('instagram')}
+                disabled={savingTokens}
+                style={{
+                  minWidth: 120,
+                  backgroundColor: '#FCE7F3',
+                  borderWidth: 1,
+                  borderColor: '#F9A8D4',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: savingTokens ? 0.55 : 1,
+                }}
+              >
+                <Text style={{ color: '#BE185D', fontSize: 13, fontWeight: '700' }}>Clear</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               onPress={handleUseFacebookTokenForInstagram}
               disabled={!tokenFields.facebook_access_token || savingTokens}
@@ -2265,22 +2331,40 @@ export default function ITAdminDashboard() {
                 </View>
               ))}
             </View>
-            <TouchableOpacity
-              onPress={() => handleSavePlatformTokens('wordpress')}
-              disabled={savingTokens}
-              style={{
-                marginTop: 16,
-                backgroundColor: '#3B82F6',
-                paddingVertical: 11,
-                borderRadius: 8,
-                alignItems: 'center',
-                opacity: savingTokens ? (savingTokenPlatform === 'wordpress' ? 0.7 : 0.55) : 1,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                {savingTokenPlatform === 'wordpress' ? 'Saving...' : 'Save WordPress Tokens'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => handleSavePlatformTokens('wordpress')}
+                disabled={savingTokens}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#3B82F6',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: savingTokens ? (savingTokenPlatform === 'wordpress' ? 0.7 : 0.55) : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                  {savingTokenPlatform === 'wordpress' ? 'Saving...' : 'Save WordPress Tokens'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleClearPlatformTokens('wordpress')}
+                disabled={savingTokens}
+                style={{
+                  minWidth: 120,
+                  backgroundColor: '#EFF6FF',
+                  borderWidth: 1,
+                  borderColor: '#93C5FD',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: savingTokens ? 0.55 : 1,
+                }}
+              >
+                <Text style={{ color: '#1D4ED8', fontSize: 13, fontWeight: '700' }}>Clear</Text>
+              </TouchableOpacity>
+            </View>
           </Card>
           <Card style={styles.userCard}>
             <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 8 }}>
