@@ -131,6 +131,7 @@ return new class extends Migration
                 'returned_for_revision',
                 'scheduled',
                 'published',
+                'publish_failed',
                 'archived'
             ])->default('draft');
             $table->json('target_platforms')->nullable();
