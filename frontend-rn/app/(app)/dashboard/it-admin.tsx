@@ -715,6 +715,7 @@ export default function ITAdminDashboard() {
   });
   const [tokenLastUpdated, setTokenLastUpdated] = useState('');
   const [savingTokens, setSavingTokens] = useState(false);
+  const [savingTokenPlatform, setSavingTokenPlatform] = useState<'all' | 'facebook' | 'instagram' | 'wordpress' | null>(null);
   const [validatingTokens, setValidatingTokens] = useState(false);
   const [showTokenField, setShowTokenField] = useState<Record<string, boolean>>({});
 
@@ -741,6 +742,7 @@ export default function ITAdminDashboard() {
 
   const handleSaveTokens = async () => {
     setSavingTokens(true);
+    setSavingTokenPlatform('all');
     try {
       const res = await tokenSettingsApi.update(tokenFields);
       showToast('Tokens saved successfully!', 'success');
@@ -749,6 +751,7 @@ export default function ITAdminDashboard() {
       showToast('Failed to save tokens: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
       setSavingTokens(false);
+      setSavingTokenPlatform(null);
     }
   };
 
@@ -763,6 +766,7 @@ export default function ITAdminDashboard() {
     keys.forEach(k => { payload[k] = (tokenFields as any)[k] || ''; });
 
     setSavingTokens(true);
+    setSavingTokenPlatform(platform);
     try {
       const res = await tokenSettingsApi.update(payload);
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens saved!`, 'success');
@@ -771,6 +775,7 @@ export default function ITAdminDashboard() {
       showToast('Failed to save: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
       setSavingTokens(false);
+      setSavingTokenPlatform(null);
     }
   };
 
@@ -922,6 +927,7 @@ export default function ITAdminDashboard() {
     }
 
     setSavingTokens(true);
+    setSavingTokenPlatform('all');
     setValidatingTokens(true);
     try {
       const saveRes = await tokenSettingsApi.update(payload);
@@ -951,6 +957,7 @@ export default function ITAdminDashboard() {
       showToast('Failed to save or validate publishing setup: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
       setSavingTokens(false);
+      setSavingTokenPlatform(null);
       setValidatingTokens(false);
     }
   };
@@ -2076,28 +2083,6 @@ export default function ITAdminDashboard() {
                 </View>
               ) : null}
             </View>
-            <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.textPrimary }}>Meta publishing requirements</Text>
-              <Text style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18 }}>
-                Use a Facebook Page Access Token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish. The same Page token can be used for Facebook and Instagram publishing.
-              </Text>
-              <TouchableOpacity
-                onPress={handleSaveAndValidatePublishingSetup}
-                disabled={savingTokens || validatingTokens}
-                style={{
-                  marginTop: 4,
-                  backgroundColor: '#0F172A',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: (savingTokens || validatingTokens) ? 0.7 : 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                  {validatingTokens ? 'Validating Meta Setup...' : 'Save & Validate Publishing Setup'}
-                </Text>
-              </TouchableOpacity>
-            </View>
           </Card>
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -2149,11 +2134,11 @@ export default function ITAdminDashboard() {
                 paddingVertical: 11,
                 borderRadius: 8,
                 alignItems: 'center',
-                opacity: savingTokens ? 0.7 : 1,
+                opacity: savingTokens ? (savingTokenPlatform === 'facebook' ? 0.7 : 0.55) : 1,
               }}
             >
               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                {savingTokens ? 'Saving...' : 'Save Facebook Tokens'}
+                {savingTokenPlatform === 'facebook' ? 'Saving...' : 'Save Facebook Tokens'}
               </Text>
             </TouchableOpacity>
           </Card>
@@ -2207,11 +2192,11 @@ export default function ITAdminDashboard() {
                 paddingVertical: 11,
                 borderRadius: 8,
                 alignItems: 'center',
-                opacity: savingTokens ? 0.7 : 1,
+                opacity: savingTokens ? (savingTokenPlatform === 'instagram' ? 0.7 : 0.55) : 1,
               }}
             >
               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                {savingTokens ? 'Saving...' : 'Save Instagram Tokens'}
+                {savingTokenPlatform === 'instagram' ? 'Saving...' : 'Save Instagram Tokens'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2284,13 +2269,37 @@ export default function ITAdminDashboard() {
                 paddingVertical: 11,
                 borderRadius: 8,
                 alignItems: 'center',
-                opacity: savingTokens ? 0.7 : 1,
+                opacity: savingTokens ? (savingTokenPlatform === 'wordpress' ? 0.7 : 0.55) : 1,
               }}
             >
               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                {savingTokens ? 'Saving...' : 'Save WordPress Tokens'}
+                {savingTokenPlatform === 'wordpress' ? 'Saving...' : 'Save WordPress Tokens'}
               </Text>
             </TouchableOpacity>
+          </Card>
+          <Card style={styles.userCard}>
+            <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.textPrimary }}>Meta publishing requirements</Text>
+              <Text style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18 }}>
+                Use a Facebook Page Access Token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish. The same Page token can be used for Facebook and Instagram publishing.
+              </Text>
+              <TouchableOpacity
+                onPress={handleSaveAndValidatePublishingSetup}
+                disabled={savingTokens || validatingTokens}
+                style={{
+                  marginTop: 4,
+                  backgroundColor: '#0F172A',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: (savingTokens || validatingTokens) ? 0.7 : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                  {validatingTokens ? 'Validating Meta Setup...' : 'Save & Validate Publishing Setup'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </Card>
         </View>
       )}
