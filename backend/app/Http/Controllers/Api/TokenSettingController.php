@@ -144,6 +144,22 @@ class TokenSettingController extends Controller
             } else {
                 $checks['facebook']['error'] = $this->friendlyMetaError($response->json(), $response->body());
             }
+
+            $permissionCheck = $this->checkMetaPermissions($facebookToken, [
+                'pages_show_list',
+                'pages_read_engagement',
+                'pages_manage_posts',
+            ]);
+
+            $checks['facebook']['permissions'] = $permissionCheck['granted'];
+            $checks['facebook']['missing_permissions'] = $permissionCheck['missing'];
+
+            if ($permissionCheck['missing'] !== []) {
+                $checks['facebook']['valid'] = false;
+                $checks['facebook']['error'] = 'Missing Facebook publishing permission(s): '
+                    . implode(', ', $permissionCheck['missing'])
+                    . '. Regenerate the Page Access Token with these permissions selected.';
+            }
         } else {
             $checks['facebook']['error'] = 'Facebook Page ID and Page Access Token are required.';
         }
@@ -164,6 +180,21 @@ class TokenSettingController extends Controller
                 ];
             } else {
                 $checks['instagram']['error'] = $this->friendlyMetaError($response->json(), $response->body());
+            }
+
+            $permissionCheck = $this->checkMetaPermissions($instagramToken, [
+                'instagram_basic',
+                'instagram_content_publish',
+            ]);
+
+            $checks['instagram']['permissions'] = $permissionCheck['granted'];
+            $checks['instagram']['missing_permissions'] = $permissionCheck['missing'];
+
+            if ($permissionCheck['missing'] !== []) {
+                $checks['instagram']['valid'] = false;
+                $checks['instagram']['error'] = 'Missing Instagram publishing permission(s): '
+                    . implode(', ', $permissionCheck['missing'])
+                    . '. Regenerate the Page Access Token with these permissions selected.';
             }
         } else {
             $checks['instagram']['error'] = 'Instagram Business Account ID and Page Access Token are required.';
@@ -209,5 +240,31 @@ class TokenSettingController extends Controller
         }
 
         return trim($message . ($subcode ? " (subcode {$subcode})" : ''));
+    }
+
+    private function checkMetaPermissions(string $accessToken, array $required): array
+    {
+        $version = env('FACEBOOK_GRAPH_API_VERSION', 'v26.0');
+        $response = Http::get("https://graph.facebook.com/{$version}/me/permissions", [
+            'access_token' => $accessToken,
+        ]);
+
+        if (!$response->successful()) {
+            return [
+                'granted' => [],
+                'missing' => $required,
+            ];
+        }
+
+        $granted = collect($response->json('data', []))
+            ->filter(fn ($permission) => ($permission['status'] ?? null) === 'granted')
+            ->pluck('permission')
+            ->values()
+            ->all();
+
+        return [
+            'granted' => $granted,
+            'missing' => array_values(array_diff($required, $granted)),
+        ];
     }
 }
