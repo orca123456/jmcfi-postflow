@@ -895,12 +895,16 @@ export default function ITAdminDashboard() {
       messages.push(`Facebook Page: ${checks.facebook.name || checks.facebook.id}`);
     } else if (checks?.facebook?.error) {
       messages.push(`Facebook: ${checks.facebook.error}`);
+    } else if (checks?.facebook?.missing_permissions?.length) {
+      messages.push(`Facebook missing: ${checks.facebook.missing_permissions.join(', ')}`);
     }
 
     if (checks?.instagram?.valid) {
       messages.push(`Instagram: @${checks.instagram.username || checks.instagram.id}`);
     } else if (checks?.instagram?.error) {
       messages.push(`Instagram: ${checks.instagram.error}`);
+    } else if (checks?.instagram?.missing_permissions?.length) {
+      messages.push(`Instagram missing: ${checks.instagram.missing_permissions.join(', ')}`);
     }
 
     return messages.join('\n');
