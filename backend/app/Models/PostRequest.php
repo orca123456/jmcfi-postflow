@@ -75,6 +75,7 @@ class PostRequest extends Model
             'returned_for_revision' => 'Returned for Revision',
             'scheduled' => 'Scheduled',
             'published' => 'Published',
+            'publish_failed' => 'Publish Failed',
             'archived' => 'Archived',
         ];
     }
