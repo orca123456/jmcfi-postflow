@@ -94,6 +94,7 @@ class ExternalIntegrationController extends Controller
 
             $mediaPath = null;
             $mediaUrl = null;
+            $media = null;
 
             // Handle external image download
             if ($request->image_url) {
@@ -144,7 +145,7 @@ class ExternalIntegrationController extends Controller
                         } else {
                             $mediaPath = Storage::disk('public')->path($media->file_path);
                         }
-                        $mediaUrl = $media->url;
+                        $mediaUrl = route('instagram.media', ['media' => $media->id]);
                     }
                 } catch (\Exception $e) {
                     // Log error but don't fail the request
@@ -159,17 +160,6 @@ class ExternalIntegrationController extends Controller
                 if (!is_array($platforms)) $platforms = [];
                 $lowerPlatforms = array_map('strtolower', $platforms);
 
-                if (in_array('facebook', $lowerPlatforms) || in_array('fb', $lowerPlatforms)) {
-                    try {
-                        $message = $post->caption_narrative ?? '';
-                        $fbResponse = $facebookService->publishPost($message, $mediaPath);
-                        $publishResults['facebook'] = $fbResponse;
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error('Direct API Publish to Facebook failed: ' . $e->getMessage());
-                        $publishResults['facebook'] = ['error' => $e->getMessage()];
-                    }
-                }
-
                 if (in_array('instagram', $lowerPlatforms) || in_array('ig', $lowerPlatforms)) {
                     try {
                         $message = $post->caption_narrative ?? '';
@@ -178,6 +168,17 @@ class ExternalIntegrationController extends Controller
                     } catch (\Exception $e) {
                         \Illuminate\Support\Facades\Log::error('Direct API Publish to Instagram failed: ' . $e->getMessage());
                         $publishResults['instagram'] = ['error' => $e->getMessage()];
+                    }
+                }
+
+                if (!isset($publishResults['instagram']['error']) && (in_array('facebook', $lowerPlatforms) || in_array('fb', $lowerPlatforms))) {
+                    try {
+                        $message = $post->caption_narrative ?? '';
+                        $fbResponse = $facebookService->publishPost($message, $mediaPath);
+                        $publishResults['facebook'] = $fbResponse;
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('Direct API Publish to Facebook failed: ' . $e->getMessage());
+                        $publishResults['facebook'] = ['error' => $e->getMessage()];
                     }
                 }
 

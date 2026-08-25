@@ -92,6 +92,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Token Settings (Admin only)
     Route::get('token-settings', [TokenSettingController::class, 'getTokens'])->middleware('role:it_publisher,it_admin');
     Route::post('token-settings', [TokenSettingController::class, 'updateTokens'])->middleware('role:it_publisher,it_admin');
+    Route::post('token-settings/validate', [TokenSettingController::class, 'validateTokens'])->middleware('role:it_publisher,it_admin');
 
     // Departments (reads open, writes admin only)
     Route::get('departments', [DepartmentController::class, 'index']);

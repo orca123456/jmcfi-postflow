@@ -21,6 +21,54 @@ use App\Models\PostMedia;
 // which wrote to the S3 disk. Both were unauthenticated. Do not add debug
 // routes to this file; it is served publicly alongside the SPA.
 
+Route::get('/instagram-media/{media}.jpg', function (PostMedia $media) {
+    if ($media->type !== 'image' && !str_starts_with((string) $media->mime_type, 'image/')) {
+        abort(404);
+    }
+
+    $path = str_replace('\\', '/', $media->file_path);
+    $disk = config('filesystems.default');
+    $storageDisk = in_array($disk, ['s3', 'b2'], true) ? $disk : 'public';
+    $content = null;
+
+    try {
+        if (Storage::disk($storageDisk)->exists($path)) {
+            $content = Storage::disk($storageDisk)->get($path);
+        }
+    } catch (Throwable) {
+        $content = null;
+    }
+
+    if ($content === null && Schema::hasTable('post_media_files')) {
+        $media->loadMissing('file:id,post_media_id,content');
+        $content = $media->file?->content;
+
+        if (is_resource($content)) {
+            $content = stream_get_contents($content);
+        }
+    }
+
+    if ($content === null) {
+        abort(404);
+    }
+
+    $image = @imagecreatefromstring($content);
+    if (!$image) {
+        abort(404);
+    }
+
+    ob_start();
+    imagejpeg($image, null, 92);
+    imagedestroy($image);
+    $jpeg = ob_get_clean();
+
+    return response($jpeg, 200, [
+        'Content-Type' => 'image/jpeg',
+        'Content-Length' => (string) strlen($jpeg),
+        'Cache-Control' => 'public, max-age=31536000, immutable',
+    ]);
+})->name('instagram.media');
+
 Route::get('/storage/{path}', function (string $path) {
     $path = str_replace('\\', '/', $path);
 
