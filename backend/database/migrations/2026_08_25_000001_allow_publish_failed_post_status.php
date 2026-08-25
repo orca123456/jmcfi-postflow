@@ -1,12 +1,25 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('post_requests', function (Blueprint $table) {
+                $table->string('status')->default('draft')->change();
+            });
+            return;
+        }
+
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE post_requests DROP CONSTRAINT IF EXISTS post_requests_status_check');
         DB::statement("ALTER TABLE post_requests ADD CONSTRAINT post_requests_status_check CHECK (status::text = ANY (ARRAY[
             'draft'::character varying,
@@ -26,6 +39,14 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE post_requests DROP CONSTRAINT IF EXISTS post_requests_status_check');
         DB::statement("ALTER TABLE post_requests ADD CONSTRAINT post_requests_status_check CHECK (status::text = ANY (ARRAY[
             'draft'::character varying,
