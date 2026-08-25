@@ -42,6 +42,12 @@ class TokenSettingController extends Controller
      */
     public function updateTokens(Request $request): JsonResponse
     {
+        $keys = [
+            'facebook_page_id', 'facebook_access_token',
+            'instagram_business_account_id', 'instagram_access_token',
+            'wordpress_url', 'wordpress_username', 'wordpress_app_password',
+        ];
+
         $validated = $request->validate([
             'facebook_page_id' => 'nullable|string',
             'facebook_access_token' => 'nullable|string',
@@ -52,28 +58,31 @@ class TokenSettingController extends Controller
             'wordpress_app_password' => 'nullable|string',
         ]);
 
-        foreach ($validated as $key => $value) {
-            if ($value !== null) {
-                $value = is_string($value) ? trim($value) : $value;
-
-                SystemSetting::updateOrCreate(
-                    ['key' => $key],
-                    [
-                        'value' => $value,
-                        'type' => 'string',
-                        'description' => $this->getLabel($key),
-                        'is_public' => false,
-                    ]
-                );
+        foreach ($keys as $key) {
+            if (!$request->exists($key)) {
+                continue;
             }
+
+            $value = $validated[$key] ?? '';
+            $value = is_string($value) ? trim($value) : '';
+
+            SystemSetting::updateOrCreate(
+                ['key' => $key],
+                [
+                    'value' => $value,
+                    'type' => 'string',
+                    'description' => $this->getLabel($key),
+                    'is_public' => false,
+                ]
+            );
         }
 
-        if (array_key_exists('facebook_page_id', $validated) || array_key_exists('facebook_access_token', $validated)) {
+        if ($request->exists('facebook_page_id') || $request->exists('facebook_access_token')) {
             Cache::forget('facebook_page_id');
             Cache::forget('facebook_access_token');
         }
 
-        if (array_key_exists('instagram_business_account_id', $validated) || array_key_exists('instagram_access_token', $validated)) {
+        if ($request->exists('instagram_business_account_id') || $request->exists('instagram_access_token')) {
             Cache::forget('instagram_business_account_id');
             Cache::forget('instagram_access_token');
         }
@@ -104,19 +113,12 @@ class TokenSettingController extends Controller
             'instagram_access_token' => 'nullable|string',
         ]);
 
-        $pageId = $validated['facebook_page_id']
-            ?? SystemSetting::where('key', 'facebook_page_id')->value('value')
-            ?? '';
-        $facebookToken = $validated['facebook_access_token']
-            ?? SystemSetting::where('key', 'facebook_access_token')->value('value')
-            ?? '';
-        $instagramId = $validated['instagram_business_account_id']
-            ?? SystemSetting::where('key', 'instagram_business_account_id')->value('value')
-            ?? '';
-        $instagramToken = $validated['instagram_access_token']
-            ?? $facebookToken
-            ?? SystemSetting::where('key', 'instagram_access_token')->value('value')
-            ?? '';
+        $pageId = $this->requestValueOrSetting($request, $validated, 'facebook_page_id');
+        $facebookToken = $this->requestValueOrSetting($request, $validated, 'facebook_access_token');
+        $instagramId = $this->requestValueOrSetting($request, $validated, 'instagram_business_account_id');
+        $instagramToken = $request->exists('instagram_access_token')
+            ? trim((string) ($validated['instagram_access_token'] ?? ''))
+            : (SystemSetting::where('key', 'instagram_access_token')->value('value') ?: $facebookToken);
 
         $version = env('FACEBOOK_GRAPH_API_VERSION', 'v26.0');
         $checks = [
@@ -242,6 +244,15 @@ class TokenSettingController extends Controller
         }
 
         return trim($message . ($subcode ? " (subcode {$subcode})" : ''));
+    }
+
+    private function requestValueOrSetting(Request $request, array $validated, string $key): string
+    {
+        if ($request->exists($key)) {
+            return trim((string) ($validated[$key] ?? ''));
+        }
+
+        return (string) (SystemSetting::where('key', $key)->value('value') ?? '');
     }
 
     private function checkMetaPermissions(string $accessToken, array $required): array
