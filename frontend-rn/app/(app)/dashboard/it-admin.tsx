@@ -763,7 +763,7 @@ export default function ITAdminDashboard() {
     };
     const keys = platformFields[platform];
     const payload: Record<string, string> = {};
-    keys.forEach(k => { payload[k] = (tokenFields as any)[k] || ''; });
+    keys.forEach(k => { payload[k] = String((tokenFields as any)[k] || '').trim(); });
 
     setSavingTokens(true);
     setSavingTokenPlatform(platform);
@@ -917,8 +917,13 @@ export default function ITAdminDashboard() {
 
   const handleSaveAndValidatePublishingSetup = async () => {
     const payload = {
-      ...tokenFields,
-      instagram_access_token: tokenFields.instagram_access_token || tokenFields.facebook_access_token,
+      facebook_page_id: tokenFields.facebook_page_id.trim(),
+      facebook_access_token: tokenFields.facebook_access_token.trim(),
+      instagram_business_account_id: tokenFields.instagram_business_account_id.trim(),
+      instagram_access_token: String(tokenFields.instagram_access_token || tokenFields.facebook_access_token || '').trim(),
+      wordpress_url: tokenFields.wordpress_url.trim(),
+      wordpress_username: tokenFields.wordpress_username.trim(),
+      wordpress_app_password: tokenFields.wordpress_app_password.trim(),
     };
 
     if (!payload.facebook_page_id || !payload.facebook_access_token) {

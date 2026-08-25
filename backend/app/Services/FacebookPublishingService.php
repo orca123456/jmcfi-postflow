@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\SystemSetting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -14,11 +16,13 @@ class FacebookPublishingService
 
     public function __construct()
     {
-        $this->pageId = \Illuminate\Support\Facades\Cache::remember('facebook_page_id', 3600, function () {
-            return \App\Models\SystemSetting::where('key', 'facebook_page_id')->value('value') ?? env('FACEBOOK_PAGE_ID', '');
+        $this->pageId = Cache::remember('facebook_page_id', 3600, function () {
+            $setting = SystemSetting::where('key', 'facebook_page_id')->first();
+            return $setting ? (string) $setting->value : env('FACEBOOK_PAGE_ID', '');
         });
-        $this->accessToken = \Illuminate\Support\Facades\Cache::remember('facebook_access_token', 3600, function () {
-            return \App\Models\SystemSetting::where('key', 'facebook_access_token')->value('value') ?? env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
+        $this->accessToken = Cache::remember('facebook_access_token', 3600, function () {
+            $setting = SystemSetting::where('key', 'facebook_access_token')->first();
+            return $setting ? (string) $setting->value : env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
         });
         $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');
     }
