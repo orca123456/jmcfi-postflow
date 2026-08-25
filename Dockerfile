@@ -78,4 +78,4 @@ EXPOSE 8080
 
 # Configure FrankenPHP to listen on the port Railway provides, or 8080 as fallback
 # FrankenPHP automatically serves the /app/public directory perfectly using Caddy (HTTP/2, Keep-Alive, etc.)
-CMD ["sh", "-c", "php artisan storage:link --force >/dev/null 2>&1 || true; php artisan migrate --force; php artisan config:cache --quiet; php artisan view:cache --quiet; php artisan optimize --quiet; frankenphp run --config /etc/caddy/Caddyfile"]
+CMD ["sh", "-c", "set -e; php artisan storage:link --force >/dev/null 2>&1 || true; php artisan migrate --force; php artisan config:cache --quiet; php artisan view:cache --quiet; php artisan optimize --quiet; frankenphp run --config /etc/caddy/Caddyfile"]
