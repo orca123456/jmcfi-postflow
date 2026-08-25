@@ -171,6 +171,7 @@ export const auditLogsApi = {
 export const tokenSettingsApi = {
   get: () => api.get('/token-settings'),
   update: (data: object) => api.post('/token-settings', data),
+  validate: (data: object) => api.post('/token-settings/validate', data),
 };
 
 // ── Email Settings endpoints ────────────────────────────────────────────────

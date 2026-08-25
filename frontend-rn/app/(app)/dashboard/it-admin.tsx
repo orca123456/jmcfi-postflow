@@ -715,6 +715,7 @@ export default function ITAdminDashboard() {
   });
   const [tokenLastUpdated, setTokenLastUpdated] = useState('');
   const [savingTokens, setSavingTokens] = useState(false);
+  const [validatingTokens, setValidatingTokens] = useState(false);
   const [showTokenField, setShowTokenField] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -867,8 +868,9 @@ export default function ITAdminDashboard() {
   const handlePublish = async (id: string | number) => {
     setPublishingPostId(id);
     try {
-      await publishingApi.publish(Number(id));
-      showToast('Post published successfully!', 'success');
+      const res = await publishingApi.publish(Number(id));
+      const hasWarnings = res.data?.data?.errors && Object.keys(res.data.data.errors).length > 0;
+      showToast(res.data?.message || 'Post published successfully!', hasWarnings ? 'warning' : 'success');
       setPreviewPost(null);
       await refetchInitData();
       loadPostsData();
@@ -876,6 +878,76 @@ export default function ITAdminDashboard() {
       showToast('Failed to publish: ' + (error.response?.data?.message || error.message), 'error');
     } finally {
       setPublishingPostId(null);
+    }
+  };
+
+  const handleUseFacebookTokenForInstagram = () => {
+    setTokenFields(prev => ({
+      ...prev,
+      instagram_access_token: prev.facebook_access_token,
+    }));
+    showToast('Instagram will use the saved Facebook Page token.', 'success');
+  };
+
+  const describeMetaValidation = (checks: any) => {
+    const messages: string[] = [];
+    if (checks?.facebook?.valid) {
+      messages.push(`Facebook Page: ${checks.facebook.name || checks.facebook.id}`);
+    } else if (checks?.facebook?.error) {
+      messages.push(`Facebook: ${checks.facebook.error}`);
+    }
+
+    if (checks?.instagram?.valid) {
+      messages.push(`Instagram: @${checks.instagram.username || checks.instagram.id}`);
+    } else if (checks?.instagram?.error) {
+      messages.push(`Instagram: ${checks.instagram.error}`);
+    }
+
+    return messages.join('\n');
+  };
+
+  const handleSaveAndValidatePublishingSetup = async () => {
+    const payload = {
+      ...tokenFields,
+      instagram_access_token: tokenFields.instagram_access_token || tokenFields.facebook_access_token,
+    };
+
+    if (!payload.facebook_page_id || !payload.facebook_access_token) {
+      showToast('Enter the Facebook Page ID and Page Access Token first.', 'warning');
+      return;
+    }
+
+    setSavingTokens(true);
+    setValidatingTokens(true);
+    try {
+      const saveRes = await tokenSettingsApi.update(payload);
+      const validationRes = await tokenSettingsApi.validate(payload);
+      const derived = validationRes.data?.derived || {};
+
+      if (derived.instagram_business_account_id && derived.instagram_business_account_id !== payload.instagram_business_account_id) {
+        const updatedPayload = {
+          ...payload,
+          instagram_business_account_id: derived.instagram_business_account_id,
+        };
+        await tokenSettingsApi.update(updatedPayload);
+        setTokenFields(updatedPayload);
+      } else {
+        setTokenFields(payload);
+      }
+
+      setTokenLastUpdated(saveRes.data.last_updated || new Date().toLocaleString());
+      const detail = describeMetaValidation(validationRes.data?.checks);
+      showToast(
+        validationRes.data?.valid
+          ? `Publishing setup saved and validated.\n${detail}`
+          : `Publishing setup saved, but Meta validation needs attention.\n${detail}`,
+        validationRes.data?.valid ? 'success' : 'warning'
+      );
+    } catch (e: any) {
+      showToast('Failed to save or validate publishing setup: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setSavingTokens(false);
+      setValidatingTokens(false);
     }
   };
 
@@ -2000,6 +2072,28 @@ export default function ITAdminDashboard() {
                 </View>
               ) : null}
             </View>
+            <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.textPrimary }}>Meta publishing requirements</Text>
+              <Text style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18 }}>
+                Use a Facebook Page Access Token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish. The same Page token can be used for Facebook and Instagram publishing.
+              </Text>
+              <TouchableOpacity
+                onPress={handleSaveAndValidatePublishingSetup}
+                disabled={savingTokens || validatingTokens}
+                style={{
+                  marginTop: 4,
+                  backgroundColor: '#0F172A',
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: (savingTokens || validatingTokens) ? 0.7 : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                  {validatingTokens ? 'Validating Meta Setup...' : 'Save & Validate Publishing Setup'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </Card>
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -2114,6 +2208,24 @@ export default function ITAdminDashboard() {
             >
               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
                 {savingTokens ? 'Saving...' : 'Save Instagram Tokens'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleUseFacebookTokenForInstagram}
+              disabled={!tokenFields.facebook_access_token || savingTokens}
+              style={{
+                marginTop: 10,
+                backgroundColor: '#FCE7F3',
+                borderWidth: 1,
+                borderColor: '#F9A8D4',
+                paddingVertical: 10,
+                borderRadius: 8,
+                alignItems: 'center',
+                opacity: (!tokenFields.facebook_access_token || savingTokens) ? 0.6 : 1,
+              }}
+            >
+              <Text style={{ color: '#BE185D', fontSize: 13, fontWeight: '700' }}>
+                Use Facebook Page Token for Instagram
               </Text>
             </TouchableOpacity>
           </Card>

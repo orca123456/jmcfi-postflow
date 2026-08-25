@@ -54,6 +54,7 @@ class PublishingController extends Controller
             $lowerPlatforms = array_map('strtolower', $platforms);
 
             $publishResults = [];
+            $publishErrors = [];
             $media = $post->media()
                 ->where(function ($query) {
                     $query->where('type', 'image')
@@ -61,6 +62,18 @@ class PublishingController extends Controller
                 })
                 ->orderBy('sort_order')
                 ->first();
+
+            if (in_array('instagram', $lowerPlatforms) || in_array('ig', $lowerPlatforms)) {
+                try {
+                    $message = $post->caption_narrative ?? '';
+                    $imageUrl = $this->instagramImageUrl($media);
+                    $igResponse = $this->instagramService->publishPost($message, $imageUrl);
+                    $publishResults['instagram'] = $igResponse;
+                } catch (Exception $e) {
+                    $publishErrors['instagram'] = $this->friendlyPublishError($e->getMessage());
+                    \Illuminate\Support\Facades\Log::error('Publish to Instagram failed: ' . $e->getMessage());
+                }
+            }
 
             // 3. Publish to Facebook if it is in the target platforms
             if (in_array('facebook', $lowerPlatforms) || in_array('fb', $lowerPlatforms)) {
@@ -75,19 +88,25 @@ class PublishingController extends Controller
                 }
 
                 $message = $post->caption_narrative ?? '';
-                $fbResponse = $this->facebookService->publishPost($message, $mediaPath);
-                $publishResults['facebook'] = $fbResponse;
+                try {
+                    $fbResponse = $this->facebookService->publishPost($message, $mediaPath);
+                    $publishResults['facebook'] = $fbResponse;
+                } catch (Exception $e) {
+                    $publishErrors['facebook'] = $this->friendlyPublishError($e->getMessage());
+                    \Illuminate\Support\Facades\Log::error('Publish to Facebook failed: ' . $e->getMessage());
+                }
             }
 
-            if (in_array('instagram', $lowerPlatforms) || in_array('ig', $lowerPlatforms)) {
-                $message = $post->caption_narrative ?? '';
-                $imageUrl = $media?->url;
-                $igResponse = $this->instagramService->publishPost($message, $imageUrl);
-                $publishResults['instagram'] = $igResponse;
+            if ($publishResults === []) {
+                $post->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
+                throw new Exception($this->formatPublishErrors($publishErrors));
             }
 
             // 4. Update the post status to published
-            $post->update(['status' => PostRequest::STATUS_PUBLISHED]);
+            $post->update([
+                'status' => PostRequest::STATUS_PUBLISHED,
+                'published_at' => now(),
+            ]);
 
             // 5. Log the action in Audit Trail
             \App\Services\AuditLogService::log(
@@ -97,7 +116,8 @@ class PublishingController extends Controller
                 [
                     'postId'    => $post->id,
                     'platforms' => $platforms,
-                    'results'   => $publishResults
+                    'results'   => $publishResults,
+                    'errors'    => $publishErrors,
                 ]
             );
 
@@ -112,15 +132,26 @@ class PublishingController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Post published successfully.',
+                'message' => $publishErrors === []
+                    ? 'Post published successfully.'
+                    : 'Post published to available platforms. Some platforms need attention: ' . $this->formatPublishErrors($publishErrors),
                 'data'    => [
                     'post'    => $post,
-                    'results' => $publishResults
+                    'results' => $publishResults,
+                    'errors'  => $publishErrors,
                 ]
             ]);
 
         } catch (Exception $e) {
             DB::rollBack();
+
+            try {
+                if ($post->status !== PostRequest::STATUS_PUBLISHED) {
+                    $post->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
+                }
+            } catch (Exception $statusEx) {
+                \Illuminate\Support\Facades\Log::error('Failed to mark post as publish_failed: ' . $statusEx->getMessage());
+            }
 
             // Notify IT Admins of failure
             try {
@@ -168,5 +199,43 @@ class PublishingController extends Controller
             'message' => 'Post scheduled successfully.',
             'data' => $post
         ]);
+    }
+
+    private function instagramImageUrl($media): ?string
+    {
+        if (!$media) {
+            return null;
+        }
+
+        return route('instagram.media', ['media' => $media->id]);
+    }
+
+    private function formatPublishErrors(array $errors): string
+    {
+        if ($errors === []) {
+            return 'No platform was selected or no platform returned a successful response.';
+        }
+
+        return collect($errors)
+            ->map(fn ($message, $platform) => ucfirst((string) $platform) . ': ' . $message)
+            ->implode(' ');
+    }
+
+    private function friendlyPublishError(string $message): string
+    {
+        $jsonStart = strpos($message, '{');
+        $decoded = json_decode($jsonStart === false ? $message : substr($message, $jsonStart), true);
+        $metaMessage = data_get($decoded, 'error.message', $message);
+        $code = data_get($decoded, 'error.code');
+
+        if ($code === 190 || str_contains(strtolower($metaMessage), 'access token')) {
+            return 'The saved Meta token is invalid or expired. Open Platform Tokens, paste a fresh Page Access Token, then click Save & Validate Publishing Setup.';
+        }
+
+        if ($code === 200 || str_contains(strtolower($metaMessage), 'publish_actions')) {
+            return 'The Page token is missing pages_manage_posts. Regenerate the Meta token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish, then save it in Platform Tokens.';
+        }
+
+        return $metaMessage;
     }
 }
