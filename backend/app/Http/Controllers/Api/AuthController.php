@@ -67,7 +67,7 @@ class AuthController extends Controller
     {
         $email = \Illuminate\Support\Str::lower((string) $request->input('email'));
 
-        return sha1($email . '|' . $request->ip());
+        return sha1($email);
     }
 
     private function loginLockoutSeconds(string $key): int
