@@ -3363,36 +3363,22 @@ $response = curl_exec($ch);`}
             (log.userName || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
             (log.description || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
             (log.eventType || '').toLowerCase().includes(auditSearchQuery.toLowerCase());
-          const matchesType = auditEventTypeFilter === 'ALL' || log.eventType === auditEventTypeFilter;
-          return matchesQuery && matchesType;
+          return matchesQuery;
         });
-
-        const eventFilterOptions = [
-          { label: 'All Events', value: 'ALL' },
-          { label: 'Login', value: 'LOGIN_SUCCESS' },
-          { label: 'Approvals', value: 'CONTENT_APPROVAL' },
-          { label: 'Rejections', value: 'CONTENT_REJECT' },
-          { label: 'User Changes', value: 'USER_UPDATED' },
-          { label: 'Tokens', value: 'TOKEN_SETTINGS_UPDATED' },
-        ];
-        const uniqueUserCount = new Set(auditLogs.map((log) => log.userEmail || log.userName).filter(Boolean)).size;
-        const loginCount = auditLogs.filter((log) => String(log.eventType || '').includes('LOGIN')).length;
-        const warningCount = auditLogs.filter((log) => log.severity === 'WARNING' || log.severity === 'ERROR').length;
 
         return (
           <View style={{ gap: Spacing.lg }}>
 
             {/* Main Table Card */}
-            <Card style={[styles.userCard, { padding: 20 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 18 }}>
-                <View style={{ gap: 4 }}>
+            <Card style={styles.userCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+                <View style={{ gap: 2 }}>
                   <Text style={styles.sectionHeader}>Activity Log Records</Text>
-                  <Text style={{ color: Colors.textSecondary, fontSize: FontSize.xs + 1 }}>Monitor sign-ins, content movement, user changes, and system settings updates.</Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   {/* Search input */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', width: 280, height: 42, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', width: 300, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
                     <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
                       style={{ flex: 1, fontSize: 14, color: Colors.textPrimary, outlineStyle: 'none' } as any}
@@ -3403,104 +3389,58 @@ $response = curl_exec($ch);`}
                     />
                   </View>
 
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', height: 42, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: Colors.border, borderRadius: 8 }}
-                    onPress={() => setAuditLoaded(false)}
-                    disabled={auditLoading}
-                  >
-                    {auditLoading ? (
-                      <ActivityIndicator size="small" color={Colors.primary} />
-                    ) : (
-                      <Ionicons name="refresh-outline" size={16} color={Colors.primary} />
-                    )}
-                    <Text style={{ marginLeft: 8, fontSize: 14, fontWeight: '700', color: Colors.primary }}>Refresh</Text>
-                  </TouchableOpacity>
-
                   {/* Export Button */}
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 42, paddingHorizontal: 16, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => handleExportAuditLogs(filteredLogs)}>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => handleExportAuditLogs(filteredLogs)}>
                     <Ionicons name="download-outline" size={16} color="#374151" style={{ marginRight: 8 }} />
                     <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Export CSV</Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-                {[
-                  { label: 'Records Loaded', value: auditLogs.length, icon: 'document-text-outline' as const, color: Colors.primary, bg: '#EEF2FF' },
-                  { label: 'Active Users', value: uniqueUserCount, icon: 'people-outline' as const, color: '#047857', bg: '#ECFDF5' },
-                  { label: 'Login Events', value: loginCount, icon: 'log-in-outline' as const, color: '#1D4ED8', bg: '#DBEAFE' },
-                  { label: 'Warnings', value: warningCount, icon: 'warning-outline' as const, color: '#B45309', bg: '#FEF3C7' },
-                ].map((item) => (
-                  <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 170, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, backgroundColor: item.bg, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                    <Ionicons name={item.icon} size={18} color={item.color} />
-                    <View>
-                      <Text style={{ fontSize: 18, fontWeight: '800', color: item.color }}>{item.value}</Text>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary }}>{item.label}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 12 }} style={{ marginBottom: 4 }}>
-                {eventFilterOptions.map((option) => {
-                  const active = auditEventTypeFilter === option.value;
-                  return (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setAuditEventTypeFilter(option.value)}
-                      style={{ height: 36, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: active ? Colors.primary : Colors.border, backgroundColor: active ? '#EEF2FF' : '#F9FAFB', justifyContent: 'center' }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.primary : Colors.textSecondary }}>{option.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
               {/* Logs Table Matching Screenshot */}
-              <ScrollView horizontal showsHorizontalScrollIndicator>
-                <View style={[styles.table, { minWidth: 980, overflow: 'hidden' }]}>
-                  <View style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: '#F8FAFC' }]}>
-                    <Text style={{ width: 190, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Timestamp</Text>
-                    <Text style={{ width: 210, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>User</Text>
-                    <Text style={{ width: 185, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Action</Text>
-                    <Text style={{ flex: 1, minWidth: 360, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Details</Text>
+              <View style={styles.table}>
+                <View style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 12 }]}>
+                  <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Timestamp</Text>
+                  <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>User</Text>
+                  <Text style={{ flex: 1.5, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Action</Text>
+                  <Text style={{ flex: 4, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Details</Text>
+                </View>
+
+                {auditLoading && filteredLogs.length === 0 && (
+                  <View style={{ paddingVertical: 28, alignItems: 'center', gap: 8 }}>
+                    <ActivityIndicator color={Colors.primary} />
+                    <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>Loading activity records...</Text>
                   </View>
+                )}
 
-                  {auditLoading && filteredLogs.length === 0 && (
-                    <View style={{ paddingVertical: 32, alignItems: 'center', gap: 8 }}>
-                      <ActivityIndicator color={Colors.primary} />
-                      <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>Loading activity records...</Text>
+                {!auditLoading && filteredLogs.map((log) => (
+                  <TouchableOpacity key={log.id} onPress={() => setSelectedAuditLog(log)} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.background }]}>
+                    {/* Timestamp */}
+                    <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: Colors.textSecondary }}>{log.timestamp}</Text>
+
+                    {/* User */}
+                    <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>{log.userName}</Text>
+
+                    {/* Action */}
+                    <View style={{ flex: 1.5 }}>
+                      <View style={{ alignSelf: 'flex-start', backgroundColor: log.badgeBg || '#F3E8FF', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: log.badgeColor || '#7C3AED' }}>{String(log.eventType || '').replace(/_/g, ' ')}</Text>
+                      </View>
                     </View>
-                  )}
 
-                  {!auditLoading && filteredLogs.map((log, index) => (
-                    <TouchableOpacity key={log.id} onPress={() => setSelectedAuditLog(log)} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#EEF2F7', backgroundColor: index % 2 === 0 ? Colors.surface : '#FCFCFD' }]}>
-                      <Text style={{ width: 190, fontSize: FontSize.xs + 1, color: Colors.textSecondary }}>{log.timestamp}</Text>
+                    {/* Details */}
+                    <Text numberOfLines={2} style={{ flex: 4, fontSize: FontSize.xs + 1, color: Colors.textPrimary, lineHeight: 20 }}>{log.description}</Text>
+                  </TouchableOpacity>
+                ))}
 
-                      <View style={{ width: 210, gap: 2 }}>
-                        <Text style={{ fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>{log.userName}</Text>
-                        {!!log.userEmail && <Text style={{ fontSize: 11, color: Colors.textMuted }}>{log.userEmail}</Text>}
-                      </View>
-
-                      <View style={{ width: 185 }}>
-                        <View style={{ alignSelf: 'flex-start', backgroundColor: log.badgeBg || '#F3E8FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: log.badgeColor || '#7C3AED' }}>{String(log.eventType || '').replace(/_/g, ' ')}</Text>
-                        </View>
-                      </View>
-
-                      <Text numberOfLines={2} style={{ flex: 1, minWidth: 360, fontSize: FontSize.xs + 1, color: Colors.textPrimary, lineHeight: 20 }}>{log.description}</Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  {!auditLoading && filteredLogs.length === 0 && (
+                {!auditLoading && filteredLogs.length === 0 && (
                   <View style={{ paddingVertical: 28, alignItems: 'center', gap: 6 }}>
                     <Ionicons name="file-tray-outline" size={28} color={Colors.textMuted} />
                     <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>No activity records found</Text>
                     <Text style={{ color: Colors.textMuted, fontSize: FontSize.xs }}>New logins, content actions, account changes, and settings updates will appear here.</Text>
                   </View>
-                  )}
-                </View>
-              </ScrollView>
+                )}
+              </View>
             </Card>
           </View>
         );
