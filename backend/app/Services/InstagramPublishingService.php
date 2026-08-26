@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\SystemSetting;
 use Exception;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -16,16 +15,11 @@ class InstagramPublishingService
 
     public function __construct()
     {
-        $this->businessAccountId = Cache::remember('instagram_business_account_id', 3600, function () {
-            $setting = SystemSetting::where('key', 'instagram_business_account_id')->first();
-            return $setting ? (string) $setting->value : env('INSTAGRAM_BUSINESS_ACCOUNT_ID', '');
-        });
+        $businessAccountId = SystemSetting::where('key', 'instagram_business_account_id')->first();
+        $accessToken = SystemSetting::where('key', 'instagram_access_token')->first();
 
-        $this->accessToken = Cache::remember('instagram_access_token', 3600, function () {
-            $setting = SystemSetting::where('key', 'instagram_access_token')->first();
-            return $setting ? (string) $setting->value : env('INSTAGRAM_ACCESS_TOKEN', '');
-        });
-
+        $this->businessAccountId = $businessAccountId ? (string) $businessAccountId->value : env('INSTAGRAM_BUSINESS_ACCOUNT_ID', '');
+        $this->accessToken = $accessToken ? (string) $accessToken->value : env('INSTAGRAM_ACCESS_TOKEN', '');
         $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');
     }
 

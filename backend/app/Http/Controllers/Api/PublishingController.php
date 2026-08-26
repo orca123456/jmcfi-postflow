@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PublishingRecord;
 use App\Models\PostRequest;
 use App\Models\User;
 use App\Notifications\PostPublishedSuccessNotification;
@@ -108,6 +109,8 @@ class PublishingController extends Controller
                 'published_at' => now(),
             ]);
 
+            $this->recordPublishingResults($post, $user->id, $publishResults, $publishErrors);
+
             // 5. Log the action in Audit Trail
             \App\Services\AuditLogService::log(
                 'POST_PUBLISHED',
@@ -208,6 +211,59 @@ class PublishingController extends Controller
         }
 
         return route('instagram.media', ['media' => $media->id]);
+    }
+
+    private function recordPublishingResults(PostRequest $post, int $userId, array $results, array $errors): void
+    {
+        foreach ($results as $platform => $response) {
+            PublishingRecord::create([
+                'post_request_id' => $post->id,
+                'published_by' => $userId,
+                'platform' => $platform,
+                'external_post_id' => $this->externalPostId($platform, $response),
+                'external_url' => $this->externalPostUrl($platform, $response),
+                'status' => 'published',
+                'published_at' => now(),
+                'platform_response' => $response,
+            ]);
+        }
+
+        foreach ($errors as $platform => $message) {
+            PublishingRecord::create([
+                'post_request_id' => $post->id,
+                'published_by' => $userId,
+                'platform' => $platform,
+                'status' => 'failed',
+                'published_at' => now(),
+                'error_message' => $message,
+            ]);
+        }
+    }
+
+    private function externalPostId(string $platform, array $response): ?string
+    {
+        return match ($platform) {
+            'instagram' => $response['id'] ?? data_get($response, 'response.id'),
+            'facebook' => $response['post_id'] ?? $response['id'] ?? null,
+            default => $response['id'] ?? null,
+        };
+    }
+
+    private function externalPostUrl(string $platform, array $response): ?string
+    {
+        if (!empty($response['permalink'])) {
+            return $response['permalink'];
+        }
+
+        $id = $this->externalPostId($platform, $response);
+        if (!$id) {
+            return null;
+        }
+
+        return match ($platform) {
+            'facebook' => str_contains($id, '_') ? 'https://www.facebook.com/' . str_replace('_', '/posts/', $id) : null,
+            default => null,
+        };
     }
 
     private function formatPublishErrors(array $errors): string
