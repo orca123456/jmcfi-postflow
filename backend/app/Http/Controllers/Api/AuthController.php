@@ -40,12 +40,20 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             \Illuminate\Support\Facades\RateLimiter::hit($throttleKey, 59);
-            
-            // If this hit just reached the max attempts (6), we want to lock them out for EXACTLY 59 seconds from right NOW.
+
+            // Start the visible lockout immediately on the 6th failed attempt.
             if (\Illuminate\Support\Facades\RateLimiter::attempts($throttleKey) >= 6) {
-                // To force a fresh 59-second lockout, we can clear the attempts and hit it with a high value, but Laravel doesn't allow overriding TTL easily.
-                // The easiest way is to use the Cache facade to set the exact lockout timer.
-                \Illuminate\Support\Facades\Cache::put($throttleKey.':timer', \Illuminate\Support\Carbon::now()->addSeconds(59)->getTimestamp(), 59);
+                $retryAfter = 59;
+                \Illuminate\Support\Facades\Cache::put(
+                    $throttleKey.':timer',
+                    \Illuminate\Support\Carbon::now()->addSeconds($retryAfter)->getTimestamp(),
+                    $retryAfter
+                );
+
+                return response()->json([
+                    'message' => 'Too many login attempts. Please try again in ' . $retryAfter . ' seconds.',
+                    'retry_after' => $retryAfter,
+                ], 429);
             }
 
             throw ValidationException::withMessages([
