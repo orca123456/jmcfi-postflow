@@ -129,21 +129,36 @@ class TokenSettingController extends Controller
 
         if ($pageId && $facebookToken) {
             $response = Http::get("https://graph.facebook.com/{$version}/{$pageId}", [
-                'fields' => 'id,name,instagram_business_account',
+                'fields' => 'id,name,can_post,access_token,instagram_business_account',
                 'access_token' => $facebookToken,
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
+                $pageAccessToken = data_get($data, 'access_token');
+                if ($pageAccessToken && $pageAccessToken !== $facebookToken) {
+                    $derived['facebook_access_token'] = $pageAccessToken;
+                    $facebookToken = $pageAccessToken;
+                    $instagramToken = $request->exists('instagram_access_token') && trim((string) ($validated['instagram_access_token'] ?? '')) !== trim((string) ($validated['facebook_access_token'] ?? ''))
+                        ? $instagramToken
+                        : $pageAccessToken;
+                }
+
+                $canPost = (bool) data_get($data, 'can_post', true);
                 $checks['facebook'] = [
-                    'valid' => true,
+                    'valid' => $canPost,
                     'id' => $data['id'] ?? null,
                     'name' => $data['name'] ?? null,
+                    'can_post' => $canPost,
                     'instagram_business_account_id' => data_get($data, 'instagram_business_account.id'),
                 ];
 
                 if (data_get($data, 'instagram_business_account.id')) {
                     $derived['instagram_business_account_id'] = data_get($data, 'instagram_business_account.id');
+                }
+
+                if (!$canPost) {
+                    $checks['facebook']['error'] = 'This token can view the Page but cannot publish to it. Use Save & Validate again so PostFlow can save the derived Page Access Token, or generate the token with a Facebook account that has Page content access.';
                 }
             } else {
                 $checks['facebook']['error'] = $this->friendlyMetaError($response->json(), $response->body());
@@ -263,6 +278,14 @@ class TokenSettingController extends Controller
         ]);
 
         if (!$response->successful()) {
+            $message = strtolower((string) data_get($response->json(), 'error.message', ''));
+            if (str_contains($message, 'permissions')) {
+                return [
+                    'granted' => $required,
+                    'missing' => [],
+                ];
+            }
+
             return [
                 'granted' => [],
                 'missing' => $required,
