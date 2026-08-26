@@ -969,10 +969,17 @@ export default function ITAdminDashboard() {
       const validationRes = await tokenSettingsApi.validate(payload);
       const derived = validationRes.data?.derived || {};
 
-      if (derived.instagram_business_account_id && derived.instagram_business_account_id !== payload.instagram_business_account_id) {
+      if (
+        derived.facebook_access_token ||
+        (derived.instagram_business_account_id && derived.instagram_business_account_id !== payload.instagram_business_account_id)
+      ) {
         const updatedPayload = {
           ...payload,
-          instagram_business_account_id: derived.instagram_business_account_id,
+          facebook_access_token: derived.facebook_access_token || payload.facebook_access_token,
+          instagram_business_account_id: derived.instagram_business_account_id || payload.instagram_business_account_id,
+          instagram_access_token: derived.facebook_access_token && (!payload.instagram_access_token || payload.instagram_access_token === payload.facebook_access_token)
+            ? derived.facebook_access_token
+            : payload.instagram_access_token,
         };
         await tokenSettingsApi.update(updatedPayload);
         setTokenFields(updatedPayload);
