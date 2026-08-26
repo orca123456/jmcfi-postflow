@@ -11,6 +11,7 @@ export interface AuthUser {
   last_name?: string;
   email: string;
   role: string;
+  roles?: string[];
   department?: string;
   position?: string;
   photo_url?: string;
@@ -56,6 +57,34 @@ const storage = {
   },
 };
 
+export const normalizeUserRole = (role?: string): string => {
+  const roleMap: Record<string, string> = {
+    content_requestor: 'requestor',
+    requestor: 'requestor',
+    it_admin: 'admin',
+    it_publisher: 'admin',
+    admin: 'admin',
+    office_head: 'approver',
+    vice_president: 'approver',
+    imc_qa_checker: 'approver',
+    approver: 'approver',
+  };
+
+  return roleMap[role || ''] ?? 'requestor';
+};
+
+const normalizeAuthUser = (user: AuthUser & { roles?: string[] }): AuthUser => {
+  const rawRole = user.roles && user.roles.length > 0 ? user.roles[0] : user.role;
+  const normalizedRole = normalizeUserRole(rawRole);
+  const name = user.name || user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ');
+
+  return {
+    ...user,
+    name,
+    role: normalizedRole,
+  };
+};
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   token: null,
@@ -70,24 +99,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       let { token, user } = response.data;
 
       if (user) {
-        if (user.roles && user.roles.length > 0) {
-          // Normalize role names from DB to frontend expectations
-          const roleMap: Record<string, string> = {
-            'content_requestor': 'requestor',
-            'it_admin': 'admin',
-            'it_publisher': 'admin',
-            'office_head': 'approver',
-            'vice_president': 'approver',
-            'imc_qa_checker': 'approver',
-          };
-          const rawRole = user.roles[0];
-          user.role = roleMap[rawRole] ?? rawRole;
-        } else if (!user.role) {
-          user.role = 'requestor';
-        }
-        if (!user.name && user.first_name) {
-          user.name = `${user.first_name} ${user.last_name}`;
-        }
+        user = normalizeAuthUser(user);
       }
 
       await storage.set('auth_token', token);
@@ -126,19 +138,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const userStr = await storage.get('auth_user');
     if (token && userStr) {
       try {
-        const user = JSON.parse(userStr);
-        // Normalize role names for backward compatibility with stored data
-        const roleMap: Record<string, string> = {
-          'content_requestor': 'requestor',
-          'it_admin': 'admin',
-          'it_publisher': 'admin',
-          'office_head': 'approver',
-          'vice_president': 'approver',
-          'imc_qa_checker': 'approver',
-        };
-        if (user.role) {
-          user.role = roleMap[user.role] ?? user.role;
-        }
+        const user = normalizeAuthUser(JSON.parse(userStr));
         set({ user, token });
       } catch (_) {}
     }
@@ -147,8 +147,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   clearError: () => set({ error: null }),
 
   setUser: async (user: AuthUser) => {
-    await storage.set('auth_user', JSON.stringify(user));
-    set({ user });
+    const normalizedUser = normalizeAuthUser(user);
+    await storage.set('auth_user', JSON.stringify(normalizedUser));
+    set({ user: normalizedUser });
   },
 
   setLockUntil: (time: number | null) => set({ lockUntil: time }),
