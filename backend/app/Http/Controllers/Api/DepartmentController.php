@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -45,6 +46,11 @@ class DepartmentController extends Controller
             'role_categories' => $categories,
         ]);
 
+        AuditLogService::log('DEPARTMENT_CREATED', 'Created department: ' . $department->display_name, 'INFO', [
+            'department_id' => $department->id,
+            'role_categories' => $categories,
+        ], $request);
+
         return response()->json([
             'data' => $department,
         ], 201);
@@ -65,6 +71,11 @@ class DepartmentController extends Controller
         ]);
 
         $department->update($validated);
+
+        AuditLogService::log('DEPARTMENT_UPDATED', 'Updated department: ' . $department->display_name, 'INFO', [
+            'department_id' => $department->id,
+            'fields' => array_keys($validated),
+        ], $request);
 
         return response()->json([
             'data' => $department,
@@ -89,12 +100,21 @@ class DepartmentController extends Controller
             $categories = array_values(array_filter($categories, fn($c) => $c !== $roleCategory));
             if (count($categories) > 0) {
                 $department->update(['role_categories' => $categories]);
+                AuditLogService::log('DEPARTMENT_UPDATED', 'Removed role access from department: ' . $department->display_name, 'WARNING', [
+                    'department_id' => $department->id,
+                    'removed_role_category' => $roleCategory,
+                ], $request);
                 return response()->json(['data' => $department]);
             }
         }
 
         // No role scope, or this was the last role using it -> delete the row.
+        $deletedName = $department->display_name;
+        $deletedId = $department->id;
         $department->delete();
+        AuditLogService::log('DEPARTMENT_DELETED', 'Deleted department: ' . $deletedName, 'WARNING', [
+            'department_id' => $deletedId,
+        ], $request);
         return response()->json(null, 204);
     }
 
@@ -114,6 +134,10 @@ class DepartmentController extends Controller
         $path = $request->file('logo')->store('department-logos', $disk);
         $department->update(['logo_path' => $path]);
 
+        AuditLogService::log('DEPARTMENT_LOGO_UPDATED', 'Updated department logo: ' . $department->display_name, 'INFO', [
+            'department_id' => $department->id,
+        ], $request);
+
         return response()->json([
             'data' => $department,
             'logo_url' => asset('storage/' . $path),
@@ -126,6 +150,10 @@ class DepartmentController extends Controller
             Storage::disk('public')->delete($department->logo_path);
         }
         $department->update(['logo_path' => null]);
+
+        AuditLogService::log('DEPARTMENT_LOGO_REMOVED', 'Removed department logo: ' . $department->display_name, 'INFO', [
+            'department_id' => $department->id,
+        ]);
 
         return response()->json(['message' => 'Logo removed.']);
     }

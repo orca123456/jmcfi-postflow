@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\UserResource;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -77,6 +78,13 @@ class UserController extends Controller
 
         $user->assignRole($validated['role']);
 
+        AuditLogService::log('USER_CREATED', 'Created institutional account: ' . $user->full_name, 'INFO', [
+            'target_user_id' => $user->id,
+            'email' => $user->email,
+            'role' => $validated['role'],
+            'department' => $dept,
+        ], $request);
+
         return response()->json([
             'data' => new UserResource($user->load('roles'))
         ], 201);
@@ -126,6 +134,13 @@ class UserController extends Controller
             $user->syncRoles([$validated['role']]);
         }
 
+        AuditLogService::log('USER_UPDATED', 'Updated institutional account: ' . $user->full_name, 'INFO', [
+            'target_user_id' => $user->id,
+            'email' => $user->email,
+            'fields' => array_keys(Arr::except($validated, ['password', 'password_confirmation'])),
+            'password_changed' => $request->has('password'),
+        ], $request);
+
         return response()->json([
             'data' => new UserResource($user->load('roles'))
         ]);
@@ -142,7 +157,13 @@ class UserController extends Controller
         }
 
         try {
+            $deleted = [
+                'target_user_id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->full_name,
+            ];
             $user->delete();
+            AuditLogService::log('USER_DELETED', 'Deleted institutional account: ' . $deleted['name'], 'WARNING', $deleted);
             return response()->json(null, 204);
         } catch (\Illuminate\Database\QueryException $e) {
             return response()->json([
