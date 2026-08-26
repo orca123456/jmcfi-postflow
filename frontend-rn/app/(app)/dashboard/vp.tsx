@@ -102,7 +102,12 @@ export default function VPDashboard() {
   const [savingAcct, setSavingAcct] = useState(false);
   const [savingAcctPw, setSavingAcctPw] = useState(false);
 
-  useEffect(() => { if (user) setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim()); }, [user]);
+  useEffect(() => {
+    if (user) {
+      setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim());
+      setProfilePhotoUrl(user.photo_url || null);
+    }
+  }, [user?.id, user?.photo_url]);
 
   const { data: initDataRes, refetch: refetchInitData, isLoading: isInitLoading } = useQuery({
     queryKey: ['vp-dashboard-data'],
@@ -207,14 +212,33 @@ export default function VPDashboard() {
       input.onchange = async (e: any) => {
         const f = e.target.files?.[0]; if (!f) return;
         setUploadingPhoto(true);
-        try { const r = await authApi.uploadPhoto(f); setProfilePhotoUrl(r.data.photo_url); } catch { } finally { setUploadingPhoto(false); }
+        try {
+          const r = await authApi.uploadPhoto(f);
+          const updatedUser = r.data?.user;
+          const nextPhotoUrl = r.data?.photo_url || updatedUser?.photo_url || null;
+          setProfilePhotoUrl(nextPhotoUrl);
+          if (user) {
+            await useAuthStore.getState().setUser({
+              ...user,
+              ...(updatedUser || {}),
+              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+              photo_url: nextPhotoUrl || undefined,
+            });
+          }
+        } catch { } finally { setUploadingPhoto(false); }
       };
       input.click();
     }
   };
   const handleRemovePhoto = async () => {
     setUploadingPhoto(true);
-    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch { } finally { setUploadingPhoto(false); }
+    try {
+      await authApi.removePhoto();
+      setProfilePhotoUrl(null);
+      if (user) {
+        await useAuthStore.getState().setUser({ ...user, photo_url: undefined });
+      }
+    } catch { } finally { setUploadingPhoto(false); }
   };
   const handleSaveDetails = async () => {
     const parts = acctFullName.trim().split(' ');
@@ -368,6 +392,7 @@ export default function VPDashboard() {
       activeTab={activeTab as string}
       onTabChange={setActiveTab}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
+      userPhotoUrl={profilePhotoUrl}
     >
       {/* ── LOADING SKELETON ── */}
       {isInitialLoading && <DashboardSkeleton />}

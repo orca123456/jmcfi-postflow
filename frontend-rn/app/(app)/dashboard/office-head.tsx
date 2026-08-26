@@ -116,18 +116,57 @@ export default function OfficeHeadDashboard() {
   const [acctConfirmPw, setAcctConfirmPw] = useState('');
   const [savingAcct, setSavingAcct] = useState(false);
 
-  useEffect(() => { if (user) setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim()); }, [user]);
+  useEffect(() => {
+    if (user) {
+      setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim());
+      setProfilePhotoUrl(user.photo_url || null);
+    }
+  }, [user?.id, user?.photo_url]);
 
   const handleUploadPhoto = () => {
-    // mock implementation
-    setUploadingPhoto(true);
-    setTimeout(() => {
-      setProfilePhotoUrl('https://via.placeholder.com/150');
-      setUploadingPhoto(false);
-    }, 1000);
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingPhoto(true);
+        try {
+          const res = await authApi.uploadPhoto(file);
+          const updatedUser = res.data?.user;
+          const nextPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+          setProfilePhotoUrl(nextPhotoUrl);
+          if (user) {
+            await useAuthStore.getState().setUser({
+              ...user,
+              ...(updatedUser || {}),
+              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+              photo_url: nextPhotoUrl || undefined,
+            });
+          }
+        } catch {
+          alert('Upload failed.');
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      input.click();
+    }
   };
-  const handleRemovePhoto = () => {
-    setProfilePhotoUrl(null);
+  const handleRemovePhoto = async () => {
+    setUploadingPhoto(true);
+    try {
+      await authApi.removePhoto();
+      setProfilePhotoUrl(null);
+      if (user) {
+        await useAuthStore.getState().setUser({ ...user, photo_url: undefined });
+      }
+    } catch {
+      alert('Remove failed.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
   const handleSaveProfile = async () => {
     if (!acctFullName) { alert('Full name required.'); return; }
@@ -387,6 +426,7 @@ export default function OfficeHeadDashboard() {
       activeTab={activeTab as string}
       onTabChange={handleTabChange}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
+      userPhotoUrl={profilePhotoUrl}
     >
       {/* ── LOADING SKELETON ── */}
       {isInitialLoading && <DashboardSkeleton />}

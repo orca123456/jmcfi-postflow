@@ -142,14 +142,22 @@ export default function RequestorDashboard() {
   useEffect(() => {
     if (user) {
       setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim());
-      if (user.photo_url) setProfilePhotoUrl(user.photo_url);
+      setProfilePhotoUrl(user.photo_url || null);
     }
     // Fetch latest user details on mount to ensure photo_url is up to date
     authApi.getUser().then(res => {
-      const photo = res.data?.user?.photo_url || res.data?.photo_url;
-      if (photo) setProfilePhotoUrl(photo);
+      const latestUser = res.data?.user || res.data;
+      const photo = latestUser?.photo_url || null;
+      setProfilePhotoUrl(photo);
+      if (latestUser && user) {
+        useAuthStore.getState().setUser({
+          ...user,
+          ...latestUser,
+          role: latestUser.roles && latestUser.roles.length > 0 ? latestUser.roles[0] : (latestUser.role || user.role),
+        });
+      }
     }).catch(() => { });
-  }, [user]);
+  }, [user?.id, user?.photo_url]);
 
   const handleUploadPhoto = () => {
     if (Platform.OS === 'web') {
@@ -158,7 +166,20 @@ export default function RequestorDashboard() {
       input.onchange = async (e: any) => {
         const file = e.target.files?.[0]; if (!file) return;
         setUploadingPhoto(true);
-        try { const res = await authApi.uploadPhoto(file); setProfilePhotoUrl(res.data.photo_url); } catch (e: any) { alert('Upload failed.'); }
+        try {
+          const res = await authApi.uploadPhoto(file);
+          const updatedUser = res.data?.user;
+          const nextPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+          setProfilePhotoUrl(nextPhotoUrl);
+          if (user) {
+            await useAuthStore.getState().setUser({
+              ...user,
+              ...(updatedUser || {}),
+              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+              photo_url: nextPhotoUrl || undefined,
+            });
+          }
+        } catch (e: any) { alert('Upload failed.'); }
         finally { setUploadingPhoto(false); }
       };
       input.click();
@@ -167,7 +188,13 @@ export default function RequestorDashboard() {
 
   const handleRemovePhoto = async () => {
     setUploadingPhoto(true);
-    try { await authApi.removePhoto(); setProfilePhotoUrl(null); } catch (e: any) { alert('Remove failed.'); }
+    try {
+      await authApi.removePhoto();
+      setProfilePhotoUrl(null);
+      if (user) {
+        await useAuthStore.getState().setUser({ ...user, photo_url: undefined });
+      }
+    } catch (e: any) { alert('Remove failed.'); }
     finally { setUploadingPhoto(false); }
   };
 
@@ -884,6 +911,7 @@ export default function RequestorDashboard() {
       activeTab={activeTab as string}
       onTabChange={setActiveTab}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
+      userPhotoUrl={profilePhotoUrl}
     >
       <Toast visible={toastVisible} message={toastMessage} type={toastType} onHide={() => setToastVisible(false)} />
       {/* ── LOADING SKELETON ── */}
