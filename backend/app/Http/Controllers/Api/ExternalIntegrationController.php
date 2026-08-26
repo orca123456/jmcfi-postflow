@@ -134,9 +134,7 @@ class ExternalIntegrationController extends Controller
                         ]);
 
                         if (Schema::hasTable('post_media_files')) {
-                            $media->file()->create([
-                                'content' => $response->body(),
-                            ]);
+                            $this->storeMediaFileContent($media, $response->body());
                         }
 
                         $disk = config('filesystems.default');
@@ -321,5 +319,21 @@ class ExternalIntegrationController extends Controller
         }
 
         return array_values(array_unique($addresses));
+    }
+
+    private function storeMediaFileContent(PostMedia $media, string $content): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::table('post_media_files')->insert([
+                'post_media_id' => $media->id,
+                'content' => DB::raw("decode('" . bin2hex($content) . "', 'hex')"),
+            ]);
+
+            return;
+        }
+
+        $media->file()->create([
+            'content' => $content,
+        ]);
     }
 }

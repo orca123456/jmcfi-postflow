@@ -46,6 +46,10 @@ Route::get('/instagram-media/{media}.jpg', function (PostMedia $media) {
         if (is_resource($content)) {
             $content = stream_get_contents($content);
         }
+
+        if (is_string($content) && str_starts_with($content, '\\x')) {
+            $content = hex2bin(substr($content, 2)) ?: null;
+        }
     }
 
     if ($content === null) {
@@ -94,6 +98,10 @@ Route::get('/storage/{path}', function (string $path) {
     $content = $media?->file?->content;
     if (is_resource($content)) {
         $content = stream_get_contents($content);
+    }
+
+    if (is_string($content) && str_starts_with($content, '\\x')) {
+        $content = hex2bin(substr($content, 2)) ?: null;
     }
 
     if ($content === null) {

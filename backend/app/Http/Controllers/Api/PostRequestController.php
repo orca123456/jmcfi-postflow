@@ -850,12 +850,26 @@ class PostRequestController extends Controller
         ]);
 
         if (Schema::hasTable('post_media_files')) {
-            $media->file()->create([
-                'content' => file_get_contents($file->getRealPath()),
-            ]);
+            $this->storeMediaFileContent($media, file_get_contents($file->getRealPath()));
         }
 
         return $media;
+    }
+
+    private function storeMediaFileContent(PostMedia $media, string $content): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::table('post_media_files')->insert([
+                'post_media_id' => $media->id,
+                'content' => DB::raw("decode('" . bin2hex($content) . "', 'hex')"),
+            ]);
+
+            return;
+        }
+
+        $media->file()->create([
+            'content' => $content,
+        ]);
     }
 
     private function recordAuditTrail(PostRequest $post, string $event, \App\Models\User $user, ?string $remarks = null): void
