@@ -720,7 +720,7 @@ export default function RequestorDashboard() {
       const submittedPost = { ...res.data.data, status: 'PENDING_OFFICE_HEAD' };
       setMockQueuePosts((prev: any) => [submittedPost, ...prev.filter((p: any) => p.id !== submittedPost.id)]);
 
-      showToast('✅ Content request submitted successfully!');
+      showToast('Content request submitted successfully!');
       setEditingPostId(null);
       setPostTitle('');
       setCaption('');
