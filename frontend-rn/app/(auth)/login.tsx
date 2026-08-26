@@ -151,6 +151,8 @@ export default function LoginScreen() {
   }, [lockUntil, setLockUntil, clearError]);
 
   const handleLogin = async () => {
+    if (loading || countdown > 0) return;
+
     setLoading(true);
     const success = await login(email, password);
     setLoading(false);
@@ -167,12 +169,12 @@ export default function LoginScreen() {
 
   const handleEmailChange = (text: string) => {
     setEmail(text);
-    if (error) clearError();
+    if (error && countdown <= 0) clearError();
   };
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
-    if (error) clearError();
+    if (error && countdown <= 0) clearError();
   };
 
   return (
@@ -238,7 +240,7 @@ export default function LoginScreen() {
                 />
               </View>
 
-              {error ? (
+              {(error || countdown > 0) ? (
                 <View style={styles.errorBox}>
                   <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
                   <Text style={styles.errorText}>
