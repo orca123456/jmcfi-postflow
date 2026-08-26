@@ -26,7 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
-import { useAuthStore } from '../../../store/auth';
+import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
@@ -568,6 +568,15 @@ export default function ITAdminDashboard() {
   // ── Profile Photo State ──
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [profilePhotoLoadFailed, setProfilePhotoLoadFailed] = useState(false);
+  const [brokenUserPhotoIds, setBrokenUserPhotoIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (activeTab === 'account-settings') {
+      setProfilePhotoUrl(user?.photo_url || null);
+      setProfilePhotoLoadFailed(false);
+    }
+  }, [activeTab, user?.photo_url]);
 
   const handleUploadProfilePhoto = () => {
     if (Platform.OS === 'web') {
@@ -580,7 +589,19 @@ export default function ITAdminDashboard() {
         setUploadingPhoto(true);
         try {
           const res = await authApi.uploadPhoto(file);
-          setProfilePhotoUrl(res.data.photo_url);
+          const updatedUser = res.data?.user;
+          const nextPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+          setProfilePhotoUrl(nextPhotoUrl);
+          setProfilePhotoLoadFailed(false);
+          if (user) {
+            await setUser({
+              ...user,
+              ...(updatedUser || {}),
+              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+              photo_url: nextPhotoUrl || undefined,
+            });
+          }
+          setUsers(currentUsers => currentUsers.map(u => String(u.id) === String(user?.id) ? { ...u, photo_url: nextPhotoUrl } : u));
           showToast('Photo updated!', 'success');
         } catch (e: any) {
           showToast('Upload failed.', 'error');
@@ -597,6 +618,11 @@ export default function ITAdminDashboard() {
     try {
       await authApi.removePhoto();
       setProfilePhotoUrl(null);
+      setProfilePhotoLoadFailed(false);
+      if (user) {
+        await setUser({ ...user, photo_url: undefined });
+      }
+      setUsers(currentUsers => currentUsers.map(u => String(u.id) === String(user?.id) ? { ...u, photo_url: null } : u));
       showToast('Photo removed.', 'success');
     } catch (e: any) {
       showToast('Remove failed.', 'error');
@@ -1173,6 +1199,7 @@ export default function ITAdminDashboard() {
         department: updatedUser.department,
         role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
         status: updatedUser.status,
+        photo_url: updatedUser.photo_url,
       } : u));
       showToast('Profile updated successfully!', 'success');
 
@@ -1186,6 +1213,7 @@ export default function ITAdminDashboard() {
           email: updatedUser.email,
           department: updatedUser.department,
           role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
+          photo_url: updatedUser.photo_url,
         });
       }
 
@@ -1839,19 +1867,25 @@ export default function ITAdminDashboard() {
             </View>
             {filteredUsers.map((u) => {
               const badge = getRoleBadgeDetails(u.role);
-              // Find matching department logo
-              const userDept = departmentsList.find((d: any) =>
-                d.display_name === u.department || d.name === u.department
-              );
-              const deptLogoUrl = userDept ? getDeptLogo(userDept.id) : null;
+              const userPhotoUrl = u.photo_url && !brokenUserPhotoIds.has(String(u.id)) ? u.photo_url : null;
+              const rowAvatarColors = getAvatarColors(`${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email);
               return (
                 <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => handleOpenProfile(u)} activeOpacity={0.7}>
                   <View style={styles.userInfo}>
-                    {deptLogoUrl ? (
-                      <Image source={{ uri: deptLogoUrl }} style={{ width: 36, height: 36, borderRadius: 18 }} resizeMode="cover" />
+                    {userPhotoUrl ? (
+                      <Image
+                        source={{ uri: userPhotoUrl }}
+                        style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: rowAvatarColors.bg }}
+                        resizeMode="cover"
+                        onError={() => setBrokenUserPhotoIds(prev => {
+                          const next = new Set(prev);
+                          next.add(String(u.id));
+                          return next;
+                        })}
+                      />
                     ) : (
-                      <View style={[styles.userAvatar, { backgroundColor: badge.bgColor }]}>
-                        <Text style={[styles.userAvatarText, { color: badge.color }]}>
+                      <View style={[styles.userAvatar, { backgroundColor: rowAvatarColors.bg }]}>
+                        <Text style={[styles.userAvatarText, { color: rowAvatarColors.text }]}>
                           {u.first_name ? (u.first_name[0] + (u.last_name?.[0] || '')).toUpperCase() : u.email.substring(0, 2).toUpperCase()}
                         </Text>
                       </View>
@@ -3048,8 +3082,13 @@ $response = curl_exec($ch);`}
 
               <View style={styles.profilePictureRow}>
                 <View style={styles.profileAvatarLarge}>
-                  {profilePhotoUrl ? (
-                    <Image source={{ uri: profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
+                  {profilePhotoUrl && !profilePhotoLoadFailed ? (
+                    <Image
+                      source={{ uri: profilePhotoUrl }}
+                      style={{ width: 72, height: 72, borderRadius: 36 }}
+                      resizeMode="cover"
+                      onError={() => setProfilePhotoLoadFailed(true)}
+                    />
                   ) : (
                     <Text style={styles.profileAvatarTextLarge}>{user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'IT'}</Text>
                   )}
