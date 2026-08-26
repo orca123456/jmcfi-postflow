@@ -72,31 +72,36 @@ class AuthController extends Controller
 
     private function loginLockoutSeconds(string $key): int
     {
-        if (! Schema::hasTable('login_lockouts')) {
+        if (! Schema::hasTable('cache')) {
             return 0;
         }
 
-        $record = DB::table('login_lockouts')->where('key', $key)->first();
+        $record = DB::table('cache')->where('key', $this->loginCacheKey($key))->first();
         if (! $record) {
             return 0;
         }
 
         $now = now();
-
-        if ($record->locked_until && $now->lessThan(\Illuminate\Support\Carbon::parse($record->locked_until))) {
-            return max(1, $now->diffInSeconds(\Illuminate\Support\Carbon::parse($record->locked_until), false));
+        if ((int) $record->expiration <= $now->getTimestamp()) {
+            DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
+            return 0;
         }
 
-        if ($now->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($record->expires_at))) {
-            DB::table('login_lockouts')->where('key', $key)->delete();
+        $value = json_decode((string) $record->value, true) ?: [];
+        $lockedUntil = (int) ($value['locked_until'] ?? 0);
+
+        if ($lockedUntil > $now->getTimestamp()) {
+            return max(1, $lockedUntil - $now->getTimestamp());
         }
+
+        DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
 
         return 0;
     }
 
     private function recordFailedLogin(string $key): int
     {
-        if (! Schema::hasTable('login_lockouts')) {
+        if (! Schema::hasTable('cache')) {
             \Illuminate\Support\Facades\RateLimiter::hit($key, 59);
 
             return \Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 6)
@@ -106,33 +111,31 @@ class AuthController extends Controller
 
         return DB::transaction(function () use ($key) {
             $now = now();
-            $windowEndsAt = $now->copy()->addSeconds(59);
-            $record = DB::table('login_lockouts')->where('key', $key)->lockForUpdate()->first();
+            $expiresAt = $now->copy()->addSeconds(59)->getTimestamp();
+            $cacheKey = $this->loginCacheKey($key);
+            $record = DB::table('cache')->where('key', $cacheKey)->lockForUpdate()->first();
             $attempts = 0;
 
-            if ($record && $now->lessThan(\Illuminate\Support\Carbon::parse($record->expires_at))) {
-                $attempts = (int) $record->attempts;
+            if ($record && (int) $record->expiration > $now->getTimestamp()) {
+                $value = json_decode((string) $record->value, true) ?: [];
+                $attempts = (int) ($value['attempts'] ?? 0);
             }
 
             $attempts++;
+            $lockedUntil = $attempts >= 6 ? $expiresAt : null;
             $payload = [
-                'attempts' => min($attempts, 6),
-                'expires_at' => $windowEndsAt,
-                'updated_at' => $now,
+                'value' => json_encode([
+                    'attempts' => min($attempts, 6),
+                    'locked_until' => $lockedUntil,
+                ]),
+                'expiration' => $expiresAt,
             ];
 
-            if ($attempts >= 6) {
-                $payload['locked_until'] = $windowEndsAt;
-            } else {
-                $payload['locked_until'] = null;
-            }
-
             if ($record) {
-                DB::table('login_lockouts')->where('key', $key)->update($payload);
+                DB::table('cache')->where('key', $cacheKey)->update($payload);
             } else {
-                DB::table('login_lockouts')->insert(array_merge($payload, [
-                    'key' => $key,
-                    'created_at' => $now,
+                DB::table('cache')->insert(array_merge($payload, [
+                    'key' => $cacheKey,
                 ]));
             }
 
@@ -142,12 +145,17 @@ class AuthController extends Controller
 
     private function clearFailedLogins(string $key): void
     {
-        if (Schema::hasTable('login_lockouts')) {
-            DB::table('login_lockouts')->where('key', $key)->delete();
+        if (Schema::hasTable('cache')) {
+            DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
             return;
         }
 
         \Illuminate\Support\Facades\RateLimiter::clear($key);
+    }
+
+    private function loginCacheKey(string $key): string
+    {
+        return 'login_lockout:' . $key;
     }
 
     public function register(RegisterRequest $request): JsonResponse
