@@ -176,9 +176,12 @@ class AuthController extends Controller
         $path = $request->file('photo')->store('profile-photos', $disk);
         $user->update(['photo_path' => $path]);
 
+        $user->refresh();
+
         return response()->json([
             'message' => 'Photo uploaded.',
-            'photo_url' => asset('storage/' . str_replace('\\', '/', $path)),
+            'photo_url' => $user->photo_url,
+            'user' => new UserResource($user->load('roles')),
         ]);
     }
 
@@ -186,11 +189,17 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        if ($user->photo_path && Storage::disk('public')->exists($user->photo_path)) {
-            Storage::disk('public')->delete($user->photo_path);
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+
+        if ($user->photo_path && Storage::disk($disk)->exists($user->photo_path)) {
+            Storage::disk($disk)->delete($user->photo_path);
         }
         $user->update(['photo_path' => null]);
 
-        return response()->json(['message' => 'Photo removed.']);
+        return response()->json([
+            'message' => 'Photo removed.',
+            'photo_url' => null,
+            'user' => new UserResource($user->fresh()->load('roles')),
+        ]);
     }
 }

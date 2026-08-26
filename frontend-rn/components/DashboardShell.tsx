@@ -53,6 +53,7 @@ export function DashboardShell({
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [isHamburgerHovered, setIsHamburgerHovered] = React.useState(false);
   const [sidebarOpenedByHover, setSidebarOpenedByHover] = React.useState(false);
+  const [photoLoadFailed, setPhotoLoadFailed] = React.useState(false);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
 
   // Mobile drawer state
@@ -138,6 +139,11 @@ export function DashboardShell({
   const finalDeptName = departmentName || user?.department || 'JMCFI';
   const photoFromUser = (user as any)?.photo_url;
   const finalPhotoUrl = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
+  const shouldShowPhoto = Boolean(finalPhotoUrl && !photoLoadFailed);
+
+  React.useEffect(() => {
+    setPhotoLoadFailed(false);
+  }, [finalPhotoUrl]);
 
   const MIN_WIDTH = 64;
   const MAX_WIDTH = 260;
@@ -375,9 +381,9 @@ export function DashboardShell({
               style={styles.profileTrigger} 
               onPress={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
             >
-              <View style={[styles.avatarCircleMini, !finalPhotoUrl && { backgroundColor: avatarColors.bg }]}>
-                {finalPhotoUrl ? (
-                  <Image source={{ uri: finalPhotoUrl }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" />
+              <View style={[styles.avatarCircleMini, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
+                {shouldShowPhoto ? (
+                  <Image source={{ uri: finalPhotoUrl! }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" onError={() => setPhotoLoadFailed(true)} />
                 ) : (
                   <Text style={[styles.avatarTextMini, { color: avatarColors.text }]}>
                     {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
@@ -397,9 +403,9 @@ export function DashboardShell({
               <View style={styles.dropdownContainer}>
                 {/* Header Info */}
                 <View style={styles.dropdownHeader}>
-                  <View style={[styles.avatarCircleLarge, !finalPhotoUrl && { backgroundColor: avatarColors.bg }]}>
-                    {finalPhotoUrl ? (
-                      <Image source={{ uri: finalPhotoUrl }} style={{ width: 48, height: 48, borderRadius: 24 }} resizeMode="cover" />
+                  <View style={[styles.avatarCircleLarge, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
+                    {shouldShowPhoto ? (
+                      <Image source={{ uri: finalPhotoUrl! }} style={{ width: 48, height: 48, borderRadius: 24 }} resizeMode="cover" onError={() => setPhotoLoadFailed(true)} />
                     ) : (
                       <Text style={[styles.avatarTextLarge, { color: avatarColors.text }]}>
                         {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
