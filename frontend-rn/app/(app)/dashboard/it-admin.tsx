@@ -317,6 +317,7 @@ export default function ITAdminDashboard() {
   // ── Lazy Loader State ──
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [overviewLoaded, setOverviewLoaded] = useState(false);
+  const [auditLoaded, setAuditLoaded] = useState(false);
 
   // ── Master data loader: fetch background data ONLY when needed ──
   useEffect(() => {
@@ -328,7 +329,11 @@ export default function ITAdminDashboard() {
         if (res.data?.data) setAnalyticsOverview(res.data.data);
       }).catch(() => {});
       
-      auditLogsApi.list().then(res => {
+    }
+
+    if (activeTab === 'audit-logs' && !auditLoaded) {
+      setAuditLoaded(true);
+      auditLogsApi.list({ per_page: 100 }).then(res => {
         if (res.data?.data) setAuditLogs(res.data.data);
       }).catch(() => {});
     }
@@ -359,7 +364,7 @@ export default function ITAdminDashboard() {
         }
       }).catch(() => {});
     }
-  }, [isInitialLoading, activeTab, overviewLoaded, usersLoaded]);
+  }, [isInitialLoading, activeTab, overviewLoaded, usersLoaded, auditLoaded]);
 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -3320,11 +3325,11 @@ $response = curl_exec($ch);`}
 
         const eventFilterOptions = [
           { label: 'All Events', value: 'ALL' },
+          { label: 'Login', value: 'LOGIN_SUCCESS' },
           { label: 'Approvals', value: 'CONTENT_APPROVAL' },
           { label: 'Rejections', value: 'CONTENT_REJECT' },
-          { label: 'Policy Updates', value: 'POLICY_UPDATE' },
-          { label: 'User Changes', value: 'USER_MODIFIED' },
-          { label: 'QA Clearance', value: 'QUALITY_CLEARANCE' },
+          { label: 'User Changes', value: 'USER_UPDATED' },
+          { label: 'Tokens', value: 'TOKEN_SETTINGS_UPDATED' },
         ];
 
         return (
@@ -3337,7 +3342,21 @@ $response = curl_exec($ch);`}
                   <Text style={styles.sectionHeader}>Activity Log Records</Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ maxWidth: 420 }}>
+                    {eventFilterOptions.map((option) => {
+                      const active = auditEventTypeFilter === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          onPress={() => setAuditEventTypeFilter(option.value)}
+                          style={{ height: 36, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: active ? Colors.primary : Colors.border, backgroundColor: active ? '#EEF2FF' : '#F9FAFB', justifyContent: 'center' }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.primary : Colors.textSecondary }}>{option.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
                   {/* Search input */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', width: 240, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
                     <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
@@ -3370,7 +3389,7 @@ $response = curl_exec($ch);`}
                 </View>
 
                 {filteredLogs.map((log) => (
-                  <View key={log.id} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.background }]}>
+                  <TouchableOpacity key={log.id} onPress={() => setSelectedAuditLog(log)} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.background }]}>
                     {/* Timestamp */}
                     <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: Colors.textSecondary }}>{log.timestamp}</Text>
 
@@ -3386,8 +3405,16 @@ $response = curl_exec($ch);`}
 
                     {/* Details */}
                     <Text style={{ flex: 4, fontSize: FontSize.xs + 1, color: Colors.textPrimary, lineHeight: 20 }}>{log.description}</Text>
-                  </View>
+                  </TouchableOpacity>
                 ))}
+
+                {filteredLogs.length === 0 && (
+                  <View style={{ paddingVertical: 28, alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="file-tray-outline" size={28} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>No activity records found</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: FontSize.xs }}>New logins, content actions, account changes, and settings updates will appear here.</Text>
+                  </View>
+                )}
               </View>
             </Card>
           </View>

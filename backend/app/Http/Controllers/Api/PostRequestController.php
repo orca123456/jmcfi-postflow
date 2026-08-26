@@ -153,6 +153,14 @@ class PostRequestController extends Controller
                 $this->workflowService->notifyApprovers($post);
             }
 
+            AuditLogService::log(
+                $request->is_draft ? 'CONTENT_DRAFT_CREATED' : 'CONTENT_SUBMITTED',
+                ($request->is_draft ? 'Saved draft: ' : 'Submitted content request: ') . $post->title,
+                'INFO',
+                ['post_id' => $post->id, 'platforms' => $post->target_platforms],
+                $request
+            );
+
             $this->clearDashboardCache();
 
             return response()->json([
@@ -241,6 +249,11 @@ class PostRequestController extends Controller
 
             $this->clearDashboardCache();
 
+            AuditLogService::log('CONTENT_UPDATED', 'Updated content request: ' . $postRequest->title, 'INFO', [
+                'post_id' => $postRequest->id,
+                'fields' => array_keys($request->validated()),
+            ], $request);
+
             return response()->json([
                 'data' => new PostRequestResource($postRequest->load([
                     'category', 'requestor', 'media', 'approvalWorkflows.approver'
@@ -263,6 +276,10 @@ class PostRequestController extends Controller
         }
 
         $postRequest->delete();
+
+        AuditLogService::log('CONTENT_DELETED', 'Deleted content request: ' . $postRequest->title, 'WARNING', [
+            'post_id' => $postRequest->id,
+        ]);
 
         $this->clearDashboardCache();
 
@@ -303,6 +320,11 @@ class PostRequestController extends Controller
             $this->workflowService->notifyApprovers($postRequest);
 
             $this->clearDashboardCache();
+
+            AuditLogService::log('CONTENT_SUBMITTED', 'Submitted draft for approval: ' . $postRequest->title, 'INFO', [
+                'post_id' => $postRequest->id,
+                'platforms' => $postRequest->target_platforms,
+            ]);
 
             // Run AI compliance check in background so submit returns instantly
             // (The DeepSeek API call can take 5-30 seconds, which blocks the user)

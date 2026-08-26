@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -97,6 +98,10 @@ class TokenSettingController extends Controller
                 'is_public' => false,
             ]
         );
+
+        AuditLogService::log('TOKEN_SETTINGS_UPDATED', 'Updated platform token settings', 'WARNING', [
+            'fields' => array_values(array_filter($keys, fn ($key) => $request->exists($key))),
+        ], $request);
 
         return response()->json([
             'message' => 'Tokens updated successfully.',

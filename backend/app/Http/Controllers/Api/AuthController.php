@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Auth\LoginRequest;
 use App\Http\Requests\Api\Auth\RegisterRequest;
 use App\Http\Resources\Api\UserResource;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,8 +22,13 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         $throttleKey = $this->loginThrottleKey($request);
+        $user = User::where('email', $request->email)->first();
 
         if (($seconds = $this->loginLockoutSeconds($throttleKey)) > 0) {
+            AuditLogService::logForUser($user, 'LOGIN_LOCKED', 'Blocked login attempt during lockout for ' . $request->email, 'WARNING', [
+                'email' => $request->email,
+                'retry_after' => $seconds,
+            ], $request);
 
             return response()->json([
                 'message' => 'Too many login attempts. Please try again in ' . $seconds . ' seconds.',
@@ -30,10 +36,12 @@ class AuthController extends Controller
             ], 429);
         }
 
-        $user = User::where('email', $request->email)->first();
-
         if (! $user || ! Hash::check($request->password, $user->password)) {
             $retryAfter = $this->recordFailedLogin($throttleKey);
+            AuditLogService::logForUser($user, 'LOGIN_FAILED', 'Failed login attempt for ' . $request->email, 'WARNING', [
+                'email' => $request->email,
+                'locked' => $retryAfter > 0,
+            ], $request);
             if ($retryAfter > 0) {
                 return response()->json([
                     'message' => 'Too many login attempts. Please try again in ' . $retryAfter . ' seconds.',
@@ -49,12 +57,21 @@ class AuthController extends Controller
         $this->clearFailedLogins($throttleKey);
 
         if (! $user->isActive()) {
+            AuditLogService::logForUser($user, 'LOGIN_BLOCKED', 'Inactive user attempted to login: ' . $user->email, 'WARNING', [
+                'email' => $user->email,
+            ], $request);
+
             return response()->json([
                 'message' => 'Your account has been deactivated. Please contact administrator.',
             ], 403);
         }
 
         $token = $user->createToken('postflow-api')->plainTextToken;
+
+        AuditLogService::logForUser($user, 'LOGIN_SUCCESS', 'User logged in: ' . $user->full_name, 'INFO', [
+            'email' => $user->email,
+            'role' => $user->workflowRole(),
+        ], $request);
 
         return response()->json([
             'user' => new UserResource($user->load('roles')),
@@ -238,6 +255,11 @@ class AuthController extends Controller
 
         $token = $user->createToken('postflow-api')->plainTextToken;
 
+        AuditLogService::logForUser($user, 'ACCOUNT_REGISTERED', 'New account registered: ' . $user->full_name, 'INFO', [
+            'email' => $user->email,
+            'role' => $request->role,
+        ], $request);
+
         return response()->json([
             'user' => new UserResource($user->load('roles')),
             'token' => $token,
@@ -247,6 +269,10 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        AuditLogService::logForUser($request->user(), 'LOGOUT', 'User logged out: ' . $request->user()->full_name, 'INFO', [
+            'email' => $request->user()->email,
+        ], $request);
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
@@ -274,6 +300,10 @@ class AuthController extends Controller
 
         $user->update($validated);
 
+        AuditLogService::logForUser($user, 'PROFILE_UPDATED', 'Updated own profile details: ' . $user->full_name, 'INFO', [
+            'fields' => array_keys($validated),
+        ], $request);
+
         return response()->json([
             'user' => new UserResource($user->load('roles')),
         ]);
@@ -297,6 +327,10 @@ class AuthController extends Controller
         $user->update([
             'password' => Hash::make($request->new_password),
         ]);
+
+        AuditLogService::logForUser($user, 'PASSWORD_UPDATED', 'Updated own password: ' . $user->full_name, 'WARNING', [
+            'email' => $user->email,
+        ], $request);
 
         // Revoke all tokens except current
         $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
@@ -325,6 +359,10 @@ class AuthController extends Controller
 
         $user->refresh();
 
+        AuditLogService::logForUser($user, 'PROFILE_PHOTO_UPDATED', 'Updated profile photo: ' . $user->full_name, 'INFO', [
+            'path' => $path,
+        ], $request);
+
         return response()->json([
             'message' => 'Photo uploaded.',
             'photo_url' => $user->photo_url,
@@ -342,6 +380,10 @@ class AuthController extends Controller
             Storage::disk($disk)->delete($user->photo_path);
         }
         $user->update(['photo_path' => null]);
+
+        AuditLogService::logForUser($user, 'PROFILE_PHOTO_REMOVED', 'Removed profile photo: ' . $user->full_name, 'INFO', [
+            'email' => $user->email,
+        ], $request);
 
         return response()->json([
             'message' => 'Photo removed.',
