@@ -57,6 +57,7 @@ export default function RequestorDashboard() {
 
   // Form State (New Request)
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingPostHasImage, setEditingPostHasImage] = useState(false);
   const [draftToDelete, setDraftToDelete] = useState<string | null>(null);
   const [postTitle, setPostTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -222,6 +223,7 @@ export default function RequestorDashboard() {
     }
     setCaption(draft.caption_narrative || draft.caption || '');
     setPlatforms(parsePlatforms(draft.platforms));
+    setEditingPostHasImage(Array.isArray(draft.media) && draft.media.some(isImageFile));
     if (draft.publishDate) setPublishDate(draft.publishDate);
     setActiveTab('request');
     alert(`Draft "${draft.title}" loaded into request form. You can now edit and submit!`);
@@ -264,6 +266,7 @@ export default function RequestorDashboard() {
     }
     setCaption(post.caption_narrative || post.caption || '');
     setPlatforms(parsePlatforms(post.platforms));
+    setEditingPostHasImage(false);
     setActiveTab('request');
     alert(`Created new request form pre-filled with data from "${post.title}". Please revise according to approver comments.`);
   };
@@ -491,6 +494,16 @@ export default function RequestorDashboard() {
     setToastVisible(true);
   };
 
+  const isImageFile = (file: any) => {
+    const mimeType = String(file?.mimeType || file?.type || file?.file?.type || file?.mime_type || '').toLowerCase();
+    if (mimeType.startsWith('image/')) return true;
+
+    const name = String(file?.name || file?.file?.name || file?.original_name || file?.original_filename || file?.uri || file?.url || '').toLowerCase();
+    return /\.(jpe?g|png|gif|webp)$/.test(name);
+  };
+
+  const hasInstagramImage = () => mediaFiles.length > 0 ? mediaFiles.some(isImageFile) : editingPostHasImage;
+
   const handleSaveDraft = async () => {
     if (!postTitle || !caption) {
       alert('Please enter a post title and caption before saving.');
@@ -571,6 +584,7 @@ export default function RequestorDashboard() {
       }
 
       setEditingPostId(null);
+      setEditingPostHasImage(false);
       loadPosts();
       setActiveTab('dashboard');
     } catch (err: any) {
@@ -592,6 +606,11 @@ export default function RequestorDashboard() {
 
     if (mediaFiles.length === 0 && supportingDocs.length === 0) {
       alert('Please attach at least one media or asset file before submitting.');
+      return;
+    }
+
+    if (selectedPlatforms.includes('instagram') && !hasInstagramImage()) {
+      alert('Instagram publishing requires a photo. Please upload an image before submitting this request.');
       return;
     }
 
@@ -680,6 +699,7 @@ export default function RequestorDashboard() {
       setPlatforms({ facebook: false, instagram: false, portal: false });
       setMediaFiles([]);
       setSupportingDocs([]);
+      setEditingPostHasImage(false);
 
       // Reload silently in background
       loadPosts(false);

@@ -267,6 +267,12 @@ class PostRequestController extends Controller
             return response()->json(['message' => 'Post cannot be submitted for approval in current status'], 400);
         }
 
+        if ($this->needsInstagramImage($postRequest)) {
+            return response()->json([
+                'message' => 'Instagram publishing requires a photo. Please upload an image before submitting this request.',
+            ], 422);
+        }
+
         return DB::transaction(function () use ($postRequest) {
             $postRequest->update([
                 'status' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
@@ -780,6 +786,24 @@ class PostRequestController extends Controller
         if (str_starts_with($mimeType, 'image/')) return 'image';
         if (str_starts_with($mimeType, 'video/')) return 'video';
         return 'document';
+    }
+
+    private function needsInstagramImage(PostRequest $postRequest): bool
+    {
+        $platforms = is_array($postRequest->target_platforms)
+            ? $postRequest->target_platforms
+            : [];
+
+        if (!in_array('instagram', $platforms, true)) {
+            return false;
+        }
+
+        return !$postRequest->media()
+            ->where(function ($query) {
+                $query->where('type', 'image')
+                    ->orWhere('mime_type', 'like', 'image/%');
+            })
+            ->exists();
     }
 
     private function createMediaRecord(

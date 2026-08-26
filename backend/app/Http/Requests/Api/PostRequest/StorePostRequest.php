@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\PostRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StorePostRequest extends FormRequest
 {
@@ -51,5 +52,33 @@ class StorePostRequest extends FormRequest
             'media.*.mimes' => 'Media files must be images (jpg, png, jpeg, gif, webp), videos (mp4, mov, avi), or documents (pdf, doc, docx).',
             'supporting_docs.*.mimes' => 'Supporting documents must be PDF, Word, Excel, or text files.',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($this->boolean('is_draft')) {
+                return;
+            }
+
+            $platforms = $this->input('target_platforms', []);
+            if (!is_array($platforms) || !in_array('instagram', $platforms, true)) {
+                return;
+            }
+
+            $mediaFiles = $this->file('media', []);
+            $mediaFiles = is_array($mediaFiles) ? $mediaFiles : [$mediaFiles];
+
+            foreach (array_filter($mediaFiles) as $file) {
+                if (str_starts_with((string) $file->getMimeType(), 'image/')) {
+                    return;
+                }
+            }
+
+            $validator->errors()->add(
+                'media',
+                'Instagram publishing requires a photo. Please upload an image before submitting this request.'
+            );
+        });
     }
 }
