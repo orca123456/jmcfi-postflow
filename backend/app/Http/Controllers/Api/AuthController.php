@@ -10,7 +10,9 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -18,17 +20,9 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request): JsonResponse
     {
-        $throttleKey = \Illuminate\Support\Str::transliterate(\Illuminate\Support\Str::lower($request->input('email')).'|'.$request->ip());
+        $throttleKey = $this->loginThrottleKey($request);
 
-        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($throttleKey, 6)) {
-            $timerKey = $throttleKey.':timer';
-            if (!\Illuminate\Support\Facades\Cache::has($timerKey)) {
-                // If the lockout just happened but timer isn't set, set it for 59s
-                \Illuminate\Support\Facades\Cache::put($timerKey, \Illuminate\Support\Carbon::now()->addSeconds(59)->getTimestamp(), 59);
-            }
-            
-            $expiresAt = \Illuminate\Support\Facades\Cache::get($timerKey);
-            $seconds = max(1, $expiresAt - \Illuminate\Support\Carbon::now()->getTimestamp());
+        if (($seconds = $this->loginLockoutSeconds($throttleKey)) > 0) {
 
             return response()->json([
                 'message' => 'Too many login attempts. Please try again in ' . $seconds . ' seconds.',
@@ -39,17 +33,8 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
-            \Illuminate\Support\Facades\RateLimiter::hit($throttleKey, 59);
-
-            // Start the visible lockout immediately on the 6th failed attempt.
-            if (\Illuminate\Support\Facades\RateLimiter::attempts($throttleKey) >= 6) {
-                $retryAfter = 59;
-                \Illuminate\Support\Facades\Cache::put(
-                    $throttleKey.':timer',
-                    \Illuminate\Support\Carbon::now()->addSeconds($retryAfter)->getTimestamp(),
-                    $retryAfter
-                );
-
+            $retryAfter = $this->recordFailedLogin($throttleKey);
+            if ($retryAfter > 0) {
                 return response()->json([
                     'message' => 'Too many login attempts. Please try again in ' . $retryAfter . ' seconds.',
                     'retry_after' => $retryAfter,
@@ -61,7 +46,7 @@ class AuthController extends Controller
             ]);
         }
 
-        \Illuminate\Support\Facades\RateLimiter::clear($throttleKey);
+        $this->clearFailedLogins($throttleKey);
 
         if (! $user->isActive()) {
             return response()->json([
@@ -76,6 +61,93 @@ class AuthController extends Controller
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
+    }
+
+    private function loginThrottleKey(Request $request): string
+    {
+        $email = \Illuminate\Support\Str::lower((string) $request->input('email'));
+
+        return sha1($email . '|' . $request->ip());
+    }
+
+    private function loginLockoutSeconds(string $key): int
+    {
+        if (! Schema::hasTable('login_lockouts')) {
+            return 0;
+        }
+
+        $record = DB::table('login_lockouts')->where('key', $key)->first();
+        if (! $record) {
+            return 0;
+        }
+
+        $now = now();
+
+        if ($record->locked_until && $now->lessThan(\Illuminate\Support\Carbon::parse($record->locked_until))) {
+            return max(1, $now->diffInSeconds(\Illuminate\Support\Carbon::parse($record->locked_until), false));
+        }
+
+        if ($now->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($record->expires_at))) {
+            DB::table('login_lockouts')->where('key', $key)->delete();
+        }
+
+        return 0;
+    }
+
+    private function recordFailedLogin(string $key): int
+    {
+        if (! Schema::hasTable('login_lockouts')) {
+            \Illuminate\Support\Facades\RateLimiter::hit($key, 59);
+
+            return \Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 6)
+                ? 59
+                : 0;
+        }
+
+        return DB::transaction(function () use ($key) {
+            $now = now();
+            $windowEndsAt = $now->copy()->addSeconds(59);
+            $record = DB::table('login_lockouts')->where('key', $key)->lockForUpdate()->first();
+            $attempts = 0;
+
+            if ($record && $now->lessThan(\Illuminate\Support\Carbon::parse($record->expires_at))) {
+                $attempts = (int) $record->attempts;
+            }
+
+            $attempts++;
+            $payload = [
+                'attempts' => min($attempts, 6),
+                'expires_at' => $windowEndsAt,
+                'updated_at' => $now,
+            ];
+
+            if ($attempts >= 6) {
+                $payload['locked_until'] = $windowEndsAt;
+            } else {
+                $payload['locked_until'] = null;
+            }
+
+            if ($record) {
+                DB::table('login_lockouts')->where('key', $key)->update($payload);
+            } else {
+                DB::table('login_lockouts')->insert(array_merge($payload, [
+                    'key' => $key,
+                    'created_at' => $now,
+                ]));
+            }
+
+            return $attempts >= 6 ? 59 : 0;
+        });
+    }
+
+    private function clearFailedLogins(string $key): void
+    {
+        if (Schema::hasTable('login_lockouts')) {
+            DB::table('login_lockouts')->where('key', $key)->delete();
+            return;
+        }
+
+        \Illuminate\Support\Facades\RateLimiter::clear($key);
     }
 
     public function register(RegisterRequest $request): JsonResponse
