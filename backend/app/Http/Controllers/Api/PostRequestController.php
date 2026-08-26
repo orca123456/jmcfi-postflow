@@ -92,7 +92,16 @@ class PostRequestController extends Controller
 
     public function store(StorePostRequest $request): JsonResponse
     {
-        return DB::transaction(function () use ($request) {
+        $lock = Cache::lock('post_request_store_user_' . $request->user()->id, 30);
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'Your request is already being submitted. Please wait a moment.',
+            ], 429);
+        }
+
+        try {
+            return DB::transaction(function () use ($request) {
             $categoryId = $request->category_id;
             if (!$categoryId) {
                 $categoryId = \App\Models\PostCategory::where('is_active', true)->value('id');
@@ -152,7 +161,10 @@ class PostRequestController extends Controller
                 ])),
                 'message' => $request->is_draft ? 'Post saved as draft' : 'Post submitted for approval',
             ], 201);
-        });
+            });
+        } finally {
+            $lock->release();
+        }
     }
 
     public function show(PostRequest $postRequest): JsonResponse
@@ -259,6 +271,15 @@ class PostRequestController extends Controller
 
     public function submitForApproval(PostRequest $postRequest): JsonResponse
     {
+        $lock = Cache::lock('post_request_submit_' . $postRequest->id, 30);
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'This request is already being submitted. Please wait a moment.',
+            ], 429);
+        }
+
+        try {
         if (!$postRequest->canBeEditedBy(request()->user())) {
             return response()->json(['message' => 'Cannot submit this post'], 403);
         }
@@ -305,6 +326,9 @@ class PostRequestController extends Controller
                 'message' => 'Post submitted for approval',
             ]);
         });
+        } finally {
+            $lock->release();
+        }
     }
 
     public function approve(Request $request, PostRequest $postRequest): JsonResponse
