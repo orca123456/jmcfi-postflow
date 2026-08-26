@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -58,6 +58,9 @@ export default function RequestorDashboard() {
   // Form State (New Request)
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingPostHasImage, setEditingPostHasImage] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const requestActionLockedRef = useRef(false);
   const [draftToDelete, setDraftToDelete] = useState<string | null>(null);
   const [postTitle, setPostTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -494,6 +497,21 @@ export default function RequestorDashboard() {
     setToastVisible(true);
   };
 
+  const getApiErrorMessage = (err: any, fallback: string) => {
+    const data = err?.response?.data;
+    if (typeof data?.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+
+    const errors = data?.errors;
+    if (errors && typeof errors === 'object') {
+      const firstError = Object.values(errors).flat().find(Boolean);
+      if (firstError) return String(firstError);
+    }
+
+    return err?.message || fallback;
+  };
+
   const isImageFile = (file: any) => {
     const mimeType = String(file?.mimeType || file?.type || file?.file?.type || file?.mime_type || '').toLowerCase();
     if (mimeType.startsWith('image/')) return true;
@@ -505,10 +523,15 @@ export default function RequestorDashboard() {
   const hasInstagramImage = () => mediaFiles.length > 0 ? mediaFiles.some(isImageFile) : editingPostHasImage;
 
   const handleSaveDraft = async () => {
+    if (requestActionLockedRef.current || isSavingDraft || isSubmittingRequest) return;
+
     if (!postTitle || !caption) {
       alert('Please enter a post title and caption before saving.');
       return;
     }
+
+    requestActionLockedRef.current = true;
+    setIsSavingDraft(true);
     try {
       const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
       const payload: any = {
@@ -588,11 +611,16 @@ export default function RequestorDashboard() {
       loadPosts();
       setActiveTab('dashboard');
     } catch (err: any) {
-      alert('Failed to save draft: ' + (err?.response?.data?.message || err.message));
+      alert('Failed to save draft: ' + getApiErrorMessage(err, 'Unable to save draft.'));
+    } finally {
+      requestActionLockedRef.current = false;
+      setIsSavingDraft(false);
     }
   };
 
   const handleSubmitRequest = async () => {
+    if (requestActionLockedRef.current || isSubmittingRequest || isSavingDraft) return;
+
     if (!postTitle || !caption) {
       alert('Please enter a post title and caption before submitting.');
       return;
@@ -614,6 +642,8 @@ export default function RequestorDashboard() {
       return;
     }
 
+    requestActionLockedRef.current = true;
+    setIsSubmittingRequest(true);
     try {
       const payload: any = {
         title: postTitle,
@@ -705,7 +735,10 @@ export default function RequestorDashboard() {
       loadPosts(false);
       setActiveTab('dashboard');
     } catch (err: any) {
-      showToast('Failed to submit request: ' + (err?.response?.data?.message || err.message), 'error');
+      showToast('Failed to submit request: ' + getApiErrorMessage(err, 'Unable to submit request.'), 'error');
+    } finally {
+      requestActionLockedRef.current = false;
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -1073,13 +1106,21 @@ export default function RequestorDashboard() {
               </Text>
             </View>
             <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity style={styles.draftButton} onPress={handleSaveDraft}>
+              <TouchableOpacity
+                style={[styles.draftButton, (isSavingDraft || isSubmittingRequest) && styles.actionButtonDisabled]}
+                onPress={handleSaveDraft}
+                disabled={isSavingDraft || isSubmittingRequest}
+              >
                 <Ionicons name="save-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={styles.draftButtonText}>Save as Draft</Text>
+                <Text style={styles.draftButtonText}>{isSavingDraft ? 'Saving...' : 'Save as Draft'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.submitButton} onPress={handleSubmitRequest}>
+              <TouchableOpacity
+                style={[styles.submitButton, (isSubmittingRequest || isSavingDraft) && styles.actionButtonDisabled]}
+                onPress={handleSubmitRequest}
+                disabled={isSubmittingRequest || isSavingDraft}
+              >
                 <Ionicons name="paper-plane-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={styles.submitButtonText}>Submit Request</Text>
+                <Text style={styles.submitButtonText}>{isSubmittingRequest ? 'Submitting...' : 'Submit Request'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2990,6 +3031,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 38,
     backgroundColor: '#FFC72C', // Changed to Gold
+  },
+  actionButtonDisabled: {
+    opacity: 0.55,
   },
   submitButtonText: {
     fontSize: FontSize.sm,
