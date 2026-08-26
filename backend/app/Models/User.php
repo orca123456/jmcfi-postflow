@@ -57,8 +57,10 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!$this->photo_path) {
             return null;
         }
-        $normalizedPath = str_replace('\\', '/', $this->photo_path);
-        return asset('storage/' . $normalizedPath);
+
+        $version = $this->updated_at?->getTimestamp();
+
+        return url('/profile-photo/' . $this->getKey()) . ($version ? '?v=' . $version : '');
     }
 
     public function getDepartmentLogoUrlAttribute(): ?string
