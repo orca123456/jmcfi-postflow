@@ -1874,38 +1874,37 @@ export default function ITAdminDashboard() {
 
           {/* Department Logos Section */}
           <Card style={[styles.userCard, { marginBottom: Spacing.xl }]}>
-            <View style={styles.userListHeader}>
-              <Text style={styles.sectionHeader}>Department Logos</Text>
-            </View>
-            <Text style={{ color: Colors.textSecondary, marginBottom: 16 }}>Upload a logo for each department. Used across the platform.</Text>
+            <Text style={[styles.sectionHeader, { marginBottom: 8 }]}>Department Logos</Text>
+            <Text style={{ color: Colors.textSecondary, marginBottom: 24 }}>Upload a logo for each department. Used across the platform.</Text>
             
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-              {departmentsList.filter((d: any) => !d.is_system).map((dept: any) => (
-                <View key={dept.id} style={{ width: 140, height: 160, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingBottom: 4 }}>
+              {departmentsList.map((dept: any) => {
+                const logoUrl = getDeptLogo(dept.id);
+                return (
+                <View key={dept.id} style={{ width: 176, height: 174, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }}>
                   <TouchableOpacity 
-                    style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' }}
+                    style={{ height: 124, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}
                     onPress={() => handleUploadDeptLogo(dept.id)}
                     disabled={uploadingDeptId === dept.id}
+                    activeOpacity={0.82}
                   >
                     {uploadingDeptId === dept.id ? (
-                      <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>Uploading...</Text>
-                    ) : dept.logo_url ? (
-                      <Image source={{ uri: dept.logo_url }} style={{ width: '80%', height: '80%' }} resizeMode="contain" />
+                      <Text style={{ color: '#475569', fontSize: 13, fontWeight: '700' }}>Uploading...</Text>
+                    ) : logoUrl ? (
+                      <Image source={{ uri: logoUrl }} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
                     ) : (
                       <>
-                        <Ionicons name="cloud-upload-outline" size={24} color={Colors.textMuted} style={{ marginBottom: 8 }} />
-                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>Tap to upload</Text>
+                        <Ionicons name="cloud-upload-outline" size={34} color="#A0AEC0" style={{ marginBottom: 10 }} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#A0AEC0' }}>Tap to upload</Text>
                       </>
                     )}
                   </TouchableOpacity>
-                  <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, borderTopWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface }}>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={1}>{dept.display_name}</Text>
-                    <TouchableOpacity onPress={() => handleDeleteDepartmentFromSystem(dept.id)}>
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                    </TouchableOpacity>
+                  <View style={{ height: 50, justifyContent: 'center', paddingHorizontal: 14, borderTopWidth: 1, borderColor: '#E5E7EB', backgroundColor: Colors.surface }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: Colors.textPrimary }} numberOfLines={1}>{dept.display_name}</Text>
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </Card>
 
