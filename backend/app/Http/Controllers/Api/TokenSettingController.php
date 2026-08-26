@@ -142,6 +142,15 @@ class TokenSettingController extends Controller
                     $instagramToken = $request->exists('instagram_access_token') && trim((string) ($validated['instagram_access_token'] ?? '')) !== trim((string) ($validated['facebook_access_token'] ?? ''))
                         ? $instagramToken
                         : $pageAccessToken;
+
+                    $pageTokenResponse = Http::get("https://graph.facebook.com/{$version}/{$pageId}", [
+                        'fields' => 'id,name,can_post,instagram_business_account',
+                        'access_token' => $pageAccessToken,
+                    ]);
+
+                    if ($pageTokenResponse->successful()) {
+                        $data = array_merge($data, $pageTokenResponse->json());
+                    }
                 }
 
                 $canPost = (bool) data_get($data, 'can_post', true);
