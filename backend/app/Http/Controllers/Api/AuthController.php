@@ -72,6 +72,28 @@ class AuthController extends Controller
 
     private function loginLockoutSeconds(string $key): int
     {
+        if (Schema::hasTable('login_lockouts')) {
+            $record = DB::table('login_lockouts')->where('key', $key)->first();
+            if (! $record) {
+                return 0;
+            }
+
+            $now = now();
+            $lockedUntil = $record->locked_until
+                ? \Illuminate\Support\Carbon::parse($record->locked_until)
+                : null;
+
+            if ($lockedUntil && $now->lessThan($lockedUntil)) {
+                return max(1, $lockedUntil->getTimestamp() - $now->getTimestamp());
+            }
+
+            if ($now->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($record->expires_at))) {
+                DB::table('login_lockouts')->where('key', $key)->delete();
+            }
+
+            return 0;
+        }
+
         if (! Schema::hasTable('cache')) {
             return 0;
         }
@@ -101,6 +123,38 @@ class AuthController extends Controller
 
     private function recordFailedLogin(string $key): int
     {
+        if (Schema::hasTable('login_lockouts')) {
+            return DB::transaction(function () use ($key) {
+                $now = now();
+                $windowEndsAt = $now->copy()->addSeconds(59);
+                $record = DB::table('login_lockouts')->where('key', $key)->lockForUpdate()->first();
+                $attempts = 0;
+
+                if ($record && $now->lessThan(\Illuminate\Support\Carbon::parse($record->expires_at))) {
+                    $attempts = (int) $record->attempts;
+                }
+
+                $attempts++;
+                $payload = [
+                    'attempts' => min($attempts, 6),
+                    'locked_until' => $attempts >= 6 ? $windowEndsAt : null,
+                    'expires_at' => $windowEndsAt,
+                    'updated_at' => $now,
+                ];
+
+                if ($record) {
+                    DB::table('login_lockouts')->where('key', $key)->update($payload);
+                } else {
+                    DB::table('login_lockouts')->insert(array_merge($payload, [
+                        'key' => $key,
+                        'created_at' => $now,
+                    ]));
+                }
+
+                return $attempts >= 6 ? 59 : 0;
+            });
+        }
+
         if (! Schema::hasTable('cache')) {
             \Illuminate\Support\Facades\RateLimiter::hit($key, 59);
 
@@ -145,6 +199,11 @@ class AuthController extends Controller
 
     private function clearFailedLogins(string $key): void
     {
+        if (Schema::hasTable('login_lockouts')) {
+            DB::table('login_lockouts')->where('key', $key)->delete();
+            return;
+        }
+
         if (Schema::hasTable('cache')) {
             DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
             return;
