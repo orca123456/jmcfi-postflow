@@ -399,6 +399,9 @@ export default function ITAdminDashboard() {
   const filteredDepts = React.useMemo(() => {
     return departmentsForRole(newUserRole, departmentsList);
   }, [newUserRole, departmentsList]);
+  const selectedDepartment = React.useMemo(() => {
+    return departmentsList.find(d => d.display_name === newUserDepartment);
+  }, [departmentsList, newUserDepartment]);
 
   // Auto-reset department when role changes, and pick appropriate default
   React.useEffect(() => {
@@ -491,12 +494,12 @@ export default function ITAdminDashboard() {
   };
 
   const handleDeleteDepartment = async () => {
-    if (departmentsList.length <= 1) {
-      showToast('Cannot delete the last remaining department.', 'warning');
-      return;
-    }
     const deptToDelete = departmentsList.find(d => d.display_name === newUserDepartment);
     if (!deptToDelete) return;
+    if (deptToDelete.is_system) {
+      showToast('Built-in system departments cannot be removed.', 'warning');
+      return;
+    }
 
     try {
       // Role-scoped: only detach this department from the selected role. If it
@@ -1839,11 +1842,12 @@ export default function ITAdminDashboard() {
                       <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E40AF' }}>Add</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: selectedDepartment?.is_system || !newUserDepartment ? '#F3F4F6' : '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: selectedDepartment?.is_system || !newUserDepartment ? 0.65 : 1 }}
                       onPress={handleDeleteDepartment}
+                      disabled={selectedDepartment?.is_system || !newUserDepartment}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#DC2626' }}>Delete</Text>
+                      <Ionicons name="trash-outline" size={14} color={selectedDepartment?.is_system || !newUserDepartment ? '#9CA3AF' : '#DC2626'} />
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: selectedDepartment?.is_system || !newUserDepartment ? '#9CA3AF' : '#DC2626' }}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1892,7 +1896,7 @@ export default function ITAdminDashboard() {
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingBottom: 4 }}>
               {departmentsList
-                .filter((dept: any) => shouldShowLogoUploadTile(dept) && (dept.role_categories || []).includes(newUserRole))
+                .filter(shouldShowLogoUploadTile)
                 .map((dept: any) => {
                 const logoUrl = getDeptLogo(dept.id);
                 return (
@@ -1904,18 +1908,18 @@ export default function ITAdminDashboard() {
                     activeOpacity={0.82}
                   >
                     {uploadingDeptId === dept.id ? (
-                      <Text style={{ color: '#475569', fontSize: 13, fontWeight: '700' }}>Uploading...</Text>
+                      <Text style={{ color: '#475569', fontSize: 13, fontWeight: '500' }}>Uploading...</Text>
                     ) : logoUrl ? (
                       <Image source={{ uri: logoUrl }} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
                     ) : (
                       <>
                         <Ionicons name="cloud-upload-outline" size={34} color="#A0AEC0" style={{ marginBottom: 10 }} />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#A0AEC0' }}>Tap to upload</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '500', color: '#A0AEC0' }}>Tap to upload</Text>
                       </>
                     )}
                   </TouchableOpacity>
                   <View style={{ height: 50, justifyContent: 'center', paddingHorizontal: 14, borderTopWidth: 1, borderColor: '#E5E7EB', backgroundColor: Colors.surface }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: Colors.textPrimary }} numberOfLines={1}>{dept.display_name}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '500', color: Colors.textPrimary }} numberOfLines={1}>{dept.display_name}</Text>
                   </View>
                 </View>
                 );

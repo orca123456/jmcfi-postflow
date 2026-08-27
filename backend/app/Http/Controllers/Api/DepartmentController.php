@@ -22,10 +22,7 @@ class DepartmentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => [
-                'required', 'string', 'max:100',
-                \Illuminate\Validation\Rule::unique('departments')->whereNull('deleted_at')
-            ],
+            'name' => 'required|string|max:100',
             'display_name' => 'required|string|max:200',
             'description' => 'nullable|string|max:500',
             'role_categories' => 'nullable|array',
@@ -36,6 +33,43 @@ class DepartmentController extends Controller
         $categories = $validated['role_categories'] ?? [];
         if (!in_array('admin', $categories, true)) {
             $categories = ['requestor', 'approver'];
+        }
+
+        $existingDepartment = Department::withTrashed()
+            ->where('name', $validated['name'])
+            ->first();
+
+        if ($existingDepartment) {
+            if ($existingDepartment->trashed()) {
+                $existingDepartment->restore();
+            }
+
+            if ($existingDepartment->is_system) {
+                return response()->json([
+                    'message' => 'This built-in system department already exists.',
+                ], 422);
+            }
+
+            $mergedCategories = array_values(array_unique(array_merge(
+                $existingDepartment->role_categories ?? [],
+                $categories
+            )));
+
+            $existingDepartment->update([
+                'display_name' => $validated['display_name'],
+                'description' => $validated['description'] ?? $existingDepartment->description,
+                'is_active' => true,
+                'role_categories' => $mergedCategories,
+            ]);
+
+            AuditLogService::log('DEPARTMENT_UPDATED', 'Updated department access: ' . $existingDepartment->display_name, 'INFO', [
+                'department_id' => $existingDepartment->id,
+                'role_categories' => $mergedCategories,
+            ], $request);
+
+            return response()->json([
+                'data' => $existingDepartment,
+            ]);
         }
 
         $department = Department::create([
