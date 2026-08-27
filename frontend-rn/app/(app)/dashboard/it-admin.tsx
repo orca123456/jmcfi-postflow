@@ -1891,7 +1891,9 @@ export default function ITAdminDashboard() {
             <Text style={{ color: Colors.textSecondary, marginBottom: 24 }}>Upload a logo for each department. Used across the platform.</Text>
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingBottom: 4 }}>
-              {departmentsList.filter(shouldShowLogoUploadTile).map((dept: any) => {
+              {departmentsList
+                .filter((dept: any) => shouldShowLogoUploadTile(dept) && (dept.role_categories || []).includes(newUserRole))
+                .map((dept: any) => {
                 const logoUrl = getDeptLogo(dept.id);
                 return (
                 <View key={dept.id} style={{ width: 176, height: 174, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }}>
@@ -1918,12 +1920,6 @@ export default function ITAdminDashboard() {
                 </View>
                 );
               })}
-              {departmentsList.filter(shouldShowLogoUploadTile).length === 0 && (
-                <View style={{ height: 174, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}>
-                  <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '700' }}>No custom departments yet.</Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 4 }}>Add a department to create its logo upload box.</Text>
-                </View>
-              )}
             </ScrollView>
           </Card>
 
