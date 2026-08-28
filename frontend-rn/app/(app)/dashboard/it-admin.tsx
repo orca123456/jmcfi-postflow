@@ -78,18 +78,54 @@ const ROLE_CATEGORIES = [
   { label: 'Requestor', value: 'requestor' },
 ];
 
+const STATIC_DEPARTMENTS = {
+  admin: 'Information Technology Office',
+  vicePresident: 'Vice President of Academic Affairs',
+  vicePresidentLegacy: 'Vice President for Academic Affairs',
+  imc: 'Institutional Marketing Communication',
+};
+
+const normalizeDepartmentName = (department?: string): string =>
+  String(department || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const isInformationTechnologyOffice = (department?: string): boolean =>
+  normalizeDepartmentName(department) === normalizeDepartmentName(STATIC_DEPARTMENTS.admin);
+
+const isVicePresidentDepartment = (department: string): boolean => {
+  const normalized = normalizeDepartmentName(department);
+  return normalized === normalizeDepartmentName(STATIC_DEPARTMENTS.vicePresident)
+    || normalized === normalizeDepartmentName(STATIC_DEPARTMENTS.vicePresidentLegacy);
+};
+
+const isImcDepartment = (department: string): boolean =>
+  normalizeDepartmentName(department) === normalizeDepartmentName(STATIC_DEPARTMENTS.imc);
+
+const isStaticSystemDepartment = (department: any): boolean => {
+  const names = [department?.display_name, department?.name];
+  return names.some((name) =>
+    isInformationTechnologyOffice(name) || isVicePresidentDepartment(String(name || '')) || isImcDepartment(String(name || ''))
+  );
+};
+
+const isLegacyInformationTechnologyDepartment = (department: any): boolean => {
+  const legacyDepartmentNames = new Set([
+    'department_of_information_technology',
+    'department of information technology',
+  ]);
+  const name = normalizeDepartmentName(department?.name);
+  const displayName = normalizeDepartmentName(department?.display_name);
+  return legacyDepartmentNames.has(name) || legacyDepartmentNames.has(displayName);
+};
+
+const isCollegeDepartment = (department: any): boolean =>
+  Boolean(department && !department.is_system && !isStaticSystemDepartment(department) && !isLegacyInformationTechnologyDepartment(department));
+
 // Map a granular DB role to its friendly category
 const roleCategoryOf = (role: string): string => {
   if (role === 'it_publisher' || role === 'it_admin') return 'admin';
   if (role === 'office_head' || role === 'vice_president' || role === 'imc_qa_checker') return 'approver';
   return 'requestor'; // requestor, content_requestor, or unknown -> safest
 };
-
-const isVicePresidentDepartment = (department: string): boolean =>
-  department.toLowerCase().includes('vice president') || department === 'Academic Affairs';
-
-const isImcDepartment = (department: string): boolean =>
-  department.toLowerCase().includes('institutional marketing');
 
 // Map category + department -> exact granular role to assign (mirrors backend)
 const granularRoleFor = (category: string, department: string): string => {
@@ -105,20 +141,19 @@ const granularRoleFor = (category: string, department: string): string => {
 // This keeps each role's pool independent — adding/deleting in one role never
 // touches another role's departments.
 const departmentsForRole = (category: string, departments: any[]): any[] => {
-  return departments.filter(d => (d.role_categories || []).includes(category));
+  if (category === 'admin') {
+    return departments.filter(d => isInformationTechnologyOffice(d.display_name) || isInformationTechnologyOffice(d.name));
+  }
+
+  if (category === 'approver') {
+    return departments.filter(d => isVicePresidentDepartment(d.display_name || d.name) || isImcDepartment(d.display_name || d.name) || isCollegeDepartment(d));
+  }
+
+  return departments.filter(isCollegeDepartment);
 };
 
 const shouldShowLogoUploadTile = (department: any): boolean => {
-  if (department?.is_system) return false;
-
-  const legacyDepartmentNames = new Set([
-    'department_of_information_technology',
-    'department of information technology',
-  ]);
-  const name = String(department?.name || '').toLowerCase();
-  const displayName = String(department?.display_name || '').toLowerCase();
-
-  return !legacyDepartmentNames.has(name) && !legacyDepartmentNames.has(displayName);
+  return isStaticSystemDepartment(department) || isCollegeDepartment(department);
 };
 
 // Auto-suggested position for category + department (mirrors backend)
@@ -378,7 +413,6 @@ export default function ITAdminDashboard() {
         const fetchedDepts = res.data?.data;
         if (fetchedDepts && fetchedDepts.length > 0) {
           setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
-          setNewUserDepartment(fetchedDepts[0].display_name);
         }
       }).catch(() => {});
     }
@@ -405,20 +439,21 @@ export default function ITAdminDashboard() {
 
   // Auto-reset department when role changes, and pick appropriate default
   React.useEffect(() => {
+    const nextDepartment = filteredDepts[0]?.display_name || '';
     if (filteredDepts.length > 0) {
-      setNewUserDepartment(filteredDepts[0].display_name);
+      setNewUserDepartment(nextDepartment);
     } else {
       // No departments left for this role (e.g. the last one was just deleted)
       // — clear the stale selection so the dropdown doesn't show a removed one.
       setNewUserDepartment('');
     }
-    setNewUserPosition(autoPositionFor(newUserRole, newUserDepartment));
-  }, [newUserRole, departmentsList]);
+    setNewUserPosition(autoPositionFor(newUserRole, nextDepartment));
+  }, [newUserRole, filteredDepts]);
 
   // Auto-fill position when department changes
   React.useEffect(() => {
     setNewUserPosition(autoPositionFor(newUserRole, newUserDepartment));
-  }, [newUserDepartment]);
+  }, [newUserRole, newUserDepartment]);
 
   // Inline add-role/department state
   const [addingRole, setAddingRole] = useState(false);
@@ -468,6 +503,10 @@ export default function ITAdminDashboard() {
   };
 
   const handleAddDepartment = () => {
+    if (newUserRole === 'admin') {
+      showToast('Admin accounts use Information Technology Office only.', 'warning');
+      return;
+    }
     setAddingDept(true);
     setNewDeptName('');
   };
@@ -475,11 +514,16 @@ export default function ITAdminDashboard() {
   const handleConfirmAddDept = async () => {
     const deptName = newDeptName.trim();
     if (deptName) {
+      if (isStaticSystemDepartment({ name: deptName, display_name: deptName })) {
+        showToast('This is a built-in system department and already exists.', 'warning');
+        setAddingDept(false);
+        setNewDeptName('');
+        return;
+      }
+
       try {
         const val = deptName.toLowerCase().replace(/\s+/g, '_');
-        // College departments are shared between requestor and approver roles.
-        // Only 'admin' departments are role-exclusive (system departments).
-        const categories = newUserRole === 'admin' ? ['admin'] : ['requestor', 'approver'];
+        const categories = ['requestor', 'approver'];
         await departmentsApi.create({ name: val, display_name: deptName, role_categories: categories });
         const res = await departmentsApi.listFresh();
         setDepartmentsList(res.data?.data || []);
@@ -502,20 +546,17 @@ export default function ITAdminDashboard() {
     }
 
     try {
-      // Role-scoped: only detach this department from the selected role. If it
-      // is shared (e.g. a college used by Requestor AND Approver), the other
-      // role keeps it.
-      await departmentsApi.deleteFromRole(deptToDelete.id, newUserRole);
+      await departmentsApi.delete(deptToDelete.id);
       const res = await departmentsApi.listFresh();
       const fresh = res.data?.data || [];
       setDepartmentsList(fresh);
-      const visible = fresh.filter((d: any) => (d.role_categories || []).includes(newUserRole));
+      const visible = departmentsForRole(newUserRole, fresh);
       if (visible.length > 0) {
         setNewUserDepartment(visible[0].display_name);
       } else {
         setNewUserDepartment('');
       }
-      showToast(`Department removed from ${newUserRole}.`, 'success');
+      showToast('Department deleted successfully.', 'success');
     } catch (e: any) {
       const msg = e.response?.data?.message || e.message;
       showToast('Failed to delete department: ' + msg, 'error');
@@ -590,6 +631,28 @@ export default function ITAdminDashboard() {
   const [showProfilePassword, setShowProfilePassword] = useState(false);
   const [showProfilePasswordConfirm, setShowProfilePasswordConfirm] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const profileFilteredDepts = React.useMemo(() => {
+    return departmentsForRole(profileRole || 'requestor', departmentsList);
+  }, [profileRole, departmentsList]);
+
+  React.useEffect(() => {
+    if (!selectedUser || !profileRole) return;
+    if (profileFilteredDepts.length === 0) {
+      setProfileDepartment('');
+      return;
+    }
+    const departmentStillAllowed = profileFilteredDepts.some((dept: any) => dept.display_name === profileDepartment);
+    if (!departmentStillAllowed) {
+      const nextDepartment = profileFilteredDepts[0].display_name;
+      setProfileDepartment(nextDepartment);
+      setProfilePosition(autoPositionFor(profileRole, nextDepartment));
+    }
+  }, [profileRole, profileDepartment, profileFilteredDepts, selectedUser]);
+
+  React.useEffect(() => {
+    if (!selectedUser || !profileRole || !profileDepartment) return;
+    setProfilePosition(autoPositionFor(profileRole, profileDepartment));
+  }, [profileRole, profileDepartment, selectedUser]);
 
   // ── Profile Photo State ──
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
@@ -1133,6 +1196,7 @@ export default function ITAdminDashboard() {
 
   const handleCreateAccount = async () => {
     if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { showToast('Please fill in all required fields.', 'warning'); return; }
+    if (!newUserDepartment) { showToast('Please select or add a valid department first.', 'warning'); return; }
     // Auto-append @jmc.edu.ph if not already a full email
     const finalEmail = newUserEmail.includes('@') ? newUserEmail : newUserEmail.trim() + '@jmc.edu.ph';
 
@@ -1827,7 +1891,7 @@ export default function ITAdminDashboard() {
                   onChange={(e: any) => setNewUserRole(e.target.value)}
                   style={{ height: 38, fontSize: 13, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', color: '#1A1A2E', paddingLeft: 10, outline: 'none', cursor: 'pointer', width: '100%' }}
                 >
-                  {ROLE_CATEGORIES.filter(opt => opt.value !== 'admin').map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </View>
               <View style={styles.formField}>
@@ -1835,11 +1899,12 @@ export default function ITAdminDashboard() {
                   <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 8 }]} numberOfLines={1}>Department</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <TouchableOpacity
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: newUserRole === 'admin' ? '#F3F4F6' : '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: newUserRole === 'admin' ? 0.65 : 1 }}
                       onPress={handleAddDepartment}
+                      disabled={newUserRole === 'admin'}
                     >
-                      <Ionicons name="add-circle-outline" size={14} color="#1E40AF" />
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E40AF' }}>Add</Text>
+                      <Ionicons name="add-circle-outline" size={14} color={newUserRole === 'admin' ? '#9CA3AF' : '#1E40AF'} />
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: newUserRole === 'admin' ? '#9CA3AF' : '#1E40AF' }}>Add</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: selectedDepartment?.is_system || !newUserDepartment ? '#F3F4F6' : '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: selectedDepartment?.is_system || !newUserDepartment ? 0.65 : 1 }}
@@ -1899,18 +1964,24 @@ export default function ITAdminDashboard() {
                 .filter(shouldShowLogoUploadTile)
                 .map((dept: any) => {
                 const logoUrl = getDeptLogo(dept.id);
+                const isStaticLogo = isStaticSystemDepartment(dept);
+                const logoSource = isStaticLogo
+                  ? require('../../../assets/images/jmc_logo.png')
+                  : logoUrl
+                    ? { uri: logoUrl }
+                    : null;
                 return (
                 <View key={dept.id} style={{ width: 176, height: 174, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }}>
                   <TouchableOpacity 
                     style={{ height: 124, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}
                     onPress={() => handleUploadDeptLogo(dept.id)}
-                    disabled={uploadingDeptId === dept.id}
+                    disabled={isStaticLogo || uploadingDeptId === dept.id}
                     activeOpacity={0.82}
                   >
                     {uploadingDeptId === dept.id ? (
                       <Text style={{ color: '#475569', fontSize: 13, fontWeight: '500' }}>Uploading...</Text>
-                    ) : logoUrl ? (
-                      <Image source={{ uri: logoUrl }} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
+                    ) : logoSource ? (
+                      <Image source={logoSource} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
                     ) : (
                       <>
                         <Ionicons name="cloud-upload-outline" size={34} color="#A0AEC0" style={{ marginBottom: 10 }} />
@@ -2099,7 +2170,7 @@ export default function ITAdminDashboard() {
                             onChange={(e: any) => setProfileDepartment(e.target.value)}
                             style={styles.wideFieldSelect}
                           >
-                            {departmentsList.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
+                            {profileFilteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                           </select>
                         </View>
                         <View style={styles.wideFieldHalf}>
@@ -2123,7 +2194,7 @@ export default function ITAdminDashboard() {
                             onChange={(e: any) => setProfileRole(e.target.value)}
                             style={styles.wideFieldSelect}
                           >
-                            {ROLE_CATEGORIES.filter(opt => opt.value !== 'admin').map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                           </select>
                         </View>
                       </View>
@@ -3322,7 +3393,7 @@ $response = curl_exec($ch);`}
 
                 <ScrollView style={{ width: '100%', maxHeight: 250 }} showsVerticalScrollIndicator={false}>
                   {(analyticsOverview?.departmentBreakdown || [])
-                    .filter((dept: any) => !['IT Office', 'Information Technology Office', 'Vice President for Academic Affairs', 'Institutional Marketing Communication'].includes(dept.name))
+                    .filter((dept: any) => !isStaticSystemDepartment({ name: dept.name, display_name: dept.name }))
                     .sort((a:any, b:any) => b.count - a.count).map((dept: any, idx: number) => (
                     <View key={idx} style={{ marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
