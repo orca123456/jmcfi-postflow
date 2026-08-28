@@ -27,8 +27,8 @@ class DepartmentSeeder extends Seeder
                 'role_categories' => ['approver'],
             ],
             [
-                'name' => 'Vice President for Academic Affairs',
-                'display_name' => 'Vice President for Academic Affairs',
+                'name' => 'Vice President of Academic Affairs',
+                'display_name' => 'Vice President of Academic Affairs',
                 'description' => 'VPAA Office — VP-level approval stage.',
                 'is_system' => true,
                 'role_categories' => ['approver'],
@@ -42,16 +42,32 @@ class DepartmentSeeder extends Seeder
             );
         }
 
-        // Clean up legacy name if it exists (was "Vice President of Academic Affairs")
-        $legacy = Department::where('name', 'Vice President of Academic Affairs')->first();
+        $legacyIt = Department::where('name', 'department_of_information_technology')
+            ->orWhere('display_name', 'Department of Information Technology')
+            ->first();
+        if ($legacyIt) {
+            if (Department::where('name', 'Information Technology Office')->where('id', '!=', $legacyIt->id)->exists()) {
+                $legacyIt->forceDelete();
+            } else {
+                $legacyIt->update([
+                    'name' => 'Information Technology Office',
+                    'display_name' => 'Information Technology Office',
+                    'is_system' => true,
+                    'role_categories' => ['admin'],
+                ]);
+            }
+        }
+
+        // Clean up legacy name if it exists (was "Vice President for Academic Affairs")
+        $legacy = Department::where('name', 'Vice President for Academic Affairs')->first();
         if ($legacy) {
             // If the correct one already exists, just remove the old one
-            if (Department::where('name', 'Vice President for Academic Affairs')->exists()) {
+            if (Department::where('name', 'Vice President of Academic Affairs')->exists()) {
                 $legacy->forceDelete();
             } else {
                 $legacy->update([
-                    'name' => 'Vice President for Academic Affairs',
-                    'display_name' => 'Vice President for Academic Affairs',
+                    'name' => 'Vice President of Academic Affairs',
+                    'display_name' => 'Vice President of Academic Affairs',
                     'is_system' => true,
                     'role_categories' => ['approver'],
                 ]);

@@ -36,7 +36,10 @@ class DepartmentController extends Controller
         }
 
         $existingDepartment = Department::withTrashed()
-            ->where('name', $validated['name'])
+            ->where(function ($query) use ($validated) {
+                $query->where('name', $validated['name'])
+                    ->orWhere('display_name', $validated['display_name']);
+            })
             ->first();
 
         if ($existingDepartment) {
