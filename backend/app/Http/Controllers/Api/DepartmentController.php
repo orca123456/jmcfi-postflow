@@ -167,9 +167,9 @@ class DepartmentController extends Controller
             Storage::disk($disk)->delete($department->logo_path);
         }
 
-        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
         $path = $request->file('logo')->store('department-logos', $disk);
         $department->update(['logo_path' => $path]);
+        $department = $department->fresh();
 
         AuditLogService::log('DEPARTMENT_LOGO_UPDATED', 'Updated department logo: ' . $department->display_name, 'INFO', [
             'department_id' => $department->id,
@@ -177,14 +177,15 @@ class DepartmentController extends Controller
 
         return response()->json([
             'data' => $department,
-            'logo_url' => asset('storage/' . $path),
+            'logo_url' => $department->logo_url,
         ]);
     }
 
     public function removeLogo(Department $department): JsonResponse
     {
-        if ($department->logo_path && Storage::disk('public')->exists($department->logo_path)) {
-            Storage::disk('public')->delete($department->logo_path);
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        if ($department->logo_path && Storage::disk($disk)->exists($department->logo_path)) {
+            Storage::disk($disk)->delete($department->logo_path);
         }
         $department->update(['logo_path' => null]);
 

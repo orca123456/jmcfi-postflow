@@ -120,6 +120,21 @@ const isLegacyInformationTechnologyDepartment = (department: any): boolean => {
 const isCollegeDepartment = (department: any): boolean =>
   Boolean(department && !department.is_system && !isStaticSystemDepartment(department) && !isLegacyInformationTechnologyDepartment(department));
 
+const resolvePublicAssetUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  if (typeof window === 'undefined') return url;
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (['localhost', '127.0.0.1', '0.0.0.0'].includes(parsed.hostname)) {
+      return `${window.location.origin}${parsed.pathname}${parsed.search}`;
+    }
+    return parsed.href;
+  } catch (_) {
+    return url.startsWith('/') ? `${window.location.origin}${url}` : url;
+  }
+};
+
 // Map a granular DB role to its friendly category
 const roleCategoryOf = (role: string): string => {
   if (role === 'it_publisher' || role === 'it_admin') return 'admin';
@@ -574,6 +589,11 @@ export default function ITAdminDashboard() {
         setUploadingDeptId(deptId);
         try {
           await departmentsApi.uploadLogo(deptId, file);
+          setBrokenDeptLogoIds(prev => {
+            const next = new Set(prev);
+            next.delete(deptId);
+            return next;
+          });
           const res = await departmentsApi.listFresh();
           setDepartmentsList(res.data?.data || []);
           showToast('Department logo uploaded successfully.', 'success');
@@ -995,24 +1015,27 @@ export default function ITAdminDashboard() {
 
   // ── Department Logo State (used to show a dept logo next to a user's avatar) ──
   const [deptLogos, setDeptLogos] = useState<Record<number, string>>({});
+  const [brokenDeptLogoIds, setBrokenDeptLogoIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    if (departmentsList.length > 0) {
-      const logos: Record<number, string> = {};
-      (departmentsList as any[]).forEach((d: any) => {
-        if (d.logo_path) {
-          logos[d.id] = d.logo_url || `http://localhost:8000/storage/${d.logo_path}`;
+    const logos: Record<number, string> = {};
+    (departmentsList as any[]).forEach((d: any) => {
+      if (d.logo_path) {
+        const resolvedUrl = resolvePublicAssetUrl(d.logo_url || `/storage/${d.logo_path}`);
+        if (resolvedUrl) {
+          logos[d.id] = resolvedUrl;
         }
-      });
-      setDeptLogos(logos);
-    }
+      }
+    });
+    setDeptLogos(logos);
   }, [departmentsList]);
 
   // Direct lookup helper — use deptLogos first, fallback to departmentsList
   const getDeptLogo = (deptId: number) => {
+    if (brokenDeptLogoIds.has(deptId)) return null;
     if (deptLogos[deptId]) return deptLogos[deptId];
     const d = departmentsList.find((x: any) => x.id === deptId);
-    return d?.logo_url || null;
+    return resolvePublicAssetUrl(d?.logo_url || (d?.logo_path ? `/storage/${d.logo_path}` : null));
   };
 
   const handlePublish = async (id: string | number) => {
@@ -1975,7 +1998,18 @@ export default function ITAdminDashboard() {
                     {uploadingDeptId === dept.id ? (
                       <Text style={{ color: '#475569', fontSize: 13, fontWeight: '500' }}>Uploading...</Text>
                     ) : logoUrl ? (
-                      <Image source={{ uri: logoUrl }} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
+                      <Image
+                        source={{ uri: logoUrl }}
+                        style={{ width: 92, height: 92, borderRadius: 46 }}
+                        resizeMode="contain"
+                        onError={() => {
+                          setBrokenDeptLogoIds(prev => {
+                            const next = new Set(prev);
+                            next.add(dept.id);
+                            return next;
+                          });
+                        }}
+                      />
                     ) : (
                       <>
                         <Ionicons name="cloud-upload-outline" size={34} color="#A0AEC0" style={{ marginBottom: 10 }} />
