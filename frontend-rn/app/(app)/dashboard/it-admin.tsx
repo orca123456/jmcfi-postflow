@@ -153,7 +153,7 @@ const departmentsForRole = (category: string, departments: any[]): any[] => {
 };
 
 const shouldShowLogoUploadTile = (department: any): boolean => {
-  return isStaticSystemDepartment(department) || isCollegeDepartment(department);
+  return isCollegeDepartment(department);
 };
 
 // Auto-suggested position for category + department (mirrors backend)
@@ -1964,24 +1964,18 @@ export default function ITAdminDashboard() {
                 .filter(shouldShowLogoUploadTile)
                 .map((dept: any) => {
                 const logoUrl = getDeptLogo(dept.id);
-                const isStaticLogo = isStaticSystemDepartment(dept);
-                const logoSource = isStaticLogo
-                  ? require('../../../assets/images/jmc_logo.png')
-                  : logoUrl
-                    ? { uri: logoUrl }
-                    : null;
                 return (
                 <View key={dept.id} style={{ width: 176, height: 174, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }}>
                   <TouchableOpacity 
                     style={{ height: 124, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}
                     onPress={() => handleUploadDeptLogo(dept.id)}
-                    disabled={isStaticLogo || uploadingDeptId === dept.id}
+                    disabled={uploadingDeptId === dept.id}
                     activeOpacity={0.82}
                   >
                     {uploadingDeptId === dept.id ? (
                       <Text style={{ color: '#475569', fontSize: 13, fontWeight: '500' }}>Uploading...</Text>
-                    ) : logoSource ? (
-                      <Image source={logoSource} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
+                    ) : logoUrl ? (
+                      <Image source={{ uri: logoUrl }} style={{ width: 92, height: 92, borderRadius: 46 }} resizeMode="contain" />
                     ) : (
                       <>
                         <Ionicons name="cloud-upload-outline" size={34} color="#A0AEC0" style={{ marginBottom: 10 }} />
