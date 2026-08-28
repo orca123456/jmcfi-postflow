@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Department extends Model
 {
@@ -36,6 +37,9 @@ class Department extends Model
         if (!$this->logo_path) {
             return null;
         }
-        return asset('storage/' . $this->logo_path);
+
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+
+        return Storage::disk($disk)->url($this->logo_path);
     }
 }
