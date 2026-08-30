@@ -433,11 +433,12 @@ class PostRequestController extends Controller
             $workflowService = $this->workflowService;
             $postId = $postRequest->id;
             $remarks = $request->remarks;
+            $userId = $user->id;
             $userName = $user->full_name;
             $hasNextStage = (bool) $nextStage;
             $nextStageName = $nextStage;
 
-            app()->terminating(function () use ($workflowService, $postId, $approvedStageName, $userName, $hasNextStage, $nextStageName, $remarks) {
+            app()->terminating(function () use ($workflowService, $postId, $approvedStageName, $userId, $userName, $hasNextStage, $nextStageName, $remarks) {
                 try {
                     $post = PostRequest::find($postId);
                     if (!$post) return;
@@ -448,7 +449,7 @@ class PostRequestController extends Controller
                     } else {
                         $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
                         $workflowService->notifyITPublisher($post);
-                        AutoPublishJob::dispatch($post)->delay(now()->addSeconds(5));
+                        AutoPublishJob::dispatch($post, $userId)->delay(now()->addSeconds(5));
                     }
 
                     AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $post->title, 'INFO', ['post_id' => $postId, 'stage' => $approvedStageName, 'remarks' => $remarks]);
@@ -782,6 +783,7 @@ class PostRequestController extends Controller
                     PostRequest::STATUS_PENDING_IMC_QA,
                     PostRequest::STATUS_APPROVED,
                     PostRequest::STATUS_SCHEDULED,
+                    PostRequest::STATUS_PUBLISHING,
                     PostRequest::STATUS_PUBLISHED,
                     PostRequest::STATUS_PUBLISH_FAILED,
                     PostRequest::STATUS_REJECTED,

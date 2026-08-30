@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -89,6 +90,12 @@ class AuthController extends Controller
 
     private function loginLockoutSeconds(string $key): int
     {
+        if ($this->shouldUseRedisLoginLockout()) {
+            return RateLimiter::tooManyAttempts($key, 6)
+                ? max(1, RateLimiter::availableIn($key))
+                : 0;
+        }
+
         if (Schema::hasTable('login_lockouts')) {
             $record = DB::table('login_lockouts')->where('key', $key)->first();
             if (! $record) {
@@ -140,6 +147,14 @@ class AuthController extends Controller
 
     private function recordFailedLogin(string $key): int
     {
+        if ($this->shouldUseRedisLoginLockout()) {
+            RateLimiter::hit($key, 59);
+
+            return RateLimiter::tooManyAttempts($key, 6)
+                ? max(1, RateLimiter::availableIn($key))
+                : 0;
+        }
+
         if (Schema::hasTable('login_lockouts')) {
             return DB::transaction(function () use ($key) {
                 $now = now();
@@ -173,9 +188,9 @@ class AuthController extends Controller
         }
 
         if (! Schema::hasTable('cache')) {
-            \Illuminate\Support\Facades\RateLimiter::hit($key, 59);
+            RateLimiter::hit($key, 59);
 
-            return \Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 6)
+            return RateLimiter::tooManyAttempts($key, 6)
                 ? 59
                 : 0;
         }
@@ -216,6 +231,11 @@ class AuthController extends Controller
 
     private function clearFailedLogins(string $key): void
     {
+        if ($this->shouldUseRedisLoginLockout()) {
+            RateLimiter::clear($key);
+            return;
+        }
+
         if (Schema::hasTable('login_lockouts')) {
             DB::table('login_lockouts')->where('key', $key)->delete();
             return;
@@ -226,12 +246,17 @@ class AuthController extends Controller
             return;
         }
 
-        \Illuminate\Support\Facades\RateLimiter::clear($key);
+        RateLimiter::clear($key);
     }
 
     private function loginCacheKey(string $key): string
     {
         return 'login_lockout:' . $key;
+    }
+
+    private function shouldUseRedisLoginLockout(): bool
+    {
+        return config('cache.default') === 'redis';
     }
 
     public function register(RegisterRequest $request): JsonResponse

@@ -3,25 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\AutoPublishJob;
 use App\Models\PublishingRecord;
 use App\Models\PostRequest;
-use App\Models\User;
-use App\Notifications\PostPublishedSuccessNotification;
-use App\Notifications\PostPublishingFailedNotification;
-use App\Services\FacebookPublishingService;
-use App\Services\InstagramPublishingService;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 use Exception;
 
 class PublishingController extends Controller
 {
     public function __construct(
-        private FacebookPublishingService $facebookService,
-        private InstagramPublishingService $instagramService,
         private AuditLogService $auditLogService
     ) {}
 
@@ -45,6 +39,16 @@ class PublishingController extends Controller
             ], 422);
         }
 
+        $lock = Cache::lock('post_request_publish_' . $post->id, 30);
+        if (! $lock->get()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This post is already being queued for publishing.'
+            ], 409);
+        }
+
+        $committed = false;
+
         try {
             DB::beginTransaction();
 
@@ -54,123 +58,73 @@ class PublishingController extends Controller
             }
             $lowerPlatforms = array_map('strtolower', $platforms);
 
-            $publishResults = [];
-            $publishErrors = [];
-            $media = $post->media()
-                ->where(function ($query) {
-                    $query->where('type', 'image')
-                        ->orWhere('mime_type', 'like', 'image/%');
-                })
-                ->orderBy('sort_order')
-                ->first();
-
-            if (in_array('instagram', $lowerPlatforms) || in_array('ig', $lowerPlatforms)) {
-                try {
-                    $message = $post->caption_narrative ?? '';
-                    $imageUrl = $this->instagramImageUrl($media);
-                    $igResponse = $this->instagramService->publishPost($message, $imageUrl);
-                    $publishResults['instagram'] = $igResponse;
-                } catch (Exception $e) {
-                    $publishErrors['instagram'] = $this->friendlyPublishError($e->getMessage());
-                    \Illuminate\Support\Facades\Log::error('Publish to Instagram failed: ' . $e->getMessage());
-                }
-            }
-
-            // 3. Publish to Facebook if it is in the target platforms
-            if (in_array('facebook', $lowerPlatforms) || in_array('fb', $lowerPlatforms)) {
-                $mediaPath = null;
-                if ($media && $media->file_path) {
-                    $disk = config('filesystems.default');
-                    if ($disk === 's3' || $disk === 'b2') {
-                        $mediaPath = $media->url;
-                    } else {
-                        $mediaPath = \Illuminate\Support\Facades\Storage::disk('public')->path($media->file_path);
-                    }
-                }
-
-                $message = $post->caption_narrative ?? '';
-                try {
-                    $fbResponse = $this->facebookService->publishPost($message, $mediaPath);
-                    $publishResults['facebook'] = $fbResponse;
-                } catch (Exception $e) {
-                    $publishErrors['facebook'] = $this->friendlyPublishError($e->getMessage());
-                    \Illuminate\Support\Facades\Log::error('Publish to Facebook failed: ' . $e->getMessage());
-                }
-            }
-
-            if ($publishResults === []) {
-                $post->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
-                throw new Exception($this->formatPublishErrors($publishErrors));
-            }
-
-            // 4. Update the post status to published
             $post->update([
-                'status' => PostRequest::STATUS_PUBLISHED,
-                'published_at' => now(),
+                'status' => PostRequest::STATUS_PUBLISHING,
             ]);
 
-            $this->recordPublishingResults($post, $user->id, $publishResults, $publishErrors);
+            $publishPlatforms = collect($lowerPlatforms)
+                ->map(fn ($platform) => match ($platform) {
+                    'fb' => 'facebook',
+                    'ig' => 'instagram',
+                    default => $platform,
+                })
+                ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
+                ->unique()
+                ->values();
 
-            // 5. Log the action in Audit Trail
+            foreach ($publishPlatforms as $platform) {
+                PublishingRecord::create([
+                    'post_request_id' => $post->id,
+                    'published_by' => $user->id,
+                    'platform' => $platform,
+                    'status' => 'publishing',
+                    'scheduled_at' => now(),
+                ]);
+            }
+
             \App\Services\AuditLogService::log(
-                'POST_PUBLISHED',
-                "Published request \"{$post->title}\" to selected platforms.",
+                'POST_PUBLISH_QUEUED',
+                "Queued request \"{$post->title}\" for publishing.",
                 'INFO',
                 [
                     'postId'    => $post->id,
                     'platforms' => $platforms,
-                    'results'   => $publishResults,
-                    'errors'    => $publishErrors,
                 ]
             );
 
             DB::commit();
+            $committed = true;
 
-            // Notify IT Admins of manual publish success
-            $itAdmins = User::whereHas('roles', fn($q) => $q->whereIn('name', ['it_publisher', 'it_admin']))
-                ->where('status', 'active')->get();
-            if ($itAdmins->isNotEmpty()) {
-                Notification::send($itAdmins, new PostPublishedSuccessNotification($post, $publishResults));
-            }
+            AutoPublishJob::dispatch($post->fresh(), $user->id)->onQueue('publishing');
 
             return response()->json([
                 'success' => true,
-                'message' => $publishErrors === []
-                    ? 'Post published successfully.'
-                    : 'Post published to available platforms. Some platforms need attention: ' . $this->formatPublishErrors($publishErrors),
+                'message' => 'Post queued for publishing. The system will publish it in the background.',
                 'data'    => [
-                    'post'    => $post,
-                    'results' => $publishResults,
-                    'errors'  => $publishErrors,
+                    'post'    => $post->fresh(),
+                    'status'  => PostRequest::STATUS_PUBLISHING,
                 ]
-            ]);
+            ], 202);
 
         } catch (Exception $e) {
-            DB::rollBack();
-
-            try {
-                if ($post->status !== PostRequest::STATUS_PUBLISHED) {
-                    $post->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
-                }
-            } catch (Exception $statusEx) {
-                \Illuminate\Support\Facades\Log::error('Failed to mark post as publish_failed: ' . $statusEx->getMessage());
+            if (! $committed) {
+                DB::rollBack();
             }
 
-            // Notify IT Admins of failure
             try {
-                $itAdmins = User::whereHas('roles', fn($q) => $q->whereIn('name', ['it_publisher', 'it_admin']))
-                    ->where('status', 'active')->get();
-                if ($itAdmins->isNotEmpty()) {
-                    Notification::send($itAdmins, new PostPublishingFailedNotification($post, $e->getMessage()));
+                if ($post->status === PostRequest::STATUS_PUBLISHING) {
+                    $post->update(['status' => PostRequest::STATUS_APPROVED]);
                 }
-            } catch (Exception $notifyEx) {
-                \Illuminate\Support\Facades\Log::error('Failed to send failure notification: ' . $notifyEx->getMessage());
+            } catch (Exception $statusEx) {
+                \Illuminate\Support\Facades\Log::error('Failed to restore post status after queue failure: ' . $statusEx->getMessage());
             }
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to publish post: ' . $e->getMessage()
+                'message' => 'Failed to queue publishing job: ' . $e->getMessage()
             ], 500);
+        } finally {
+            optional($lock)->release();
         }
     }
 
