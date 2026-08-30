@@ -37,7 +37,7 @@ export default function PublishScreen() {
     setLoading(true);
     try {
       await publishingApi.publish(Number(id));
-      Alert.alert('Published!', `Post successfully published to ${selectedPlatforms.join(', ')}!`);
+      Alert.alert('Queued!', `Post queued for publishing to ${selectedPlatforms.join(', ')}.`);
       router.back();
     } catch (e: any) {
       Alert.alert('Error', e.response?.data?.message ?? 'Publishing failed.');

@@ -23,6 +23,7 @@ class PostRequest extends Model
     public const STATUS_REJECTED = 'rejected';
     public const STATUS_RETURNED_FOR_REVISION = 'returned_for_revision';
     public const STATUS_SCHEDULED = 'scheduled';
+    public const STATUS_PUBLISHING = 'publishing';
     public const STATUS_PUBLISHED = 'published';
     public const STATUS_PUBLISH_FAILED = 'publish_failed';
     public const STATUS_ARCHIVED = 'archived';
@@ -74,6 +75,7 @@ class PostRequest extends Model
             'rejected' => 'Rejected',
             'returned_for_revision' => 'Returned for Revision',
             'scheduled' => 'Scheduled',
+            'publishing' => 'Publishing',
             'published' => 'Published',
             'publish_failed' => 'Publish Failed',
             'archived' => 'Archived',

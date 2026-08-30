@@ -309,6 +309,15 @@ export default function ITAdminDashboard() {
   };
 
   const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled';
+  const isPublishedLikeStatus = (status?: string) => status === 'published' || status === 'approved';
+  const isFailedLikeStatus = (status?: string) => status === 'rejected' || status === 'returned_for_revision' || status === 'publish_failed';
+  const isProcessingLikeStatus = (status?: string) => status === 'publishing' || status === 'scheduled';
+  const statusBadgeStyle = (status?: string) => {
+    if (isPublishedLikeStatus(status)) return { backgroundColor: '#DCFCE7', color: '#16A34A' };
+    if (isFailedLikeStatus(status)) return { backgroundColor: '#FEE2E2', color: '#DC2626' };
+    if (isProcessingLikeStatus(status)) return { backgroundColor: '#DBEAFE', color: '#2563EB' };
+    return { backgroundColor: '#FEF3C7', color: '#B45309' };
+  };
 
   // ── Animated spinner rotation ──
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -1415,7 +1424,7 @@ export default function ITAdminDashboard() {
     let matchesStatus = true;
     if (requestsStatus !== 'All Status') {
       if (requestsStatus === 'Pending') {
-        matchesStatus = ['pending_office_head', 'pending_vice_president', 'pending_imc_qa', 'draft'].includes(post.rawStatus);
+        matchesStatus = ['pending_office_head', 'pending_vice_president', 'pending_imc_qa', 'publishing', 'draft'].includes(post.rawStatus);
       } else if (requestsStatus === 'Published') {
         matchesStatus = ['published', 'approved'].includes(post.rawStatus);
       } else if (requestsStatus === 'Rejected') {
@@ -1471,7 +1480,7 @@ export default function ITAdminDashboard() {
     return {
       total: mockTablePosts.length,
       published: mockTablePosts.filter((p: any) => ['published', 'approved'].includes(p.rawStatus)).length,
-      pending: mockTablePosts.filter((p: any) => ['pending_office_head', 'pending_vice_president', 'pending_imc_qa'].includes(p.rawStatus)).length,
+      pending: mockTablePosts.filter((p: any) => ['pending_office_head', 'pending_vice_president', 'pending_imc_qa', 'publishing'].includes(p.rawStatus)).length,
       draft: mockTablePosts.filter((p: any) => p.rawStatus === 'draft').length,
     };
   }, [mockTablePosts]);
@@ -1735,12 +1744,12 @@ export default function ITAdminDashboard() {
                       {!isTablet ? (
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                           <View style={{
-                            backgroundColor: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#dcfce7' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                            backgroundColor: statusBadgeStyle(post.rawStatus).backgroundColor,
                             paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4
                           }}>
                             <Text style={{
                               fontSize: 10, fontWeight: '600', textTransform: 'uppercase',
-                              color: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#16a34a' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309'
+                              color: statusBadgeStyle(post.rawStatus).color
                             }}>{post.status}</Text>
                           </View>
                           
@@ -1755,12 +1764,12 @@ export default function ITAdminDashboard() {
                           {/* STATUS (Tablet) */}
                           <View style={{ flex: 1.5, paddingRight: 12 }}>
                             <View style={{
-                              backgroundColor: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#dcfce7' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                              backgroundColor: statusBadgeStyle(post.rawStatus).backgroundColor,
                               paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start'
                             }}>
                               <Text style={{
                                 fontSize: 10, fontWeight: '600', textTransform: 'uppercase',
-                                color: post.rawStatus === 'published' || post.rawStatus === 'approved' ? '#16a34a' : post.rawStatus === 'rejected' || post.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309'
+                                color: statusBadgeStyle(post.rawStatus).color
                               }}>{post.status}</Text>
                             </View>
                           </View>
@@ -3696,10 +3705,10 @@ $response = curl_exec($ch);`}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Status</Text>
                     <View style={{
-                      backgroundColor: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#dcfce7' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#fee2e2' : '#fef3c7',
+                      backgroundColor: statusBadgeStyle(previewPost?.rawStatus).backgroundColor,
                       paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4
                     }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: previewPost?.rawStatus === 'published' || previewPost?.rawStatus === 'approved' ? '#16a34a' : previewPost?.rawStatus === 'rejected' || previewPost?.rawStatus === 'returned_for_revision' ? '#dc2626' : '#b45309' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: statusBadgeStyle(previewPost?.rawStatus).color }}>
                         {previewPost?.status}
                       </Text>
                     </View>
