@@ -1213,6 +1213,47 @@ export default function ITAdminDashboard() {
     showToast('CSV export is available in the web app.', 'warning');
   };
 
+  const handleExportAnalyticsOverview = () => {
+    const rows = [
+      ['Metric', 'Value'],
+      ['Total Submissions', analyticsOverview?.totalVolume || '0'],
+      ['Compliance Rate', analyticsOverview?.complianceRate || '0%'],
+      ['Pending Reviews', analyticsOverview?.pendingApproval || '0'],
+      ['Active Requestors', analyticsOverview?.activeUsers || '0'],
+      ['Content Published', analyticsOverview?.contentPublished || '0'],
+      [],
+      ['Month', 'Submissions'],
+      ...((analyticsOverview?.monthsData || []) as any[]).map((item: any) => [item.month, item.posts]),
+      [],
+      ['Department', 'Submissions', 'Share'],
+      ...((analyticsOverview?.departmentBreakdown || []) as any[])
+        .filter((dept: any) => !isStaticSystemDepartment({ name: dept.name, display_name: dept.name }))
+        .map((dept: any) => [dept.name, dept.count, `${dept.percentage}%`]),
+      [],
+      ['Platform', 'Targeted Posts'],
+      ...((analyticsOverview?.platformStats || []) as any[]).map((platform: any) => [platform.name, platform.posts]),
+    ];
+
+    const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `postflow-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('Analytics report exported.', 'success');
+      return;
+    }
+
+    showToast('Analytics export is available in the web app.', 'warning');
+  };
+
   const [analyticsOverview, setAnalyticsOverview] = useState<any>({
     totalVolume: '0',
     avgVelocity: '0 hrs',
@@ -2319,294 +2360,173 @@ export default function ITAdminDashboard() {
       )}
 
       {activeTab === 'tokens' && !isInitialLoading && (
-        <View style={{ gap: 20 }}>
-          <Card style={styles.userCard}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <View>
-                <Text style={styles.sectionHeader}>Platform Tokens</Text>
-                <Text style={styles.policyNote}>Manage API tokens for Facebook, Instagram, and WordPress integration.</Text>
+        (() => {
+          const platformCards = [
+            {
+              id: 'facebook' as const,
+              name: 'Facebook',
+              description: 'Connect your Facebook Page for automatic publishing.',
+              icon: 'logo-facebook' as const,
+              color: '#1877F2',
+              fields: [
+                { key: 'facebook_page_id', label: 'Page ID', hint: 'Enter your Facebook Page ID', placeholder: '344674548722841' },
+                { key: 'facebook_access_token', label: 'Access Token', hint: 'Enter your Facebook Page access token', placeholder: 'Enter your Facebook Page access token', sensitive: true },
+              ],
+            },
+            {
+              id: 'instagram' as const,
+              name: 'Instagram',
+              description: 'Connect your Instagram Business account for publishing.',
+              icon: 'logo-instagram' as const,
+              color: '#E1306C',
+              fields: [
+                { key: 'instagram_business_account_id', label: 'Business Account ID', hint: 'Enter your Instagram Business Account ID', placeholder: '17841405822304' },
+                { key: 'instagram_access_token', label: 'Access Token', hint: 'Enter your Instagram access token', placeholder: 'Enter your Instagram access token', sensitive: true },
+              ],
+            },
+            {
+              id: 'wordpress' as const,
+              name: 'WordPress',
+              description: 'Connect your WordPress website for automatic publishing.',
+              icon: 'logo-wordpress' as const,
+              color: '#0073AA',
+              fields: [
+                { key: 'wordpress_url', label: 'Site URL', hint: 'Enter your WordPress site URL', placeholder: 'https://your-school.edu' },
+                { key: 'wordpress_username', label: 'Username', hint: 'Enter your WordPress username', placeholder: 'Enter WordPress username' },
+                { key: 'wordpress_app_password', label: 'Application Password', hint: 'Enter your WordPress Application Password', placeholder: 'Enter your WordPress Application Password', sensitive: true },
+              ],
+            },
+          ];
+
+          const isConnected = (platform: typeof platformCards[number]) =>
+            platform.fields.every((field) => Boolean(String((tokenFields as any)[field.key] || '').trim()));
+
+          return (
+            <View style={styles.tokensPage}>
+              <View style={styles.tokensHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tokensTitle}>Platform Integrations</Text>
+                  <Text style={styles.tokensSubtitle}>Manage your social media and website publishing connections.</Text>
+                </View>
+                {(tokenLastUpdated && tokenLastUpdated !== 'Never') ? (
+                  <View style={styles.tokensUpdatedBadge}>
+                    <Ionicons name="time-outline" size={14} color="#5B21B6" />
+                    <Text style={styles.tokensUpdatedText}>
+                      Last updated: {new Date(tokenLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              {(tokenLastUpdated && tokenLastUpdated !== 'Never') ? (
-                <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                  <Text style={{ fontSize: 11, color: '#1e40af', fontWeight: '500' }}>
-                    Last updated: {new Date(tokenLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </Card>
-          <Card style={styles.userCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Facebook</Text>
-            </View>
-            <View style={{ gap: 14 }}>
-              {[
-                { key: 'facebook_page_id', label: 'Page ID', icon: 'id-card-outline' as const, placeholder: 'e.g. 344674548722841' },
-                { key: 'facebook_access_token', label: 'Access Token', icon: 'lock-closed-outline' as const, placeholder: 'Enter your Facebook page access token', sensitive: true },
-              ].map(field => (
-                <View key={field.key} style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textTransform: 'uppercase' }}>{field.label}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <TextInput
-                      style={{
-                        flex: 1,
-                        backgroundColor: '#f9fafb',
-                        borderWidth: 1,
-                        borderColor: '#e5e7eb',
-                        borderRadius: 8,
-                        paddingHorizontal: 14,
-                        paddingVertical: 12,
-                        fontSize: 14,
-                        color: Colors.textPrimary,
-                        outlineStyle: 'none',
-                      } as any}
-                      placeholder={field.placeholder}
-                      placeholderTextColor="#9ca3af"
-                      value={(tokenFields as any)[field.key]}
-                      secureTextEntry={field.sensitive && !showTokenField[field.key]}
-                      onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
-                    />
-                    {field.sensitive ? (
-                      <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={{ padding: 8 }}>
-                        <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6b7280" />
-                      </TouchableOpacity>
-                    ) : null}
+
+              <View style={styles.tokensSecurityBanner}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#6D28D9" />
+                <Text style={styles.tokensSecurityText}>API credentials are encrypted and securely stored. Never share your access tokens.</Text>
+              </View>
+
+              <Card style={styles.tokensMetaCard}>
+                <View style={styles.tokensMetaContent}>
+                  <View style={styles.tokensMetaIcon}>
+                    <Ionicons name="shield-outline" size={18} color="#6D28D9" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tokensMetaTitle}>Meta publishing requirements</Text>
+                    <Text style={styles.tokensMetaText}>
+                      Use a Facebook Page Access Token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish. The same Page token can be used for Facebook and Instagram publishing.
+                    </Text>
                   </View>
                 </View>
-              ))}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
-                onPress={() => handleSavePlatformTokens('facebook')}
-                disabled={savingTokens}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#1877F2',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: savingTokens ? (savingTokenPlatform === 'facebook' ? 0.7 : 0.55) : 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                  {savingTokenPlatform === 'facebook' ? 'Saving...' : 'Save Facebook Tokens'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleClearPlatformTokens('facebook')}
-                disabled={savingTokens}
-                style={{
-                  minWidth: 120,
-                  backgroundColor: '#EFF6FF',
-                  borderWidth: 1,
-                  borderColor: '#93C5FD',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: savingTokens ? 0.55 : 1,
-                }}
-              >
-                <Text style={{ color: '#1D4ED8', fontSize: 13, fontWeight: '700' }}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-          <Card style={styles.userCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <Ionicons name="logo-instagram" size={24} color="#E1306C" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Instagram</Text>
-            </View>
-            <View style={{ gap: 14 }}>
-              {[
-                { key: 'instagram_business_account_id', label: 'Business Account ID', icon: 'id-card-outline' as const, placeholder: 'e.g. 17841405822304' },
-                { key: 'instagram_access_token', label: 'Access Token', icon: 'lock-closed-outline' as const, placeholder: 'Enter your Instagram access token', sensitive: true },
-              ].map(field => (
-                <View key={field.key} style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textTransform: 'uppercase' }}>{field.label}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <TextInput
-                      style={{
-                        flex: 1,
-                        backgroundColor: '#f9fafb',
-                        borderWidth: 1,
-                        borderColor: '#e5e7eb',
-                        borderRadius: 8,
-                        paddingHorizontal: 14,
-                        paddingVertical: 12,
-                        fontSize: 14,
-                        color: Colors.textPrimary,
-                        outlineStyle: 'none',
-                      } as any}
-                      placeholder={field.placeholder}
-                      placeholderTextColor="#9ca3af"
-                      value={(tokenFields as any)[field.key]}
-                      secureTextEntry={field.sensitive && !showTokenField[field.key]}
-                      onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
-                    />
-                    {field.sensitive ? (
-                      <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={{ padding: 8 }}>
-                        <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6b7280" />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
+                <View style={styles.tokensMetaActions}>
+                  <TouchableOpacity
+                    onPress={handleUseFacebookTokenForInstagram}
+                    disabled={!tokenFields.facebook_access_token || savingTokens}
+                    style={[styles.tokensSecondaryButton, (!tokenFields.facebook_access_token || savingTokens) && styles.tokensButtonDisabled]}
+                  >
+                    <Ionicons name="copy-outline" size={15} color="#5B21B6" />
+                    <Text style={styles.tokensSecondaryButtonText}>Use Facebook Token for Instagram</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleSaveAndValidatePublishingSetup}
+                    disabled={savingTokens || validatingTokens}
+                    style={[styles.tokensPrimaryButton, (savingTokens || validatingTokens) && styles.tokensButtonDisabled]}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.tokensPrimaryButtonText}>
+                      {validatingTokens ? 'Validating Meta Setup...' : 'Save & Validate Publishing Setup'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              ))}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
-                onPress={() => handleSavePlatformTokens('instagram')}
-                disabled={savingTokens}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#E1306C',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: savingTokens ? (savingTokenPlatform === 'instagram' ? 0.7 : 0.55) : 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                  {savingTokenPlatform === 'instagram' ? 'Saving...' : 'Save Instagram Tokens'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleClearPlatformTokens('instagram')}
-                disabled={savingTokens}
-                style={{
-                  minWidth: 120,
-                  backgroundColor: '#FCE7F3',
-                  borderWidth: 1,
-                  borderColor: '#F9A8D4',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: savingTokens ? 0.55 : 1,
-                }}
-              >
-                <Text style={{ color: '#BE185D', fontSize: 13, fontWeight: '700' }}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              onPress={handleUseFacebookTokenForInstagram}
-              disabled={!tokenFields.facebook_access_token || savingTokens}
-              style={{
-                marginTop: 10,
-                backgroundColor: '#FCE7F3',
-                borderWidth: 1,
-                borderColor: '#F9A8D4',
-                paddingVertical: 10,
-                borderRadius: 8,
-                alignItems: 'center',
-                opacity: (!tokenFields.facebook_access_token || savingTokens) ? 0.6 : 1,
-              }}
-            >
-              <Text style={{ color: '#BE185D', fontSize: 13, fontWeight: '700' }}>
-                Use Facebook Page Token for Instagram
-              </Text>
-            </TouchableOpacity>
-          </Card>
-          <Card style={styles.userCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <Ionicons name="globe-outline" size={24} color="#3B82F6" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>WordPress</Text>
-            </View>
-            <View style={{ gap: 14 }}>
-              {[
-                { key: 'wordpress_url', label: 'Site URL', icon: 'link-outline' as const, placeholder: 'https://your-school.edu/wp-json/wp/v2' },
-                { key: 'wordpress_username', label: 'Username', icon: 'person-outline' as const, placeholder: 'WordPress username' },
-                { key: 'wordpress_app_password', label: 'Application Password', icon: 'lock-closed-outline' as const, placeholder: 'Enter WordPress app password', sensitive: true },
-              ].map(field => (
-                <View key={field.key} style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textTransform: 'uppercase' }}>{field.label}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <TextInput
-                      style={{
-                        flex: 1,
-                        backgroundColor: '#f9fafb',
-                        borderWidth: 1,
-                        borderColor: '#e5e7eb',
-                        borderRadius: 8,
-                        paddingHorizontal: 14,
-                        paddingVertical: 12,
-                        fontSize: 14,
-                        color: Colors.textPrimary,
-                        outlineStyle: 'none',
-                      } as any}
-                      placeholder={field.placeholder}
-                      placeholderTextColor="#9ca3af"
-                      value={(tokenFields as any)[field.key]}
-                      secureTextEntry={field.sensitive && !showTokenField[field.key]}
-                      onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
-                    />
-                    {field.sensitive ? (
-                      <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={{ padding: 8 }}>
-                        <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6b7280" />
-                      </TouchableOpacity>
-                    ) : null}
+              </Card>
+
+              {platformCards.map((platform) => (
+                <Card key={platform.id} style={[styles.tokensIntegrationCard, !isLargeScreen && styles.tokensIntegrationCardMobile]}>
+                  <View style={[styles.tokensPlatformIntro, !isLargeScreen && styles.tokensPlatformIntroMobile]}>
+                    <View style={[styles.tokensPlatformIcon, { backgroundColor: platform.color }]}>
+                      <Ionicons name={platform.icon as any} size={25} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.tokensPlatformName}>{platform.name}</Text>
+                      <Text style={styles.tokensPlatformDescription}>{platform.description}</Text>
+                      <View style={[styles.tokensConnectionBadge, isConnected(platform) && styles.tokensConnectionBadgeConnected]}>
+                        <View style={[styles.tokensConnectionDot, isConnected(platform) && styles.tokensConnectionDotConnected]} />
+                        <Text style={[styles.tokensConnectionText, isConnected(platform) && styles.tokensConnectionTextConnected]}>
+                          {isConnected(platform) ? 'Connected' : 'Not Connected'}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
+
+                  <View style={styles.tokensFormPanel}>
+                    <View style={[styles.tokensFieldGrid, !isLargeScreen && styles.tokensFieldGridMobile]}>
+                      {platform.fields.map((field) => (
+                        <View key={field.key} style={styles.tokensField}>
+                          <View style={styles.tokensLabelRow}>
+                            <Text style={styles.tokensFieldLabel}>{field.label}</Text>
+                            <Ionicons name="help-circle-outline" size={13} color="#94A3B8" />
+                          </View>
+                          <View style={styles.tokensInputWrap}>
+                            <TextInput
+                              style={styles.tokensInput as any}
+                              placeholder={field.placeholder}
+                              placeholderTextColor="#94A3B8"
+                              value={(tokenFields as any)[field.key]}
+                              secureTextEntry={field.sensitive && !showTokenField[field.key]}
+                              onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
+                            />
+                            {field.sensitive ? (
+                              <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={styles.tokensEyeButton}>
+                                <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={18} color="#64748B" />
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                          <Text style={styles.tokensFieldHint}>{field.hint}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.tokensCardActions}>
+                      <TouchableOpacity
+                        onPress={() => handleClearPlatformTokens(platform.id)}
+                        disabled={savingTokens}
+                        style={[styles.tokensClearButton, savingTokens && styles.tokensButtonDisabled]}
+                      >
+                        <Text style={styles.tokensClearButtonText}>Clear</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleSavePlatformTokens(platform.id)}
+                        disabled={savingTokens}
+                        style={[styles.tokensSaveButton, savingTokens && styles.tokensButtonDisabled]}
+                      >
+                        <Ionicons name="save-outline" size={15} color="#FFFFFF" />
+                        <Text style={styles.tokensSaveButtonText}>
+                          {savingTokenPlatform === platform.id ? 'Saving...' : 'Save Changes'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Card>
               ))}
             </View>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
-                onPress={() => handleSavePlatformTokens('wordpress')}
-                disabled={savingTokens}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#3B82F6',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: savingTokens ? (savingTokenPlatform === 'wordpress' ? 0.7 : 0.55) : 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                  {savingTokenPlatform === 'wordpress' ? 'Saving...' : 'Save WordPress Tokens'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleClearPlatformTokens('wordpress')}
-                disabled={savingTokens}
-                style={{
-                  minWidth: 120,
-                  backgroundColor: '#EFF6FF',
-                  borderWidth: 1,
-                  borderColor: '#93C5FD',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: savingTokens ? 0.55 : 1,
-                }}
-              >
-                <Text style={{ color: '#1D4ED8', fontSize: 13, fontWeight: '700' }}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-          <Card style={styles.userCard}>
-            <View style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.textPrimary }}>Meta publishing requirements</Text>
-              <Text style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18 }}>
-                Use a Facebook Page Access Token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish. The same Page token can be used for Facebook and Instagram publishing.
-              </Text>
-              <TouchableOpacity
-                onPress={handleSaveAndValidatePublishingSetup}
-                disabled={savingTokens || validatingTokens}
-                style={{
-                  marginTop: 4,
-                  backgroundColor: '#0F172A',
-                  paddingVertical: 11,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: (savingTokens || validatingTokens) ? 0.7 : 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                  {validatingTokens ? 'Validating Meta Setup...' : 'Save & Validate Publishing Setup'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-        </View>
+          );
+        })()
       )}
 
       {/* ── EMAIL SETTINGS TAB ── */}
@@ -2819,6 +2739,192 @@ $response = curl_exec($ch);`}
       )}
 
       {activeTab === 'email-settings' && !isInitialLoading && (
+        <View style={styles.emailPage}>
+          <Card style={styles.emailHeroCard}>
+            <View style={styles.emailHeroIcon}>
+              <Ionicons name="mail" size={24} color="#4F46E5" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.emailHeroTitle}>Email Notification Settings</Text>
+              <Text style={styles.emailHeroSubtitle}>Configure the SMTP server used to send approval, publishing, and alert emails to users and admins.</Text>
+            </View>
+          </Card>
+
+          <View style={[styles.emailLayout, !isLargeScreen && styles.emailLayoutStacked]}>
+            <Card style={[styles.emailSmtpCard, !isLargeScreen && styles.emailSmtpCardMobile]}>
+              <Text style={styles.emailCardTitle}>Gmail SMTP Configuration</Text>
+              <Text style={styles.emailCardSubtitle}>
+                Use your school Gmail account to send emails. You need to generate an App Password from{' '}
+                <Text style={styles.emailLinkText}>Google Account - Security - App Passwords</Text>.
+              </Text>
+
+              <View style={[styles.emailTwoColumnRow, !isLargeScreen && styles.emailColumnRow]}>
+                <View style={[styles.emailField, { flex: 2 }]}>
+                  <Text style={styles.emailFieldLabel}>SMTP Host</Text>
+                  <View style={styles.emailInputWrap}>
+                    <Ionicons name="server-outline" size={19} color="#94A3B8" />
+                    <TextInput
+                      style={styles.emailInput as any}
+                      value={emailFields.mail_host}
+                      onChangeText={v => setEmailFields(p => ({ ...p, mail_host: v }))}
+                      placeholder="smtp.gmail.com"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+                <View style={[styles.emailField, { flex: 1 }]}>
+                  <Text style={styles.emailFieldLabel}>Port</Text>
+                  <View style={styles.emailInputWrap}>
+                    <Ionicons name="hardware-chip-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      style={styles.emailInput as any}
+                      value={emailFields.mail_port}
+                      onChangeText={v => setEmailFields(p => ({ ...p, mail_port: v }))}
+                      placeholder="587"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.emailField}>
+                <Text style={styles.emailFieldLabel}>Encryption</Text>
+                <View style={styles.emailEncryptionRow}>
+                  {['tls', 'ssl', ''].map(enc => {
+                    const selected = emailFields.mail_encryption === enc;
+                    return (
+                      <TouchableOpacity
+                        key={enc || 'none'}
+                        onPress={() => setEmailFields(p => ({ ...p, mail_encryption: enc }))}
+                        style={[styles.emailEncryptionOption, selected && styles.emailEncryptionOptionActive]}
+                      >
+                        <View style={[styles.emailRadio, selected && styles.emailRadioActive]}>
+                          {selected ? <View style={styles.emailRadioInner} /> : null}
+                        </View>
+                        <Text style={[styles.emailEncryptionText, selected && styles.emailEncryptionTextActive]}>
+                          {enc === '' ? 'None' : enc.toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.emailInfoBanner}>
+                <Ionicons name="information-circle-outline" size={17} color="#4F46E5" />
+                <Text style={styles.emailInfoText}>TLS is recommended for better security.</Text>
+              </View>
+
+              <View style={[styles.emailTwoColumnRow, !isLargeScreen && styles.emailColumnRow]}>
+                <View style={styles.emailField}>
+                  <Text style={styles.emailFieldLabel}>Gmail Username (Email Address)</Text>
+                  <View style={styles.emailInputWrap}>
+                    <Ionicons name="mail-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      style={styles.emailInput as any}
+                      value={emailFields.mail_username}
+                      onChangeText={v => setEmailFields(p => ({ ...p, mail_username: v }))}
+                      placeholder="your-school-email@gmail.com"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </View>
+                <View style={styles.emailField}>
+                  <Text style={styles.emailFieldLabel}>
+                    Gmail App Password {emailPasswordSet && <Text style={styles.emailPasswordSetText}>Password is set</Text>}
+                  </Text>
+                  <View style={styles.emailInputWrap}>
+                    <Ionicons name="apps-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      style={styles.emailInput as any}
+                      value={emailFields.mail_password}
+                      onChangeText={v => setEmailFields(p => ({ ...p, mail_password: v }))}
+                      placeholder={emailPasswordSet ? 'Leave blank to keep current' : 'Enter Gmail App Password'}
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry={!showEmailPassword}
+                      autoCapitalize="none"
+                    />
+                    <TouchableOpacity onPress={() => setShowEmailPassword(p => !p)} style={styles.emailEyeButton}>
+                      <Ionicons name={showEmailPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.emailWarningBanner}>
+                <Ionicons name="shield-checkmark-outline" size={17} color="#4F46E5" />
+                <Text style={styles.emailInfoText}>Not your regular Gmail password - generate an App Password from Google Account - Security.</Text>
+              </View>
+            </Card>
+
+            <View style={[styles.emailSideColumn, !isLargeScreen && styles.emailSideColumnMobile]}>
+              <Card style={styles.emailSenderCard}>
+                <Text style={styles.emailCardTitle}>Sender Identity</Text>
+                <Text style={styles.emailCardSubtitle}>The name and email address that recipients will see in their inbox.</Text>
+
+                <View style={styles.emailField}>
+                  <Text style={styles.emailFieldLabel}>From Name</Text>
+                  <View style={styles.emailInputWrap}>
+                    <Ionicons name="person-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      style={styles.emailInput as any}
+                      value={emailFields.mail_from_name}
+                      onChangeText={v => setEmailFields(p => ({ ...p, mail_from_name: v }))}
+                      placeholder="JMCFI PostFlow"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.emailField}>
+                  <Text style={styles.emailFieldLabel}>From Email Address</Text>
+                  <View style={styles.emailInputWrap}>
+                    <Ionicons name="mail-outline" size={18} color="#94A3B8" />
+                    <TextInput
+                      style={styles.emailInput as any}
+                      value={emailFields.mail_from_address}
+                      onChangeText={v => setEmailFields(p => ({ ...p, mail_from_address: v }))}
+                      placeholder="postflow@jmc.edu.ph"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </View>
+              </Card>
+
+              <TouchableOpacity
+                onPress={handleTestEmail}
+                disabled={testingEmail}
+                style={[styles.emailTestButton, testingEmail && styles.emailButtonDisabled]}
+              >
+                <Ionicons name="paper-plane-outline" size={22} color="#4F46E5" />
+                <View>
+                  <Text style={styles.emailTestButtonText}>{testingEmail ? 'Sending...' : 'Send Test Email'}</Text>
+                  <Text style={styles.emailTestButtonSubtext}>Send a test email to verify your settings</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSaveEmailSettings}
+                disabled={savingEmail}
+                style={[styles.emailSaveButton, savingEmail && styles.emailButtonDisabled]}
+              >
+                <Ionicons name="save-outline" size={20} color="#FFFFFF" />
+                <View>
+                  <Text style={styles.emailSaveButtonText}>{savingEmail ? 'Saving...' : 'Save Settings'}</Text>
+                  <Text style={styles.emailSaveButtonSubtext}>Save and apply email configuration</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {false && activeTab === 'email-settings' && !isInitialLoading && (
         <View style={{ gap: 20 }}>
           {/* Header */}
           <Card style={styles.userCard}>
@@ -3354,129 +3460,209 @@ $response = curl_exec($ch);`}
           ];
 
         const maxPosts = Math.max(...monthsData.map((d: any) => d.posts), 10);
+        const totalVolumeNumber = Number(String(analyticsOverview?.totalVolume || '0').replace(/,/g, '')) || 0;
+        const publishedCount = allMockPosts.filter((post: any) => ['published', 'approved'].includes(post.rawStatus)).length;
+        const rejectedCount = allMockPosts.filter((post: any) => ['rejected', 'returned_for_revision', 'publish_failed'].includes(post.rawStatus)).length;
+        const pendingCount = Number(String(analyticsOverview?.pendingApproval || '0').replace(/,/g, '')) || allMockPosts.filter((post: any) => ['pending_office_head', 'pending_vice_president', 'pending_president', 'pending_imc_qa', 'publishing', 'scheduled'].includes(post.rawStatus)).length;
+        const draftCount = allMockPosts.filter((post: any) => post.rawStatus === 'draft').length;
+        const statusTotal = Math.max(totalVolumeNumber, pendingCount + rejectedCount + publishedCount + draftCount, 1);
+        const topDepartments = (analyticsOverview?.departmentBreakdown || [])
+          .filter((dept: any) => !isStaticSystemDepartment({ name: dept.name, display_name: dept.name }))
+          .sort((a:any, b:any) => b.count - a.count)
+          .slice(0, 4);
+        const platformStats = analyticsOverview?.platformStats || [];
+        const trendStats = [
+          { title: 'Total Submissions', value: analyticsOverview?.totalVolume || '0', subTitle: 'All time volume', icon: 'document-text' as const, color: '#7C3AED', bg: '#F3E8FF', trend: '46%', trendColor: '#10B981' },
+          { title: 'Compliance Rate', value: analyticsOverview?.complianceRate || '0%', subTitle: 'Approved vs Rejected', icon: 'shield-checkmark' as const, color: '#10B981', bg: '#DCFCE7', trend: '100%', trendColor: '#EF4444', down: true },
+          { title: 'Pending Reviews', value: analyticsOverview?.pendingApproval || '0', subTitle: 'Awaiting action', icon: 'time' as const, color: '#F97316', bg: '#FFEDD5', trend: '30%', trendColor: '#F97316' },
+          { title: 'Active Requestors', value: analyticsOverview?.activeUsers || '0', subTitle: 'Users who submitted posts', icon: 'people' as const, color: '#6366F1', bg: '#E0E7FF', trend: '100%', trendColor: '#10B981' },
+        ];
+        const statusRows = [
+          { label: 'Pending Reviews', value: pendingCount, color: '#F97316' },
+          { label: 'Rejected', value: rejectedCount, color: '#10B981' },
+          { label: 'Published', value: publishedCount, color: '#3B82F6' },
+          { label: 'Draft', value: draftCount, color: '#6B7280' },
+        ];
 
         return (
-          <View style={{ gap: Spacing.xl }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View>
-                <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary }}>System Analytics</Text>
-                <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 4 }}>Content creation trends and performance metrics across the year.</Text>
+          <View style={styles.analyticsPage}>
+            <View style={[styles.analyticsHeader, !isLargeScreen && styles.analyticsHeaderStacked]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.analyticsTitle}>System Analytics</Text>
+                <Text style={styles.analyticsSubtitle}>Welcome back! Here's what's happening with your publications.</Text>
+              </View>
+              <View style={styles.analyticsHeaderActions}>
+                <TouchableOpacity style={styles.analyticsActionButton} activeOpacity={0.8}>
+                  <Ionicons name="calendar-outline" size={15} color="#334155" />
+                  <Text style={styles.analyticsActionText}>This Month</Text>
+                  <Ionicons name="chevron-down" size={14} color="#334155" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.analyticsActionButton} activeOpacity={0.8} onPress={handleExportAnalyticsOverview}>
+                  <Ionicons name="download-outline" size={15} color="#334155" />
+                  <Text style={styles.analyticsActionText}>Export Report</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
-            {/* Functional Stats Row */}
-            <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 16 }}>
-              {[
-                { title: 'Total Submissions', value: analyticsOverview?.totalVolume || '0', subTitle: 'All time volume', icon: 'document-text', color: '#3B82F6', bg: '#EFF6FF' },
-                { title: 'Compliance Rate', value: analyticsOverview?.complianceRate || '0%', subTitle: 'Approved vs Rejected', icon: 'shield-checkmark', color: '#10B981', bg: '#ECFDF5' },
-                { title: 'Pending Reviews', value: analyticsOverview?.pendingApproval || '0', subTitle: 'Awaiting action', icon: 'time', color: '#F59E0B', bg: '#FEF3C7' },
-                { title: 'Active Requestors', value: analyticsOverview?.activeUsers || '0', subTitle: 'Users who submitted posts', icon: 'people', color: '#8B5CF6', bg: '#F5F3FF' }
-              ].map(stat => (
-                <Card key={stat.title} style={{ flex: 1, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: Colors.surface, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
-                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name={stat.icon as any} size={24} color={stat.color} />
+            <View style={[styles.analyticsStatsGrid, !isLargeScreen && styles.analyticsStack]}>
+              {trendStats.map(stat => (
+                <Card key={stat.title} style={styles.analyticsStatCard}>
+                  <View style={[styles.analyticsStatIcon, { backgroundColor: stat.bg }]}>
+                    <Ionicons name={stat.icon} size={22} color={stat.color} />
                   </View>
-                  <View>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textSecondary }}>{stat.title}</Text>
-                    <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary, marginVertical: 2 }}>{stat.value}</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.textMuted }}>{stat.subTitle}</Text>
+                  <View style={styles.analyticsStatContent}>
+                    <View style={styles.analyticsStatTopline}>
+                      <Text style={styles.analyticsStatLabel}>{stat.title}</Text>
+                      <View style={styles.analyticsTrend}>
+                        <Ionicons name={stat.down ? 'arrow-down' : 'arrow-up'} size={12} color={stat.trendColor} />
+                        <Text style={[styles.analyticsTrendText, { color: stat.trendColor }]}>{stat.trend}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.analyticsStatValue}>{stat.value}</Text>
+                    <View style={styles.analyticsStatFooter}>
+                      <Text style={styles.analyticsStatSubtext}>{stat.subTitle}</Text>
+                      <Text style={styles.analyticsCompareText}>vs last month</Text>
+                    </View>
                   </View>
                 </Card>
               ))}
             </View>
 
-            {/* Main Charts Row */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { gap: 24 }]}>
-
-              {/* Yearly Bar Chart */}
-              <Card style={[styles.userCard, { flex: 2, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, borderTopWidth: 4, borderTopColor: '#7C3AED' }] as any}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
+            <View style={[styles.analyticsMainGrid, !isLargeScreen && styles.analyticsStack]}>
+              <Card style={styles.analyticsChartCard}>
+                <View style={styles.analyticsCardHeader}>
                   <View>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Publication Volume Overview</Text>
-                    <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 4 }}>Monthly post submissions for the current year</Text>
+                    <Text style={styles.analyticsCardTitle}>Publication Volume Overview</Text>
+                    <Text style={styles.analyticsCardSubtitle}>Monthly post submissions for the current year</Text>
                   </View>
-                  <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
-                    <Text style={{ color: '#7C3AED', fontWeight: 'bold', fontSize: 13 }}>Total Submissions: {analyticsOverview?.totalVolume || '0'}</Text>
+                  <View style={styles.analyticsPill}>
+                    <Text style={styles.analyticsPillText}>Total Submissions: {analyticsOverview?.totalVolume || '0'}</Text>
                   </View>
                 </View>
 
-                {/* Modern Bar Chart Canvas */}
-                <View style={{ height: 240, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', position: 'relative' }}>
-                  {/* Grid lines with labels */}
-                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}><Text style={{ position: 'absolute', top: -8, left: -30, fontSize: 10, color: Colors.textMuted }}>{maxPosts}</Text></View>
-                  <View style={{ position: 'absolute', top: 70, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}><Text style={{ position: 'absolute', top: -8, left: -30, fontSize: 10, color: Colors.textMuted }}>{Math.floor(maxPosts * 0.66)}</Text></View>
-                  <View style={{ position: 'absolute', top: 140, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' }}><Text style={{ position: 'absolute', top: -8, left: -30, fontSize: 10, color: Colors.textMuted }}>{Math.floor(maxPosts * 0.33)}</Text></View>
-                  <Text style={{ position: 'absolute', bottom: 30, left: -20, fontSize: 10, color: Colors.textMuted }}>0</Text>
-
-                  {monthsData.map((item: any, index: number) => {
-                    const heightPercent = maxPosts > 0 ? (item.posts / maxPosts) * 100 : 0;
+                <View style={styles.analyticsChartArea}>
+                  {[maxPosts, Math.round(maxPosts * 0.75), Math.round(maxPosts * 0.5), Math.round(maxPosts * 0.25)].map((label, index) => (
+                    <View key={index} style={[styles.analyticsGridLine, { top: `${index * 24}%` }]}>
+                      <Text style={styles.analyticsYAxisLabel}>{label}</Text>
+                    </View>
+                  ))}
+                  {monthsData.map((item: any) => {
+                    const heightPercent = maxPosts > 0 ? Math.max((item.posts / maxPosts) * 82, item.posts > 0 ? 8 : 0) : 0;
+                    const isPeak = item.posts === maxPosts && item.posts > 0;
                     return (
-                      <View key={item.month} style={{ alignItems: 'center', width: '7%', height: '100%', justifyContent: 'flex-end', zIndex: 10 }}>
-                        <Text style={{ fontSize: 11, color: Colors.textSecondary, fontWeight: '700', marginBottom: 8 }}>{item.posts > 0 ? item.posts : ''}</Text>
-                        <View style={{ width: '100%', height: `${Math.max(heightPercent, 2)}%`, backgroundColor: index === new Date().getMonth() ? '#7C3AED' : '#C4B5FD', borderRadius: 6, minHeight: 4 }} />
-                        <Text style={{ position: 'absolute', bottom: -28, fontSize: 12, color: index === new Date().getMonth() ? '#7C3AED' : Colors.textSecondary, fontWeight: index === new Date().getMonth() ? 'bold' : '500' }}>{item.month}</Text>
+                      <View key={item.month} style={styles.analyticsMonthColumn}>
+                        <View style={styles.analyticsPlotColumn}>
+                          {item.posts > 0 && <Text style={styles.analyticsPointLabel}>{item.posts}</Text>}
+                          <View style={[styles.analyticsAreaBar, { height: `${heightPercent}%`, opacity: item.posts > 0 ? 1 : 0 }]} />
+                          <View style={[styles.analyticsPoint, isPeak && styles.analyticsPointPeak]} />
+                        </View>
+                        <Text style={styles.analyticsMonthLabel}>{item.month}</Text>
                       </View>
                     );
                   })}
                 </View>
+                <View style={styles.analyticsChartLegend}>
+                  <View style={styles.analyticsLegendItem}><View style={[styles.analyticsLegendDot, { backgroundColor: '#7C3AED' }]} /><Text style={styles.analyticsLegendText}>Submissions</Text></View>
+                  <View style={styles.analyticsLegendItem}><View style={[styles.analyticsLegendDot, { width: 28, borderRadius: 4, backgroundColor: '#DDD6FE' }]} /><Text style={styles.analyticsLegendText}>Target</Text></View>
+                </View>
               </Card>
 
-              {/* Department Breakdown */}
-              <Card style={[styles.userCard, { flex: 1, padding: 24, backgroundColor: Colors.surface, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }] as any}>
-                <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 24 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Top Departments</Text>
-                  <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 4 }}>Submission share by department</Text>
+              <Card style={styles.analyticsDepartmentCard}>
+                <View style={styles.analyticsCardHeader}>
+                  <View>
+                    <Text style={styles.analyticsCardTitle}>Top Departments</Text>
+                    <Text style={styles.analyticsCardSubtitle}>Submission share by department</Text>
+                  </View>
                 </View>
-
-                <ScrollView style={{ width: '100%', maxHeight: 250 }} showsVerticalScrollIndicator={false}>
-                  {(analyticsOverview?.departmentBreakdown || [])
-                    .filter((dept: any) => !isStaticSystemDepartment({ name: dept.name, display_name: dept.name }))
-                    .sort((a:any, b:any) => b.count - a.count).map((dept: any, idx: number) => (
-                    <View key={idx} style={{ marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary, flex: 1 }} numberOfLines={1}>{dept.name}</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textSecondary }}>{dept.percentage}%</Text>
+                <View style={styles.analyticsDeptList}>
+                  {topDepartments.map((dept: any, idx: number) => (
+                    <View key={idx} style={styles.analyticsDeptItem}>
+                      <View style={styles.analyticsDeptHeader}>
+                        <Text style={styles.analyticsDeptName} numberOfLines={1}>{dept.name}</Text>
+                        <Text style={styles.analyticsDeptPercent}>{dept.percentage}%</Text>
                       </View>
-                      <View style={{ width: '100%', height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
-                        <View style={{ width: `${dept.percentage}%`, height: '100%', backgroundColor: dept.barColor || '#3B82F6', borderRadius: 4 }} />
+                      <View style={styles.analyticsDeptTrack}>
+                        <View style={[styles.analyticsDeptFill, { width: `${dept.percentage}%`, backgroundColor: dept.barColor || '#7C3AED' }]} />
                       </View>
-                      <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>{dept.count} Submissions</Text>
+                      <Text style={styles.analyticsDeptSubtext}>{dept.count} Submissions</Text>
                     </View>
                   ))}
-                  {(!analyticsOverview?.departmentBreakdown || analyticsOverview.departmentBreakdown.length === 0) && (
-                    <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: 20 }}>No department data available</Text>
+                  {topDepartments.length === 0 && (
+                    <Text style={styles.analyticsEmptyText}>No department data available</Text>
                   )}
-                </ScrollView>
+                </View>
+                <TouchableOpacity style={styles.analyticsDeptFooter} activeOpacity={0.8}>
+                  <Text style={styles.analyticsDeptFooterText}>View All Departments</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#111827" />
+                </TouchableOpacity>
               </Card>
-
             </View>
 
-            {/* Platform Stats Row */}
-            <View style={{ marginTop: 8 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 16 }}>Platform Targets Breakdown</Text>
-              <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 16 }}>
-                {(analyticsOverview?.platformStats || []).map((platform: any, idx: number) => (
-                  <Card key={idx} style={{ flex: 1, padding: 20, backgroundColor: Colors.surface, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: platform.bgColor || '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
-                          <Ionicons name={platform.icon || 'globe-outline' as any} size={20} color={platform.color || Colors.primary} />
+            <View style={[styles.analyticsBottomGrid, !isLargeScreen && styles.analyticsStack]}>
+              <Card style={styles.analyticsPlatformCard}>
+                <Text style={styles.analyticsCardTitle}>Platform Targets Breakdown</Text>
+                <View style={[styles.analyticsPlatformGrid, !isLargeScreen && styles.analyticsStack]}>
+                  {platformStats.map((platform: any, idx: number) => {
+                    const platformKey = platform.name.toLowerCase() === 'website' ? 'other' : platform.name.toLowerCase();
+                    const reach = analyticsOverview?.platformReach?.[platformKey] || 0;
+                    const postCount = parseInt(String(platform.posts || '0'), 10) || 0;
+                    return (
+                      <View key={idx} style={styles.analyticsPlatformItem}>
+                        <View style={styles.analyticsPlatformTop}>
+                          <View style={styles.analyticsPlatformIdentity}>
+                            <View style={[styles.analyticsPlatformIcon, { backgroundColor: platform.color || '#7C3AED' }]}>
+                              <Ionicons name={(platform.icon || 'globe-outline') as any} size={16} color="#FFFFFF" />
+                            </View>
+                            <Text style={styles.analyticsPlatformName}>{platform.name}</Text>
+                          </View>
+                          <Text style={styles.analyticsPlatformPercent}>{reach}%</Text>
                         </View>
-                        <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>{platform.name}</Text>
+                        <View style={styles.analyticsPlatformBody}>
+                          <View>
+                            <Text style={[styles.analyticsPlatformPosts, { color: platform.color || '#7C3AED' }]}>{postCount}</Text>
+                            <Text style={[styles.analyticsPlatformPostsLabel, { color: platform.color || '#7C3AED' }]}>posts</Text>
+                            <Text style={styles.analyticsPlatformTarget}>Total Posts Targeted</Text>
+                          </View>
+                          <View style={styles.analyticsProgressRing}>
+                            <View style={[styles.analyticsProgressRingFill, { borderColor: platform.color || '#7C3AED', opacity: reach > 0 ? 1 : 0.15 }]} />
+                          </View>
+                        </View>
                       </View>
-                      <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.textPrimary }}>{analyticsOverview?.platformReach?.[platform.name.toLowerCase()] || 0}%</Text>
+                    );
+                  })}
+                  {platformStats.length === 0 && (
+                    <Text style={styles.analyticsEmptyText}>No platform data available yet.</Text>
+                  )}
+                </View>
+              </Card>
+
+              <Card style={styles.analyticsStatusCard}>
+                <Text style={styles.analyticsCardTitle}>Submissions Status</Text>
+                <View style={[styles.analyticsStatusBody, !isLargeScreen && styles.analyticsStack]}>
+                  <View style={styles.analyticsDonutWrap}>
+                    <View style={styles.analyticsDonutOuter}>
+                      <View style={styles.analyticsDonutMiddle}>
+                        <Text style={styles.analyticsDonutValue}>{analyticsOverview?.totalVolume || '0'}</Text>
+                        <Text style={styles.analyticsDonutLabel}>Total</Text>
+                      </View>
                     </View>
-                    <View style={{ height: 1, backgroundColor: '#F3F4F6', marginBottom: 16 }} />
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 13, color: Colors.textSecondary }}>Total Posts Targeted</Text>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: platform.color }}>{platform.posts}</Text>
-                    </View>
-                  </Card>
-                ))}
-                {(!analyticsOverview?.platformStats || analyticsOverview.platformStats.length === 0) && (
-                  <Text style={{ color: Colors.textMuted, padding: 20 }}>No platform data available yet.</Text>
-                )}
-              </View>
+                  </View>
+                  <View style={styles.analyticsStatusLegendList}>
+                    {statusRows.map((row) => {
+                      const pct = Math.round((row.value / statusTotal) * 100);
+                      return (
+                        <View key={row.label} style={styles.analyticsStatusRow}>
+                          <View style={styles.analyticsStatusLabelWrap}>
+                            <View style={[styles.analyticsStatusDot, { backgroundColor: row.color }]} />
+                            <Text style={styles.analyticsStatusLabel}>{row.label}</Text>
+                          </View>
+                          <Text style={styles.analyticsStatusValue}>{row.value} ({pct}%)</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              </Card>
             </View>
           </View>
         );
@@ -3894,6 +4080,182 @@ const styles = StyleSheet.create({
   platformPercentage: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textPrimary },
   progressBarBg: { height: 8, backgroundColor: Colors.background, borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: 8, borderRadius: 4 },
+
+  // Analytics
+  analyticsPage: { gap: 24 },
+  analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  analyticsHeaderStacked: { flexDirection: 'column' },
+  analyticsTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
+  analyticsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
+  analyticsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  analyticsActionButton: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8 },
+  analyticsActionText: { fontSize: 13, fontWeight: '700', color: '#334155' },
+  analyticsStatsGrid: { flexDirection: 'row', gap: 18 },
+  analyticsStack: { flexDirection: 'column' },
+  analyticsStatCard: { flex: 1, minWidth: 210, padding: 16, flexDirection: 'row', gap: 16, alignItems: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  analyticsStatContent: { flex: 1, minWidth: 0, gap: 6 },
+  analyticsStatTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  analyticsStatLabel: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  analyticsTrend: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  analyticsTrendText: { fontSize: 12, fontWeight: '800' },
+  analyticsStatValue: { fontSize: 25, lineHeight: 30, fontWeight: '900', color: '#111827' },
+  analyticsStatFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  analyticsStatSubtext: { fontSize: 11, color: '#64748B' },
+  analyticsCompareText: { fontSize: 10, color: '#94A3B8' },
+  analyticsMainGrid: { flexDirection: 'row', gap: 24 },
+  analyticsChartCard: { flex: 2, minWidth: 0, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsDepartmentCard: { flex: 1, minWidth: 300, padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 20 },
+  analyticsCardTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  analyticsCardSubtitle: { fontSize: 12, color: '#64748B', marginTop: 4 },
+  analyticsPill: { backgroundColor: '#F3E8FF', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8 },
+  analyticsPillText: { fontSize: 12, fontWeight: '800', color: '#7C3AED' },
+  analyticsChartArea: { height: 250, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingLeft: 36, paddingRight: 8, paddingTop: 8, paddingBottom: 28, position: 'relative' },
+  analyticsGridLine: { position: 'absolute', left: 36, right: 8, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' },
+  analyticsYAxisLabel: { position: 'absolute', left: -30, top: -8, fontSize: 11, color: '#94A3B8' },
+  analyticsMonthColumn: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end', minWidth: 30 },
+  analyticsPlotColumn: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' },
+  analyticsAreaBar: { width: '45%', maxWidth: 28, minHeight: 4, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: 'rgba(124, 58, 237, 0.35)' },
+  analyticsPoint: { width: 12, height: 12, borderRadius: 6, borderWidth: 3, borderColor: '#7C3AED', backgroundColor: '#FFFFFF', marginTop: -6 },
+  analyticsPointPeak: { width: 15, height: 15, borderRadius: 8, borderWidth: 3 },
+  analyticsPointLabel: { position: 'absolute', bottom: '84%', fontSize: 18, fontWeight: '900', color: '#7C3AED' },
+  analyticsMonthLabel: { fontSize: 11, color: '#64748B', marginTop: 12 },
+  analyticsChartLegend: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24, marginTop: 6 },
+  analyticsLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  analyticsLegendDot: { width: 18, height: 4, borderRadius: 2 },
+  analyticsLegendText: { fontSize: 11, color: '#64748B' },
+  analyticsDeptList: { paddingHorizontal: 22, paddingBottom: 16, gap: 16 },
+  analyticsDeptItem: { gap: 7 },
+  analyticsDeptHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  analyticsDeptName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#111827' },
+  analyticsDeptPercent: { fontSize: 12, fontWeight: '900', color: '#111827' },
+  analyticsDeptTrack: { height: 7, borderRadius: 8, backgroundColor: '#F1F5F9', overflow: 'hidden' },
+  analyticsDeptFill: { height: '100%', borderRadius: 8 },
+  analyticsDeptSubtext: { fontSize: 11, color: '#94A3B8' },
+  analyticsDeptFooter: { marginTop: 'auto', minHeight: 48, borderTopWidth: 1, borderTopColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
+  analyticsDeptFooterText: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  analyticsBottomGrid: { flexDirection: 'row', gap: 24 },
+  analyticsPlatformCard: { flex: 1.35, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsPlatformGrid: { flexDirection: 'row', gap: 16, marginTop: 16 },
+  analyticsPlatformItem: { flex: 1, minWidth: 190, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, position: 'relative', overflow: 'hidden' },
+  analyticsPlatformTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 20 },
+  analyticsPlatformIdentity: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
+  analyticsPlatformIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  analyticsPlatformName: { fontSize: 13, fontWeight: '800', color: '#111827' },
+  analyticsPlatformPercent: { fontSize: 19, fontWeight: '900', color: '#111827' },
+  analyticsPlatformBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 },
+  analyticsPlatformPosts: { fontSize: 24, lineHeight: 28, fontWeight: '900' },
+  analyticsPlatformPostsLabel: { fontSize: 11, fontWeight: '800', marginTop: -1 },
+  analyticsPlatformTarget: { fontSize: 11, color: '#64748B', marginTop: 8 },
+  analyticsProgressRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  analyticsProgressRingFill: { position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderLeftColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '35deg' }] },
+  analyticsStatusCard: { flex: 1, minWidth: 330, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatusBody: { flexDirection: 'row', alignItems: 'center', gap: 28, marginTop: 18 },
+  analyticsDonutWrap: { width: 136, alignItems: 'center' },
+  analyticsDonutOuter: { width: 118, height: 118, borderRadius: 59, borderWidth: 22, borderColor: '#F97316', borderLeftColor: '#10B981', borderTopColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
+  analyticsDonutMiddle: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  analyticsDonutValue: { fontSize: 23, fontWeight: '900', color: '#111827' },
+  analyticsDonutLabel: { fontSize: 10, color: '#64748B' },
+  analyticsStatusLegendList: { flex: 1, gap: 15 },
+  analyticsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18 },
+  analyticsStatusLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
+  analyticsStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  analyticsStatusLabel: { fontSize: 12, color: '#64748B' },
+  analyticsStatusValue: { fontSize: 12, fontWeight: '800', color: '#111827' },
+  analyticsEmptyText: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 20 },
+
+  // Platform integrations
+  tokensPage: { gap: 18 },
+  tokensHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  tokensTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
+  tokensSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
+  tokensUpdatedBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#F3E8FF', borderWidth: 1, borderColor: '#E9D5FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  tokensUpdatedText: { fontSize: 11, fontWeight: '700', color: '#5B21B6' },
+  tokensSecurityBanner: { minHeight: 48, borderRadius: 8, backgroundColor: 'rgba(245, 240, 255, 0.92)', borderWidth: 1, borderColor: '#E9D5FF', paddingHorizontal: 16, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  tokensSecurityText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#5B21B6' },
+  tokensMetaCard: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 18, flexWrap: 'wrap', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
+  tokensMetaContent: { flex: 1, minWidth: 300, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  tokensMetaIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
+  tokensMetaTitle: { fontSize: 13, fontWeight: '900', color: '#111827' },
+  tokensMetaText: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 4 },
+  tokensMetaActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  tokensPrimaryButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 15, backgroundColor: '#5B0FB8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  tokensPrimaryButtonText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
+  tokensSecondaryButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 14, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#DDD6FE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  tokensSecondaryButtonText: { fontSize: 12, fontWeight: '900', color: '#5B21B6' },
+  tokensButtonDisabled: { opacity: 0.6 },
+  tokensIntegrationCard: { padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  tokensIntegrationCardMobile: { flexDirection: 'column' },
+  tokensPlatformIntro: { width: 360, padding: 24, borderRightWidth: 1, borderRightColor: '#E5E7EB', flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  tokensPlatformIntroMobile: { width: '100%', borderRightWidth: 0, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  tokensPlatformIcon: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  tokensPlatformName: { fontSize: 17, fontWeight: '900', color: '#111827', marginTop: 3 },
+  tokensPlatformDescription: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 18 },
+  tokensConnectionBadge: { alignSelf: 'flex-start', marginTop: 20, borderRadius: 999, backgroundColor: '#FEF3C7', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6 },
+  tokensConnectionBadgeConnected: { backgroundColor: '#DCFCE7' },
+  tokensConnectionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#F59E0B' },
+  tokensConnectionDotConnected: { backgroundColor: '#16A34A' },
+  tokensConnectionText: { fontSize: 11, fontWeight: '900', color: '#EA580C' },
+  tokensConnectionTextConnected: { color: '#15803D' },
+  tokensFormPanel: { flex: 1, padding: 24, justifyContent: 'space-between', gap: 18 },
+  tokensFieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  tokensFieldGridMobile: { flexDirection: 'column' },
+  tokensField: { flex: 1, minWidth: 280, gap: 7 },
+  tokensLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tokensFieldLabel: { fontSize: 12, fontWeight: '800', color: '#111827' },
+  tokensInputWrap: { minHeight: 40, borderWidth: 1, borderColor: '#DDE3EA', borderRadius: 7, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  tokensInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#111827', outlineStyle: 'none' } as any,
+  tokensEyeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  tokensFieldHint: { fontSize: 11, color: '#94A3B8' },
+  tokensCardActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  tokensSaveButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 16, backgroundColor: '#5B0FB8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  tokensSaveButtonText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
+  tokensClearButton: { minHeight: 40, minWidth: 82, borderRadius: 7, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  tokensClearButtonText: { fontSize: 12, fontWeight: '800', color: '#64748B' },
+
+  // Email settings
+  emailPage: { gap: 26 },
+  emailHeroCard: { padding: 24, minHeight: 92, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', gap: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  emailHeroIcon: { width: 50, height: 50, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  emailHeroTitle: { fontSize: 19, fontWeight: '900', color: '#111827' },
+  emailHeroSubtitle: { fontSize: 14, color: '#64748B', marginTop: 6 },
+  emailLayout: { flexDirection: 'row', gap: 26, alignItems: 'flex-start' },
+  emailLayoutStacked: { flexDirection: 'column' },
+  emailSmtpCard: { flex: 1.45, minWidth: 520, padding: 26, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  emailSmtpCardMobile: { minWidth: 0, width: '100%' },
+  emailSideColumn: { flex: 1, minWidth: 360, gap: 26, alignSelf: 'stretch' },
+  emailSideColumnMobile: { minWidth: 0, width: '100%' },
+  emailSenderCard: { padding: 26, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', gap: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  emailCardTitle: { fontSize: 19, fontWeight: '900', color: '#111827' },
+  emailCardSubtitle: { fontSize: 13, color: '#64748B', lineHeight: 20, marginTop: 10, marginBottom: 24 },
+  emailLinkText: { color: '#4F46E5', fontWeight: '800' },
+  emailTwoColumnRow: { flexDirection: 'row', gap: 18, marginBottom: 24 },
+  emailColumnRow: { flexDirection: 'column' },
+  emailField: { flex: 1, minWidth: 0 },
+  emailFieldLabel: { fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 9 },
+  emailInputWrap: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#DDE3EA', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
+  emailInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: '#111827', outlineStyle: 'none' } as any,
+  emailEyeButton: { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  emailEncryptionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 20 },
+  emailEncryptionOption: { minHeight: 42, minWidth: 88, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 },
+  emailEncryptionOptionActive: { borderColor: '#4F46E5', backgroundColor: '#FFFFFF' },
+  emailRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+  emailRadioActive: { borderColor: '#4F46E5' },
+  emailRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4F46E5' },
+  emailEncryptionText: { fontSize: 13, fontWeight: '800', color: '#334155' },
+  emailEncryptionTextActive: { color: '#4F46E5' },
+  emailInfoBanner: { minHeight: 46, borderRadius: 8, backgroundColor: '#F2F0FF', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, marginBottom: 24 },
+  emailWarningBanner: { minHeight: 46, borderRadius: 8, backgroundColor: '#F2F0FF', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
+  emailInfoText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#4F46E5', lineHeight: 18 },
+  emailPasswordSetText: { color: '#059669', fontSize: 11, fontWeight: '800' },
+  emailTestButton: { minHeight: 66, borderRadius: 8, borderWidth: 1.5, borderColor: '#4F46E5', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 18 },
+  emailTestButtonText: { fontSize: 15, fontWeight: '900', color: '#4F46E5' },
+  emailTestButtonSubtext: { fontSize: 12, color: '#818CF8', marginTop: 2 },
+  emailSaveButton: { minHeight: 66, borderRadius: 8, backgroundColor: '#4F46E5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 18, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.24, shadowRadius: 14, elevation: 4 },
+  emailSaveButtonText: { fontSize: 15, fontWeight: '900', color: '#FFFFFF' },
+  emailSaveButtonSubtext: { fontSize: 12, color: '#C7D2FE', marginTop: 2 },
+  emailButtonDisabled: { opacity: 0.65 },
 
   // User management
   userTabContainer: { gap: Spacing.md },
