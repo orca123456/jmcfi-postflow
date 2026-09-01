@@ -3568,7 +3568,7 @@ $response = curl_exec($ch);`}
               </Card>
 
               <Card style={styles.analyticsDepartmentCard}>
-                <View style={styles.analyticsCardHeader}>
+                <View style={styles.analyticsDepartmentHeader}>
                   <View>
                     <Text style={styles.analyticsCardTitle}>Top Departments</Text>
                     <Text style={styles.analyticsCardSubtitle}>Submission share by department</Text>
@@ -4106,6 +4106,7 @@ const styles = StyleSheet.create({
   analyticsMainGrid: { flexDirection: 'row', gap: 24 },
   analyticsChartCard: { flex: 2, minWidth: 0, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsDepartmentCard: { flex: 1, minWidth: 300, padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsDepartmentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, paddingTop: 24, paddingHorizontal: 22, marginBottom: 20 },
   analyticsCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 20 },
   analyticsCardTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
   analyticsCardSubtitle: { fontSize: 12, color: '#64748B', marginTop: 4 },
@@ -4125,7 +4126,7 @@ const styles = StyleSheet.create({
   analyticsLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   analyticsLegendDot: { width: 18, height: 4, borderRadius: 2 },
   analyticsLegendText: { fontSize: 11, color: '#64748B' },
-  analyticsDeptList: { paddingHorizontal: 22, paddingBottom: 16, gap: 16 },
+  analyticsDeptList: { flex: 1, paddingHorizontal: 22, paddingBottom: 16, gap: 16 },
   analyticsDeptItem: { gap: 7 },
   analyticsDeptHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   analyticsDeptName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#111827' },
@@ -4163,7 +4164,7 @@ const styles = StyleSheet.create({
   analyticsStatusDot: { width: 8, height: 8, borderRadius: 4 },
   analyticsStatusLabel: { fontSize: 12, color: '#64748B' },
   analyticsStatusValue: { fontSize: 12, fontWeight: '800', color: '#111827' },
-  analyticsEmptyText: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 20 },
+  analyticsEmptyText: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 20, alignSelf: 'center' },
 
   // Platform integrations
   tokensPage: { gap: 18 },
