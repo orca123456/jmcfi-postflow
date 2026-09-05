@@ -72,7 +72,7 @@ class ExternalIntegrationController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($request) {
+        return DB::transaction(function () use ($request, $facebookService, $instagramService) {
             $categoryId = $request->category_id;
             if (!$categoryId) {
                 $categoryId = PostCategory::where('is_active', true)->value('id');

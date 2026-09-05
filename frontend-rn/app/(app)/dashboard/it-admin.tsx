@@ -1274,7 +1274,14 @@ export default function ITAdminDashboard() {
     const finalEmail = newUserEmail.includes('@') ? newUserEmail : newUserEmail.trim() + '@jmc.edu.ph';
 
     try {
-      const generatedEmpId = 'EMP-' + Math.floor(10000 + Math.random() * 90000);
+      const randomValues = new Uint32Array(1);
+      const cryptoSource = typeof globalThis.crypto?.getRandomValues === 'function'
+        ? globalThis.crypto
+        : null;
+      const randomNumber = cryptoSource
+        ? cryptoSource.getRandomValues(randomValues)[0] % 90000
+        : Date.now() % 90000;
+      const generatedEmpId = 'EMP-' + String(10000 + randomNumber).padStart(5, '0');
       const res = await usersApi.create({
         employee_id: generatedEmpId,
         first_name: newUserFirstName,
