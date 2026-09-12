@@ -443,13 +443,16 @@ class PostRequestController extends Controller
                     $post = PostRequest::find($postId);
                     if (!$post) return;
 
+                    if (!$hasNextStage) {
+                        AutoPublishJob::dispatch($post, $userId)->onQueue('publishing')->delay(now()->addSeconds(5));
+                    }
+
                     if ($hasNextStage) {
                         $workflowService->notifyNextApprover($post, $nextStageName);
                         $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
                     } else {
                         $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
                         $workflowService->notifyITPublisher($post);
-                        AutoPublishJob::dispatch($post, $userId)->delay(now()->addSeconds(5));
                     }
 
                     AuditLogService::log('CONTENT_APPROVAL', 'Approved post: ' . $post->title, 'INFO', ['post_id' => $postId, 'stage' => $approvedStageName, 'remarks' => $remarks]);

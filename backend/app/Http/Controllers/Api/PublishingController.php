@@ -32,7 +32,7 @@ class PublishingController extends Controller
         }
 
         // 2. Validate that the post is ready to be published (must be approved or scheduled)
-        if (!in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED])) {
+        if (!in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED, PostRequest::STATUS_PUBLISH_FAILED])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Post cannot be published. Current status is ' . $post->status
@@ -66,13 +66,18 @@ class PublishingController extends Controller
                 ->map(fn ($platform) => match ($platform) {
                     'fb' => 'facebook',
                     'ig' => 'instagram',
+                    'website', 'wp' => 'wordpress',
                     default => $platform,
                 })
-                ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram'], true))
+                ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram', 'wordpress'], true))
                 ->unique()
                 ->values();
 
             foreach ($publishPlatforms as $platform) {
+                if (PublishingRecord::where('post_request_id', $post->id)
+                    ->where('platform', $platform)->where('status', 'published')->exists()) {
+                    continue;
+                }
                 PublishingRecord::create([
                     'post_request_id' => $post->id,
                     'published_by' => $user->id,
