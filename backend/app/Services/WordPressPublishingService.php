@@ -42,19 +42,10 @@ class WordPressPublishingService
             'slug' => $slug,
         ];
         if ($media) {
-            $diskName = config('filesystems.default');
-            $disk = Storage::disk(in_array($diskName, ['s3', 'b2'], true) ? $diskName : 'public');
-            $path = str_replace('\\', '/', (string) $media->file_path);
-            if (!$path || !$disk->exists($path)) {
-                throw new RuntimeException('WordPress image is missing from storage. Re-upload the image before publishing.');
-            }
-            $stream = $disk->readStream($path);
-            if (!is_resource($stream)) {
-                throw new RuntimeException('Unable to read the WordPress image from storage.');
-            }
+            [$stream, $filename] = $this->openMediaStream($media);
             try {
                 $upload = $this->response((clone $client)
-                    ->attach('file', $stream, basename($path))
+                    ->attach('file', $stream, $filename)
                     ->post($url . '/?rest_route=/wp/v2/media'), 'upload image');
             } finally {
                 if (is_resource($stream)) {
@@ -68,6 +59,53 @@ class WordPressPublishingService
         }
 
         return $this->publishedArticle($this->response($client->post($endpoint, $payload), 'publish article'));
+    }
+
+    private function openMediaStream(PostMedia $media): array
+    {
+        $path = str_replace('\\', '/', (string) $media->file_path);
+        $diskName = config('filesystems.default');
+        $mediaUrl = (string) ($media->url ?? '');
+
+        if (in_array($diskName, ['s3', 'b2'], true) && filter_var($mediaUrl, FILTER_VALIDATE_URL)) {
+            return $this->openMediaUrlStream($mediaUrl);
+        }
+
+        if ($path !== '') {
+            $disk = Storage::disk(in_array($diskName, ['s3', 'b2'], true) ? $diskName : 'public');
+            if (!$disk->exists($path)) {
+                throw new RuntimeException('WordPress image is missing from storage. Re-upload the image before publishing.');
+            }
+            $stream = $disk->readStream($path);
+            if (!is_resource($stream)) {
+                throw new RuntimeException('Unable to read the WordPress image from storage.');
+            }
+
+            return [$stream, basename($path)];
+        }
+
+        if (!filter_var($mediaUrl, FILTER_VALIDATE_URL)) {
+            throw new RuntimeException('WordPress image is missing from storage. Re-upload the image before publishing.');
+        }
+
+        return $this->openMediaUrlStream($mediaUrl);
+    }
+
+    private function openMediaUrlStream(string $mediaUrl): array
+    {
+        $response = Http::connectTimeout(5)->timeout(25)->withoutRedirecting()->get($mediaUrl);
+        if (!$response->successful()) {
+            throw new RuntimeException("WordPress image could not be downloaded (HTTP {$response->status()}). Re-upload the image before publishing.");
+        }
+
+        $stream = fopen('php://temp', 'r+');
+        if (!is_resource($stream)) {
+            throw new RuntimeException('Unable to prepare the WordPress image for upload.');
+        }
+        fwrite($stream, $response->body());
+        rewind($stream);
+
+        return [$stream, basename(parse_url($mediaUrl, PHP_URL_PATH) ?: 'postflow-image.jpg') ?: 'postflow-image.jpg'];
     }
 
     private function client(string $url, string $username, string $password): PendingRequest
