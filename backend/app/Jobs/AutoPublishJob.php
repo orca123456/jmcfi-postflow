@@ -54,7 +54,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             $lowerPlatforms = array_unique(array_map(fn ($platform) => match (strtolower(trim($platform))) {
                 'fb' => 'facebook',
                 'ig' => 'instagram',
-                'website', 'wp' => 'wordpress',
+                'portal', 'website', 'wp' => 'wordpress',
                 default => strtolower(trim($platform)),
             }, $platforms));
             $completed = PublishingRecord::where('post_request_id', $this->postRequest->id)

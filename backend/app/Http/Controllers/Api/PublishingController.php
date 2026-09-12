@@ -66,7 +66,7 @@ class PublishingController extends Controller
                 ->map(fn ($platform) => match ($platform) {
                     'fb' => 'facebook',
                     'ig' => 'instagram',
-                    'website', 'wp' => 'wordpress',
+                    'portal', 'website', 'wp' => 'wordpress',
                     default => $platform,
                 })
                 ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram', 'wordpress'], true))
