@@ -857,6 +857,7 @@ export default function ITAdminDashboard() {
     wordpress_username: '',
     wordpress_app_password: '',
   });
+  const [savedTokenFields, setSavedTokenFields] = useState<Record<string, string>>({});
   const [tokenLastUpdated, setTokenLastUpdated] = useState('');
   const [savingTokens, setSavingTokens] = useState(false);
   const [savingTokenPlatform, setSavingTokenPlatform] = useState<'all' | 'facebook' | 'instagram' | 'wordpress' | null>(null);
@@ -868,6 +869,7 @@ export default function ITAdminDashboard() {
       tokenSettingsApi.get()
         .then(res => {
           const t = res.data.tokens || {};
+          setSavedTokenFields(t);
           setTokenFields(prev => ({
             ...prev,
             facebook_page_id: t.facebook_page_id || '',
@@ -889,6 +891,7 @@ export default function ITAdminDashboard() {
     setSavingTokenPlatform('all');
     try {
       const res = await tokenSettingsApi.update(tokenFields);
+      setSavedTokenFields({ ...tokenFields });
       showToast('Tokens saved successfully!', 'success');
       setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
     } catch (e: any) {
@@ -913,6 +916,7 @@ export default function ITAdminDashboard() {
     setSavingTokenPlatform(platform);
     try {
       const res = await tokenSettingsApi.update(payload);
+      setSavedTokenFields(prev => ({ ...prev, ...payload }));
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens saved!`, 'success');
       setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
     } catch (e: any) {
@@ -943,6 +947,7 @@ export default function ITAdminDashboard() {
     setSavingTokenPlatform(platform);
     try {
       const res = await tokenSettingsApi.update(payload);
+      setSavedTokenFields(prev => ({ ...prev, ...payload }));
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens cleared!`, 'success');
       setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
     } catch (e: any) {
@@ -1113,6 +1118,7 @@ export default function ITAdminDashboard() {
     setValidatingTokens(true);
     try {
       const saveRes = await tokenSettingsApi.update(payload);
+      setSavedTokenFields({ ...payload });
       const validationRes = await tokenSettingsApi.validate(payload);
       const derived = validationRes.data?.derived || {};
 
@@ -1129,6 +1135,7 @@ export default function ITAdminDashboard() {
             : payload.instagram_access_token,
         };
         await tokenSettingsApi.update(updatedPayload);
+        setSavedTokenFields({ ...updatedPayload });
         setTokenFields(updatedPayload);
       } else {
         setTokenFields(payload);
@@ -2406,7 +2413,10 @@ export default function ITAdminDashboard() {
           ];
 
           const isConnected = (platform: typeof platformCards[number]) =>
-            platform.fields.every((field) => Boolean(String((tokenFields as any)[field.key] || '').trim()));
+            platform.fields.every((field) => {
+              const savedValue = String(savedTokenFields[field.key] || '').trim();
+              return Boolean(savedValue) && savedValue === String((tokenFields as any)[field.key] || '').trim();
+            });
 
           return (
             <View style={styles.tokensPage}>
