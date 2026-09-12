@@ -9,6 +9,7 @@ use App\Notifications\PostPublishedSuccessNotification;
 use App\Notifications\PostPublishingFailedNotification;
 use App\Services\FacebookPublishingService;
 use App\Services\InstagramPublishingService;
+use App\Services\WordPressPublishingService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -36,7 +37,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         return 'post-publish-' . $this->postRequest->id;
     }
 
-    public function handle(FacebookPublishingService $facebookService, InstagramPublishingService $instagramService): void
+    public function handle(FacebookPublishingService $facebookService, InstagramPublishingService $instagramService, WordPressPublishingService $wordpressService): void
     {
         $this->postRequest->refresh();
         Log::info("AutoPublishJob: Starting publish for post ID {$this->postRequest->id} - {$this->postRequest->title}");
@@ -50,7 +51,15 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 $platforms = [];
             }
 
-            $lowerPlatforms = array_map('strtolower', $platforms);
+            $lowerPlatforms = array_unique(array_map(fn ($platform) => match (strtolower(trim($platform))) {
+                'fb' => 'facebook',
+                'ig' => 'instagram',
+                'website', 'wp' => 'wordpress',
+                default => strtolower(trim($platform)),
+            }, $platforms));
+            $completed = PublishingRecord::where('post_request_id', $this->postRequest->id)
+                ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
+                ->pluck('platform')->all();
             $publishResults = [];
             $publishErrors = [];
             $media = $this->postRequest->media()
@@ -65,7 +74,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISHING]);
             }
 
-            if (in_array('instagram', $lowerPlatforms, true) || in_array('ig', $lowerPlatforms, true)) {
+            if (in_array('instagram', $lowerPlatforms, true) && !in_array('instagram', $completed, true)) {
                 try {
                     $imageUrl = $media ? route('instagram.media', ['media' => $media->id]) : null;
                     $publishResults['instagram'] = $instagramService->publishPost($this->postRequest->caption_narrative ?? '', $imageUrl);
@@ -76,7 +85,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 }
             }
 
-            if (in_array('facebook', $lowerPlatforms, true) || in_array('fb', $lowerPlatforms, true)) {
+            if (in_array('facebook', $lowerPlatforms, true) && !in_array('facebook', $completed, true)) {
                 $mediaPath = null;
                 if ($media && $media->file_path) {
                     $disk = config('filesystems.default');
@@ -96,9 +105,20 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 }
             }
 
+            if (in_array('wordpress', $lowerPlatforms, true) && !in_array('wordpress', $completed, true)) {
+                try {
+                    $publishResults['wordpress'] = $wordpressService->publishPost($this->postRequest, $media);
+                } catch (Exception $e) {
+                    $publishErrors['wordpress'] = $e->getMessage();
+                }
+            }
+
+            foreach (array_diff($lowerPlatforms, ['facebook', 'instagram', 'wordpress']) as $unsupported) {
+                $publishErrors[$unsupported] = 'This platform is not supported for automatic publishing.';
+            }
             $this->recordPublishingResults($publishResults, $publishErrors);
 
-            if ($publishResults === []) {
+            if ($publishErrors !== [] || ($publishResults === [] && $completed === [])) {
                 $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
                 throw new Exception($this->formatPublishErrors($publishErrors));
             }
@@ -120,7 +140,10 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 ]
             );
 
-            $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $publishResults));
+            $allResults = PublishingRecord::where('post_request_id', $this->postRequest->id)
+                ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
+                ->pluck('platform_response', 'platform')->all();
+            $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults));
             Log::info("AutoPublishJob: Completed for post ID {$this->postRequest->id}");
         } catch (Exception $e) {
             Log::error("AutoPublishJob: FAILED for post ID {$this->postRequest->id}. Error: {$e->getMessage()}");
@@ -206,6 +229,9 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 
     private function externalPostUrl(string $platform, array $response): ?string
     {
+        if ($platform === 'wordpress') {
+            return $response['link'] ?? null;
+        }
         if (!empty($response['permalink'])) {
             return $response['permalink'];
         }

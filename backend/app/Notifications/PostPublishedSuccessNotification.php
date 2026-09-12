@@ -39,6 +39,10 @@ class PostPublishedSuccessNotification extends Notification implements ShouldQue
             $mail->line("**Facebook Post ID:** {$fbPostId}");
         }
 
+        if (!empty($this->publishResults['wordpress']['link'])) {
+            $mail->line('WordPress article: ' . $this->publishResults['wordpress']['link']);
+        }
+
         $mail->action('View in Dashboard', url(config('app.frontend_url', 'http://localhost:8081') . "/admin/posts/{$this->postRequest->id}"))
              ->line('No action is required. This is a confirmation email.')
              ->line('**JMCFI PostFlow System**');
