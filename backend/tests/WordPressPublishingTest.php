@@ -130,6 +130,28 @@ final class WordPressPublishingTest extends TestCase
         Http::assertSent(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), '/wp/v2/posts') && $request['featured_media'] === 9);
     }
 
+    public function testImageCanBeUploadedFromMediaUrlWhenStoragePathIsMissing(): void
+    {
+        config(['filesystems.default' => 'b2']);
+        Http::fake(['*' => Http::sequence()
+            ->push([])
+            ->push('remote-image-bytes', 200)
+            ->push(['id' => 9], 201)
+            ->push($this->article(), 201)]);
+        $media = new class extends PostMedia {
+            public function getUrlAttribute(): string
+            {
+                return 'https://media.example.org/uploads/news-photo.jpg';
+            }
+        };
+        $media->forceFill(['file_path' => 'post-media/remote-news-photo.jpg']);
+        (new WordPressPublishingService)->publishPost($this->post(), $media);
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && $request->url() === 'https://media.example.org/uploads/news-photo.jpg');
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/wp/v2/media') && $request->isMultipart());
+        Http::assertSent(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), '/wp/v2/posts') && $request['featured_media'] === 9);
+    }
+
     public function testMissingImageDoesNotPublishTextOnly(): void
     {
         Storage::fake('public');
