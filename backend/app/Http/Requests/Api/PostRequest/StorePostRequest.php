@@ -24,7 +24,7 @@ class StorePostRequest extends FormRequest
             'other_category_name' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'string', 'max:255'],
             'target_platforms' => ['nullable', 'array'],
-            'target_platforms.*' => ['string', 'in:facebook,instagram,portal'],
+            'target_platforms.*' => ['string', 'in:facebook,instagram,portal,wordpress,website,wp'],
             'preferred_schedule_at' => ['nullable', 'date'],
             'is_draft' => ['boolean'],
         ];
