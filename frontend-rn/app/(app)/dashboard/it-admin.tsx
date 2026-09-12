@@ -858,6 +858,7 @@ export default function ITAdminDashboard() {
     wordpress_app_password: '',
   });
   const [savedTokenFields, setSavedTokenFields] = useState<Record<string, string>>({});
+  const [verifiedConnections, setVerifiedConnections] = useState<Record<string, boolean>>({});
   const [tokenLastUpdated, setTokenLastUpdated] = useState('');
   const [savingTokens, setSavingTokens] = useState(false);
   const [savingTokenPlatform, setSavingTokenPlatform] = useState<'all' | 'facebook' | 'instagram' | 'wordpress' | null>(null);
@@ -870,6 +871,7 @@ export default function ITAdminDashboard() {
         .then(res => {
           const t = res.data.tokens || {};
           setSavedTokenFields(t);
+          setVerifiedConnections(res.data.connections || {});
           setTokenFields(prev => ({
             ...prev,
             facebook_page_id: t.facebook_page_id || '',
@@ -892,6 +894,7 @@ export default function ITAdminDashboard() {
     try {
       const res = await tokenSettingsApi.update(tokenFields);
       setSavedTokenFields({ ...tokenFields });
+      setVerifiedConnections(res.data.connections || {});
       showToast('Tokens saved successfully!', 'success');
       setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
     } catch (e: any) {
@@ -917,9 +920,11 @@ export default function ITAdminDashboard() {
     try {
       const res = await tokenSettingsApi.update(payload);
       setSavedTokenFields(prev => ({ ...prev, ...payload }));
+      setVerifiedConnections(res.data.connections || {});
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens saved!`, 'success');
       setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
     } catch (e: any) {
+      setVerifiedConnections(prev => ({ ...prev, [platform]: false }));
       showToast('Failed to save: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
       setSavingTokens(false);
@@ -948,6 +953,7 @@ export default function ITAdminDashboard() {
     try {
       const res = await tokenSettingsApi.update(payload);
       setSavedTokenFields(prev => ({ ...prev, ...payload }));
+      setVerifiedConnections(res.data.connections || {});
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens cleared!`, 'success');
       setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
     } catch (e: any) {
@@ -1119,6 +1125,7 @@ export default function ITAdminDashboard() {
     try {
       const saveRes = await tokenSettingsApi.update(payload);
       setSavedTokenFields({ ...payload });
+      setVerifiedConnections(saveRes.data.connections || {});
       const validationRes = await tokenSettingsApi.validate(payload);
       const derived = validationRes.data?.derived || {};
 
@@ -1134,7 +1141,8 @@ export default function ITAdminDashboard() {
             ? derived.facebook_access_token
             : payload.instagram_access_token,
         };
-        await tokenSettingsApi.update(updatedPayload);
+        const updatedRes = await tokenSettingsApi.update(updatedPayload);
+        setVerifiedConnections(updatedRes.data.connections || {});
         setSavedTokenFields({ ...updatedPayload });
         setTokenFields(updatedPayload);
       } else {
@@ -2413,6 +2421,7 @@ export default function ITAdminDashboard() {
           ];
 
           const isConnected = (platform: typeof platformCards[number]) =>
+            verifiedConnections[platform.id] === true &&
             platform.fields.every((field) => {
               const savedValue = String(savedTokenFields[field.key] || '').trim();
               return Boolean(savedValue) && savedValue === String((tokenFields as any)[field.key] || '').trim();
