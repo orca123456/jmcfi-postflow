@@ -169,6 +169,9 @@ export const auditLogsApi = {
 
 // ── Token Settings endpoints ────────────────────────────────────────────────
 export const tokenSettingsApi = {
+  getAI: () => api.get('/ai-settings'),
+  updateAI: (data: { provider: string; model: string; api_key?: string }) => api.post('/ai-settings', data),
+  clearAI: () => api.delete('/ai-settings'),
   get: () => api.get('/token-settings'),
   update: (data: object) => api.post('/token-settings', data),
   validate: (data: object) => api.post('/token-settings/validate', data),

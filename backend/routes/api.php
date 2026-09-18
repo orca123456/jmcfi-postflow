@@ -90,6 +90,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('policy-settings', [PolicySettingController::class, 'updateSettings'])->middleware('role:it_publisher,it_admin');
 
     // Token Settings (Admin only)
+    Route::get('ai-settings', [\App\Http\Controllers\Api\AISettingController::class, 'show'])->middleware('role:it_publisher,it_admin');
+    Route::post('ai-settings', [\App\Http\Controllers\Api\AISettingController::class, 'update'])->middleware(['role:it_publisher,it_admin', 'throttle:10,1']);
+    Route::delete('ai-settings', [\App\Http\Controllers\Api\AISettingController::class, 'clear'])->middleware('role:it_publisher,it_admin');
     Route::get('token-settings', [TokenSettingController::class, 'getTokens'])->middleware('role:it_publisher,it_admin');
     Route::post('token-settings', [TokenSettingController::class, 'updateTokens'])->middleware('role:it_publisher,it_admin');
     Route::post('token-settings/validate', [TokenSettingController::class, 'validateTokens'])->middleware('role:it_publisher,it_admin');

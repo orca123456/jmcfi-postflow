@@ -5,21 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Http;
+use App\Services\AIClient;
 use Illuminate\Support\Facades\Log;
 
 class ChatbotController extends Controller
 {
-    private string $apiKey;
-    private string $apiUrl;
-    private string $model;
-
-    public function __construct()
-    {
-        $this->apiKey = env('DEEPSEEK_API_KEY', '');
-        $this->apiUrl = env('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1');
-        $this->model = env('DEEPSEEK_MODEL', 'deepseek-chat');
-    }
+    public function __construct(private AIClient $client) {}
 
     public function handleMessage(Request $request): JsonResponse
     {
@@ -44,7 +35,7 @@ class ChatbotController extends Controller
                 ]
             ];
 
-            // Map incoming messages to deepseek format
+            // Keep the server's system instructions separate from user messages.
             foreach ($request->messages as $msg) {
                 $apiMessages[] = [
                     'role' => $msg['role'],
@@ -52,34 +43,15 @@ class ChatbotController extends Controller
                 ];
             }
 
-            $response = Http::withoutVerifying()->withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-            ])->timeout(120)->post("{$this->apiUrl}/chat/completions", [
-                'model' => $this->model,
-                'messages' => $apiMessages,
-                'temperature' => 0.7,
-                'max_tokens' => 1024,
-                'top_p' => 0.9,
-            ]);
-
-            if (!$response->successful()) {
-                Log::error('Chatbot API Error', [
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-                return response()->json([
-                    'error' => 'Chatbot service unavailable.'
-                ], 503);
-            }
-
-            $data = $response->json();
-            $reply = $data['choices'][0]['message']['content'] ?? 'I could not process that request.';
+            $response = $this->client->complete($apiMessages);
+            $reply = $response['content'];
 
             return response()->json([
                 'reply' => $reply
             ]);
 
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 503);
         } catch (\Exception $e) {
             Log::error('Chatbot Controller Exception: ' . $e->getMessage());
             return response()->json([

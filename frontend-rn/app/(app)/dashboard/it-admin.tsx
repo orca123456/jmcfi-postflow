@@ -34,6 +34,7 @@ import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../co
 import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { RichTextEditor } from '../../../components/ui/RichTextEditor';
+import { AISettingsPanel } from '../../../components/AISettingsPanel';
 
 interface StatCardProps {
   label: string;
@@ -2429,6 +2430,7 @@ export default function ITAdminDashboard() {
 
           return (
             <View style={styles.tokensPage}>
+              <AISettingsPanel />
               <View style={styles.tokensHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tokensTitle}>Platform Integrations</Text>
