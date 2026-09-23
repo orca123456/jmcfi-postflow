@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
     height: '100%',
     fontSize: 13,
     color: '#0F172A',
-    ...(Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : {}),
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0, outlineColor: 'transparent' } as any) : {}),
   },
   eyeBtn: {
     paddingLeft: 8,
