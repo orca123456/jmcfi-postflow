@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -22,11 +23,13 @@ type Settings = {
   providers: { id: string; name: string }[];
 };
 
-const PROVIDER_META: Record<string, { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
-  deepseek:  { icon: 'flash', color: '#0284C7' },
-  openai:    { icon: 'sparkles', color: '#10A37F' },
-  anthropic: { icon: 'color-wand', color: '#D97706' },
-  default:   { icon: 'hardware-chip', color: '#7C3AED' },
+const PROVIDER_META: Record<string, { logo?: any; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
+  deepseek:   { logo: require('../assets/images/providers/deepseek.png'), icon: 'flash', color: '#1E40AF' },
+  openai:     { logo: require('../assets/images/providers/openai.png'), icon: 'sparkles', color: '#000000' },
+  gemini:     { logo: require('../assets/images/providers/gemini.jpg'), icon: 'planet', color: '#1A73E8' },
+  groq:       { logo: require('../assets/images/providers/groq.png'), icon: 'hardware-chip', color: '#F05023' },
+  openrouter: { logo: require('../assets/images/providers/openrouter.png'), icon: 'git-network', color: '#6566F1' },
+  default:    { icon: 'hardware-chip', color: '#7C3AED' },
 };
 
 function getProviderMeta(id: string) {
@@ -119,8 +122,12 @@ export function AISettingsPanel() {
       <View testID="ai-settings-intro" style={[styles.introPanel, !isWide && styles.introPanelMobile]}>
         <View style={styles.introTop}>
           <View style={styles.titleRow}>
-            <View style={[styles.iconBox, { backgroundColor: meta.color }]}>
-              <Ionicons name={meta.icon} size={22} color="#FFFFFF" />
+            <View style={styles.iconBox}>
+              {meta.logo ? (
+                <Image source={meta.logo} style={styles.logoImage} resizeMode="contain" />
+              ) : (
+                <Ionicons name={meta.icon} size={22} color="#FFFFFF" />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>AI Provider</Text>
@@ -350,8 +357,12 @@ export function AISettingsPanel() {
                       setMenu(false);
                     }}
                   >
-                    <View style={[styles.optionIcon, { backgroundColor: m.color }]}>
-                      <Ionicons name={m.icon} size={17} color="#FFFFFF" />
+                    <View style={styles.optionIcon}>
+                      {m.logo ? (
+                        <Image source={m.logo} style={styles.optionLogoImage} resizeMode="contain" />
+                      ) : (
+                        <Ionicons name={m.icon} size={17} color="#64748B" />
+                      )}
                     </View>
                     <Text style={[styles.optionLabel, sel && styles.optionLabelActive]}>{opt.name}</Text>
                     {sel && <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />}
@@ -455,9 +466,18 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
+    padding: 4,
+  },
+  logoImage: {
+    width: 30,
+    height: 30,
   },
   cardTitle: {
     fontSize: 17,
@@ -810,8 +830,16 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 3,
+  },
+  optionLogoImage: {
+    width: 24,
+    height: 24,
   },
   optionLabel: {
     flex: 1,
