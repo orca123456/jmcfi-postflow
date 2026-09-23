@@ -47,7 +47,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [menu, setMenu] = useState(false);
@@ -135,8 +135,8 @@ export function AISettingsPanel({ isVisible = true }: Props) {
   const dirty        = !!saved && (provider !== saved.provider || model.trim() !== saved.model || !!apiKey.trim());
   const connected    = !!saved?.configured && !!saved.verified_at;
   const meta         = getProviderMeta(provider);
-  const status       = loading ? 'Loading…'
-    : !saved    ? 'Unavailable'
+  const status       = !saved
+    ? 'Not Connected'
     : connected ? 'Connected'
     : saved.configured ? 'Not Verified'
     : 'Not Connected';
@@ -183,29 +183,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
 
       {/* ── Right Form Panel ────────────────────────────────────────────── */}
       <View style={styles.formPanel}>
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color="#7C3AED" accessibilityLabel="Loading AI settings" />
-            <Text style={styles.loadingLabel}>Loading settings…</Text>
-          </View>
-        ) : !saved ? (
-          <View style={styles.retryWrap}>
-            <View style={styles.retryCircle}>
-              <Ionicons name="cloud-offline-outline" size={26} color="#94A3B8" />
-            </View>
-            <Text accessibilityRole="alert" style={styles.feedbackError}>{error}</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Retry"
-              style={styles.retryBtn}
-              onPress={load}
-            >
-              <Ionicons name="refresh-outline" size={15} color="#7C3AED" />
-              <Text style={styles.retryBtnLabel}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
+        <>
             {/* Fields Row */}
             <View style={[styles.fieldsRow, !isWide && styles.fieldsRowMobile]}>
               {/* Field 1: Provider */}
@@ -217,10 +195,10 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel="Select AI provider"
-                  accessibilityState={{ expanded: menu, disabled: busy }}
-                  disabled={busy}
+                  accessibilityState={{ expanded: menu, disabled: busy || loading }}
+                  disabled={busy || loading}
                   onPress={() => setMenu(true)}
-                  style={[styles.inputBox, styles.selectBox, busy && styles.inputDisabled]}
+                  style={[styles.inputBox, styles.selectBox, (busy || loading) && styles.inputDisabled]}
                 >
                   <Text style={styles.inputText} numberOfLines={1}>{providerName}</Text>
                   <Ionicons name="chevron-down" size={15} color="#94A3B8" />
@@ -234,7 +212,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                   <Text style={styles.fieldLabel}>Model ID</Text>
                   <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
                 </View>
-                <View style={[styles.inputBox, focused === 'model' && styles.inputFocused, busy && styles.inputDisabled]}>
+                <View style={[styles.inputBox, focused === 'model' && styles.inputFocused, (busy || loading) && styles.inputDisabled]}>
                   <TextInput
                     accessibilityLabel="AI model ID"
                     style={styles.textInput}
@@ -244,7 +222,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                     onBlur={() => setFocused('')}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    editable={!busy}
+                    editable={!busy && !loading}
                     maxLength={200}
                     placeholderTextColor="#94A3B8"
                     placeholder="e.g. deepseek-chat"
@@ -259,7 +237,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                   <Text style={styles.fieldLabel}>API Key</Text>
                   <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
                 </View>
-                <View style={[styles.inputBox, focused === 'key' && styles.inputFocused, busy && styles.inputDisabled]}>
+                <View style={[styles.inputBox, focused === 'key' && styles.inputFocused, (busy || loading) && styles.inputDisabled]}>
                   <TextInput
                     accessibilityLabel="AI API key"
                     style={[styles.textInput, { flex: 1 }]}
@@ -270,7 +248,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                     secureTextEntry={!showKey}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    editable={!busy}
+                    editable={!busy && !loading}
                     maxLength={2048}
                     placeholderTextColor="#94A3B8"
                     placeholder={canKeepKey ? '•••••• Saved key (unchanged)' : 'Enter API Key (Optional)'}
@@ -317,9 +295,9 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel="Clear credentials"
-                  disabled={busy || !saved.configured}
+                  disabled={busy || loading || !saved?.configured}
                   onPress={() => setConfirmClear(true)}
-                  style={[styles.btnClear, (busy || !saved.configured) && styles.btnDisabled]}
+                  style={[styles.btnClear, (busy || loading || !saved?.configured) && styles.btnDisabled]}
                 >
                   <Text style={styles.btnClearText}>Clear</Text>
                 </TouchableOpacity>
@@ -341,8 +319,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
               </View>
             </View>
           </>
-        )}
-      </View>
+        </View>
 
       {/* ── Provider Picker Modal ─────────────────────────────────────── */}
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
