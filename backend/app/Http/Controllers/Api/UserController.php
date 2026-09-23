@@ -36,11 +36,13 @@ class UserController extends Controller
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
+            'email' => ['required', 'email', 'max:255', 'unique:users,email', 'regex:/@jmc\.edu\.ph$/i'],
             'password' => 'required|string|min:8',
             'department' => 'nullable|string|max:255',
             'position' => 'nullable|string|max:255',
             'role' => 'required|string|exists:roles,name',
+        ], [
+            'email.regex' => 'Only @jmc.edu.ph email addresses are allowed.',
         ]);
 
         // Auto-set position based on role category (mirrors User::roleCategory)
@@ -109,13 +111,15 @@ class UserController extends Controller
             'first_name' => 'sometimes|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
+            'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,' . $user->id, 'regex:/@jmc\.edu\.ph$/i'],
             'phone' => 'nullable|string|max:20',
             'position' => 'nullable|string|max:255',
             'department' => 'nullable|string|max:255',
             'role' => 'sometimes|string|exists:roles,name',
             'status' => 'sometimes|string|in:active,inactive',
             'password' => 'sometimes|string|min:8|confirmed',
+        ], [
+            'email.regex' => 'Only @jmc.edu.ph email addresses are allowed.',
         ]);
 
         // `role` is not a users column (roles live in the Spatie pivot table and
