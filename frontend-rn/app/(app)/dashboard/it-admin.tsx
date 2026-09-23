@@ -1287,7 +1287,11 @@ export default function ITAdminDashboard() {
     if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { showToast('Please fill in all required fields.', 'warning'); return; }
     if (!newUserDepartment) { showToast('Please select or add a valid department first.', 'warning'); return; }
     // Auto-append @jmc.edu.ph if not already a full email
-    const finalEmail = newUserEmail.includes('@') ? newUserEmail : newUserEmail.trim() + '@jmc.edu.ph';
+    const finalEmail = newUserEmail.includes('@') ? newUserEmail.trim() : newUserEmail.trim() + '@jmc.edu.ph';
+    if (!finalEmail.toLowerCase().endsWith('@jmc.edu.ph')) {
+      showToast('Only @jmc.edu.ph email addresses are allowed.', 'warning');
+      return;
+    }
 
     try {
       const randomValues = new Uint32Array(1);
