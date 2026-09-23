@@ -18,7 +18,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_PROCESS_TIMEOUT=1200 \
     COMPOSER_MAX_PARALLEL_HTTP=6
 
-RUN apk add --no-cache git unzip
+RUN apk add --no-cache git unzip supervisor
 
 # Install PHP extensions required by your Laravel app
 RUN install-php-extensions \
@@ -78,4 +78,4 @@ EXPOSE 8080
 
 # Configure FrankenPHP to listen on the port Railway provides, or 8080 as fallback
 # FrankenPHP automatically serves the /app/public directory perfectly using Caddy (HTTP/2, Keep-Alive, etc.)
-CMD ["sh", "-c", "set -e; export QUEUE_CONNECTION=\"${QUEUE_CONNECTION:-database}\"; if { [ \"${QUEUE_CONNECTION:-}\" = \"redis\" ] || [ \"${CACHE_STORE:-${CACHE_DRIVER:-}}\" = \"redis\" ]; } && [ -z \"${REDIS_URL:-}\" ]; then echo \"Redis is enabled but REDIS_URL is missing; falling back to database queue/cache.\"; export QUEUE_CONNECTION=database CACHE_STORE=database CACHE_DRIVER=database; fi; php artisan storage:link --force >/dev/null 2>&1 || true; php artisan migrate --force; php artisan config:cache --quiet; php artisan view:cache --quiet; php artisan optimize --quiet; if [ \"${QUEUE_CONNECTION:-sync}\" != \"sync\" ]; then php artisan queue:work \"${QUEUE_CONNECTION}\" --queue=\"${QUEUE_NAMES:-publishing,default}\" --memory=128 --sleep=3 --tries=3 --timeout=120 --max-time=3600 & fi; frankenphp run --config /etc/caddy/Caddyfile"]
+CMD ["sh", "/app/docker/start.sh"]
