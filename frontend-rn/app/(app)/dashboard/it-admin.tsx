@@ -2430,7 +2430,7 @@ export default function ITAdminDashboard() {
 
           return (
             <View style={styles.tokensPage}>
-              <AISettingsPanel />
+              <AISettingsPanel isVisible={activeTab === 'tokens'} />
               <View style={styles.tokensHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tokensTitle}>Platform Integrations</Text>

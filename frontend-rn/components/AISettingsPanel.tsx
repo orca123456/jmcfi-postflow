@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -36,7 +36,9 @@ function getProviderMeta(id: string) {
   return PROVIDER_META[id] ?? PROVIDER_META.default;
 }
 
-export function AISettingsPanel() {
+type Props = { isVisible?: boolean };
+
+export function AISettingsPanel({ isVisible = true }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 1024;
 
@@ -63,7 +65,7 @@ export function AISettingsPanel() {
     setConfirmClear(false);
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -73,9 +75,32 @@ export function AISettingsPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  // Initial load
+  useEffect(() => { load(); }, [load]);
+
+  // Re-load whenever the panel becomes visible (e.g. user switches to the Tokens tab)
+  // and the data hasn't successfully loaded yet.
+  const prevVisible = useRef(isVisible);
+  useEffect(() => {
+    if (isVisible && !prevVisible.current && !saved) {
+      load();
+    }
+    prevVisible.current = isVisible;
+  }, [isVisible, load, saved]);
+
+  // On web: retry when the browser tab regains focus (handles page-level visibility)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && isVisible && !saved) {
+        load();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [isVisible, saved, load]);
 
   const save = async (clear = false) => {
     if (inFlight.current) return;
