@@ -35,7 +35,7 @@ function getProviderMeta(id: string) {
 
 export function AISettingsPanel() {
   const { width: windowWidth } = useWindowDimensions();
-  const isWide = windowWidth >= 768;
+  const isWide = windowWidth >= 1024;
 
   const [saved, setSaved] = useState<Settings | null>(null);
   const [provider, setProvider] = useState('deepseek');
