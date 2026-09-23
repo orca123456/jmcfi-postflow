@@ -122,7 +122,12 @@ export function AISettingsPanel() {
             <View style={[styles.iconBox, { backgroundColor: meta.color }]}>
               <Ionicons name={meta.icon} size={22} color="#FFFFFF" />
             </View>
-            <Text style={styles.cardTitle}>AI Provider</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>AI Provider</Text>
+              {!!saved?.model && (
+                <Text style={styles.cardSub} numberOfLines={1}>{saved.model}</Text>
+              )}
+            </View>
           </View>
           <Text style={styles.cardDesc}>
             Configure your AI model for automatic policy checks and assistant responses.
@@ -459,6 +464,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.2,
+  },
+  cardSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
   },
   cardDesc: {
     fontSize: 12,
