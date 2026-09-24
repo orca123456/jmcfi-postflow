@@ -121,10 +121,11 @@ class PostRequestController extends Controller
 
             // Handle media uploads
             if ($request->hasFile('media')) {
+                $featuredIndex = (int) $request->input('featured_media_index', 0);
                 foreach ($request->file('media') as $index => $file) {
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                     $path = $file->store('post-media/' . $post->id, $disk);
-                    $this->createMediaRecord($post, $file, $path, $this->getMediaType($file->getMimeType()), $index, $index === 0);
+                    $this->createMediaRecord($post, $file, $path, $this->getMediaType($file->getMimeType()), $index, $index === $featuredIndex);
                 }
             }
 
@@ -830,6 +831,23 @@ class PostRequestController extends Controller
                       $q->where('department', $user->department);
                   });
         }
+    }
+
+    public function setFeaturedMedia(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $validated = $request->validate([
+            'media_id' => 'required|integer|exists:post_media,id',
+        ]);
+
+        // Un-feature all media for this post request
+        $postRequest->media()->update(['is_featured' => false]);
+        // Set selected media as featured
+        $postRequest->media()->where('id', $validated['media_id'])->update(['is_featured' => true]);
+
+        return response()->json([
+            'message' => 'WordPress featured image updated successfully.',
+            'data' => new PostRequestResource($postRequest->load('media')),
+        ]);
     }
 
     private function getMediaType(string $mimeType): string

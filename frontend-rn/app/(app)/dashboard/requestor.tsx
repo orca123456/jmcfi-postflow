@@ -83,6 +83,7 @@ export default function RequestorDashboard() {
   const [publishDate, setPublishDate] = useState('');
   const [publishTime, setPublishTime] = useState('');
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [featuredMediaIndex, setFeaturedMediaIndex] = useState(0);
   const [supportingDocs, setSupportingDocs] = useState<any[]>([]);
 
   // Dropdown States
@@ -591,6 +592,7 @@ export default function RequestorDashboard() {
         if (payload.preferred_schedule_at) {
           formData.append('preferred_schedule_at', payload.preferred_schedule_at);
         }
+        formData.append('featured_media_index', String(featuredMediaIndex));
 
         mediaFiles.forEach((file: any, idx: number) => {
           if (Platform.OS === 'web' && file.file) {
@@ -701,6 +703,7 @@ export default function RequestorDashboard() {
         if (payload.preferred_schedule_at) {
           formData.append('preferred_schedule_at', payload.preferred_schedule_at);
         }
+        formData.append('featured_media_index', String(featuredMediaIndex));
 
         mediaFiles.forEach((file: any, idx: number) => {
           if (Platform.OS === 'web' && file.file) {
@@ -755,6 +758,7 @@ export default function RequestorDashboard() {
       setPublishTime('');
       setPlatforms({ facebook: false, instagram: false, portal: false });
       setMediaFiles([]);
+      setFeaturedMediaIndex(0);
       setSupportingDocs([]);
       setEditingPostHasImage(false);
 
@@ -1508,6 +1512,61 @@ export default function RequestorDashboard() {
                       </Text>
                     </TouchableOpacity>
                   </View>
+
+                  {mediaFiles.length > 0 && (
+                    <View style={{ marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="logo-wordpress" size={16} color="#21759B" />
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>
+                            WordPress Featured Image Choice
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                          {mediaFiles.length === 1 ? '1 image attached' : `${mediaFiles.length} images attached — tap to select 1 for WordPress`}
+                        </Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+                        {mediaFiles.map((file: any, idx: number) => {
+                          const isSelected = featuredMediaIndex === idx;
+                          const isImg = file.mimeType ? file.mimeType.startsWith('image/') : true;
+                          return (
+                            <TouchableOpacity
+                              key={idx}
+                              onPress={() => setFeaturedMediaIndex(idx)}
+                              activeOpacity={0.8}
+                              style={{
+                                width: 110,
+                                borderRadius: 8,
+                                borderWidth: isSelected ? 2 : 1,
+                                borderColor: isSelected ? '#21759B' : Colors.border,
+                                backgroundColor: isSelected ? '#F0F9FF' : Colors.surfaceSecondary,
+                                padding: 6,
+                                alignItems: 'center',
+                                position: 'relative',
+                              }}
+                            >
+                              {isSelected && (
+                                <View style={{ position: 'absolute', top: 4, right: 4, zIndex: 5, backgroundColor: '#21759B', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>WordPress</Text>
+                                </View>
+                              )}
+                              <View style={{ width: '100%', height: 64, borderRadius: 6, overflow: 'hidden', backgroundColor: '#E5E7EB', marginBottom: 4, justifyContent: 'center', alignItems: 'center' }}>
+                                {file.uri && isImg ? (
+                                  <Image source={{ uri: file.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                ) : (
+                                  <Ionicons name={isImg ? 'image-outline' : 'videocam-outline'} size={24} color={Colors.textMuted} />
+                                )}
+                              </View>
+                              <Text numberOfLines={1} style={{ fontSize: 11, color: isSelected ? '#21759B' : Colors.textSecondary, fontWeight: isSelected ? '700' : '400', textAlign: 'center' }}>
+                                {file.name || `Image #${idx + 1}`}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
                 </Card>
               </View>
 

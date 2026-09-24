@@ -67,6 +67,13 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                     $query->where('type', 'image')
                         ->orWhere('mime_type', 'like', 'image/%');
                 })
+                ->where('is_featured', true)
+                ->first()
+                ?? $this->postRequest->media()
+                    ->where(function ($query) {
+                        $query->where('type', 'image')
+                            ->orWhere('mime_type', 'like', 'image/%');
+                    })
                 ->orderBy('sort_order')
                 ->first();
 

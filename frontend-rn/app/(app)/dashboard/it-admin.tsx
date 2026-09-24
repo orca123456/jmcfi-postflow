@@ -1073,6 +1073,29 @@ export default function ITAdminDashboard() {
     } finally {
       setPublishingPostId(null);
     }
+  const handleSetFeaturedMedia = async (postId: number, mediaId: number) => {
+    try {
+      await postsApi.setFeaturedMedia(postId, mediaId);
+      showToast('WordPress featured image updated!', 'success');
+      if (previewPost && previewPost.rawPost && previewPost.rawPost.media) {
+        const updatedMedia = previewPost.rawPost.media.map((m: any) => ({
+          ...m,
+          is_featured: m.id === mediaId,
+        }));
+        const featuredObj = updatedMedia.find((m: any) => m.is_featured);
+        setPreviewPost({
+          ...previewPost,
+          image: featuredObj?.url || previewPost.image,
+          rawPost: {
+            ...previewPost.rawPost,
+            media: updatedMedia,
+          },
+        });
+      }
+      loadPostsData();
+    } catch (e: any) {
+      showToast('Failed to update featured image: ' + (e.response?.data?.message || e.message), 'error');
+    }
   };
 
   const handleUseFacebookTokenForInstagram = () => {
@@ -3883,6 +3906,45 @@ $response = curl_exec($ch);`}
                       }}
                     />
                   </TouchableOpacity>
+                  {Array.isArray(previewPost?.rawPost?.media) && previewPost.rawPost.media.length > 0 && (
+                    <View style={{ marginTop: 12, width: '100%' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6 }}>
+                        WordPress Featured Image Choice
+                      </Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                        {previewPost.rawPost.media.map((m: any) => {
+                          const isFeatured = !!m.is_featured;
+                          return (
+                            <TouchableOpacity
+                              key={m.id}
+                              onPress={() => handleSetFeaturedMedia(previewPost.rawPost.id, m.id)}
+                              activeOpacity={0.8}
+                              style={{
+                                width: 90,
+                                borderRadius: 6,
+                                borderWidth: isFeatured ? 2 : 1,
+                                borderColor: isFeatured ? '#21759B' : '#E5E7EB',
+                                backgroundColor: isFeatured ? '#F0F9FF' : '#F9FAFB',
+                                padding: 4,
+                                alignItems: 'center',
+                                position: 'relative',
+                              }}
+                            >
+                              {isFeatured && (
+                                <View style={{ position: 'absolute', top: 3, right: 3, zIndex: 5, backgroundColor: '#21759B', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                                  <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>WordPress</Text>
+                                </View>
+                              )}
+                              <Image source={{ uri: m.url }} style={{ width: '100%', height: 50, borderRadius: 4, backgroundColor: '#E5E7EB', marginBottom: 2 }} resizeMode="cover" />
+                              <Text numberOfLines={1} style={{ fontSize: 10, color: isFeatured ? '#21759B' : Colors.textMuted, fontWeight: isFeatured ? '700' : '400' }}>
+                                {isFeatured ? '⭐ Featured' : 'Set Featured'}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
                 <View style={{ flex: 1, gap: 12 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>{previewPost?.title}</Text>
