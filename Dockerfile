@@ -16,7 +16,8 @@ FROM dunglas/frankenphp:1-php8.2-alpine
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_NO_INTERACTION=1 \
     COMPOSER_PROCESS_TIMEOUT=1200 \
-    COMPOSER_MAX_PARALLEL_HTTP=6
+    COMPOSER_MAX_PARALLEL_HTTP=6 \
+    COMPOSER_MEMORY_LIMIT=-1
 
 RUN apk add --no-cache git unzip supervisor
 
@@ -29,20 +30,6 @@ RUN install-php-extensions \
     redis \
     gd \
     zip
-
-# Keep PHP predictable on a 1GB container and reserve memory for the OS/database
-# connection overhead. FrankenPHP does not use php-fpm, so pm.max_children is not
-# applicable here; these limits are the effective low-memory tuning for this image.
-RUN printf '%s\n' \
-    'memory_limit=128M' \
-    'opcache.enable=1' \
-    'opcache.enable_cli=1' \
-    'opcache.memory_consumption=64' \
-    'opcache.max_accelerated_files=10000' \
-    'opcache.validate_timestamps=0' \
-    'realpath_cache_size=4096K' \
-    'realpath_cache_ttl=600' \
-    > /usr/local/etc/php/conf.d/zz-production.ini
 
 # Install Composer securely
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -57,12 +44,24 @@ COPY backend/ ./
 RUN mkdir -p bootstrap/cache storage/logs storage/framework/views storage/framework/cache storage/framework/sessions resources/views \
     && chmod -R 777 bootstrap/cache storage
 
-# Install Composer Dependencies
+# Install Composer Dependencies with unlimited CLI memory limit during image build
 RUN for attempt in 1 2 3; do \
-        composer install --no-dev --optimize-autoloader --prefer-dist --no-progress && break; \
+        php -d memory_limit=-1 /usr/bin/composer install --no-dev --optimize-autoloader --prefer-dist --no-progress && break; \
         if [ "$attempt" = "3" ]; then exit 1; fi; \
         sleep $((attempt * 10)); \
     done
+
+# Configure production PHP limits for FrankenPHP runtime
+RUN printf '%s\n' \
+    'memory_limit=128M' \
+    'opcache.enable=1' \
+    'opcache.enable_cli=1' \
+    'opcache.memory_consumption=64' \
+    'opcache.max_accelerated_files=10000' \
+    'opcache.validate_timestamps=0' \
+    'realpath_cache_size=4096K' \
+    'realpath_cache_ttl=600' \
+    > /usr/local/etc/php/conf.d/zz-production.ini
 
 # Copy the built frontend from STAGE 1 into Laravel's public directory
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
