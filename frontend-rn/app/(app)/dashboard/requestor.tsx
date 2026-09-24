@@ -1088,7 +1088,7 @@ export default function RequestorDashboard() {
                       if (platform === 'linkedin') return <Ionicons key={idx} name="logo-linkedin" size={16} color="#0077B5" />;
                       if (platform === 'tiktok') return <Ionicons key={idx} name="logo-tiktok" size={16} color="#000000" />;
                       if (platform === 'youtube') return <Ionicons key={idx} name="logo-youtube" size={16} color="#FF0000" />;
-                      if (platform === 'website' || platform === 'web') return <Ionicons key={idx} name="globe-outline" size={16} color="#3B82F6" />;
+                      if (platform === 'website' || platform === 'web' || platform === 'portal' || platform === 'wordpress') return <Ionicons key={idx} name="globe-outline" size={16} color="#3B82F6" />;
                       return <Text key={idx} style={styles.postPlatformsText}>{p}</Text>;
                     })}
                   </View>
@@ -2708,11 +2708,33 @@ export default function RequestorDashboard() {
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>Target Platforms</Text>
                     <View style={styles.platformsContainer}>
-                      {selectedRow.target_platforms.map((plat: string) => (
-                        <View key={plat} style={styles.platformBadge}>
-                          <Text style={styles.platformBadgeText}>{plat}</Text>
-                        </View>
-                      ))}
+                      {selectedRow.target_platforms.map((plat: string) => {
+                        const pLower = plat.trim().toLowerCase();
+                        let iconName = 'globe-outline';
+                        let iconColor = '#059669';
+                        let label = plat;
+
+                        if (pLower === 'facebook') {
+                          iconName = 'logo-facebook';
+                          iconColor = '#1877F2';
+                          label = 'Facebook';
+                        } else if (pLower === 'instagram') {
+                          iconName = 'logo-instagram';
+                          iconColor = '#E1306C';
+                          label = 'Instagram';
+                        } else if (pLower === 'portal' || pLower === 'website' || pLower === 'wordpress') {
+                          iconName = 'globe-outline';
+                          iconColor = '#059669';
+                          label = 'WordPress / Website';
+                        }
+
+                        return (
+                          <View key={plat} style={[styles.platformBadge, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                            <Ionicons name={iconName as any} size={14} color={iconColor} />
+                            <Text style={styles.platformBadgeText}>{label}</Text>
+                          </View>
+                        );
+                      })}
                     </View>
                   </View>
                 )}
