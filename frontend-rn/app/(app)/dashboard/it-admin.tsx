@@ -3973,8 +3973,8 @@ $response = curl_exec($ch);`}
                     <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
                       {/* FB Header */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1877F2', alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>JMC</Text>
+                        <View style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: 13, fontWeight: '700', color: '#050505' }}>
@@ -4033,9 +4033,7 @@ $response = curl_exec($ch);`}
                       {/* IG Header */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
                         <View style={{ width: 36, height: 36, borderRadius: 18, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
-                          <View style={{ width: '100%', height: '100%', borderRadius: 16, backgroundColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 11 }}>JMC</Text>
-                          </View>
+                          <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>
