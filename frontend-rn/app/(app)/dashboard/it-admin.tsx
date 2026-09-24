@@ -831,8 +831,8 @@ export default function ITAdminDashboard() {
   const [postsPerPage, setPostsPerPage] = useState(10);
   const [previewPost, setPreviewPost] = useState<any>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [previewPlatformTab, setPreviewPlatformTab] = useState<'facebook' | 'instagram' | 'wordpress'>('facebook');
   const [previewImgSize, setPreviewImgSize] = useState<{ width: number; height: number } | null>(null);
-
 
   // Fetch image dimensions when preview opens (Facebook-style dynamic sizing)
   useEffect(() => {
@@ -1077,23 +1077,23 @@ export default function ITAdminDashboard() {
 
   const handleSetFeaturedMedia = async (postId: number, mediaId: number) => {
     try {
-      await postsApi.setFeaturedMedia(postId, mediaId);
-      showToast('WordPress featured image updated!', 'success');
       if (previewPost && previewPost.rawPost && previewPost.rawPost.media) {
         const updatedMedia = previewPost.rawPost.media.map((m: any) => ({
           ...m,
           is_featured: m.id === mediaId,
         }));
         const featuredObj = updatedMedia.find((m: any) => m.is_featured);
-        setPreviewPost({
-          ...previewPost,
-          image: featuredObj?.url || previewPost.image,
+        setPreviewPost((prev: any) => prev ? ({
+          ...prev,
+          image: featuredObj?.url || prev.image,
           rawPost: {
-            ...previewPost.rawPost,
+            ...prev.rawPost,
             media: updatedMedia,
           },
-        });
+        }) : prev);
       }
+      await postsApi.setFeaturedMedia(postId, mediaId);
+      showToast('WordPress featured image updated!', 'success');
       loadPostsData();
     } catch (e: any) {
       showToast('Failed to update featured image: ' + (e.response?.data?.message || e.message), 'error');
@@ -3884,49 +3884,271 @@ $response = curl_exec($ch);`}
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 720, maxHeight: '90%', backgroundColor: '#fff', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
             {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Content Request Preview</Text>
               <TouchableOpacity onPress={() => setPreviewPost(null)}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
+            {/* Platform Live Preview Choices (3 Tabs: Facebook, Instagram, WordPress) */}
+            <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 4, marginBottom: 16 }}>
+              <TouchableOpacity
+                onPress={() => setPreviewPlatformTab('facebook')}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: previewPlatformTab === 'facebook' ? '#FFFFFF' : 'transparent',
+                  borderWidth: previewPlatformTab === 'facebook' ? 1 : 0,
+                  borderColor: previewPlatformTab === 'facebook' ? '#E5E7EB' : 'transparent',
+                }}
+              >
+                <Ionicons name="logo-facebook" size={16} color={previewPlatformTab === 'facebook' ? '#1877F2' : '#6B7280'} />
+                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'facebook' ? '700' : '500', color: previewPlatformTab === 'facebook' ? '#1877F2' : '#4B5563' }}>
+                  Facebook
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setPreviewPlatformTab('instagram')}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: previewPlatformTab === 'instagram' ? '#FFFFFF' : 'transparent',
+                  borderWidth: previewPlatformTab === 'instagram' ? 1 : 0,
+                  borderColor: previewPlatformTab === 'instagram' ? '#E5E7EB' : 'transparent',
+                }}
+              >
+                <Ionicons name="logo-instagram" size={16} color={previewPlatformTab === 'instagram' ? '#E1306C' : '#6B7280'} />
+                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'instagram' ? '700' : '500', color: previewPlatformTab === 'instagram' ? '#E1306C' : '#4B5563' }}>
+                  Instagram
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setPreviewPlatformTab('wordpress')}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: previewPlatformTab === 'wordpress' ? '#FFFFFF' : 'transparent',
+                  borderWidth: previewPlatformTab === 'wordpress' ? 1 : 0,
+                  borderColor: previewPlatformTab === 'wordpress' ? '#E5E7EB' : 'transparent',
+                }}
+              >
+                <Ionicons name="globe-outline" size={16} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#6B7280'} />
+                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#4B5563' }}>
+                  WordPress
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Top Area */}
               <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
-                <View style={{ flex: 1.5, alignItems: 'center', justifyContent: 'center' }}>
-                  <TouchableOpacity onPress={() => previewPost?.image && setFullScreenImage(previewPost.image)} activeOpacity={0.8} style={{ width: '100%' }}>
-                    <Image
-                      source={{ uri: previewPost?.image }}
-                      resizeMode="contain"
-                      style={{
-                        width: '100%',
-                        maxHeight: 400,
-                        aspectRatio: previewImgSize ? previewImgSize.width / previewImgSize.height : undefined,
-                        backgroundColor: '#f3f4f6',
-                        borderRadius: 8,
-                      }}
-                    />
-                  </TouchableOpacity>
-                  {Array.isArray(previewPost?.rawPost?.media) && previewPost.rawPost.media.length > 0 && (
-                    <View style={{ marginTop: 12, width: '100%' }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6 }}>
-                        WordPress Featured Image Choice
+                <View style={{ flex: 1.5 }}>
+                  {/* FACEBOOK PREVIEW MOCKUP */}
+                  {previewPlatformTab === 'facebook' && (
+                    <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                      {/* FB Header */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1877F2', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>JMC</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#050505' }}>
+                            Jose Maria College Foundation, Inc.
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ fontSize: 11, color: '#65676B' }}>{previewPost?.department || 'Official'}</Text>
+                            <Text style={{ fontSize: 11, color: '#65676B' }}>• Just now •</Text>
+                            <Ionicons name="earth" size={12} color="#65676B" />
+                          </View>
+                        </View>
+                      </View>
+                      {/* FB Text */}
+                      {previewPost?.rawPost?.caption_narrative ? (
+                        <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+                          <FormattedText style={{ fontSize: 13, color: '#050505', lineHeight: 18 }}>
+                            {previewPost.rawPost.caption_narrative}
+                          </FormattedText>
+                        </View>
+                      ) : null}
+                      {/* FB Image */}
+                      {previewPost?.image && (
+                        <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9}>
+                          <Image
+                            source={{ uri: previewPost.image }}
+                            resizeMode="cover"
+                            style={{
+                              width: '100%',
+                              height: 260,
+                              backgroundColor: '#F3F4F6',
+                            }}
+                          />
+                        </TouchableOpacity>
+                      )}
+                      {/* FB Footer actions */}
+                      <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 6 }}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                          <Ionicons name="thumbs-up-outline" size={16} color="#65676B" />
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Like</Text>
+                        </View>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                          <Ionicons name="chatbubble-outline" size={16} color="#65676B" />
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Comment</Text>
+                        </View>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                          <Ionicons name="share-social-outline" size={16} color="#65676B" />
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Share</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* INSTAGRAM PREVIEW MOCKUP */}
+                  {previewPlatformTab === 'instagram' && (
+                    <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                      {/* IG Header */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                        <View style={{ width: 36, height: 36, borderRadius: 18, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
+                          <View style={{ width: '100%', height: '100%', borderRadius: 16, backgroundColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 11 }}>JMC</Text>
+                          </View>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>
+                            jmc_official
+                          </Text>
+                          <Text style={{ fontSize: 10, color: '#8E8E8E' }}>
+                            {previewPost?.department || 'Davao City, Philippines'}
+                          </Text>
+                        </View>
+                        <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
+                      </View>
+                      {/* IG Image */}
+                      {previewPost?.image && (
+                        <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9}>
+                          <Image
+                            source={{ uri: previewPost.image }}
+                            resizeMode="cover"
+                            style={{
+                              width: '100%',
+                              height: 280,
+                              backgroundColor: '#F3F4F6',
+                            }}
+                          />
+                        </TouchableOpacity>
+                      )}
+                      {/* IG Action bar */}
+                      <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <View style={{ flexDirection: 'row', gap: 14 }}>
+                            <Ionicons name="heart" size={22} color="#E1306C" />
+                            <Ionicons name="chatbubble-outline" size={20} color="#262626" />
+                            <Ionicons name="paper-plane-outline" size={20} color="#262626" />
+                          </View>
+                          <Ionicons name="bookmark-outline" size={20} color="#262626" />
+                        </View>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626', marginBottom: 4 }}>
+                          Liked by jmcfi_official and others
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#262626', lineHeight: 16 }}>
+                          <Text style={{ fontWeight: '700' }}>jmc_official </Text>
+                          {previewPost?.rawPost?.caption_narrative || previewPost?.title}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* WORDPRESS PREVIEW MOCKUP */}
+                  {previewPlatformTab === 'wordpress' && (
+                    <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 14 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+                        <Ionicons name="globe-outline" size={14} color="#21759B" />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                      </View>
+
+                      <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 6, lineHeight: 22 }}>
+                        {previewPost?.title}
                       </Text>
+
+                      <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                        By {previewPost?.requestedBy || 'JMCFI Admin'} • {previewPost?.department || 'News'} • {previewPost?.requestedOn}
+                      </Text>
+
+                      {previewPost?.image && (
+                        <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
+                          <Image
+                            source={{ uri: previewPost.image }}
+                            resizeMode="cover"
+                            style={{
+                              width: '100%',
+                              height: 220,
+                              borderRadius: 8,
+                              backgroundColor: '#F3F4F6',
+                            }}
+                          />
+                          <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(33, 117, 155, 0.9)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFF' }}>WordPress Featured Image</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+
+                      <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                        {previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || 'No article content provided.'}
+                      </FormattedText>
+                    </View>
+                  )}
+
+                  {/* WordPress Featured Image Choice (Available & Active across previews) */}
+                  {Array.isArray(previewPost?.rawPost?.media) && previewPost.rawPost.media.length > 0 && (
+                    <View style={{ marginTop: 14, width: '100%', backgroundColor: '#F8FAFC', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#21759B' }}>
+                          WordPress Featured Image Choice
+                        </Text>
+                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>
+                          Click thumbnail to switch preview & featured image
+                        </Text>
+                      </View>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
                         {previewPost.rawPost.media.map((m: any) => {
                           const isFeatured = !!m.is_featured;
+                          const isCurrentActive = previewPost?.image === m.url || isFeatured;
                           return (
                             <TouchableOpacity
                               key={m.id}
-                              onPress={() => handleSetFeaturedMedia(previewPost.rawPost.id, m.id)}
+                              onPress={() => {
+                                // Switch preview image immediately on click
+                                setPreviewPost((prev: any) => prev ? ({ ...prev, image: m.url }) : prev);
+                                // Persist as WordPress featured image
+                                handleSetFeaturedMedia(previewPost.rawPost.id, m.id);
+                              }}
                               activeOpacity={0.8}
                               style={{
-                                width: 90,
+                                width: 96,
                                 borderRadius: 6,
-                                borderWidth: isFeatured ? 2 : 1,
-                                borderColor: isFeatured ? '#21759B' : '#E5E7EB',
-                                backgroundColor: isFeatured ? '#F0F9FF' : '#F9FAFB',
+                                borderWidth: isCurrentActive ? 2 : 1,
+                                borderColor: isCurrentActive ? '#21759B' : '#CBD5E1',
+                                backgroundColor: isCurrentActive ? '#F0F9FF' : '#FFFFFF',
                                 padding: 4,
                                 alignItems: 'center',
                                 position: 'relative',
@@ -3937,8 +4159,8 @@ $response = curl_exec($ch);`}
                                   <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>WordPress</Text>
                                 </View>
                               )}
-                              <Image source={{ uri: m.url }} style={{ width: '100%', height: 50, borderRadius: 4, backgroundColor: '#E5E7EB', marginBottom: 2 }} resizeMode="cover" />
-                              <Text numberOfLines={1} style={{ fontSize: 10, color: isFeatured ? '#21759B' : Colors.textMuted, fontWeight: isFeatured ? '700' : '400' }}>
+                              <Image source={{ uri: m.url }} style={{ width: '100%', height: 55, borderRadius: 4, backgroundColor: '#E2E8F0', marginBottom: 3 }} resizeMode="cover" />
+                              <Text numberOfLines={1} style={{ fontSize: 10, color: isFeatured ? '#21759B' : Colors.textMuted, fontWeight: isFeatured ? '700' : '500' }}>
                                 {isFeatured ? '⭐ Featured' : 'Set Featured'}
                               </Text>
                             </TouchableOpacity>
@@ -3948,6 +4170,7 @@ $response = curl_exec($ch);`}
                     </View>
                   )}
                 </View>
+
                 <View style={{ flex: 1, gap: 12 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>{previewPost?.title}</Text>
 
