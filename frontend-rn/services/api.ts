@@ -88,7 +88,9 @@ export const postsApi = {
   returnRevision: (id: number, data: object) => api.post(`/posts/${id}/return-revision`, data),
   aiCheck: (id: number) => api.post(`/posts/${id}/ai-check`),
   aiCheckDraft: (data: object) => api.post(`/posts/ai-check-draft`, data),
+  setFeaturedMedia: (id: number, mediaId: number) => api.post(`/posts/${id}/featured-media`, { media_id: mediaId }),
 };
+
 
 // ── Categories endpoints ───────────────────────────────────────────────────
 export const categoriesApi = {

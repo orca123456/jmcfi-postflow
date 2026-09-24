@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision'])->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck']);
     Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/featured-media', [PostRequestController::class, 'setFeaturedMedia'])->where(['postRequest' => '[0-9]{1,19}']);
 
     // Categories
     Route::get('categories', [CategoryController::class, 'index']);
