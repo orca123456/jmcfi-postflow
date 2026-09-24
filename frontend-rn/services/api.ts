@@ -193,4 +193,11 @@ export const apiTokensApi = {
   revoke: (tokenId: number) => api.delete(`/api-tokens/${tokenId}`),
 };
 
+// ── Notifications endpoints ────────────────────────────────────────────────
+export const notificationsApi = {
+  getNotifications: () => api.get('/notifications'),
+  markAsRead: (id: string) => api.post(`/notifications/${id}/read`),
+  markAllAsRead: () => api.post('/notifications/read-all'),
+};
+
 export default api;

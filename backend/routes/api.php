@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\TokenSettingController;
 use App\Http\Controllers\Api\ApiTokenController;
 use App\Http\Controllers\Api\ExternalIntegrationController;
+use App\Http\Controllers\Api\NotificationController;
 
 // NOTE: the former unauthenticated GET /api/magic-seed route ran
 // `migrate:fresh` + `db:seed`, i.e. any request to that URL dropped every
@@ -42,6 +43,10 @@ Route::delete('/auth/profile-photo', [AuthController::class, 'removePhoto'])->mi
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Notifications
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     // Dashboard stats MUST come before apiResource to avoid route collision with {post}
     Route::get('posts/dashboard/stats', [PostRequestController::class, 'getDashboardStats']);
 

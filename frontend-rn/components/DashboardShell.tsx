@@ -19,8 +19,7 @@ import { useAuthStore, getRoleLabel, getRoleColor, getRoleDashboardPath, getAvat
 import { useThemeStore } from '../store/theme';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../constants/theme';
 import { ChatBot } from './ChatBot';
-import { departmentsApi } from '../services/api';
-import { authApi } from '../services/api';
+import { departmentsApi, authApi, notificationsApi } from '../services/api';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -55,6 +54,51 @@ export function DashboardShell({
   const [sidebarOpenedByHover, setSidebarOpenedByHover] = React.useState(false);
   const [photoLoadFailed, setPhotoLoadFailed] = React.useState(false);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
+
+  // Notifications State & Logic
+  const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = React.useState(false);
+  const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState<number>(0);
+
+  const fetchNotifications = React.useCallback(async () => {
+    try {
+      const res = await notificationsApi.getNotifications();
+      if (res.data) {
+        setNotifications(res.data.notifications || []);
+        setUnreadCount(res.data.unread_count || 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await notificationsApi.markAsRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsApi.markAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Mobile drawer state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = React.useState(false);
@@ -370,11 +414,114 @@ export function DashboardShell({
             />
           </TouchableOpacity>
 
-          {userRole === 'requestor' && isDesktop && (
-            <View style={styles.topRightNav}>
-              <Ionicons name="notifications-outline" size={18} color="#FFFFFF" style={styles.navIconSpacing} />
-            </View>
-          )}
+          {/* NOTIFICATION BELL TRIGGER */}
+          <View style={{ position: 'relative', zIndex: 110 }}>
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={() => {
+                setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
+                if (isProfileDropdownOpen) setIsProfileDropdownOpen(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
+              {unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* NOTIFICATIONS DROPDOWN OVERLAY */}
+            {isNotificationDropdownOpen && (
+              <View style={styles.notificationsDropdownContainer}>
+                <View style={styles.notifHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.notifHeaderTitle}>Notifications</Text>
+                    {unreadCount > 0 && (
+                      <View style={{ backgroundColor: '#EF4444', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>{unreadCount} new</Text>
+                      </View>
+                    )}
+                  </View>
+                  {unreadCount > 0 && (
+                    <TouchableOpacity onPress={handleMarkAllAsRead}>
+                      <Text style={{ fontSize: 12, color: Colors.primary, fontWeight: '600' }}>Mark all as read</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={{ height: 1, backgroundColor: '#E5E7EB' }} />
+
+                <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={true}>
+                  {notifications.length === 0 ? (
+                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="notifications-off-outline" size={32} color="#9CA3AF" style={{ marginBottom: 8 }} />
+                      <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>No notifications yet</Text>
+                      <Text style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', marginTop: 2 }}>You're all caught up!</Text>
+                    </View>
+                  ) : (
+                    notifications.map((n) => {
+                      const isRead = n.read;
+                      const title = n.data?.title || n.data?.post_title || 'Notification';
+                      const message = n.data?.message || n.data?.reason || n.data?.remarks || 'Action updated';
+                      const timeAgo = n.created_at || 'Just now';
+
+                      return (
+                        <TouchableOpacity
+                          key={n.id}
+                          style={[
+                            styles.notifItem,
+                            !isRead && { backgroundColor: '#F0F9FF' },
+                          ]}
+                          onPress={() => handleMarkAsRead(n.id)}
+                        >
+                          <View
+                            style={[
+                              styles.notifIconCircle,
+                              {
+                                backgroundColor: n.type?.includes('Approved')
+                                  ? '#DCFCE7'
+                                  : n.type?.includes('Rejected')
+                                  ? '#FEE2E2'
+                                  : '#EFF6FF',
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name={
+                                n.type?.includes('Approved')
+                                  ? 'checkmark-circle'
+                                  : n.type?.includes('Rejected')
+                                  ? 'close-circle'
+                                  : 'information-circle'
+                              }
+                              size={18}
+                              color={
+                                n.type?.includes('Approved')
+                                  ? '#16A34A'
+                                  : n.type?.includes('Rejected')
+                                  ? '#DC2626'
+                                  : '#2563EB'
+                              }
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.notifTitle, !isRead && { fontWeight: '700' }]}>{title}</Text>
+                            <Text style={styles.notifMessage} numberOfLines={2}>{message}</Text>
+                            <Text style={styles.notifTime}>{timeAgo}</Text>
+                          </View>
+                          {!isRead && <View style={styles.unreadDot} />}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </View>
           <View style={{ position: 'relative', zIndex: 100 }}>
             {/* PROFILE TRIGGER */}
             <TouchableOpacity 
@@ -1072,5 +1219,92 @@ const styles = StyleSheet.create({
   mobileDrawerFooter: {
     paddingHorizontal: 12,
     paddingBottom: 24,
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#4C007C',
+  },
+  unreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800' as const,
+  },
+  notificationsDropdownContainer: {
+    position: 'absolute',
+    top: 48,
+    right: 0,
+    width: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    overflow: 'hidden',
+    zIndex: 1000,
+  },
+  notifHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  notifHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#1F2937',
+  },
+  notifItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  notifIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  notifTitle: {
+    fontSize: 12,
+    color: '#1F2937',
+  },
+  notifMessage: {
+    fontSize: 11,
+    color: '#4B5563',
+    marginTop: 2,
+  },
+  notifTime: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2563EB',
+    alignSelf: 'center',
   },
 });
