@@ -4074,10 +4074,9 @@ $response = curl_exec($ch);`}
                         <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626', marginBottom: 4 }}>
                           Liked by jmcfi_official and others
                         </Text>
-                        <Text style={{ fontSize: 12, color: '#262626', lineHeight: 16 }}>
-                          <Text style={{ fontWeight: '700' }}>jmc_official </Text>
-                          {previewPost?.rawPost?.caption_narrative || previewPost?.title}
-                        </Text>
+                        <FormattedText style={{ fontSize: 12, color: '#262626', lineHeight: 16 }}>
+                          {'<b>jmc_official </b>' + (previewPost?.rawPost?.caption_narrative || previewPost?.title || '')}
+                        </FormattedText>
                       </View>
                     </View>
                   )}
