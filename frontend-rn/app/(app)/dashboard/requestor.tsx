@@ -92,6 +92,7 @@ export default function RequestorDashboard() {
 
   // Preview States
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
+  const [previewPlatformTab, setPreviewPlatformTab] = useState<'facebook' | 'instagram' | 'wordpress'>('facebook');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Dashboard Page State
@@ -1582,6 +1583,75 @@ export default function RequestorDashboard() {
                     <Text style={styles.cardTitle}>Live Preview</Text>
                   </View>
 
+                  {/* Platform Choice Selector (3 Choices: Facebook, Instagram, WordPress) */}
+                  <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 3, marginBottom: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => setPreviewPlatformTab('facebook')}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 5,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: previewPlatformTab === 'facebook' ? '#FFFFFF' : 'transparent',
+                        borderWidth: previewPlatformTab === 'facebook' ? 1 : 0,
+                        borderColor: previewPlatformTab === 'facebook' ? '#E5E7EB' : 'transparent',
+                      }}
+                    >
+                      <Ionicons name="logo-facebook" size={15} color={previewPlatformTab === 'facebook' ? '#1877F2' : '#6B7280'} />
+                      <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'facebook' ? '700' : '500', color: previewPlatformTab === 'facebook' ? '#1877F2' : '#4B5563' }}>
+                        Facebook
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setPreviewPlatformTab('instagram')}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 5,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: previewPlatformTab === 'instagram' ? '#FFFFFF' : 'transparent',
+                        borderWidth: previewPlatformTab === 'instagram' ? 1 : 0,
+                        borderColor: previewPlatformTab === 'instagram' ? '#E5E7EB' : 'transparent',
+                      }}
+                    >
+                      <Ionicons name="logo-instagram" size={15} color={previewPlatformTab === 'instagram' ? '#E1306C' : '#6B7280'} />
+                      <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'instagram' ? '700' : '500', color: previewPlatformTab === 'instagram' ? '#E1306C' : '#4B5563' }}>
+                        Instagram
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setPreviewPlatformTab('wordpress')}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 5,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: previewPlatformTab === 'wordpress' ? '#FFFFFF' : 'transparent',
+                        borderWidth: previewPlatformTab === 'wordpress' ? 1 : 0,
+                        borderColor: previewPlatformTab === 'wordpress' ? '#E5E7EB' : 'transparent',
+                      }}
+                    >
+                      <Ionicons name="globe-outline" size={15} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#6B7280'} />
+                      <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#4B5563' }}>
+                        WordPress
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
                   <View style={styles.previewModeRow}>
                     <TouchableOpacity
                       style={[styles.previewToggleBtn, previewMode === 'mobile' && styles.previewToggleBtnActive]}
@@ -1601,49 +1671,152 @@ export default function RequestorDashboard() {
                     </TouchableOpacity>
                   </View>
 
-                  <View style={[styles.previewMockupFrame, previewMode === 'mobile' ? { maxWidth: 360, alignSelf: 'center', width: '100%' } : { width: '100%' }]}>
-                    <View style={styles.mockPostHeader}>
-                      <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
-                        <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.mockPostAuthorName}>Jose Maria College Foundation Inc.</Text>
-                        <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
-                    </View>
+                  {(() => {
+                    const activePreviewMedia = (mediaFiles && mediaFiles[featuredMediaIndex])
+                      ? mediaFiles[featuredMediaIndex]
+                      : (mediaFiles && mediaFiles[0] ? mediaFiles[0] : null);
+                    const activePreviewUri = activePreviewMedia?.uri || activePreviewMedia?.url;
 
-                    <View style={styles.mockPostContentArea}>
-                      <FormattedText style={styles.mockPostCaptionText}>
-                        {caption ? caption : 'Upload media to see your content preview here...'}
-                      </FormattedText>
-                    </View>
+                    return (
+                      <View style={[styles.previewMockupFrame, previewMode === 'mobile' ? { maxWidth: 360, alignSelf: 'center', width: '100%' } : { width: '100%' }]}>
+                        {/* FACEBOOK PREVIEW */}
+                        {previewPlatformTab === 'facebook' && (
+                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                            <View style={styles.mockPostHeader}>
+                              <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.mockPostAuthorName}>Jose Maria College Foundation Inc.</Text>
+                                <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
+                              </View>
+                              <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                            </View>
 
-                    {mediaFiles && mediaFiles.length > 0 ? (
-                      <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(mediaFiles[0].uri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
-                        <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={styles.mockPostMediaPlaceholder}>
-                        <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
-                        <Text style={styles.mockPostMediaPlaceholderText}>
-                          Upload media to see your content preview here...
-                        </Text>
-                      </View>
-                    )}
+                            <View style={styles.mockPostContentArea}>
+                              <FormattedText style={styles.mockPostCaptionText}>
+                                {caption ? caption : 'Upload media to see your content preview here...'}
+                              </FormattedText>
+                            </View>
 
-                    <View style={styles.mockPostActionsRow}>
-                      <View style={styles.mockActionGroup}>
-                        <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+                            {activePreviewUri ? (
+                              <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
+                                <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={styles.mockPostMediaPlaceholder}>
+                                <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                                <Text style={styles.mockPostMediaPlaceholderText}>
+                                  Upload media to see your content preview here...
+                                </Text>
+                              </View>
+                            )}
+
+                            <View style={styles.mockPostActionsRow}>
+                              <View style={styles.mockActionGroup}>
+                                <Ionicons name="thumbs-up-outline" size={17} color={Colors.textSecondary} />
+                                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 4 }}>Like</Text>
+                              </View>
+                              <View style={styles.mockActionGroup}>
+                                <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+                                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 4 }}>Comment</Text>
+                              </View>
+                              <View style={styles.mockActionGroup}>
+                                <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
+                                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 4 }}>Share</Text>
+                              </View>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* INSTAGRAM PREVIEW */}
+                        {previewPlatformTab === 'instagram' && (
+                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                              <View style={{ width: 34, height: 34, borderRadius: 17, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>jmc_official</Text>
+                                <Text style={{ fontSize: 10, color: '#8E8E8E' }}>Davao City, Philippines</Text>
+                              </View>
+                              <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
+                            </View>
+
+                            {activePreviewUri ? (
+                              <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ width: '100%', aspectRatio: 1, backgroundColor: '#f3f4f6' }}>
+                                <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={[styles.mockPostMediaPlaceholder, { aspectRatio: 1 }]}>
+                                <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                                <Text style={styles.mockPostMediaPlaceholderText}>
+                                  Upload media to see your content preview here...
+                                </Text>
+                              </View>
+                            )}
+
+                            <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <View style={{ flexDirection: 'row', gap: 12 }}>
+                                  <Ionicons name="heart" size={20} color="#E1306C" />
+                                  <Ionicons name="chatbubble-outline" size={19} color="#262626" />
+                                  <Ionicons name="paper-plane-outline" size={19} color="#262626" />
+                                </View>
+                                <Ionicons name="bookmark-outline" size={19} color="#262626" />
+                              </View>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#262626', marginBottom: 3 }}>
+                                Liked by jmcfi_official and others
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
+                                <Text style={{ fontWeight: '700' }}>jmc_official </Text>
+                                {caption ? caption : 'Upload media to see your content preview here...'}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* WORDPRESS PREVIEW */}
+                        {previewPlatformTab === 'wordpress' && (
+                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 14 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+                              <Ionicons name="globe-outline" size={13} color="#21759B" />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                            </View>
+
+                            <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 4, lineHeight: 20 }}>
+                              {postTitle ? postTitle : (caption ? (caption.length > 50 ? caption.slice(0, 50) + '...' : caption) : 'Content Request Title')}
+                            </Text>
+
+                            <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 10 }}>
+                              By JMCFI Requestor • News & Announcements • Just now
+                            </Text>
+
+                            {activePreviewUri ? (
+                              <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginBottom: 10 }}>
+                                <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: 180, borderRadius: 6, backgroundColor: '#f3f4f6' }} resizeMode="cover" />
+                                <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(33, 117, 155, 0.9)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>WordPress Featured Image</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={[styles.mockPostMediaPlaceholder, { height: 120, marginBottom: 10 }]}>
+                                <Ionicons name="image-outline" size={28} color={Colors.textMuted} />
+                                <Text style={styles.mockPostMediaPlaceholderText}>
+                                  Upload media for WordPress Featured Image...
+                                </Text>
+                              </View>
+                            )}
+
+                            <FormattedText style={{ fontSize: 12, color: '#334155', lineHeight: 17 }}>
+                              {caption ? caption : 'Upload media to see your content preview here...'}
+                            </FormattedText>
+                          </View>
+                        )}
                       </View>
-                      <View style={styles.mockActionGroup}>
-                        <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
-                      </View>
-                      <View style={styles.mockActionGroup}>
-                        <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
-                      </View>
-                    </View>
-                  </View>
+                    );
+                  })()}
+
                 </Card>
               </View>
             </View>
@@ -2582,60 +2755,237 @@ export default function RequestorDashboard() {
           onRequestClose={() => setIsPreviewModalOpen(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 400 : 800, padding: 0, backgroundColor: 'transparent', shadowColor: 'transparent', elevation: 0 }]}>
+            <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 440 : 800, padding: 16, backgroundColor: Colors.surface, borderRadius: 12 }]}>
 
-              <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: Colors.surface, maxHeight: '90%' }]}>
-                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                  <View style={styles.mockPostHeader}>
-                    <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
-                      <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.mockPostAuthorName}>Jose Maria College Foundation Inc.</Text>
-                      <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setIsPreviewModalOpen(false)}>
-                      <Ionicons name="close" size={24} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.mockPostContentArea}>
-                    <FormattedText style={styles.mockPostCaptionText}>
-                      {caption ? caption : 'Upload media to see your content preview here...'}
-                    </FormattedText>
-                  </View>
-
-                  {mediaFiles && mediaFiles.length > 0 ? (
-                    <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(mediaFiles[0].uri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
-                      <Image source={{ uri: mediaFiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.mockPostMediaPlaceholder}>
-                      <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
-                      <Text style={styles.mockPostMediaPlaceholderText}>
-                        Upload media to see your content preview here...
-                      </Text>
-                    </View>
-                  )}
-
-                  <View style={styles.mockPostActionsRow}>
-                    <View style={styles.mockActionGroup}>
-                      <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
-                    </View>
-                    <View style={styles.mockActionGroup}>
-                      <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
-                    </View>
-                    <View style={styles.mockActionGroup}>
-                      <Ionicons name="arrow-redo-outline" size={18} color={Colors.textSecondary} />
-                    </View>
-                  </View>
-                </ScrollView>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Live Preview</Text>
+                <TouchableOpacity onPress={() => setIsPreviewModalOpen(false)}>
+                  <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
               </View>
+
+              {/* Platform Choice Selector (3 Choices: Facebook, Instagram, WordPress) */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 3, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setPreviewPlatformTab('facebook')}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    backgroundColor: previewPlatformTab === 'facebook' ? '#FFFFFF' : 'transparent',
+                    borderWidth: previewPlatformTab === 'facebook' ? 1 : 0,
+                    borderColor: previewPlatformTab === 'facebook' ? '#E5E7EB' : 'transparent',
+                  }}
+                >
+                  <Ionicons name="logo-facebook" size={15} color={previewPlatformTab === 'facebook' ? '#1877F2' : '#6B7280'} />
+                  <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'facebook' ? '700' : '500', color: previewPlatformTab === 'facebook' ? '#1877F2' : '#4B5563' }}>
+                    Facebook
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setPreviewPlatformTab('instagram')}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    backgroundColor: previewPlatformTab === 'instagram' ? '#FFFFFF' : 'transparent',
+                    borderWidth: previewPlatformTab === 'instagram' ? 1 : 0,
+                    borderColor: previewPlatformTab === 'instagram' ? '#E5E7EB' : 'transparent',
+                  }}
+                >
+                  <Ionicons name="logo-instagram" size={15} color={previewPlatformTab === 'instagram' ? '#E1306C' : '#6B7280'} />
+                  <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'instagram' ? '700' : '500', color: previewPlatformTab === 'instagram' ? '#E1306C' : '#4B5563' }}>
+                    Instagram
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setPreviewPlatformTab('wordpress')}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    backgroundColor: previewPlatformTab === 'wordpress' ? '#FFFFFF' : 'transparent',
+                    borderWidth: previewPlatformTab === 'wordpress' ? 1 : 0,
+                    borderColor: previewPlatformTab === 'wordpress' ? '#E5E7EB' : 'transparent',
+                  }}
+                >
+                  <Ionicons name="globe-outline" size={15} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#6B7280'} />
+                  <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#4B5563' }}>
+                    WordPress
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {(() => {
+                const activePreviewMedia = (mediaFiles && mediaFiles[featuredMediaIndex])
+                  ? mediaFiles[featuredMediaIndex]
+                  : (mediaFiles && mediaFiles[0] ? mediaFiles[0] : null);
+                const activePreviewUri = activePreviewMedia?.uri || activePreviewMedia?.url;
+
+                return (
+                  <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: Colors.surface, maxHeight: '80%' }]}>
+                    <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                      {/* FACEBOOK PREVIEW */}
+                      {previewPlatformTab === 'facebook' && (
+                        <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                          <View style={styles.mockPostHeader}>
+                            <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
+                              <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.mockPostAuthorName}>Jose Maria College Foundation Inc.</Text>
+                              <Text style={styles.mockPostMetaSubtext}>Sponsored &bull; Just now</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.mockPostContentArea}>
+                            <FormattedText style={styles.mockPostCaptionText}>
+                              {caption ? caption : 'Upload media to see your content preview here...'}
+                            </FormattedText>
+                          </View>
+
+                          {activePreviewUri ? (
+                            <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
+                              <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={styles.mockPostMediaPlaceholder}>
+                              <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                              <Text style={styles.mockPostMediaPlaceholderText}>
+                                Upload media to see your content preview here...
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={styles.mockPostActionsRow}>
+                            <View style={styles.mockActionGroup}>
+                              <Ionicons name="thumbs-up-outline" size={17} color={Colors.textSecondary} />
+                              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 4 }}>Like</Text>
+                            </View>
+                            <View style={styles.mockActionGroup}>
+                              <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+                              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 4 }}>Comment</Text>
+                            </View>
+                            <View style={styles.mockActionGroup}>
+                              <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
+                              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 4 }}>Share</Text>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* INSTAGRAM PREVIEW */}
+                      {previewPlatformTab === 'instagram' && (
+                        <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                            <View style={{ width: 34, height: 34, borderRadius: 17, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
+                              <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>jmc_official</Text>
+                              <Text style={{ fontSize: 10, color: '#8E8E8E' }}>Davao City, Philippines</Text>
+                            </View>
+                            <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
+                          </View>
+
+                          {activePreviewUri ? (
+                            <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ width: '100%', aspectRatio: 1, backgroundColor: '#f3f4f6' }}>
+                              <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={[styles.mockPostMediaPlaceholder, { aspectRatio: 1 }]}>
+                              <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                              <Text style={styles.mockPostMediaPlaceholderText}>
+                                Upload media to see your content preview here...
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                              <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <Ionicons name="heart" size={20} color="#E1306C" />
+                                <Ionicons name="chatbubble-outline" size={19} color="#262626" />
+                                <Ionicons name="paper-plane-outline" size={19} color="#262626" />
+                              </View>
+                              <Ionicons name="bookmark-outline" size={19} color="#262626" />
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#262626', marginBottom: 3 }}>
+                              Liked by jmcfi_official and others
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
+                              <Text style={{ fontWeight: '700' }}>jmc_official </Text>
+                              {caption ? caption : 'Upload media to see your content preview here...'}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* WORDPRESS PREVIEW */}
+                      {previewPlatformTab === 'wordpress' && (
+                        <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 14 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+                            <Ionicons name="globe-outline" size={13} color="#21759B" />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                          </View>
+
+                          <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 4, lineHeight: 20 }}>
+                            {postTitle ? postTitle : (caption ? (caption.length > 50 ? caption.slice(0, 50) + '...' : caption) : 'Content Request Title')}
+                          </Text>
+
+                          <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 10 }}>
+                            By JMCFI Requestor • News & Announcements • Just now
+                          </Text>
+
+                          {activePreviewUri ? (
+                            <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginBottom: 10 }}>
+                              <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: 180, borderRadius: 6, backgroundColor: '#f3f4f6' }} resizeMode="cover" />
+                              <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(33, 117, 155, 0.9)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>WordPress Featured Image</Text>
+                              </View>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={[styles.mockPostMediaPlaceholder, { height: 120, marginBottom: 10 }]}>
+                              <Ionicons name="image-outline" size={28} color={Colors.textMuted} />
+                              <Text style={styles.mockPostMediaPlaceholderText}>
+                                Upload media for WordPress Featured Image...
+                              </Text>
+                            </View>
+                          )}
+
+                          <FormattedText style={{ fontSize: 12, color: '#334155', lineHeight: 17 }}>
+                            {caption ? caption : 'Upload media to see your content preview here...'}
+                          </FormattedText>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                );
+              })()}
 
             </View>
           </View>
         </Modal>
       )}
+
       {/* ── DELETE DRAFT CONFIRMATION MODAL ── */}
       <Modal
         visible={!!draftToDelete}
