@@ -4,7 +4,9 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend-rn
 COPY frontend-rn/package*.json ./
-RUN npm install
+# Skip downloading Playwright browser binaries during build (tests run separately)
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm ci
 COPY frontend-rn/ ./
 RUN npx expo export -p web
 
