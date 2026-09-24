@@ -1774,10 +1774,9 @@ export default function RequestorDashboard() {
                               <Text style={{ fontSize: 11, fontWeight: '700', color: '#262626', marginBottom: 3 }}>
                                 Liked by jmcfi_official and others
                               </Text>
-                              <Text style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
-                                <Text style={{ fontWeight: '700' }}>jmc_official </Text>
-                                {caption ? caption : 'Upload media to see your content preview here...'}
-                              </Text>
+                              <FormattedText style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
+                                {'<b>jmc_official </b>' + (caption ? caption : 'Upload media to see your content preview here...')}
+                              </FormattedText>
                             </View>
                           </View>
                         )}
@@ -2937,10 +2936,9 @@ export default function RequestorDashboard() {
                             <Text style={{ fontSize: 11, fontWeight: '700', color: '#262626', marginBottom: 3 }}>
                               Liked by jmcfi_official and others
                             </Text>
-                            <Text style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
-                              <Text style={{ fontWeight: '700' }}>jmc_official </Text>
-                              {caption ? caption : 'Upload media to see your content preview here...'}
-                            </Text>
+                            <FormattedText style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
+                              {'<b>jmc_official </b>' + (caption ? caption : 'Upload media to see your content preview here...')}
+                            </FormattedText>
                           </View>
                         </View>
                       )}
