@@ -4118,57 +4118,6 @@ $response = curl_exec($ch);`}
                     </View>
                   )}
 
-                  {/* WordPress Featured Image Choice (Available & Active across previews) */}
-                  {Array.isArray(previewPost?.rawPost?.media) && previewPost.rawPost.media.length > 0 && (
-                    <View style={{ marginTop: 14, width: '100%', backgroundColor: '#F8FAFC', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#21759B' }}>
-                          WordPress Featured Image Choice
-                        </Text>
-                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                          Click thumbnail to switch preview & featured image
-                        </Text>
-                      </View>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                        {previewPost.rawPost.media.map((m: any) => {
-                          const isFeatured = !!m.is_featured;
-                          const isCurrentActive = previewPost?.image === m.url || isFeatured;
-                          return (
-                            <TouchableOpacity
-                              key={m.id}
-                              onPress={() => {
-                                // Switch preview image immediately on click
-                                setPreviewPost((prev: any) => prev ? ({ ...prev, image: m.url }) : prev);
-                                // Persist as WordPress featured image
-                                handleSetFeaturedMedia(previewPost.rawPost.id, m.id);
-                              }}
-                              activeOpacity={0.8}
-                              style={{
-                                width: 96,
-                                borderRadius: 6,
-                                borderWidth: isCurrentActive ? 2 : 1,
-                                borderColor: isCurrentActive ? '#21759B' : '#CBD5E1',
-                                backgroundColor: isCurrentActive ? '#F0F9FF' : '#FFFFFF',
-                                padding: 4,
-                                alignItems: 'center',
-                                position: 'relative',
-                              }}
-                            >
-                              {isFeatured && (
-                                <View style={{ position: 'absolute', top: 3, right: 3, zIndex: 5, backgroundColor: '#21759B', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>WordPress</Text>
-                                </View>
-                              )}
-                              <Image source={{ uri: m.url }} style={{ width: '100%', height: 55, borderRadius: 4, backgroundColor: '#E2E8F0', marginBottom: 3 }} resizeMode="cover" />
-                              <Text numberOfLines={1} style={{ fontSize: 10, color: isFeatured ? '#21759B' : Colors.textMuted, fontWeight: isFeatured ? '700' : '500' }}>
-                                {isFeatured ? '⭐ Featured' : 'Set Featured'}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
-                  )}
                 </View>
 
                 <View style={{ flex: 1, gap: 12 }}>
@@ -4224,11 +4173,6 @@ $response = curl_exec($ch);`}
               {/* Caption / Description / Approval Timeline */}
               <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Caption / Narrative</Text>
-                  <FormattedText style={{ fontSize: 13, color: Colors.textPrimary, marginBottom: 16 }}>
-                    {previewPost?.rawPost?.caption_narrative || 'No caption provided.'}
-                  </FormattedText>
-
                   {previewPost?.rawPost?.description ? (
                     <>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Description</Text>
