@@ -1853,7 +1853,7 @@ export default function ITAdminDashboard() {
                           <View style={{ flexDirection: 'row', gap: 6 }}>
                             {post.platforms.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
                             {post.platforms.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                            {post.platforms.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                            {(post.platforms.includes('website') || post.platforms.includes('portal') || post.platforms.includes('wordpress')) && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
                           </View>
                         </View>
                       ) : (
@@ -1875,7 +1875,7 @@ export default function ITAdminDashboard() {
                           <View style={{ flex: 1, flexDirection: 'row', gap: 6, paddingRight: 12 }}>
                             {post.platforms.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
                             {post.platforms.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                            {post.platforms.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                            {(post.platforms.includes('website') || post.platforms.includes('portal') || post.platforms.includes('wordpress')) && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
                           </View>
                         </>
                       )}
@@ -4156,7 +4156,7 @@ $response = curl_exec($ch);`}
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       {previewPost?.platforms?.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
                       {previewPost?.platforms?.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                      {previewPost?.platforms?.includes('website') && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                      {(previewPost?.platforms?.includes('website') || previewPost?.platforms?.includes('portal') || previewPost?.platforms?.includes('wordpress')) && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
                     </View>
                   </View>
 

@@ -678,7 +678,7 @@ export default function OfficeHeadDashboard() {
                         <Ionicons name="logo-instagram" size={13} color="#E1306C" />
                       </View>
                     )}
-                    {req.platforms.includes('website') && (
+                    {(req.platforms.includes('website') || req.platforms.includes('portal') || req.platforms.includes('wordpress')) && (
                       <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
                         <Ionicons name="globe-outline" size={13} color="#059669" />
                       </View>
@@ -1145,7 +1145,7 @@ export default function OfficeHeadDashboard() {
                               <Ionicons name="logo-instagram" size={14} color="#E1306C" />
                             </View>
                           )}
-                          {selectedRequest.platforms.includes('website') && (
+                          {(selectedRequest.platforms.includes('website') || selectedRequest.platforms.includes('portal') || selectedRequest.platforms.includes('wordpress')) && (
                             <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
                               <Ionicons name="globe-outline" size={14} color="#059669" />
                             </View>
