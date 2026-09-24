@@ -235,7 +235,7 @@ export default function RequestorDashboard() {
     return {
       facebook: arr.includes('facebook'),
       instagram: arr.includes('instagram'),
-      portal: arr.includes('portal'),
+      portal: arr.includes('portal') || arr.includes('website') || arr.includes('wordpress'),
     };
   };
 
@@ -2216,7 +2216,7 @@ export default function RequestorDashboard() {
                             <Ionicons name="logo-instagram" size={13} color="#E1306C" />
                           </View>
                         )}
-                        {(post.platforms || []).includes('website') && (
+                        {((post.platforms || []).includes('website') || (post.platforms || []).includes('portal') || (post.platforms || []).includes('wordpress')) && (
                           <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
                             <Ionicons name="globe-outline" size={13} color="#059669" />
                           </View>
@@ -2563,7 +2563,7 @@ export default function RequestorDashboard() {
                               <Ionicons name="logo-instagram" size={14} color="#E1306C" />
                             </View>
                           )}
-                          {(selectedQueuePost.platforms || []).includes('website') && (
+                          {((selectedQueuePost.platforms || []).includes('website') || (selectedQueuePost.platforms || []).includes('portal') || (selectedQueuePost.platforms || []).includes('wordpress')) && (
                             <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
                               <Ionicons name="globe-outline" size={14} color="#059669" />
                             </View>
