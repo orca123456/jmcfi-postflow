@@ -381,7 +381,11 @@ export default function ITAdminDashboard() {
       requestedTime: new Date(p.created_at).toLocaleTimeString(),
       rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : '',
       image: Array.isArray(p.media)
-        ? (p.media.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url || null)
+        ? (p.media.find((m: any) => m?.is_featured && (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')))?.url
+           || p.media.find((m: any) => m?.is_featured)?.url
+           || p.media.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url
+           || p.media[0]?.url
+           || null)
         : null,
       rawPost: p,
     }));
