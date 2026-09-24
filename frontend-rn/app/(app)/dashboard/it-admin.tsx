@@ -1073,6 +1073,8 @@ export default function ITAdminDashboard() {
     } finally {
       setPublishingPostId(null);
     }
+  };
+
   const handleSetFeaturedMedia = async (postId: number, mediaId: number) => {
     try {
       await postsApi.setFeaturedMedia(postId, mediaId);
