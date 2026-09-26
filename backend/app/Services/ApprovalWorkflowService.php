@@ -84,7 +84,7 @@ class ApprovalWorkflowService
                     $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest));
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::warning("Failed to notify first stage approver. Error: " . $e->getMessage());
         }
     }
@@ -102,7 +102,7 @@ class ApprovalWorkflowService
                     $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest, $nextStage));
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::warning("Failed to notify next stage ({$nextStage}) approver. Error: " . $e->getMessage());
         }
     }
@@ -117,7 +117,7 @@ class ApprovalWorkflowService
 
         try {
             $requestor->notify(new PostApprovedNotification($postRequest, $stage, $approverName));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::warning("Failed to notify requestor of stage approval. Error: " . $e->getMessage());
         }
     }
@@ -134,7 +134,7 @@ class ApprovalWorkflowService
             if ($publisher) {
                 $publisher->notify(new \App\Notifications\PostReadyForPublishingNotification($postRequest));
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::warning("Failed to notify IT publisher. Error: " . $e->getMessage());
         }
     }
@@ -142,17 +142,22 @@ class ApprovalWorkflowService
     public function notifyRequestor(PostRequest $postRequest, string $action, string $reason): void
     {
         $requestor = $postRequest->requestor;
+        if (!$requestor) return;
 
-        switch ($action) {
-            case 'rejected':
-                $requestor->notify(new PostRejectedNotification($postRequest, $reason));
-                break;
-            case 'returned_for_revision':
-                $requestor->notify(new PostReturnedForRevisionNotification($postRequest, $reason, []));
-                break;
-            case 'approved':
-                $requestor->notify(new PostApprovedNotification($postRequest));
-                break;
+        try {
+            switch ($action) {
+                case 'rejected':
+                    $requestor->notify(new PostRejectedNotification($postRequest, $reason));
+                    break;
+                case 'returned_for_revision':
+                    $requestor->notify(new PostReturnedForRevisionNotification($postRequest, $reason, []));
+                    break;
+                case 'approved':
+                    $requestor->notify(new PostApprovedNotification($postRequest));
+                    break;
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to notify requestor of {$action}. Error: " . $e->getMessage());
         }
     }
 }

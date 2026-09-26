@@ -102,75 +102,88 @@ class PostRequestController extends Controller
 
         try {
             return DB::transaction(function () use ($request) {
-            $categoryId = $request->category_id;
-            if (!$categoryId) {
-                $categoryId = \App\Models\PostCategory::where('is_active', true)->value('id');
-            }
-            $post = PostRequest::create([
-                'title' => $request->title,
-                'slug' => Str::slug($request->title) . '-' . Str::random(6),
-                'caption_narrative' => $request->caption_narrative,
-                'category_id' => $categoryId,
-                'department_id' => $request->user()->id,
-                'requestor_id' => $request->user()->id,
-                'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
-                'target_platforms' => $request->target_platforms ?? [],
-                'preferred_schedule_at' => $request->preferred_schedule_at,
-                'revision_count' => 0,
+                $categoryId = $request->category_id;
+                if (!$categoryId || !\App\Models\PostCategory::where('id', $categoryId)->exists()) {
+                    $firstCat = \App\Models\PostCategory::where('is_active', true)->first();
+                    if ($firstCat) {
+                        $categoryId = $firstCat->id;
+                    } else {
+                        $categoryId = \App\Models\PostCategory::create([
+                            'name' => 'General Advisory',
+                            'slug' => 'general-advisory',
+                            'is_active' => true,
+                        ])->id;
+                    }
+                }
+
+                $post = PostRequest::create([
+                    'title' => $request->title,
+                    'slug' => Str::slug($request->title) . '-' . Str::random(6),
+                    'caption_narrative' => $request->caption_narrative,
+                    'category_id' => $categoryId,
+                    'department_id' => $request->user()->id,
+                    'requestor_id' => $request->user()->id,
+                    'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                    'target_platforms' => $request->target_platforms ?? [],
+                    'preferred_schedule_at' => $request->preferred_schedule_at,
+                    'revision_count' => 0,
+                ]);
+
+                // Handle media uploads
+                if ($request->hasFile('media')) {
+                    $featuredIndex = (int) $request->input('featured_media_index', 0);
+                    foreach ($request->file('media') as $index => $file) {
+                        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                        $path = $file->store('post-media/' . $post->id, $disk);
+                        $this->createMediaRecord($post, $file, $path, $this->getMediaType($file->getMimeType()), $index, $index === $featuredIndex);
+                    }
+                }
+
+                // Handle supporting documents
+                if ($request->hasFile('supporting_docs')) {
+                    foreach ($request->file('supporting_docs') as $index => $file) {
+                        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                        $path = $file->store('post-supporting-docs/' . $post->id, $disk);
+                        $this->createMediaRecord($post, $file, $path, 'document', 100 + $index, false);
+                    }
+                }
+
+                // Create approval workflow stages
+                if (!$request->is_draft) {
+                    $this->workflowService->initializeWorkflow($post);
+                }
+
+                // Send notifications to approvers (safely)
+                if (!$request->is_draft) {
+                    $this->workflowService->notifyApprovers($post);
+                }
+
+                AuditLogService::log(
+                    $request->is_draft ? 'CONTENT_DRAFT_CREATED' : 'CONTENT_SUBMITTED',
+                    ($request->is_draft ? 'Saved draft: ' : 'Submitted content request: ') . $post->title,
+                    'INFO',
+                    ['post_id' => $post->id, 'platforms' => $post->target_platforms],
+                    $request
+                );
+
+                $this->clearDashboardCache();
+
+                return response()->json([
+                    'data' => new PostRequestResource($post->load([
+                        'category', 'requestor', 'media', 'approvalWorkflows.approver'
+                    ])),
+                    'message' => $request->is_draft ? 'Post saved as draft' : 'Post submitted for approval',
+                ], 201);
+            });
+        } catch (\Throwable $e) {
+            Log::error('Post request store failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()?->id,
             ]);
 
-            // Handle media uploads
-            if ($request->hasFile('media')) {
-                $featuredIndex = (int) $request->input('featured_media_index', 0);
-                foreach ($request->file('media') as $index => $file) {
-                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-                    $path = $file->store('post-media/' . $post->id, $disk);
-                    $this->createMediaRecord($post, $file, $path, $this->getMediaType($file->getMimeType()), $index, $index === $featuredIndex);
-                }
-            }
-
-            // Handle supporting documents
-            if ($request->hasFile('supporting_docs')) {
-                foreach ($request->file('supporting_docs') as $index => $file) {
-                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-                    $path = $file->store('post-supporting-docs/' . $post->id, $disk);
-                    $this->createMediaRecord($post, $file, $path, 'document', 100 + $index, false);
-                }
-            }
-
-            // Create approval workflow stages
-            if (!$request->is_draft) {
-                $this->workflowService->initializeWorkflow($post);
-            }
-
-            // Run AI compliance check if not draft
-            // Temporarily disabled as per user request to ensure smooth submission
-            // if (!$request->is_draft && $request->run_ai_check) {
-            //     $this->aiService->checkCompliance($post);
-            // }
-
-            // Send notifications to approvers
-            if (!$request->is_draft) {
-                $this->workflowService->notifyApprovers($post);
-            }
-
-            AuditLogService::log(
-                $request->is_draft ? 'CONTENT_DRAFT_CREATED' : 'CONTENT_SUBMITTED',
-                ($request->is_draft ? 'Saved draft: ' : 'Submitted content request: ') . $post->title,
-                'INFO',
-                ['post_id' => $post->id, 'platforms' => $post->target_platforms],
-                $request
-            );
-
-            $this->clearDashboardCache();
-
             return response()->json([
-                'data' => new PostRequestResource($post->load([
-                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
-                ])),
-                'message' => $request->is_draft ? 'Post saved as draft' : 'Post submitted for approval',
-            ], 201);
-            });
+                'message' => 'Failed to submit request: ' . $e->getMessage(),
+            ], 500);
         } finally {
             $lock->release();
         }
