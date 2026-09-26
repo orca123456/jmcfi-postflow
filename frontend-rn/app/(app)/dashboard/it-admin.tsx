@@ -1703,17 +1703,21 @@ export default function ITAdminDashboard() {
               {/* Bottom Row: Inline Filters */}
               <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12, zIndex: 40 }}>
                 {/* All Departments */}
-                <View style={{ position: 'relative', zIndex: 50 }}>
+                <View style={{ position: 'relative', zIndex: isRequestsDeptDropdownOpen ? 100 : 50 }}>
                   <TouchableOpacity
                     style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }}
-                    onPress={() => setIsRequestsDeptDropdownOpen(!isRequestsDeptDropdownOpen)}
+                    onPress={() => {
+                      setIsRequestsDeptDropdownOpen(!isRequestsDeptDropdownOpen);
+                      setIsRequestsStatusDropdownOpen(false);
+                      setIsRequestsDateDropdownOpen(false);
+                    }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginRight: 6 }} numberOfLines={1}>{requestsDept}</Text>
                     <Ionicons name="chevron-down-outline" size={13} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isRequestsDeptDropdownOpen && (
-                    <ScrollView style={{ position: 'absolute', top: 38, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 180, maxHeight: 260, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }} nestedScrollEnabled>
+                    <ScrollView style={{ position: 'absolute', top: 38, left: 0, right: 'auto', backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 180, maxHeight: 260, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }} nestedScrollEnabled>
                       <TouchableOpacity
                         style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 6, backgroundColor: requestsDept === 'All Departments' ? '#f1f5f9' : 'transparent' }}
                         onPress={() => {
@@ -1740,17 +1744,21 @@ export default function ITAdminDashboard() {
                 </View>
 
                 {/* All Status */}
-                <View style={{ position: 'relative', zIndex: 50 }}>
+                <View style={{ position: 'relative', zIndex: isRequestsStatusDropdownOpen ? 100 : 50 }}>
                   <TouchableOpacity
                     style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }}
-                    onPress={() => setIsRequestsStatusDropdownOpen(!isRequestsStatusDropdownOpen)}
+                    onPress={() => {
+                      setIsRequestsStatusDropdownOpen(!isRequestsStatusDropdownOpen);
+                      setIsRequestsDeptDropdownOpen(false);
+                      setIsRequestsDateDropdownOpen(false);
+                    }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginRight: 6 }}>{requestsStatus}</Text>
                     <Ionicons name="chevron-down-outline" size={13} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isRequestsStatusDropdownOpen && (
-                    <View style={{ position: 'absolute', top: 38, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
+                    <View style={{ position: 'absolute', top: 38, left: 0, right: 'auto', backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
                       {['All Status', 'Pending', 'Published', 'Rejected', 'Draft'].map((opt: any) => (
                         <TouchableOpacity
                           key={opt}
@@ -1768,10 +1776,14 @@ export default function ITAdminDashboard() {
                 </View>
 
                 {/* All Time (With Calendar Icon) */}
-                <View style={{ position: 'relative', zIndex: 50 }}>
+                <View style={{ position: 'relative', zIndex: isRequestsDateDropdownOpen ? 100 : 50 }}>
                   <TouchableOpacity
                     style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }}
-                    onPress={() => setIsRequestsDateDropdownOpen(!isRequestsDateDropdownOpen)}
+                    onPress={() => {
+                      setIsRequestsDateDropdownOpen(!isRequestsDateDropdownOpen);
+                      setIsRequestsDeptDropdownOpen(false);
+                      setIsRequestsStatusDropdownOpen(false);
+                    }}
                   >
                     <Ionicons name="calendar-outline" size={13} color={Colors.textSecondary} style={{ marginRight: 5 }} />
                     <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginRight: 6 }}>{requestsDate}</Text>
@@ -1779,7 +1791,7 @@ export default function ITAdminDashboard() {
                   </TouchableOpacity>
 
                   {isRequestsDateDropdownOpen && (
-                    <View style={{ position: 'absolute', top: 38, right: 0, backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
+                    <View style={{ position: 'absolute', top: 38, right: 0, left: 'auto', backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
                       {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
                         <TouchableOpacity
                           key={opt}
