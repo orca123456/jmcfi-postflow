@@ -414,204 +414,213 @@ export function DashboardShell({
             />
           </TouchableOpacity>
 
-          {/* NOTIFICATION BELL TRIGGER */}
-          <View style={{ position: 'relative', zIndex: 110 }}>
-            <TouchableOpacity
-              style={styles.headerIconButton}
-              onPress={() => {
-                setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
-                if (isProfileDropdownOpen) setIsProfileDropdownOpen(false);
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
-              {unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* NOTIFICATIONS DROPDOWN OVERLAY */}
-            {isNotificationDropdownOpen && (
-              <View style={styles.notificationsDropdownContainer}>
-                <View style={styles.notifHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.notifHeaderTitle}>Notifications</Text>
-                    {unreadCount > 0 && (
-                      <View style={{ backgroundColor: '#EF4444', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
-                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>{unreadCount} new</Text>
-                      </View>
-                    )}
-                  </View>
-                  {unreadCount > 0 && (
-                    <TouchableOpacity onPress={handleMarkAllAsRead}>
-                      <Text style={{ fontSize: 12, color: Colors.primary, fontWeight: '600' }}>Mark all as read</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <View style={{ height: 1, backgroundColor: '#E5E7EB' }} />
-
-                <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={true}>
-                  {notifications.length === 0 ? (
-                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="notifications-off-outline" size={32} color="#9CA3AF" style={{ marginBottom: 8 }} />
-                      <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>No notifications yet</Text>
-                      <Text style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', marginTop: 2 }}>You're all caught up!</Text>
-                    </View>
-                  ) : (
-                    notifications.map((n) => {
-                      const isRead = n.read;
-                      const title = n.data?.title || n.data?.post_title || 'Notification';
-                      const message = n.data?.message || n.data?.reason || n.data?.remarks || 'Action updated';
-                      const timeAgo = n.created_at || 'Just now';
-
-                      return (
-                        <TouchableOpacity
-                          key={n.id}
-                          style={[
-                            styles.notifItem,
-                            !isRead && { backgroundColor: '#F0F9FF' },
-                          ]}
-                          onPress={() => handleMarkAsRead(n.id)}
-                        >
-                          <View
-                            style={[
-                              styles.notifIconCircle,
-                              {
-                                backgroundColor: n.type?.includes('Approved')
-                                  ? '#DCFCE7'
-                                  : n.type?.includes('Rejected')
-                                  ? '#FEE2E2'
-                                  : '#EFF6FF',
-                              },
-                            ]}
-                          >
-                            <Ionicons
-                              name={
-                                n.type?.includes('Approved')
-                                  ? 'checkmark-circle'
-                                  : n.type?.includes('Rejected')
-                                  ? 'close-circle'
-                                  : 'information-circle'
-                              }
-                              size={18}
-                              color={
-                                n.type?.includes('Approved')
-                                  ? '#16A34A'
-                                  : n.type?.includes('Rejected')
-                                  ? '#DC2626'
-                                  : '#2563EB'
-                              }
-                            />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.notifTitle, !isRead && { fontWeight: '700' }]}>{title}</Text>
-                            <Text style={styles.notifMessage} numberOfLines={2}>{message}</Text>
-                            <Text style={styles.notifTime}>{timeAgo}</Text>
-                          </View>
-                          {!isRead && <View style={styles.unreadDot} />}
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </ScrollView>
+          {/* NOTIFICATION TRIGGER */}
+          <TouchableOpacity 
+            onPress={() => {
+              setIsProfileDropdownOpen(false);
+              setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
+            }}
+            style={styles.headerIconButton}
+          >
+            <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
               </View>
             )}
+          </TouchableOpacity>
+
+          {/* PROFILE TRIGGER */}
+          <TouchableOpacity 
+            style={styles.profileTrigger} 
+            onPress={() => {
+              setIsNotificationDropdownOpen(false);
+              setIsProfileDropdownOpen(!isProfileDropdownOpen);
+            }}
+          >
+            <View style={[styles.avatarCircleMini, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
+              {shouldShowPhoto ? (
+                <Image source={{ uri: finalPhotoUrl! }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" onError={() => setPhotoLoadFailed(true)} />
+              ) : (
+                <Text style={[styles.avatarTextMini, { color: avatarColors.text }]}>
+                  {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
+                </Text>
+              )}
+            </View>
+            {isDesktop && (
+              <View style={styles.triggerTextContainer}>
+                <Text style={styles.triggerNameText}>{user?.name ?? 'Esther Howard'}</Text>
+              </View>
+            )}
+            <Ionicons name="chevron-down" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
+        </View>
+
+        {/* BACKDROP FOR DROPDOWNS */}
+        {(isProfileDropdownOpen || isNotificationDropdownOpen) && (
+          <TouchableWithoutFeedback
+            onPress={() => {
+              setIsProfileDropdownOpen(false);
+              setIsNotificationDropdownOpen(false);
+            }}
+          >
+            <View style={styles.dropdownBackdrop} />
+          </TouchableWithoutFeedback>
+        )}
+
+        {/* NOTIFICATIONS DROPDOWN OVERLAY (HEADER LEVEL) */}
+        {isNotificationDropdownOpen && (
+          <View style={styles.notificationsDropdownContainer}>
+            <View style={styles.notifHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.notifHeaderTitle}>Notifications</Text>
+                {unreadCount > 0 && (
+                  <View style={{ backgroundColor: '#EF4444', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                    <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>{unreadCount} new</Text>
+                  </View>
+                )}
+              </View>
+              {unreadCount > 0 && (
+                <TouchableOpacity onPress={handleMarkAllAsRead}>
+                  <Text style={{ fontSize: 12, color: Colors.primary, fontWeight: '600' }}>Mark all as read</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={{ height: 1, backgroundColor: '#E5E7EB' }} />
+
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={true}>
+              {notifications.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="notifications-off-outline" size={32} color="#9CA3AF" style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>No notifications yet</Text>
+                  <Text style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', marginTop: 2 }}>You're all caught up!</Text>
+                </View>
+              ) : (
+                notifications.map((n) => {
+                  const isRead = n.read;
+                  const title = n.data?.title || n.data?.post_title || 'Notification';
+                  const message = n.data?.message || n.data?.reason || n.data?.remarks || 'Action updated';
+                  const timeAgo = n.created_at || 'Just now';
+
+                  return (
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[
+                        styles.notifItem,
+                        !isRead && { backgroundColor: '#F0F9FF' },
+                      ]}
+                      onPress={() => handleMarkAsRead(n.id)}
+                    >
+                      <View
+                        style={[
+                          styles.notifIconCircle,
+                          {
+                            backgroundColor: n.type?.includes('Approved')
+                              ? '#DCFCE7'
+                              : n.type?.includes('Rejected')
+                              ? '#FEE2E2'
+                              : '#EFF6FF',
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            n.type?.includes('Approved')
+                              ? 'checkmark-circle'
+                              : n.type?.includes('Rejected')
+                              ? 'close-circle'
+                              : 'information-circle'
+                          }
+                          size={18}
+                          color={
+                            n.type?.includes('Approved')
+                              ? '#16A34A'
+                              : n.type?.includes('Rejected')
+                              ? '#DC2626'
+                              : '#2563EB'
+                          }
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.notifTitle, !isRead && { fontWeight: '700' }]}>{title}</Text>
+                        <Text style={styles.notifMessage} numberOfLines={2}>{message}</Text>
+                        <Text style={styles.notifTime}>{timeAgo}</Text>
+                      </View>
+                      {!isRead && <View style={styles.unreadDot} />}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
           </View>
-          <View style={{ position: 'relative', zIndex: 100 }}>
-            {/* PROFILE TRIGGER */}
-            <TouchableOpacity 
-              style={styles.profileTrigger} 
-              onPress={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-            >
-              <View style={[styles.avatarCircleMini, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
+        )}
+
+        {/* PROFILE DROPDOWN OVERLAY (HEADER LEVEL) */}
+        {isProfileDropdownOpen && (
+          <View style={styles.dropdownContainer}>
+            {/* Header Info */}
+            <View style={styles.dropdownHeader}>
+              <View style={[styles.avatarCircleLarge, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
                 {shouldShowPhoto ? (
-                  <Image source={{ uri: finalPhotoUrl! }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" onError={() => setPhotoLoadFailed(true)} />
+                  <Image source={{ uri: finalPhotoUrl! }} style={{ width: 48, height: 48, borderRadius: 24 }} resizeMode="cover" onError={() => setPhotoLoadFailed(true)} />
                 ) : (
-                  <Text style={[styles.avatarTextMini, { color: avatarColors.text }]}>
+                  <Text style={[styles.avatarTextLarge, { color: avatarColors.text }]}>
                     {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
                   </Text>
                 )}
               </View>
-              {isDesktop && (
-                <View style={styles.triggerTextContainer}>
-                  <Text style={styles.triggerNameText}>{user?.name ?? 'Esther Howard'}</Text>
-                </View>
-              )}
-              <Ionicons name="chevron-down" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
-            </TouchableOpacity>
-
-            {/* DROPDOWN OVERLAY */}
-            {isProfileDropdownOpen && (
-              <View style={styles.dropdownContainer}>
-                {/* Header Info */}
-                <View style={styles.dropdownHeader}>
-                  <View style={[styles.avatarCircleLarge, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
-                    {shouldShowPhoto ? (
-                      <Image source={{ uri: finalPhotoUrl! }} style={{ width: 48, height: 48, borderRadius: 24 }} resizeMode="cover" onError={() => setPhotoLoadFailed(true)} />
-                    ) : (
-                      <Text style={[styles.avatarTextLarge, { color: avatarColors.text }]}>
-                        {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'EH'}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.headerTextContainer}>
-                    <Text style={styles.dropdownNameText}>{user?.name ?? 'Esther Howard'}</Text>
-                    <Text style={styles.dropdownEmailText}>{user?.email ?? 'estherhoward@gmail.com'}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.dropdownDivider} />
-                
-                {/* Menu items */}
-                <ScrollView style={styles.dropdownItemsList}>
-                  {userRole === 'it_publisher' && (
-                    <TouchableOpacity 
-                      style={styles.dropdownItem} 
-                      onPress={() => { setIsProfileDropdownOpen(false); if (onTabChange) onTabChange('user-management'); }}
-                    >
-                      <Ionicons name="people-outline" size={18} color="#4B5563" />
-                      <View style={styles.itemTextContainer}>
-                        <Text style={styles.itemTitle}>User Management</Text>
-                        <Text style={styles.itemSubtitle}>Manage members, access & more</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { 
-                      setIsProfileDropdownOpen(false); 
-                      if (onTabChange) onTabChange('account-settings');
-                    }}
-                  >
-                    <Ionicons name="settings-outline" size={18} color="#4B5563" />
-                    <View style={styles.itemTextContainer}>
-                      <Text style={styles.itemTitle}>Account settings</Text>
-                      <Text style={styles.itemSubtitle}>Manage defaults, privacy & more</Text>
-                    </View>
-                  </TouchableOpacity>
-
-
-
-                  <TouchableOpacity 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setIsProfileDropdownOpen(false); handleLogout(); }}
-                  >
-                    <Ionicons name="log-out-outline" size={18} color="#4B5563" />
-                    <View style={styles.itemTextContainer}>
-                      <Text style={styles.itemTitle}>Sign out</Text>
-                    </View>
-                  </TouchableOpacity>
-                </ScrollView>
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.dropdownNameText}>{user?.name ?? 'Esther Howard'}</Text>
+                <Text style={styles.dropdownEmailText}>{user?.email ?? 'estherhoward@gmail.com'}</Text>
               </View>
-            )}
+            </View>
+            
+            <View style={styles.dropdownDivider} />
+            
+            {/* Menu items */}
+            <ScrollView style={styles.dropdownItemsList}>
+              {userRole === 'it_publisher' && (
+                <TouchableOpacity 
+                  style={styles.dropdownItem} 
+                  onPress={() => { setIsProfileDropdownOpen(false); if (onTabChange) onTabChange('user-management'); }}
+                >
+                  <Ionicons name="people-outline" size={18} color="#4B5563" />
+                  <View style={styles.itemTextContainer}>
+                    <Text style={styles.itemTitle}>User Management</Text>
+                    <Text style={styles.itemSubtitle}>Manage members, access & more</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { 
+                  setIsProfileDropdownOpen(false); 
+                  if (onTabChange) onTabChange('account-settings');
+                }}
+              >
+                <Ionicons name="settings-outline" size={18} color="#4B5563" />
+                <View style={styles.itemTextContainer}>
+                  <Text style={styles.itemTitle}>Account settings</Text>
+                  <Text style={styles.itemSubtitle}>Manage defaults, privacy & more</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={() => { setIsProfileDropdownOpen(false); handleLogout(); }}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#4B5563" />
+                <View style={styles.itemTextContainer}>
+                  <Text style={styles.itemTitle}>Sign out</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
+        )}
       </View>
 
       {/* Main Layout Container */}
@@ -833,6 +842,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -841,7 +851,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#3B0061',
-    zIndex: 10,
+    zIndex: 1000,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -933,10 +943,18 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     marginTop: 1,
   },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: -2000,
+    zIndex: 99990,
+  },
   dropdownContainer: {
     position: 'absolute',
-    top: 48,
-    right: 8,
+    top: 54,
+    right: 12,
     width: 270,
     maxWidth: '88vw' as any,
     backgroundColor: Colors.surface,
@@ -1243,9 +1261,9 @@ const styles = StyleSheet.create({
   },
   notificationsDropdownContainer: {
     position: 'absolute',
-    top: 48,
-    right: 8,
-    width: 300,
+    top: 54,
+    right: 12,
+    width: 320,
     maxWidth: '88vw' as any,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
