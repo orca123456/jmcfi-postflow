@@ -2477,9 +2477,9 @@ export default function ITAdminDashboard() {
           return (
             <View style={styles.tokensPage}>
               <AISettingsPanel isVisible={activeTab === 'tokens'} />
-              <View style={styles.tokensHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tokensTitle}>Platform Integrations</Text>
+              <View style={[styles.tokensHeader, !isLargeScreen && styles.tokensHeaderMobile]}>
+                <View style={[{ flex: 1, minWidth: 0 }, !isLargeScreen && { width: '100%', flex: 0 }]}>
+                  <Text style={[styles.tokensTitle, !isLargeScreen && styles.tokensTitleMobile]}>Platform Integrations</Text>
                   <Text style={styles.tokensSubtitle}>Manage your social media and website publishing connections.</Text>
                 </View>
                 {(tokenLastUpdated && tokenLastUpdated !== 'Never') ? (
@@ -2497,34 +2497,34 @@ export default function ITAdminDashboard() {
                 <Text style={styles.tokensSecurityText}>API credentials are encrypted and securely stored. Never share your access tokens.</Text>
               </View>
 
-              <Card style={styles.tokensMetaCard}>
-                <View style={styles.tokensMetaContent}>
+              <Card style={[styles.tokensMetaCard, !isLargeScreen && styles.tokensMetaCardMobile]}>
+                <View style={[styles.tokensMetaContent, !isLargeScreen && styles.tokensMetaContentMobile]}>
                   <View style={styles.tokensMetaIcon}>
                     <Ionicons name="shield-outline" size={18} color="#6D28D9" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.tokensMetaTitle}>Meta publishing requirements</Text>
                     <Text style={styles.tokensMetaText}>
                       Use a Facebook Page Access Token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish. The same Page token can be used for Facebook and Instagram publishing.
                     </Text>
                   </View>
                 </View>
-                <View style={styles.tokensMetaActions}>
+                <View style={[styles.tokensMetaActions, !isLargeScreen && styles.tokensMetaActionsMobile]}>
                   <TouchableOpacity
                     onPress={handleUseFacebookTokenForInstagram}
                     disabled={!tokenFields.facebook_access_token || savingTokens}
-                    style={[styles.tokensSecondaryButton, (!tokenFields.facebook_access_token || savingTokens) && styles.tokensButtonDisabled]}
+                    style={[styles.tokensSecondaryButton, !isLargeScreen && styles.tokensFullWidthButton, (!tokenFields.facebook_access_token || savingTokens) && styles.tokensButtonDisabled]}
                   >
                     <Ionicons name="copy-outline" size={15} color="#5B21B6" />
-                    <Text style={styles.tokensSecondaryButtonText}>Use Facebook Token for Instagram</Text>
+                    <Text style={[styles.tokensSecondaryButtonText, !isLargeScreen && { textAlign: 'center' }]}>Use Facebook Token for Instagram</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleSaveAndValidatePublishingSetup}
                     disabled={savingTokens || validatingTokens}
-                    style={[styles.tokensPrimaryButton, (savingTokens || validatingTokens) && styles.tokensButtonDisabled]}
+                    style={[styles.tokensPrimaryButton, !isLargeScreen && styles.tokensFullWidthButton, (savingTokens || validatingTokens) && styles.tokensButtonDisabled]}
                   >
                     <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
-                    <Text style={styles.tokensPrimaryButtonText}>
+                    <Text style={[styles.tokensPrimaryButtonText, !isLargeScreen && { textAlign: 'center' }]}>
                       {validatingTokens ? 'Validating Meta Setup...' : 'Save & Validate Publishing Setup'}
                     </Text>
                   </TouchableOpacity>
@@ -2576,18 +2576,18 @@ export default function ITAdminDashboard() {
                         </View>
                       ))}
                     </View>
-                    <View style={styles.tokensCardActions}>
+                    <View style={[styles.tokensCardActions, !isLargeScreen && styles.tokensCardActionsMobile]}>
                       <TouchableOpacity
                         onPress={() => handleClearPlatformTokens(platform.id)}
                         disabled={savingTokens}
-                        style={[styles.tokensClearButton, savingTokens && styles.tokensButtonDisabled]}
+                        style={[styles.tokensClearButton, !isLargeScreen && styles.tokensFullWidthButton, savingTokens && styles.tokensButtonDisabled]}
                       >
                         <Text style={styles.tokensClearButtonText}>Clear</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleSavePlatformTokens(platform.id)}
                         disabled={savingTokens}
-                        style={[styles.tokensSaveButton, savingTokens && styles.tokensButtonDisabled]}
+                        style={[styles.tokensSaveButton, !isLargeScreen && styles.tokensFullWidthButton, savingTokens && styles.tokensButtonDisabled]}
                       >
                         <Ionicons name="save-outline" size={15} color="#FFFFFF" />
                         <Text style={styles.tokensSaveButtonText}>
@@ -4571,31 +4571,37 @@ const styles = StyleSheet.create({
   // Platform integrations
   tokensPage: { gap: 18 },
   tokensHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  tokensHeaderMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 10 },
   tokensTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
-  tokensSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
+  tokensTitleMobile: { fontSize: 21 },
+  tokensSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5, lineHeight: 18 },
   tokensUpdatedBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#F3E8FF', borderWidth: 1, borderColor: '#E9D5FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   tokensUpdatedText: { fontSize: 11, fontWeight: '700', color: '#5B21B6' },
   tokensSecurityBanner: { minHeight: 48, borderRadius: 8, backgroundColor: 'rgba(245, 240, 255, 0.92)', borderWidth: 1, borderColor: '#E9D5FF', paddingHorizontal: 16, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 12 },
   tokensSecurityText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#5B21B6' },
   tokensMetaCard: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 18, flexWrap: 'wrap', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
-  tokensMetaContent: { flex: 1, minWidth: 300, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  tokensMetaIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
+  tokensMetaCardMobile: { flexDirection: 'column', alignItems: 'stretch', gap: 14, padding: 14 },
+  tokensMetaContent: { flex: 1, minWidth: 260, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  tokensMetaContentMobile: { flex: 0, minWidth: 0, width: '100%' },
+  tokensMetaIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   tokensMetaTitle: { fontSize: 13, fontWeight: '900', color: '#111827' },
   tokensMetaText: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 4 },
   tokensMetaActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  tokensMetaActionsMobile: { flexDirection: 'column', width: '100%', alignItems: 'stretch', gap: 10 },
+  tokensFullWidthButton: { width: '100%', minHeight: 42, justifyContent: 'center' },
   tokensPrimaryButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 15, backgroundColor: '#5B0FB8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  tokensPrimaryButtonText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
+  tokensPrimaryButtonText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF', flexShrink: 1 },
   tokensSecondaryButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 14, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#DDD6FE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  tokensSecondaryButtonText: { fontSize: 12, fontWeight: '900', color: '#5B21B6' },
+  tokensSecondaryButtonText: { fontSize: 12, fontWeight: '900', color: '#5B21B6', flexShrink: 1 },
   tokensButtonDisabled: { opacity: 0.6 },
   tokensIntegrationCard: { padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   tokensIntegrationCardMobile: { flexDirection: 'column' },
   tokensPlatformIntro: { width: 360, padding: 24, borderRightWidth: 1, borderRightColor: '#E5E7EB', flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  tokensPlatformIntroMobile: { width: '100%', borderRightWidth: 0, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  tokensPlatformIcon: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  tokensPlatformIntroMobile: { width: '100%', borderRightWidth: 0, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 16 },
+  tokensPlatformIcon: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   tokensPlatformName: { fontSize: 17, fontWeight: '900', color: '#111827', marginTop: 3 },
-  tokensPlatformDescription: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 18 },
-  tokensConnectionBadge: { alignSelf: 'flex-start', marginTop: 20, borderRadius: 999, backgroundColor: '#FEF3C7', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6 },
+  tokensPlatformDescription: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 10 },
+  tokensConnectionBadge: { alignSelf: 'flex-start', marginTop: 14, borderRadius: 999, backgroundColor: '#FEF3C7', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6 },
   tokensConnectionBadgeConnected: { backgroundColor: '#DCFCE7' },
   tokensConnectionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#F59E0B' },
   tokensConnectionDotConnected: { backgroundColor: '#16A34A' },
@@ -4612,6 +4618,7 @@ const styles = StyleSheet.create({
   tokensEyeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   tokensFieldHint: { fontSize: 11, color: '#94A3B8' },
   tokensCardActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  tokensCardActionsMobile: { flexDirection: 'column', width: '100%', alignItems: 'stretch', gap: 10 },
   tokensSaveButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 16, backgroundColor: '#5B0FB8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   tokensSaveButtonText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
   tokensClearButton: { minHeight: 40, minWidth: 82, borderRadius: 7, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
