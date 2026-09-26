@@ -117,6 +117,59 @@ class EmailSettingController extends Controller
 
         $adminEmail = $request->user()->email;
         $adminName  = $request->user()->full_name;
+        $cleanPassword = str_replace(' ', '', $password);
+
+        $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
+
+        if ($isSendGrid) {
+            try {
+                $client = new \GuzzleHttp\Client();
+                $res = $client->post('https://api.sendgrid.com/v3/mail/send', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $cleanPassword,
+                        'Content-Type'  => 'application/json',
+                    ],
+                    'json' => [
+                        'personalizations' => [
+                            [
+                                'to' => [
+                                    ['email' => $adminEmail, 'name' => $adminName]
+                                ]
+                            ]
+                        ],
+                        'from' => [
+                            'email' => $fromAddr ?: 'postflow@jmc.edu.ph',
+                            'name'  => $fromName ?: 'JMCFI PostFlow'
+                        ],
+                        'subject' => '[JMCFI PostFlow] ✅ Test Email — Configuration Successful!',
+                        'content' => [
+                            [
+                                'type'  => 'text/plain',
+                                'value' => "Hello {$adminName},\n\nThis is a test email sent via Twilio SendGrid API from JMCFI PostFlow.\n\nIf you received this, your SendGrid integration is working correctly!\n\n— JMCFI PostFlow System"
+                            ]
+                        ]
+                    ],
+                    'timeout' => 12,
+                ]);
+
+                if ($res->getStatusCode() >= 200 && $res->getStatusCode() < 300) {
+                    Log::info("SendGrid test email sent successfully to {$adminEmail}");
+                    return response()->json(['message' => "Test email sent via Twilio SendGrid to {$adminEmail}. Please check your inbox!"]);
+                }
+            } catch (\GuzzleHttp\Exception\ClientException $ge) {
+                $respBody = (string) $ge->getResponse()?->getBody();
+                Log::error("SendGrid API error: {$respBody}");
+                if (str_contains($respBody, 'authorization') || $ge->getCode() === 401) {
+                    return response()->json(['message' => 'SendGrid Authentication Failed (401). Please verify your SendGrid API Key.'], 422);
+                } elseif (str_contains($respBody, 'Single Sender') || $ge->getCode() === 403) {
+                    return response()->json(['message' => 'SendGrid Error: The From Email Address must be verified in Twilio SendGrid (Single Sender Verification).'], 422);
+                }
+                return response()->json(['message' => 'SendGrid API Error: ' . ($respBody ?: $ge->getMessage())], 422);
+            } catch (\Exception $e) {
+                Log::error("SendGrid exception: " . $e->getMessage());
+                return response()->json(['message' => 'SendGrid Error: ' . $e->getMessage()], 422);
+            }
+        }
 
         try {
             Mail::raw(
@@ -138,7 +191,7 @@ class EmailSettingController extends Controller
             if (str_contains($lower, '530') || str_contains($lower, '535') || str_contains($lower, '534') || str_contains($lower, 'authentication') || str_contains($lower, 'bad credentials')) {
                 $errorMsg = 'Gmail Authentication Failed (530/535). Please double check your 16-character Gmail App Password and click "Save Settings".';
             } elseif (str_contains($lower, 'connection') || str_contains($lower, 'stream') || str_contains($lower, 'timeout') || str_contains($lower, 'refused')) {
-                $errorMsg = "Could not connect to SMTP server ({$host}:{$port}). Railway/cloud hosting blocks outbound SMTP ports (587/465) by default to prevent spam. Consider using an HTTP email API (e.g., Resend) for cloud environments.";
+                $errorMsg = "Could not connect to SMTP server ({$host}:{$port}). Railway/cloud hosting blocks outbound SMTP ports (587/465) by default to prevent spam. Consider using SendGrid API (Host: api.sendgrid.com) or an HTTP mail API for cloud environments.";
             } else {
                 $errorMsg = "Test failed: {$rawMsg}";
             }
