@@ -138,7 +138,7 @@ class EmailSettingController extends Controller
             if (str_contains($lower, '530') || str_contains($lower, '535') || str_contains($lower, '534') || str_contains($lower, 'authentication') || str_contains($lower, 'bad credentials')) {
                 $errorMsg = 'Gmail Authentication Failed (530/535). Please double check your 16-character Gmail App Password and click "Save Settings".';
             } elseif (str_contains($lower, 'connection') || str_contains($lower, 'stream') || str_contains($lower, 'timeout') || str_contains($lower, 'refused')) {
-                $errorMsg = "Could not connect to SMTP server ({$host}:{$port}). If hosted on Railway/cloud, try Port 465 with SSL encryption instead of Port 587 TLS.";
+                $errorMsg = "Could not connect to SMTP server ({$host}:{$port}). Railway/cloud hosting blocks outbound SMTP ports (587/465) by default to prevent spam. Consider using an HTTP email API (e.g., Resend) for cloud environments.";
             } else {
                 $errorMsg = "Test failed: {$rawMsg}";
             }
