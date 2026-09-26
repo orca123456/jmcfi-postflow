@@ -15,8 +15,6 @@ class StorePostRequest extends FormRequest
 
     public function rules(): array
     {
-        $isDraft = $this->boolean('is_draft');
-
         $rules = [
             'title' => ['required', 'string', 'max:255'],
             'caption_narrative' => ['required', 'string', 'max:5000'],
@@ -29,15 +27,12 @@ class StorePostRequest extends FormRequest
             'is_draft' => ['boolean'],
         ];
 
-        // Media validation when files are uploaded
         if ($this->hasFile('media')) {
-            $rules['media'] = ['array'];
-            $rules['media.*'] = ['file', 'mimes:jpg,jpeg,png,gif,webp,mp4,mov,avi,pdf,doc,docx', 'max:51200'];
+            $rules['media'] = ['nullable'];
         }
 
         if ($this->hasFile('supporting_docs')) {
-            $rules['supporting_docs'] = ['array'];
-            $rules['supporting_docs.*'] = ['file', 'mimes:pdf,doc,docx,xls,xlsx,txt', 'max:51200'];
+            $rules['supporting_docs'] = ['nullable'];
         }
 
         return $rules;
@@ -48,9 +43,6 @@ class StorePostRequest extends FormRequest
         return [
             'title.required' => 'A post title is required.',
             'caption_narrative.required' => 'Please provide a caption for your post.',
-            'media.*.max' => 'Each file must not exceed 50MB.',
-            'media.*.mimes' => 'Media files must be images (jpg, png, jpeg, gif, webp), videos (mp4, mov, avi), or documents (pdf, doc, docx).',
-            'supporting_docs.*.mimes' => 'Supporting documents must be PDF, Word, Excel, or text files.',
         ];
     }
 
@@ -67,11 +59,18 @@ class StorePostRequest extends FormRequest
             }
 
             $mediaFiles = $this->file('media', []);
+            if (!$mediaFiles) {
+                $mediaFiles = [];
+            }
             $mediaFiles = is_array($mediaFiles) ? $mediaFiles : [$mediaFiles];
 
             foreach (array_filter($mediaFiles) as $file) {
-                if (str_starts_with((string) $file->getMimeType(), 'image/')) {
-                    return;
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $mime = strtolower((string) $file->getMimeType());
+                    $ext = strtolower((string) $file->getClientOriginalExtension());
+                    if (str_starts_with($mime, 'image/') || in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                        return;
+                    }
                 }
             }
 

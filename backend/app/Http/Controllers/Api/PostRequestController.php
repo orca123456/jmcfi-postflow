@@ -132,16 +132,23 @@ class PostRequestController extends Controller
                 // Handle media uploads
                 if ($request->hasFile('media')) {
                     $featuredIndex = (int) $request->input('featured_media_index', 0);
-                    foreach ($request->file('media') as $index => $file) {
+                    $mediaFiles = $request->file('media');
+                    $mediaFiles = is_array($mediaFiles) ? $mediaFiles : [$mediaFiles];
+                    foreach ($mediaFiles as $index => $file) {
+                        if (!$file instanceof \Illuminate\Http\UploadedFile) continue;
                         $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                         $path = $file->store('post-media/' . $post->id, $disk);
-                        $this->createMediaRecord($post, $file, $path, $this->getMediaType($file->getMimeType()), $index, $index === $featuredIndex);
+                        $mime = $file->getMimeType() ?: 'image/jpeg';
+                        $this->createMediaRecord($post, $file, $path, $this->getMediaType($mime), $index, $index === $featuredIndex);
                     }
                 }
 
                 // Handle supporting documents
                 if ($request->hasFile('supporting_docs')) {
-                    foreach ($request->file('supporting_docs') as $index => $file) {
+                    $docs = $request->file('supporting_docs');
+                    $docs = is_array($docs) ? $docs : [$docs];
+                    foreach ($docs as $index => $file) {
+                        if (!$file instanceof \Illuminate\Http\UploadedFile) continue;
                         $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                         $path = $file->store('post-supporting-docs/' . $post->id, $disk);
                         $this->createMediaRecord($post, $file, $path, 'document', 100 + $index, false);
@@ -239,11 +246,15 @@ class PostRequestController extends Controller
 
                 // Add new media
                 $existingCount = $postRequest->media()->whereIn('id', $keepIds)->count();
-                foreach ($request->file('media') as $index => $file) {
+                $upMedia = $request->file('media');
+                $upMedia = is_array($upMedia) ? $upMedia : [$upMedia];
+                foreach ($upMedia as $index => $file) {
+                    if (!$file instanceof \Illuminate\Http\UploadedFile) continue;
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
                     $path = $file->store('post-media/' . $postRequest->id, $disk);
                     $sortOrder = $existingCount + $index;
-                    $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($file->getMimeType()), $sortOrder, $sortOrder === 0);
+                    $mime = $file->getMimeType() ?: 'image/jpeg';
+                    $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), $sortOrder, $sortOrder === 0);
                 }
             }
 
