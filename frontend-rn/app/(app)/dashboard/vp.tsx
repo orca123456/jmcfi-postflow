@@ -403,7 +403,7 @@ export default function VPDashboard() {
       {isInitialLoading && <DashboardSkeleton />}
 
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected') && !isInitialLoading && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting and Department Filter */}
           {activeTab === 'dashboard' && (
@@ -418,11 +418,11 @@ export default function VPDashboard() {
           )}
 
           {/* Metric Summary Cards Row (2x2 on Mobile) */}
-          {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
+          {['dashboard', 'approved', 'rejected', 'all'].includes(activeTab) && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
               {/* Card 1: For My Approval */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#F3E8FF' }]}>
                       <Ionicons name="document-text" size={20} color="#7C3AED" />
@@ -436,7 +436,7 @@ export default function VPDashboard() {
 
               {/* Card 2: Approved */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
                       <Ionicons name="checkmark-circle" size={20} color="#D97706" />
@@ -450,7 +450,7 @@ export default function VPDashboard() {
 
               {/* Card 3: Rejected */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEE2E2' }]}>
                       <Ionicons name="close-circle" size={20} color="#DC2626" />
@@ -463,8 +463,8 @@ export default function VPDashboard() {
               </TouchableOpacity>
 
               {/* Card 4: Total Requests */}
-              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
-                <Card style={styles.metricCard}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('all')} activeOpacity={0.7}>
+                <Card style={[styles.metricCard, activeTab === 'all' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#DBEAFE' }]}>
                       <Ionicons name="paper-plane" size={20} color="#2563EB" />
@@ -483,7 +483,7 @@ export default function VPDashboard() {
             {/* Table Control Header */}
             <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
               <Text style={styles.tableTitle}>
-                {activeTab === 'dashboard' ? 'Requests Awaiting Your Approval' : activeTab === 'approved' ? 'Approved Requests' : 'Rejected Requests'}
+                {activeTab === 'dashboard' ? 'Requests Awaiting Your Approval' : activeTab === 'approved' ? 'Approved Requests' : activeTab === 'rejected' ? 'Rejected Requests' : 'All Requests'}
               </Text>
 
               <View style={[styles.tableControlsRight, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
@@ -1336,21 +1336,21 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   metricCard: {
-    flex: 1,
-    minWidth: 200,
-    padding: Spacing.md,
+    padding: 12,
     borderRadius: BorderRadius.lg,
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.background,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minHeight: 125,
+    justifyContent: 'space-between',
   },
   metricCardHeader: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   metricIconBg: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
