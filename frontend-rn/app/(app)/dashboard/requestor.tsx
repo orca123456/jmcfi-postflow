@@ -2163,78 +2163,80 @@ export default function RequestorDashboard() {
               </Card>
             ) : (
               <>
-                <View style={styles.table}>
-                  <View style={styles.tableHeaderRow}>
-                    <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
-                    <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
-                    <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
-                    <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
-                    <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
-                  </View>
-                  {filteredRejectedPosts.map((post) => (
-                    <TouchableOpacity
-                      key={post.id}
-                      style={styles.tableRow}
-                      activeOpacity={0.7}
-                      onPress={() => setSelectedQueuePost(post)}
-                    >
-                      {/* REQUEST TITLE + CATEGORY TAG */}
-                      <View style={[styles.cellContainer, styles.flexTitle]}>
-                        <View style={styles.thumbnailBox}>
-                          {post.thumbnailUrl ? (
-                            <Image source={{ uri: post.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
-                          ) : (
-                            <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ minWidth: isTablet ? '100%' : 800 }}>
+                  <View style={styles.table}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
+                      <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
+                      <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
+                      <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
+                      <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
+                    </View>
+                    {filteredRejectedPosts.map((post) => (
+                      <TouchableOpacity
+                        key={post.id}
+                        style={styles.tableRow}
+                        activeOpacity={0.7}
+                        onPress={() => setSelectedQueuePost(post)}
+                      >
+                        {/* REQUEST TITLE + CATEGORY TAG */}
+                        <View style={[styles.cellContainer, styles.flexTitle]}>
+                          <View style={styles.thumbnailBox}>
+                            {post.thumbnailUrl ? (
+                              <Image source={{ uri: post.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
+                            ) : (
+                              <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.rowTitleText}>{post.title}</Text>
+                            <View style={styles.categoryPill}>
+                              <Text style={styles.categoryPillText}>{post.other_category_name || post.category}</Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* REQUESTED BY */}
+                        <View style={[styles.cellContainer, styles.flexUser]}>
+                          <Text style={styles.rowUserName}>{user?.full_name}</Text>
+                          <Text style={styles.rowUserRole}>Requestor</Text>
+                        </View>
+
+                        {/* REQUESTED ON */}
+                        <View style={[styles.cellContainer, styles.flexDate]}>
+                          <Text style={styles.rowDateText}>{post.date}</Text>
+                          <Text style={styles.rowTimeText}>{post.time}</Text>
+                        </View>
+
+                        {/* PLATFORMS */}
+                        <View style={[styles.cellContainer, styles.flexPlatforms, { flexDirection: 'row', gap: 6, justifyContent: 'flex-start' }]}>
+                          {(post.platforms || []).includes('facebook') && (
+                            <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                              <Ionicons name="logo-facebook" size={13} color="#1877F2" />
+                            </View>
+                          )}
+                          {(post.platforms || []).includes('instagram') && (
+                            <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
+                              <Ionicons name="logo-instagram" size={13} color="#E1306C" />
+                            </View>
+                          )}
+                          {((post.platforms || []).includes('website') || (post.platforms || []).includes('portal') || (post.platforms || []).includes('wordpress')) && (
+                            <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
+                              <Ionicons name="globe-outline" size={13} color="#059669" />
+                            </View>
                           )}
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.rowTitleText}>{post.title}</Text>
-                          <View style={styles.categoryPill}>
-                            <Text style={styles.categoryPillText}>{post.other_category_name || post.category}</Text>
+
+                        {/* ACTIONS */}
+                        <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup, { justifyContent: 'flex-end' }]}>
+                          <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#B91C1C' }}>REJECTED</Text>
                           </View>
                         </View>
-                      </View>
-
-                      {/* REQUESTED BY */}
-                      <View style={[styles.cellContainer, styles.flexUser]}>
-                        <Text style={styles.rowUserName}>{user?.full_name}</Text>
-                        <Text style={styles.rowUserRole}>Requestor</Text>
-                      </View>
-
-                      {/* REQUESTED ON */}
-                      <View style={[styles.cellContainer, styles.flexDate]}>
-                        <Text style={styles.rowDateText}>{post.date}</Text>
-                        <Text style={styles.rowTimeText}>{post.time}</Text>
-                      </View>
-
-                      {/* PLATFORMS */}
-                      <View style={[styles.cellContainer, styles.flexPlatforms, { flexDirection: 'row', gap: 6, justifyContent: 'flex-start' }]}>
-                        {(post.platforms || []).includes('facebook') && (
-                          <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
-                            <Ionicons name="logo-facebook" size={13} color="#1877F2" />
-                          </View>
-                        )}
-                        {(post.platforms || []).includes('instagram') && (
-                          <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
-                            <Ionicons name="logo-instagram" size={13} color="#E1306C" />
-                          </View>
-                        )}
-                        {((post.platforms || []).includes('website') || (post.platforms || []).includes('portal') || (post.platforms || []).includes('wordpress')) && (
-                          <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                            <Ionicons name="globe-outline" size={13} color="#059669" />
-                          </View>
-                        )}
-                      </View>
-
-                      {/* ACTIONS */}
-                      <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup, { justifyContent: 'flex-end' }]}>
-                        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#B91C1C' }}>REJECTED</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
 
                 <PaginationControl
                   currentPage={1}
@@ -3258,6 +3260,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
     color: Colors.textSecondary,
+    paddingRight: 16,
   },
   tableRow: {
     flexDirection: 'row',
@@ -3272,16 +3275,17 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
 
-  // Column Flex Multipliers
-  flexTitle: { flex: 2 },
-  flexDept: { flex: 2.2 },
-  flexUser: { flex: 1.5 },
-  flexDate: { flex: 1.2 },
-  flexPlatforms: { flex: 1 },
-  flexActions: { flex: 1.5 },
+  // Column Flex Multipliers & Min-Widths to Prevent Overlap
+  flexTitle: { flex: 2.2, minWidth: 200 },
+  flexDept: { flex: 2.5, minWidth: 220 },
+  flexUser: { flex: 1.8, minWidth: 140 },
+  flexDate: { flex: 1.2, minWidth: 110 },
+  flexPlatforms: { flex: 1, minWidth: 90 },
+  flexActions: { flex: 1.5, minWidth: 150 },
 
   cellContainer: {
     justifyContent: 'center',
+    paddingRight: 16,
   },
   thumbnailBox: {
     width: 32,

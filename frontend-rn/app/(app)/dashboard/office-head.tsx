@@ -626,7 +626,7 @@ export default function OfficeHeadDashboard() {
             </View>
 
             {/* Requests Table */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ minWidth: isTablet ? '100%' : 760 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ minWidth: isTablet ? '100%' : 920 }}>
               <View style={styles.table}>
                 <View style={styles.tableHeaderRow}>
                   <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
@@ -1507,12 +1507,13 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: Colors.textSecondary,
     letterSpacing: 0.5,
+    paddingRight: 16,
   },
 
   // Column Flex Multipliers & Min-Widths to Prevent Overlap
-  flexTitle: { flex: 2, minWidth: 160 },
-  flexDept: { flex: 2.2, minWidth: 140 },
-  flexUser: { flex: 1.5, minWidth: 120 },
+  flexTitle: { flex: 2.2, minWidth: 200 },
+  flexDept: { flex: 2.5, minWidth: 220 },
+  flexUser: { flex: 1.8, minWidth: 140 },
   flexDate: { flex: 1.2, minWidth: 110 },
   flexPlatforms: { flex: 1, minWidth: 90 },
   flexActions: { flex: 1.5, minWidth: 150 },
@@ -1528,6 +1529,7 @@ const styles = StyleSheet.create({
   },
   cellContainer: {
     justifyContent: 'center',
+    paddingRight: 16,
   },
   thumbnailBox: {
     width: 32,
@@ -1560,6 +1562,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
     color: '#4B5563',
+    lineHeight: 18,
   },
   rowUserName: {
     fontSize: FontSize.xs + 1,
