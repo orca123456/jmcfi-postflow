@@ -141,9 +141,9 @@ export function ChatBot() {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
-  const fabTranslateX = edgeAnim.interpolate({
+  const fabMarginRight = edgeAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [34, 0],
+    outputRange: [-26, 0],
   });
 
   return (
@@ -280,7 +280,7 @@ export function ChatBot() {
       <Animated.View
         style={[
           styles.fabWrapper,
-          { transform: [{ translateX: fabTranslateX }] },
+          { marginRight: fabMarginRight },
         ]}
         {...({
           onMouseEnter: handleMouseEnter,
