@@ -27,14 +27,14 @@ export default function NotFoundScreen() {
           </>
         )}
 
-        {/* Large Background "404" Text */}
+        {/* Large Background "404" Text - Centered and fully visible */}
         <Text
           style={[
             styles.backgroundText,
             {
-              fontSize: isMobile ? Math.min(width * 0.32, 120) : Math.min(width * 0.18, 200),
-              letterSpacing: isMobile ? 6 : 16,
-              top: isMobile ? 40 : 30,
+              fontSize: isMobile ? Math.min(width * 0.28, 110) : Math.min(width * 0.16, 210),
+              letterSpacing: isMobile ? 4 : 12,
+              top: isMobile ? 45 : 70,
             },
           ]}
           numberOfLines={1}
@@ -52,8 +52,8 @@ export default function NotFoundScreen() {
             <View style={isMobile ? styles.triangleBottom : styles.triangleRight} />
           </View>
 
-          {/* Mascot Image */}
-          <View style={[styles.mascotWrapper, Platform.OS === 'web' ? ({ mixBlendMode: 'multiply' } as any) : {}]}>
+          {/* Mascot Image with transparent multiply blend so white box never covers 404 */}
+          <View style={styles.mascotWrapper}>
             <Image
               source={require('../assets/images/404-mascot.jpg')}
               style={[
@@ -62,6 +62,7 @@ export default function NotFoundScreen() {
                   width: isMobile ? Math.min(width * 0.55, 220) : Math.min(width * 0.32, 340),
                   height: isMobile ? Math.min(width * 0.55, 220) : Math.min(width * 0.32, 340),
                 },
+                Platform.OS === 'web' && ({ mixBlendMode: 'multiply' } as any),
               ]}
               resizeMode="contain"
             />
@@ -119,28 +120,30 @@ const styles = StyleSheet.create({
   backgroundText: {
     position: 'absolute',
     fontWeight: '900',
-    color: '#E5E7EB',
+    color: '#CBD5E1',
     alignSelf: 'center',
     textAlign: 'center',
     zIndex: 0,
-    opacity: 0.85,
+    opacity: 0.95,
+    ...(Platform.OS === 'web' && ({ userSelect: 'none' } as any)),
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
-    marginTop: 40,
+    marginTop: 60,
     maxWidth: '100%',
   },
   contentColumn: {
     flexDirection: 'column',
-    marginTop: 20,
+    marginTop: 30,
     gap: 16,
   },
   mascotWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
   mascot: {
     marginLeft: 0,
@@ -160,6 +163,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 5,
+    zIndex: 3,
     ...(Platform.OS === 'web' && ({ backdropFilter: 'blur(12px)' } as any)),
   },
   speechBubbleMobile: {
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     borderBottomColor: 'transparent',
     borderTopColor: 'transparent',
-    zIndex: 2,
+    zIndex: 4,
   },
   triangleBottom: {
     position: 'absolute',
@@ -205,7 +209,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    zIndex: 2,
+    zIndex: 4,
   },
   speechText: {
     fontSize: 20,
