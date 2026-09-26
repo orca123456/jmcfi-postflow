@@ -72,13 +72,25 @@ export function ChatBot() {
   const handleMouseLeave = () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      setIsRevealed(false);
-    }, 1800);
+      if (!isOpen) {
+        setIsRevealed(false);
+      }
+    }, 600);
+  };
+
+  const handleClose = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    setIsOpen(false);
+    setIsRevealed(false);
   };
 
   const handleFabPress = () => {
-    setIsRevealed(true);
-    setIsOpen((prev) => !prev);
+    if (isOpen) {
+      handleClose();
+    } else {
+      setIsRevealed(true);
+      setIsOpen(true);
+    }
   };
 
   const formatTime = (date: Date) => {
@@ -179,10 +191,10 @@ export function ChatBot() {
               </View>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.headerActionBtn}>
+              <TouchableOpacity onPress={handleClose} style={styles.headerActionBtn}>
                 <Ionicons name="remove-outline" size={18} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.headerActionBtn}>
+              <TouchableOpacity onPress={handleClose} style={styles.headerActionBtn}>
                 <Ionicons name="close-outline" size={18} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
