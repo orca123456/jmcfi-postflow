@@ -233,25 +233,35 @@ class EmailSettingController extends Controller
             $effectiveEncryption = 'tls';
         }
 
-        Config::set('mail.default', $mailer);
-        Config::set('mail.mailers.smtp.transport', 'smtp');
-        Config::set('mail.mailers.smtp.host', $host);
-        Config::set('mail.mailers.smtp.port', (int) $port);
-        Config::set('mail.mailers.smtp.username', $username);
-        Config::set('mail.mailers.smtp.password', $cleanPassword);
-        Config::set('mail.mailers.smtp.encryption', $effectiveEncryption ?: null);
-        Config::set('mail.mailers.smtp.timeout', 12);
-        Config::set('mail.mailers.smtp.stream', [
-            'ssl' => [
-                'allow_self_signed' => true,
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-            ],
-        ]);
+        $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
+
+        if ($isSendGrid) {
+            Config::set('mail.default', 'sendgrid');
+            Config::set('mail.mailers.sendgrid.transport', 'sendgrid');
+            Config::set('mail.mailers.sendgrid.key', $cleanPassword);
+        } else {
+            Config::set('mail.default', $mailer);
+            Config::set('mail.mailers.smtp.transport', 'smtp');
+            Config::set('mail.mailers.smtp.host', $host);
+            Config::set('mail.mailers.smtp.port', (int) $port);
+            Config::set('mail.mailers.smtp.username', $username);
+            Config::set('mail.mailers.smtp.password', $cleanPassword);
+            Config::set('mail.mailers.smtp.encryption', $effectiveEncryption ?: null);
+            Config::set('mail.mailers.smtp.timeout', 12);
+            Config::set('mail.mailers.smtp.stream', [
+                'ssl' => [
+                    'allow_self_signed' => true,
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                ],
+            ]);
+        }
+
         Config::set('mail.from.address', $from ?: 'postflow@jmc.edu.ph');
         Config::set('mail.from.name', $name ?: 'JMCFI PostFlow');
 
         // Purge mailer instances so Laravel rebuilds transport with new config
+        Mail::purge('sendgrid');
         Mail::purge('smtp');
         Mail::purge($mailer);
         Mail::purge();
