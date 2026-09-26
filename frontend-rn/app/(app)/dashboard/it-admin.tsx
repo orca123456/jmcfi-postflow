@@ -2299,146 +2299,152 @@ export default function ITAdminDashboard() {
                   </TouchableOpacity>
                 </View>
 
-                {/* ── Two-Column Body (no scroll) ── */}
-                <View style={[styles.wideModalBody, width <= 600 && { flexDirection: 'column', overflow: 'scroll' } as any]}>
-                  {/* ── LEFT COLUMN ── */}
-                  <View style={[styles.wideModalColumn, width <= 600 && { borderRightWidth: 0 }]}>
-                    {/* Personal Information */}
-                    <View style={styles.wideModalSection}>
-                      <Text style={styles.wideSectionTitle}>Personal Information</Text>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldHalf}>
-                          <Text style={styles.wideFieldLabel}>First Name</Text>
-                          <TextInput style={styles.wideFieldInput} value={profileFirstName} onChangeText={setProfileFirstName} placeholder="First name" />
+                {/* ── Two-Column Body (Scrollable) ── */}
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16 }}
+                  showsVerticalScrollIndicator={true}
+                >
+                  <View style={[styles.wideModalBody, width <= 600 && { flexDirection: 'column' }]}>
+                    {/* ── LEFT COLUMN ── */}
+                    <View style={[styles.wideModalColumn, width <= 600 && { borderRightWidth: 0, paddingRight: 0 }]}>
+                      {/* Personal Information */}
+                      <View style={styles.wideModalSection}>
+                        <Text style={styles.wideSectionTitle}>Personal Information</Text>
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldHalf}>
+                            <Text style={styles.wideFieldLabel}>First Name</Text>
+                            <TextInput style={styles.wideFieldInput} value={profileFirstName} onChangeText={setProfileFirstName} placeholder="First name" />
+                          </View>
+                          <View style={styles.wideFieldHalf}>
+                            <Text style={styles.wideFieldLabel}>Last Name</Text>
+                            <TextInput style={styles.wideFieldInput} value={profileLastName} onChangeText={setProfileLastName} placeholder="Last name" />
+                          </View>
                         </View>
-                        <View style={styles.wideFieldHalf}>
-                          <Text style={styles.wideFieldLabel}>Last Name</Text>
-                          <TextInput style={styles.wideFieldInput} value={profileLastName} onChangeText={setProfileLastName} placeholder="Last name" />
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldHalf}>
+                            <Text style={styles.wideFieldLabel}>Middle Name</Text>
+                            <TextInput style={styles.wideFieldInput} value={profileMiddleName} onChangeText={setProfileMiddleName} placeholder="(Optional)" />
+                          </View>
+                          <View style={styles.wideFieldHalf}>
+                            <Text style={styles.wideFieldLabel}>Phone</Text>
+                            <TextInput style={styles.wideFieldInput} value={profilePhone} onChangeText={setProfilePhone} placeholder="(Optional)" />
+                          </View>
                         </View>
                       </View>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldHalf}>
-                          <Text style={styles.wideFieldLabel}>Middle Name</Text>
-                          <TextInput style={styles.wideFieldInput} value={profileMiddleName} onChangeText={setProfileMiddleName} placeholder="(Optional)" />
+
+                      {/* Contact & Work */}
+                      <View style={styles.wideModalSection}>
+                        <Text style={styles.wideSectionTitle}>Contact & Work</Text>
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldFull}>
+                            <Text style={styles.wideFieldLabel}>Email Address</Text>
+                            <TextInput style={styles.wideFieldInput} value={profileEmail} onChangeText={setProfileEmail} autoCapitalize="none" keyboardType="email-address" />
+                          </View>
                         </View>
-                        <View style={styles.wideFieldHalf}>
-                          <Text style={styles.wideFieldLabel}>Phone</Text>
-                          <TextInput style={styles.wideFieldInput} value={profilePhone} onChangeText={setProfilePhone} placeholder="(Optional)" />
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldHalf}>
+                            <Text style={styles.wideFieldLabel}>Department</Text>
+                            <select
+                              value={profileDepartment}
+                              onChange={(e: any) => setProfileDepartment(e.target.value)}
+                              style={styles.wideFieldSelect}
+                            >
+                              {profileFilteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
+                            </select>
+                          </View>
+                          <View style={styles.wideFieldHalf}>
+                            <Text style={styles.wideFieldLabel}>Position</Text>
+                            <TextInput style={styles.wideFieldInput} value={profilePosition} onChangeText={setProfilePosition} placeholder="(Optional)" />
+                          </View>
                         </View>
                       </View>
                     </View>
 
-                    {/* Contact & Work */}
-                    <View style={styles.wideModalSection}>
-                      <Text style={styles.wideSectionTitle}>Contact & Work</Text>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldFull}>
-                          <Text style={styles.wideFieldLabel}>Email Address</Text>
-                          <TextInput style={styles.wideFieldInput} value={profileEmail} onChangeText={setProfileEmail} autoCapitalize="none" keyboardType="email-address" />
+                    {/* ── RIGHT COLUMN ── */}
+                    <View style={[styles.wideModalColumn, styles.wideModalColumnRight, width <= 600 && { borderLeftWidth: 0, paddingLeft: 0, paddingTop: 16 }]}>
+                      {/* Account Settings */}
+                      <View style={styles.wideModalSection}>
+                        <Text style={styles.wideSectionTitle}>Account Settings</Text>
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldFull}>
+                            <Text style={styles.wideFieldLabel}>Role</Text>
+                            <select
+                              value={profileRole}
+                              onChange={(e: any) => setProfileRole(e.target.value)}
+                              style={styles.wideFieldSelect}
+                            >
+                              {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            </select>
+                          </View>
+                        </View>
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldFull}>
+                            <Text style={styles.wideFieldLabel}>Status</Text>
+                            <View style={styles.wideStatusRow}>
+                              <TouchableOpacity
+                                style={[styles.wideStatusToggle, profileStatus === 'active' && styles.wideStatusActive]}
+                                onPress={() => setProfileStatus('active')}
+                              >
+                                <View style={[styles.wideStatusDot, { backgroundColor: '#16A34A' }]} />
+                                <Text style={[styles.wideStatusText, profileStatus === 'active' && { color: '#fff' }]}>Active</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.wideStatusToggle, profileStatus === 'inactive' && styles.wideStatusInactive]}
+                                onPress={() => setProfileStatus('inactive')}
+                              >
+                                <View style={[styles.wideStatusDot, { backgroundColor: '#DC2626' }]} />
+                                <Text style={[styles.wideStatusText, profileStatus === 'inactive' && { color: '#fff' }]}>Inactive</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
                         </View>
                       </View>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldHalf}>
-                          <Text style={styles.wideFieldLabel}>Department</Text>
-                          <select
-                            value={profileDepartment}
-                            onChange={(e: any) => setProfileDepartment(e.target.value)}
-                            style={styles.wideFieldSelect}
-                          >
-                            {profileFilteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
-                          </select>
+
+                      {/* Change Password */}
+                      <View style={styles.wideModalSection}>
+                        <Text style={styles.wideSectionTitle}>Change Password</Text>
+                        <Text style={styles.wideFormHint}>Leave blank to keep current</Text>
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldFull}>
+                            <Text style={styles.wideFieldLabel}>New Password</Text>
+                            <View style={styles.widePasswordWrapper}>
+                              <TextInput
+                                style={styles.widePasswordInput}
+                                secureTextEntry={!showProfilePassword}
+                                value={profilePassword}
+                                onChangeText={setProfilePassword}
+                                placeholder="Min. 8 characters"
+                                autoCapitalize="none"
+                              />
+                              <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePassword(!showProfilePassword)}>
+                                <Ionicons name={showProfilePassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
                         </View>
-                        <View style={styles.wideFieldHalf}>
-                          <Text style={styles.wideFieldLabel}>Position</Text>
-                          <TextInput style={styles.wideFieldInput} value={profilePosition} onChangeText={setProfilePosition} placeholder="(Optional)" />
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldFull}>
+                            <Text style={styles.wideFieldLabel}>Confirm Password</Text>
+                            <View style={styles.widePasswordWrapper}>
+                              <TextInput
+                                style={styles.widePasswordInput}
+                                secureTextEntry={!showProfilePasswordConfirm}
+                                value={profilePasswordConfirmation}
+                                onChangeText={setProfilePasswordConfirmation}
+                                placeholder="Re-enter password"
+                                autoCapitalize="none"
+                              />
+                              <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePasswordConfirm(!showProfilePasswordConfirm)}>
+                                <Ionicons name={showProfilePasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
                         </View>
                       </View>
                     </View>
                   </View>
-
-                  {/* ── RIGHT COLUMN ── */}
-                  <View style={[styles.wideModalColumn, styles.wideModalColumnRight, width <= 600 && { borderLeftWidth: 0, paddingTop: 0 }]}>
-                    {/* Account Settings */}
-                    <View style={styles.wideModalSection}>
-                      <Text style={styles.wideSectionTitle}>Account Settings</Text>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldFull}>
-                          <Text style={styles.wideFieldLabel}>Role</Text>
-                          <select
-                            value={profileRole}
-                            onChange={(e: any) => setProfileRole(e.target.value)}
-                            style={styles.wideFieldSelect}
-                          >
-                            {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </select>
-                        </View>
-                      </View>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldFull}>
-                          <Text style={styles.wideFieldLabel}>Status</Text>
-                          <View style={styles.wideStatusRow}>
-                            <TouchableOpacity
-                              style={[styles.wideStatusToggle, profileStatus === 'active' && styles.wideStatusActive]}
-                              onPress={() => setProfileStatus('active')}
-                            >
-                              <View style={[styles.wideStatusDot, { backgroundColor: '#16A34A' }]} />
-                              <Text style={[styles.wideStatusText, profileStatus === 'active' && { color: '#fff' }]}>Active</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.wideStatusToggle, profileStatus === 'inactive' && styles.wideStatusInactive]}
-                              onPress={() => setProfileStatus('inactive')}
-                            >
-                              <View style={[styles.wideStatusDot, { backgroundColor: '#DC2626' }]} />
-                              <Text style={[styles.wideStatusText, profileStatus === 'inactive' && { color: '#fff' }]}>Inactive</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Change Password */}
-                    <View style={styles.wideModalSection}>
-                      <Text style={styles.wideSectionTitle}>Change Password</Text>
-                      <Text style={styles.wideFormHint}>Leave blank to keep current</Text>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldFull}>
-                          <Text style={styles.wideFieldLabel}>New Password</Text>
-                          <View style={styles.widePasswordWrapper}>
-                            <TextInput
-                              style={styles.widePasswordInput}
-                              secureTextEntry={!showProfilePassword}
-                              value={profilePassword}
-                              onChangeText={setProfilePassword}
-                              placeholder="Min. 8 characters"
-                              autoCapitalize="none"
-                            />
-                            <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePassword(!showProfilePassword)}>
-                              <Ionicons name={showProfilePassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                      <View style={styles.wideFieldRow}>
-                        <View style={styles.wideFieldFull}>
-                          <Text style={styles.wideFieldLabel}>Confirm Password</Text>
-                          <View style={styles.widePasswordWrapper}>
-                            <TextInput
-                              style={styles.widePasswordInput}
-                              secureTextEntry={!showProfilePasswordConfirm}
-                              value={profilePasswordConfirmation}
-                              onChangeText={setProfilePasswordConfirmation}
-                              placeholder="Re-enter password"
-                              autoCapitalize="none"
-                            />
-                            <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePasswordConfirm(!showProfilePasswordConfirm)}>
-                              <Ionicons name={showProfilePasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                </View>
+                </ScrollView>
 
                 {/* ── Footer Actions ── */}
                 <View style={styles.wideModalFooter}>
@@ -4848,7 +4854,7 @@ const styles = StyleSheet.create({
   wideModalTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
   wideModalSubtitle: { fontSize: 11, fontWeight: '500', color: Colors.textMuted, marginTop: 1 },
   wideModalCloseBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
-  wideModalBody: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6, overflow: 'hidden' },
+  wideModalBody: { flexDirection: 'row' },
   wideModalColumn: { flex: 1, paddingHorizontal: 10 },
   wideModalColumnRight: { borderLeftWidth: 1, borderLeftColor: Colors.border, paddingLeft: 16 },
   wideModalSection: { marginBottom: 18 },
