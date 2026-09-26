@@ -450,71 +450,71 @@ export default function OfficeHeadDashboard() {
             </View>
           )}
 
-          {/* Metric Summary Cards Row */}
+          {/* Metric Summary Cards Row (2x2 on Mobile, 4x1 on Tablet/Desktop) */}
           {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
-            <View style={[styles.metricsGrid, !isTablet && { flexDirection: 'column' }]}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
               {/* Card 1: Pending Sign-off */}
-              <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
                       <Ionicons name="document-text" size={20} color="#D97706" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Pending Sign-off</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Pending Sign-off</Text>
                   <Text style={styles.metricCount}>{computedStats.pending}</Text>
-                  <Text style={styles.metricSubtext}>Requests awaiting your approval</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests awaiting your approval</Text>
                 </Card>
               </TouchableOpacity>
 
               {/* Card 2: Approved */}
-              <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => handleTabChange('approved')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('approved')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
                       <Ionicons name="checkmark-circle" size={20} color="#047857" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Approved</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Approved</Text>
                   <Text style={styles.metricCount}>{computedStats.approved}</Text>
-                  <Text style={styles.metricSubtext}>Departmental requests approved</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Departmental requests approved</Text>
                 </Card>
               </TouchableOpacity>
 
               {/* Card 3: Rejected */}
-              <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => handleTabChange('rejected')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('rejected')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
                       <Ionicons name="close-circle" size={20} color="#B91C1C" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Rejected</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Rejected</Text>
                   <Text style={styles.metricCount}>{computedStats.rejected}</Text>
-                  <Text style={styles.metricSubtext}>Requests rejected</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests rejected</Text>
                 </Card>
               </TouchableOpacity>
 
               {/* Card 4: Total Requests (Static Metric) */}
-              <View style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }}>
+              <View style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }}>
                 <Card style={styles.metricCard}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
                       <Ionicons name="arrow-forward-circle" size={20} color="#1E40AF" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Total Requests</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Total Requests</Text>
                   <Text style={styles.metricCount}>{computedStats.total}</Text>
-                  <Text style={styles.metricSubtext}>All requests</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">All requests</Text>
                 </Card>
               </View>
             </View>
           )}
 
           {/* Main Content Card: Requests List */}
-          <Card style={styles.tableCard}>
+          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
             {/* Table Control Header */}
-            <View style={styles.tableCardHeaderRow}>
+            <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
               <Text style={styles.tableTitle}>
                 {activeTab === 'dashboard'
                   ? 'Pending Departmental Requests'
@@ -523,9 +523,9 @@ export default function OfficeHeadDashboard() {
                     : 'Rejected Requests'}
               </Text>
 
-              <View style={styles.tableControlsRight}>
+              <View style={[styles.tableControlsRight, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
                 {/* Search Bar */}
-                <View style={styles.searchBox}>
+                <View style={[styles.searchBox, !isTablet && { width: '100%' }]}>
                   <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
                   <TextInput
                     style={styles.searchInput}
