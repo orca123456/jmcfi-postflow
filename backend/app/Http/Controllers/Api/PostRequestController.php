@@ -906,16 +906,26 @@ class PostRequestController extends Controller
         $media = PostMedia::create([
             'post_request_id' => $post->id,
             'type' => $type,
-            'original_name' => $file->getClientOriginalName(),
+            'original_name' => $file->getClientOriginalName() ?: 'upload.png',
             'file_path' => $path,
-            'mime_type' => $file->getMimeType(),
-            'file_size' => $file->getSize(),
+            'mime_type' => $file->getMimeType() ?: 'image/png',
+            'file_size' => $file->getSize() ?: 0,
             'sort_order' => $sortOrder,
             'is_featured' => $isFeatured,
         ]);
 
         if (Schema::hasTable('post_media_files')) {
-            $this->storeMediaFileContent($media, file_get_contents($file->getRealPath()));
+            try {
+                $realPath = $file->getRealPath();
+                if ($realPath && file_exists($realPath)) {
+                    $content = @file_get_contents($realPath);
+                    if ($content !== false && strlen($content) < 10485760) {
+                        $this->storeMediaFileContent($media, $content);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Media DB backup store skipped: ' . $e->getMessage());
+            }
         }
 
         return $media;
