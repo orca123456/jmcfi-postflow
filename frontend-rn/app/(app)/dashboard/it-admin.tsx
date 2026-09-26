@@ -35,6 +35,7 @@ import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { RichTextEditor } from '../../../components/ui/RichTextEditor';
 import { AISettingsPanel } from '../../../components/AISettingsPanel';
+import { triggerCsvDownload } from '../../../utils/export';
 
 interface StatCardProps {
   label: string;
@@ -1228,7 +1229,7 @@ export default function ITAdminDashboard() {
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
-  const handleExportAuditLogs = (logs: any[]) => {
+  const handleExportAuditLogs = async (logs: any[]) => {
     if (logs.length === 0) {
       showToast('No activity records to export.', 'warning');
       return;
@@ -1249,25 +1250,17 @@ export default function ITAdminDashboard() {
       ]),
     ];
     const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const filename = `postflow-activity-logs-${new Date().toISOString().slice(0, 10)}.csv`;
 
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `postflow-activity-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showToast('Activity logs exported.', 'success');
-      return;
+    const success = await triggerCsvDownload(filename, csv);
+    if (success) {
+      showToast('Activity logs exported successfully.', 'success');
+    } else {
+      showToast('Failed to export activity logs.', 'error');
     }
-
-    showToast('CSV export is available in the web app.', 'warning');
   };
 
-  const handleExportAnalyticsOverview = () => {
+  const handleExportAnalyticsOverview = async () => {
     const rows = [
       ['Metric', 'Value'],
       ['Total Submissions', analyticsOverview?.totalVolume || '0'],
@@ -1290,23 +1283,16 @@ export default function ITAdminDashboard() {
 
     const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const filename = `postflow-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
 
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `postflow-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showToast('Analytics report exported.', 'success');
-      return;
+    const success = await triggerCsvDownload(filename, csv);
+    if (success) {
+      showToast('Analytics report exported successfully.', 'success');
+    } else {
+      showToast('Failed to export analytics report.', 'error');
     }
-
-    showToast('Analytics export is available in the web app.', 'warning');
   };
+
 
   const [analyticsOverview, setAnalyticsOverview] = useState<any>({
     totalVolume: '0',
