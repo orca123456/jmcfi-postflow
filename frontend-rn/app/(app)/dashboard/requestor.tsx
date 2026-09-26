@@ -1165,7 +1165,7 @@ export default function RequestorDashboard() {
           </View>
 
           {/* Form Layout Split */}
-          <View style={{ gap: Spacing.lg }}>
+          <View style={{ gap: 16 }}>
             {/* ROW 1 */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
               <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
@@ -3508,25 +3508,22 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
   splitLayout: {
-    gap: Spacing.lg,
-    marginBottom: Spacing.md,
+    gap: 16,
   },
   rowLayout: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.lg,
+    gap: 16,
   },
   columnLayout: {
     flexDirection: 'column',
-    gap: Spacing.lg,
+    gap: 16,
   },
   leftColumn: {
     flex: 1.5,
-    gap: Spacing.lg,
   },
   rightColumn: {
     flex: 1,
-    gap: Spacing.lg,
   },
   formCard: {
     backgroundColor: Colors.surface,
@@ -3535,7 +3532,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: Spacing.lg,
     gap: Spacing.md,
-    marginBottom: Spacing.md,
   },
   configCard: {
     backgroundColor: Colors.surface,
