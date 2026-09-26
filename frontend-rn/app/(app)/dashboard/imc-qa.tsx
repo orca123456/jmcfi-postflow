@@ -28,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 export default function ImcQaDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const isTablet = width > 768;
   const { user } = useAuthStore();
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
