@@ -361,6 +361,7 @@ export default function OfficeHeadDashboard() {
   const getRequestsForTab = () => {
     if (activeTab === 'approved') return approvedRequests;
     if (activeTab === 'rejected') return rejectedRequests;
+    if (activeTab === 'all') return [...requestsList, ...approvedRequests, ...rejectedRequests];
     return requestsList;
   };
 
@@ -436,7 +437,7 @@ export default function OfficeHeadDashboard() {
       {isInitialLoading && <DashboardSkeleton />}
 
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected') && !isInitialLoading && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
@@ -451,11 +452,11 @@ export default function OfficeHeadDashboard() {
           )}
 
           {/* Metric Summary Cards Row (2x2 on Mobile, 4x1 on Tablet/Desktop) */}
-          {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
+          {['dashboard', 'approved', 'rejected', 'all'].includes(activeTab) && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
               {/* Card 1: Pending Sign-off */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('dashboard')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
                       <Ionicons name="document-text" size={20} color="#D97706" />
@@ -469,7 +470,7 @@ export default function OfficeHeadDashboard() {
 
               {/* Card 2: Approved */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('approved')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
                       <Ionicons name="checkmark-circle" size={20} color="#047857" />
@@ -483,7 +484,7 @@ export default function OfficeHeadDashboard() {
 
               {/* Card 3: Rejected */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('rejected')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
                       <Ionicons name="close-circle" size={20} color="#B91C1C" />
@@ -495,9 +496,9 @@ export default function OfficeHeadDashboard() {
                 </Card>
               </TouchableOpacity>
 
-              {/* Card 4: Total Requests (Static Metric) */}
-              <View style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }}>
-                <Card style={styles.metricCard}>
+              {/* Card 4: Total Requests */}
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => handleTabChange('all')} activeOpacity={0.7}>
+                <Card style={[styles.metricCard, activeTab === 'all' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
                       <Ionicons name="arrow-forward-circle" size={20} color="#1E40AF" />
@@ -507,7 +508,7 @@ export default function OfficeHeadDashboard() {
                   <Text style={styles.metricCount}>{computedStats.total}</Text>
                   <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">All requests</Text>
                 </Card>
-              </View>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -520,7 +521,9 @@ export default function OfficeHeadDashboard() {
                   ? 'Pending Departmental Requests'
                   : activeTab === 'approved'
                     ? 'Approved Requests'
-                    : 'Rejected Requests'}
+                    : activeTab === 'rejected'
+                      ? 'Rejected Requests'
+                      : 'All Departmental Submissions'}
               </Text>
 
               <View style={[styles.tableControlsRight, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
@@ -1378,21 +1381,21 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   metricCard: {
-    flex: 1,
-    minWidth: 200,
-    padding: Spacing.md,
+    padding: 12,
     borderRadius: BorderRadius.lg,
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.background,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minHeight: 125,
+    justifyContent: 'space-between',
   },
   metricCardHeader: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   metricIconBg: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },

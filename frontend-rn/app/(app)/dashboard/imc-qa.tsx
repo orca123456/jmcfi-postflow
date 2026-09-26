@@ -338,6 +338,7 @@ export default function ImcQaDashboard() {
   const getRequestsForTab = () => {
     if (activeTab === 'approved') return approvedRequests;
     if (activeTab === 'rejected') return rejectedRequests;
+    if (activeTab === 'all') return [...requestsList, ...approvedRequests, ...rejectedRequests];
     return requestsList;
   };
 
@@ -401,7 +402,7 @@ export default function ImcQaDashboard() {
       {isInitialLoading && <DashboardSkeleton />}
 
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected') && !isInitialLoading && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
@@ -416,11 +417,11 @@ export default function ImcQaDashboard() {
           )}
 
           {/* Metric Summary Cards Row (2x2 on Mobile) */}
-          {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
+          {['dashboard', 'approved', 'rejected', 'all'].includes(activeTab) && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
               {/* Card 1: For Quality Review */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
                       <Ionicons name="shield-checkmark" size={20} color="#1E40AF" />
@@ -434,7 +435,7 @@ export default function ImcQaDashboard() {
 
               {/* Card 2: Approved */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
                       <Ionicons name="checkmark-circle" size={20} color="#047857" />
@@ -448,7 +449,7 @@ export default function ImcQaDashboard() {
 
               {/* Card 3: Rejected */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
                       <Ionicons name="close-circle" size={20} color="#B91C1C" />
@@ -461,8 +462,8 @@ export default function ImcQaDashboard() {
               </TouchableOpacity>
 
               {/* Card 4: Total Requests */}
-              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
-                <Card style={styles.metricCard}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('all')} activeOpacity={0.7}>
+                <Card style={[styles.metricCard, activeTab === 'all' && { borderColor: Colors.primary }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#F0FDFA' }]}>
                       <Ionicons name="send" size={20} color="#0D9488" />
@@ -485,7 +486,9 @@ export default function ImcQaDashboard() {
                   ? 'Requests Awaiting QA Review'
                   : activeTab === 'approved'
                     ? 'Approved Requests'
-                    : 'Rejected Requests'}
+                    : activeTab === 'rejected'
+                      ? 'Rejected Requests'
+                      : 'All Requests'}
               </Text>
 
               <View style={[styles.tableControlsRight, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
@@ -1323,21 +1326,21 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   metricCard: {
-    flex: 1,
-    minWidth: 200,
-    padding: Spacing.md,
+    padding: 12,
     borderRadius: BorderRadius.lg,
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.background,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minHeight: 125,
+    justifyContent: 'space-between',
   },
   metricCardHeader: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   metricIconBg: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
