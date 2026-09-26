@@ -657,8 +657,15 @@ export default function RequestorDashboard() {
   const handleSubmitRequest = async () => {
     if (requestActionLockedRef.current || isSubmittingRequest || isSavingDraft) return;
 
-    if (!postTitle || !caption) {
-      alert('Please enter a post title and caption before submitting.');
+    if (!postTitle || !caption || !caption.trim()) {
+      showToast('Please enter a post title and content caption before submitting.', 'error');
+      alert('Please enter a post title and content caption before submitting.');
+      return;
+    }
+
+    if (mediaFiles.length === 0 && supportingDocs.length === 0) {
+      showToast('Please attach at least one photo or media file before submitting.', 'error');
+      alert('Please attach at least one photo or media file before submitting.');
       return;
     }
 
