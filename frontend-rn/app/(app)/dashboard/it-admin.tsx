@@ -3679,13 +3679,13 @@ $response = curl_exec($ch);`}
             <View style={[styles.analyticsBottomGrid, !isLargeScreen && styles.analyticsStack]}>
               <Card style={styles.analyticsPlatformCard}>
                 <Text style={styles.analyticsCardTitle}>Platform Targets Breakdown</Text>
-                <View style={[styles.analyticsPlatformGrid, !isLargeScreen && styles.analyticsStack]}>
+                <View style={[styles.analyticsPlatformGrid, !isLargeScreen && { flexDirection: 'column', gap: 12 }]}>
                   {platformStats.map((platform: any, idx: number) => {
                     const platformKey = platform.name.toLowerCase() === 'website' ? 'other' : platform.name.toLowerCase();
                     const reach = analyticsOverview?.platformReach?.[platformKey] || 0;
                     const postCount = parseInt(String(platform.posts || '0'), 10) || 0;
                     return (
-                      <View key={idx} style={styles.analyticsPlatformItem}>
+                      <View key={idx} style={[styles.analyticsPlatformItem, !isLargeScreen && { flex: 0, width: '100%' }]}>
                         <View style={styles.analyticsPlatformTop}>
                           <View style={styles.analyticsPlatformIdentity}>
                             <View style={[styles.analyticsPlatformIcon, { backgroundColor: platform.color || '#7C3AED' }]}>
@@ -4466,7 +4466,7 @@ const styles = StyleSheet.create({
   analyticsDeptTrack: { height: 7, borderRadius: 8, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   analyticsDeptFill: { height: '100%', borderRadius: 8 },
   analyticsDeptSubtext: { fontSize: 11, color: '#94A3B8' },
-  analyticsDeptFooter: { marginTop: 'auto', minHeight: 48, borderTopWidth: 1, borderTopColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
+  analyticsDeptFooter: { marginTop: 16, minHeight: 48, borderTopWidth: 1, borderTopColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10, paddingVertical: 12 },
   analyticsDeptFooterText: { fontSize: 13, fontWeight: '700', color: '#111827' },
   analyticsBottomGrid: { flexDirection: 'row', gap: 24 },
   analyticsPlatformCard: { flex: 1.35, minWidth: 0, width: '100%', padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
