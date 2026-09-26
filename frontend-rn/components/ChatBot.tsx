@@ -39,34 +39,45 @@ export function ChatBot() {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
+
   const scrollRef = useRef<ScrollView>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const edgeAnim = useRef(new Animated.Value(0)).current;
+  const hideTimerRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.12, duration: 1000, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: isOpen ? 1 : 0,
+    Animated.spring(edgeAnim, {
+      toValue: isRevealed || isOpen ? 1 : 0,
       useNativeDriver: true,
-      tension: 100,
-      friction: 12,
+      tension: 110,
+      friction: 14,
     }).start();
-  }, [isOpen]);
+  }, [isRevealed, isOpen]);
 
-  const scrollToBottom = () => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  const handleMouseEnter = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    setIsRevealed(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      setIsRevealed(false);
+    }, 1800);
+  };
+
+  const handleFabPress = () => {
+    if (!isRevealed && !isOpen) {
+      setIsRevealed(true);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = setTimeout(() => {
+        setIsRevealed(false);
+      }, 4000);
+    } else {
+      setIsOpen((prev) => !prev);
+    }
   };
 
   const sendMessage = async (text?: string) => {
@@ -124,6 +135,10 @@ export function ChatBot() {
   const chatOpacity = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
+  });
+  const fabTranslateX = edgeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [34, 0],
   });
 
   return (
@@ -236,11 +251,20 @@ export function ChatBot() {
         </Animated.View>
       )}
 
-      {/* FAB */}
-      <Animated.View style={[styles.fabWrapper, { transform: [{ scale: isOpen ? 1 : pulseAnim }] }]}>
-        <TouchableOpacity style={styles.fab} onPress={() => setIsOpen(!isOpen)} activeOpacity={0.85}>
+      {/* FAB - Edge Hugging Drawer */}
+      <Animated.View
+        style={[
+          styles.fabWrapper,
+          { transform: [{ translateX: fabTranslateX }] },
+        ]}
+        {...({
+          onMouseEnter: handleMouseEnter,
+          onMouseLeave: handleMouseLeave,
+        } as any)}
+      >
+        <TouchableOpacity style={styles.fab} onPress={handleFabPress} activeOpacity={0.85}>
           {isOpen ? (
-            <Ionicons name="close" size={28} color="#0B2545" />
+            <Ionicons name="close" size={24} color="#0B2545" />
           ) : (
             <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           )}
