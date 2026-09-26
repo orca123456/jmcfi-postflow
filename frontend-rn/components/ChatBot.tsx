@@ -8,6 +8,7 @@ import {
   ScrollView,
   Animated,
   Image,
+  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../constants/theme';
@@ -45,6 +46,43 @@ export function ChatBot() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const edgeAnim = useRef(new Animated.Value(0)).current;
   const hideTimerRef = useRef<any>(null);
+
+  // ── Drag & Drop PanResponder State ──
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const isDraggingRef = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3;
+      },
+      onPanResponderGrant: () => {
+        isDraggingRef.current = false;
+        pan.setOffset({
+          x: (pan.x as any)._value || 0,
+          y: (pan.y as any)._value || 0,
+        });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4) {
+          isDraggingRef.current = true;
+        }
+        pan.x.setValue(gestureState.dx);
+        pan.y.setValue(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        pan.flattenOffset();
+        if (!isDraggingRef.current && Math.hypot(gestureState.dx, gestureState.dy) < 6) {
+          handleFabPress();
+        }
+      },
+      onPanResponderTerminate: () => {
+        pan.flattenOffset();
+      },
+    })
+  ).current;
 
   useEffect(() => {
     Animated.spring(edgeAnim, {
@@ -171,7 +209,15 @@ export function ChatBot() {
   });
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          transform: pan.getTranslateTransform(),
+        },
+      ]}
+      pointerEvents="box-none"
+    >
       {isOpen && (
         <Animated.View
           style={[
@@ -179,15 +225,18 @@ export function ChatBot() {
             { opacity: chatOpacity, transform: [{ translateY: chatTranslateY }] },
           ]}
         >
-          {/* Header */}
-          <View style={styles.chatHeader}>
+          {/* Header (Draggable) */}
+          <View
+            style={[styles.chatHeader, { cursor: 'grab' as any }]}
+            {...panResponder.panHandlers}
+          >
             <View style={styles.chatHeaderLeft}>
               <View style={styles.botAvatar}>
                 <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               </View>
               <View>
-                <Text style={styles.chatHeaderTitle}>AI Assistant</Text>
-                <Text style={styles.chatHeaderSub}>Ask me anything about accreditation.</Text>
+                <Text style={styles.chatHeaderTitle}>AI Assistant ✋</Text>
+                <Text style={styles.chatHeaderSub}>Drag header to move window.</Text>
               </View>
             </View>
             <View style={styles.headerActions}>
@@ -306,15 +355,17 @@ export function ChatBot() {
         </Animated.View>
       )}
 
-      {/* Corner-Hugging Peeking AI Assistant Mascot */}
+      {/* Corner-Hugging Peeking AI Assistant Mascot (Draggable) */}
       <Animated.View
         style={[
           styles.cornerPeekingWrap,
           {
             marginRight: fabMarginRight,
             marginBottom: fabMarginBottom,
+            cursor: 'grab' as any,
           },
         ]}
+        {...panResponder.panHandlers}
         {...({
           onMouseEnter: handleMouseEnter,
           onMouseLeave: handleMouseLeave,
@@ -323,12 +374,12 @@ export function ChatBot() {
         {/* Hover Callout Tooltip */}
         {isRevealed && !isOpen && (
           <View style={styles.calloutTooltip}>
-            <Text style={styles.calloutText}>Hi! Need help? 👋</Text>
+            <Text style={styles.calloutText}>Drag me anywhere or click! 👋</Text>
             <View style={styles.calloutArrow} />
           </View>
         )}
 
-        <TouchableOpacity style={styles.cornerMascotButton} onPress={handleFabPress} activeOpacity={0.9}>
+        <View style={styles.cornerMascotButton}>
           {isOpen ? (
             <View style={styles.closeIconBox}>
               <Ionicons name="close" size={22} color="#0B2545" />
@@ -350,9 +401,9 @@ export function ChatBot() {
               </View>
             </View>
           )}
-        </TouchableOpacity>
+        </View>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
