@@ -179,11 +179,18 @@ const autoPositionFor = (category: string, department: string): string => {
   if (category === 'approver') {
     if (isImcDepartment(department)) return 'QA / Branding Checker';
     if (department === 'Office of the President' || isVicePresidentDepartment(department)) return 'Vice President';
-    return 'Department Head';
+    return 'Requestor';
   }
   return '';
 };
 
+const ANALYTICS_PERIOD_OPTIONS = [
+  { value: 'this_month', label: 'This Month' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: '3_months', label: 'Last 3 Months' },
+  { value: 'this_year', label: 'This Year' },
+  { value: 'all_time', label: 'All Time' },
+];
 
 export default function ITAdminDashboard() {
   const router = useRouter();
@@ -415,7 +422,7 @@ export default function ITAdminDashboard() {
     if (isInitialLoading) return;
     
     if (activeTab === 'overview' || activeTab === 'analytics') {
-      dashboardApi.getAnalyticsOverview().then(res => {
+      dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
         if (res.data?.data) setAnalyticsOverview(res.data.data);
       }).catch(() => {});
     }
@@ -1221,6 +1228,20 @@ export default function ITAdminDashboard() {
     { name: 'Twitter/X', percentage: 10, barColor: Colors.textSecondary },
     { name: 'Portal', percentage: 10, barColor: '#3B82F6' },
   ];
+
+  // Analytics Period Filter State
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('this_month');
+  const [isAnalyticsPeriodOpen, setIsAnalyticsPeriodOpen] = useState(false);
+
+  const handleSelectAnalyticsPeriod = (periodValue: string) => {
+    setAnalyticsPeriod(periodValue);
+    setIsAnalyticsPeriodOpen(false);
+    dashboardApi.getAnalyticsOverview({ period: periodValue }).then((res) => {
+      if (res.data?.data) {
+        setAnalyticsOverview(res.data.data);
+      }
+    }).catch(() => {});
+  };
 
   // Audit Logs State & Mock Data
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
@@ -3665,11 +3686,47 @@ $response = curl_exec($ch);`}
                 <Text style={styles.analyticsSubtitle}>Welcome back! Here's what's happening with your publications.</Text>
               </View>
               <View style={styles.analyticsHeaderActions}>
-                <TouchableOpacity style={styles.analyticsActionButton} activeOpacity={0.8}>
-                  <Ionicons name="calendar-outline" size={15} color="#334155" />
-                  <Text style={styles.analyticsActionText}>This Month</Text>
-                  <Ionicons name="chevron-down" size={14} color="#334155" />
-                </TouchableOpacity>
+                <View style={styles.analyticsPeriodDropdownContainer}>
+                  <TouchableOpacity
+                    style={styles.analyticsActionButton}
+                    activeOpacity={0.8}
+                    onPress={() => setIsAnalyticsPeriodOpen(!isAnalyticsPeriodOpen)}
+                  >
+                    <Ionicons name="calendar-outline" size={15} color="#334155" />
+                    <Text style={styles.analyticsActionText}>
+                      {ANALYTICS_PERIOD_OPTIONS.find((opt) => opt.value === analyticsPeriod)?.label || 'This Month'}
+                    </Text>
+                    <Ionicons name={isAnalyticsPeriodOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#334155" />
+                  </TouchableOpacity>
+
+                  {isAnalyticsPeriodOpen && (
+                    <View style={styles.analyticsPeriodDropdown}>
+                      {ANALYTICS_PERIOD_OPTIONS.map((opt) => (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[
+                            styles.analyticsPeriodItem,
+                            analyticsPeriod === opt.value && styles.analyticsPeriodItemActive,
+                          ]}
+                          onPress={() => handleSelectAnalyticsPeriod(opt.value)}
+                        >
+                          <Text
+                            style={[
+                              styles.analyticsPeriodItemText,
+                              analyticsPeriod === opt.value && styles.analyticsPeriodItemTextActive,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                          {analyticsPeriod === opt.value && (
+                            <Ionicons name="checkmark" size={14} color="#7C3AED" />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
                 <TouchableOpacity style={styles.analyticsActionButton} activeOpacity={0.8} onPress={handleExportAnalyticsOverview}>
                   <Ionicons name="download-outline" size={15} color="#334155" />
                   <Text style={styles.analyticsActionText}>Export Report</Text>
@@ -4516,7 +4573,35 @@ const styles = StyleSheet.create({
   analyticsHeaderStacked: { flexDirection: 'column' },
   analyticsTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
   analyticsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
-  analyticsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  analyticsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', zIndex: 50 },
+  analyticsPeriodDropdownContainer: { position: 'relative', zIndex: 100 },
+  analyticsPeriodDropdown: {
+    position: 'absolute',
+    top: 46,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingVertical: 4,
+    minWidth: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+    zIndex: 9999,
+  },
+  analyticsPeriodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  analyticsPeriodItemActive: { backgroundColor: '#F3E8FF' },
+  analyticsPeriodItemText: { fontSize: 13, fontWeight: '600', color: '#334155' },
+  analyticsPeriodItemTextActive: { fontWeight: '700', color: '#7C3AED' },
   analyticsActionButton: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8 },
   analyticsActionText: { fontSize: 13, fontWeight: '700', color: '#334155' },
   analyticsStatsGrid: { flexDirection: 'row', gap: 18 },

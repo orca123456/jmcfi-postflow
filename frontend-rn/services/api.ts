@@ -102,7 +102,7 @@ export const dashboardApi = {
   getInitData: () => api.get('/dashboard/init'),
   getStats: () => api.get('/dashboard/stats'),
   getRecentActivity: () => api.get('/dashboard/recent-activity'),
-  getAnalyticsOverview: () => api.get('/dashboard/analytics'),
+  getAnalyticsOverview: (params?: any) => api.get('/dashboard/analytics', { params }),
 };
 
 // ── Publishing endpoints ───────────────────────────────────────────────────
