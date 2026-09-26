@@ -1049,7 +1049,12 @@ export default function ITAdminDashboard() {
       const res = await (emailSettingsApi as any).test();
       showToast(res.data.message || 'Test email sent!', 'success');
     } catch (e: any) {
-      showToast('Test failed: ' + (e.response?.data?.message || e.message), 'error');
+      const errMsg = e.response?.data?.message || e.message || '';
+      if (errMsg.toLowerCase().includes('timeout')) {
+        showToast('SMTP connection timed out. Please check your Gmail App Password and network connection.', 'error');
+      } else {
+        showToast(errMsg.startsWith('Please') ? errMsg : 'Test failed: ' + errMsg, 'error');
+      }
     } finally {
       setTestingEmail(false);
     }
