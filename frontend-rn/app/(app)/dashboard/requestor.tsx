@@ -3532,6 +3532,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: Spacing.lg,
     gap: Spacing.md,
+    marginBottom: 20,
   },
   configCard: {
     backgroundColor: Colors.surface,
