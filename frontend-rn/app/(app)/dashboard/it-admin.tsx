@@ -3296,11 +3296,23 @@ $response = curl_exec($ch);`}
                 cardIconColor = '#DC2626';
                 cardAccentColor = '#DC2626';
               } else if (secNumber === '5') {
-                badgeBg = '#0B2545';
+                badgeBg = '#D97706';
                 cardIconName = 'copy-outline';
                 cardIconBg = '#FEF3C7';
                 cardIconColor = '#D97706';
                 cardAccentColor = '#D97706';
+              } else if (secNumber === '6') {
+                badgeBg = '#2563EB';
+                cardIconName = 'git-network-outline';
+                cardIconBg = '#EFF6FF';
+                cardIconColor = '#2563EB';
+                cardAccentColor = '#2563EB';
+              } else if (secNumber === '7') {
+                badgeBg = '#4B5563';
+                cardIconName = 'warning-outline';
+                cardIconBg = '#F3F4F6';
+                cardIconColor = '#374151';
+                cardAccentColor = '#4B5563';
               }
 
               return (
@@ -3313,15 +3325,17 @@ $response = curl_exec($ch);`}
                     <Text style={styles.policySectionTitleText}>{secCleanTitle}</Text>
                   </View>
 
-                  {/* Section Content Rendering */}
-                  {secNumber === '1' ? (
+                  {/* Section Description / Statement White Card Box */}
+                  {section.content ? (
                     <Card style={styles.policyStatementCard}>
-                      <View style={[styles.policyCardIconSquare, { backgroundColor: '#EFF6FF' }]}>
-                        <Ionicons name="book-outline" size={18} color="#2563EB" />
+                      <View style={[styles.policyCardIconSquare, { backgroundColor: cardIconBg }]}>
+                        <Ionicons name={cardIconName} size={18} color={cardIconColor} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12, marginBottom: 4 }}>
-                          <Text style={styles.policyStatementTitle}>Policy statement</Text>
+                          <Text style={styles.policyStatementTitle}>
+                            {secNumber === '1' ? 'Policy statement' : 'Guidelines & Enforcement'}
+                          </Text>
                         </View>
                         {isEditingPolicyMode ? (
                           <RichTextEditor
@@ -3333,13 +3347,25 @@ $response = curl_exec($ch);`}
                             }}
                           />
                         ) : (
-                          <FormattedText style={styles.policyStatementBody}>
-                            {section.content || 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors (“Posters”). The goal is to ensure a cohesive, safe, and professionally branded digital presence.'}
-                          </FormattedText>
+                          <>
+                            <FormattedText style={styles.policyStatementBody}>
+                              {section.content}
+                            </FormattedText>
+                            {section.contact ? (
+                              <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+                                <FormattedText style={[styles.policyStatementBody, { fontWeight: '600', color: cardAccentColor }]}>
+                                  {section.contact}
+                                </FormattedText>
+                              </View>
+                            ) : null}
+                          </>
                         )}
                       </View>
                     </Card>
-                  ) : (section.bullets && section.bullets.length > 0) || (section.steps && section.steps.length > 0) ? (
+                  ) : null}
+
+                  {/* Section Bullets / Steps Grid Cards */}
+                  {((section.bullets && section.bullets.length > 0) || (section.steps && section.steps.length > 0)) && (
                     <View style={styles.policyGridRow}>
                       {(section.bullets || section.steps || [])
                         .filter((b: any) => {
@@ -3406,25 +3432,6 @@ $response = curl_exec($ch);`}
                             )}
                           </Card>
                         ))}
-                    </View>
-                  ) : (
-                    <View style={styles.policySimpleContentBox}>
-                      {isEditingPolicyMode ? (
-                        <View style={{ gap: 6 }}>
-                          <RichTextEditor
-                            value={section.content || ''}
-                            onChange={(val) => {
-                              const updated = [...editableSections];
-                              updated[sIdx] = { ...updated[sIdx], content: val };
-                              setEditableSections(updated);
-                            }}
-                          />
-                        </View>
-                      ) : (
-                        <FormattedText style={styles.policySimpleContentText}>
-                          {section.content || 'Respect copyright laws. Use licensed or original content only and give proper attribution.'}
-                        </FormattedText>
-                      )}
                     </View>
                   )}
                 </View>
