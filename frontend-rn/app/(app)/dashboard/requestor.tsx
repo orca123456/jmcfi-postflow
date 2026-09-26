@@ -3509,13 +3509,16 @@ const styles = StyleSheet.create({
   },
   splitLayout: {
     gap: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   rowLayout: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'flex-start',
+    gap: Spacing.lg,
   },
   columnLayout: {
     flexDirection: 'column',
+    gap: Spacing.lg,
   },
   leftColumn: {
     flex: 1.5,
@@ -3529,9 +3532,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
+    borderRadius: 8,
     padding: Spacing.lg,
     gap: Spacing.md,
+    marginBottom: Spacing.md,
   },
   configCard: {
     backgroundColor: Colors.surface,
