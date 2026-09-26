@@ -21,13 +21,22 @@ class ChatbotController extends Controller
         ]);
 
         try {
-            // Read the markdown prompt from the root folder
-            $promptPath = base_path('../chatbot_system_prompt.md');
-            $systemPrompt = file_exists($promptPath) 
-                ? file_get_contents($promptPath) 
-                : 'You are a helpful assistant for JMCFI PostFlow.';
+            // Read the markdown prompt from root or backend folder
+            $possiblePaths = [
+                base_path('chatbot_system_prompt.md'),
+                base_path('../chatbot_system_prompt.md'),
+                base_path('../../chatbot_system_prompt.md'),
+            ];
 
-            // Construct payload
+            $systemPrompt = 'You are a helpful assistant for JMCFI PostFlow.';
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $systemPrompt = file_get_contents($path);
+                    break;
+                }
+            }
+
+            // Construct payload with injected system prompt
             $apiMessages = [
                 [
                     'role' => 'system',
