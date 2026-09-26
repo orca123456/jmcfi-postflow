@@ -3471,10 +3471,13 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xxl - 2,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
+    lineHeight: 28,
+    marginBottom: 4,
   },
   mainPageSubtitle: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
+    lineHeight: 20,
     flexShrink: 1,
     maxWidth: '100%',
   },

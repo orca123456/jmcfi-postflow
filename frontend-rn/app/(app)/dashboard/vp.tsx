@@ -1281,11 +1281,13 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xl + 2,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
+    lineHeight: 28,
+    marginBottom: 4,
   },
   greetingSubtitle: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
-    marginTop: 2,
+    lineHeight: 20,
   },
 
   // Department Dropdown
