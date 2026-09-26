@@ -3616,27 +3616,29 @@ $response = curl_exec($ch);`}
                   </View>
                 </View>
 
-                <View style={styles.analyticsChartArea}>
-                  {[maxPosts, Math.round(maxPosts * 0.75), Math.round(maxPosts * 0.5), Math.round(maxPosts * 0.25)].map((label, index) => (
-                    <View key={index} style={[styles.analyticsGridLine, { top: `${index * 24}%` }]}>
-                      <Text style={styles.analyticsYAxisLabel}>{label}</Text>
-                    </View>
-                  ))}
-                  {monthsData.map((item: any) => {
-                    const heightPercent = maxPosts > 0 ? Math.max((item.posts / maxPosts) * 82, item.posts > 0 ? 8 : 0) : 0;
-                    const isPeak = item.posts === maxPosts && item.posts > 0;
-                    return (
-                      <View key={item.month} style={styles.analyticsMonthColumn}>
-                        <View style={styles.analyticsPlotColumn}>
-                          {item.posts > 0 && <Text style={styles.analyticsPointLabel}>{item.posts}</Text>}
-                          <View style={[styles.analyticsAreaBar, { height: `${heightPercent}%`, opacity: item.posts > 0 ? 1 : 0 }]} />
-                          <View style={[styles.analyticsPoint, isPeak && styles.analyticsPointPeak]} />
-                        </View>
-                        <Text style={styles.analyticsMonthLabel}>{item.month}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: !isTablet ? 540 : '100%' }}>
+                  <View style={[styles.analyticsChartArea, { width: !isTablet ? 540 : '100%' }]}>
+                    {[maxPosts, Math.round(maxPosts * 0.75), Math.round(maxPosts * 0.5), Math.round(maxPosts * 0.25)].map((label, index) => (
+                      <View key={index} style={[styles.analyticsGridLine, { top: `${index * 24}%` }]}>
+                        <Text style={styles.analyticsYAxisLabel}>{label}</Text>
                       </View>
-                    );
-                  })}
-                </View>
+                    ))}
+                    {monthsData.map((item: any) => {
+                      const heightPercent = maxPosts > 0 ? Math.max((item.posts / maxPosts) * 82, item.posts > 0 ? 8 : 0) : 0;
+                      const isPeak = item.posts === maxPosts && item.posts > 0;
+                      return (
+                        <View key={item.month} style={styles.analyticsMonthColumn}>
+                          <View style={styles.analyticsPlotColumn}>
+                            {item.posts > 0 && <Text style={styles.analyticsPointLabel}>{item.posts}</Text>}
+                            <View style={[styles.analyticsAreaBar, { height: `${heightPercent}%`, opacity: item.posts > 0 ? 1 : 0 }]} />
+                            <View style={[styles.analyticsPoint, isPeak && styles.analyticsPointPeak]} />
+                          </View>
+                          <Text style={styles.analyticsMonthLabel}>{item.month}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
                 <View style={styles.analyticsChartLegend}>
                   <View style={styles.analyticsLegendItem}><View style={[styles.analyticsLegendDot, { backgroundColor: '#7C3AED' }]} /><Text style={styles.analyticsLegendText}>Submissions</Text></View>
                   <View style={styles.analyticsLegendItem}><View style={[styles.analyticsLegendDot, { width: 28, borderRadius: 4, backgroundColor: '#DDD6FE' }]} /><Text style={styles.analyticsLegendText}>Target</Text></View>
@@ -3787,39 +3789,90 @@ $response = curl_exec($ch);`}
 
               {/* Logs Table Matching Screenshot */}
               <View style={styles.table}>
-                <View style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 12 }]}>
-                  <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Timestamp</Text>
-                  <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>User</Text>
-                  <Text style={{ flex: 1.5, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Action</Text>
-                  <Text style={{ flex: 4, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Details</Text>
-                </View>
-
-                {auditLoading && filteredLogs.length === 0 && (
-                  <View style={{ paddingVertical: 28, alignItems: 'center', gap: 8 }}>
-                    <ActivityIndicator color={Colors.primary} />
-                    <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>Loading activity records...</Text>
-                  </View>
-                )}
-
-                {!auditLoading && filteredLogs.map((log) => (
-                  <TouchableOpacity key={log.id} onPress={() => setSelectedAuditLog(log)} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.background }]}>
-                    {/* Timestamp */}
-                    <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: Colors.textSecondary }}>{log.timestamp}</Text>
-
-                    {/* User */}
-                    <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>{log.userName}</Text>
-
-                    {/* Action */}
-                    <View style={{ flex: 1.5 }}>
-                      <View style={{ alignSelf: 'flex-start', backgroundColor: log.badgeBg || '#F3E8FF', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 }}>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: log.badgeColor || '#7C3AED' }}>{String(log.eventType || '').replace(/_/g, ' ')}</Text>
-                      </View>
+                {isTablet ? (
+                  /* Desktop / Tablet Table View */
+                  <>
+                    <View style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 12 }]}>
+                      <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Timestamp</Text>
+                      <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>User</Text>
+                      <Text style={{ flex: 1.5, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Action</Text>
+                      <Text style={{ flex: 4, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>Details</Text>
                     </View>
 
-                    {/* Details */}
-                    <Text numberOfLines={2} style={{ flex: 4, fontSize: FontSize.xs + 1, color: Colors.textPrimary, lineHeight: 20 }}>{log.description}</Text>
-                  </TouchableOpacity>
-                ))}
+                    {auditLoading && filteredLogs.length === 0 && (
+                      <View style={{ paddingVertical: 28, alignItems: 'center', gap: 8 }}>
+                        <ActivityIndicator color={Colors.primary} />
+                        <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>Loading activity records...</Text>
+                      </View>
+                    )}
+
+                    {!auditLoading && filteredLogs.map((log) => (
+                      <TouchableOpacity key={log.id} onPress={() => setSelectedAuditLog(log)} style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.background }]}>
+                        {/* Timestamp */}
+                        <Text style={{ flex: 1.8, fontSize: FontSize.xs + 1, color: Colors.textSecondary }}>{log.timestamp}</Text>
+
+                        {/* User */}
+                        <Text style={{ flex: 2, fontSize: FontSize.xs + 1, fontWeight: 'bold', color: Colors.textPrimary }}>{log.userName}</Text>
+
+                        {/* Action */}
+                        <View style={{ flex: 1.5 }}>
+                          <View style={{ alignSelf: 'flex-start', backgroundColor: log.badgeBg || '#F3E8FF', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 }}>
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: log.badgeColor || '#7C3AED' }}>{String(log.eventType || '').replace(/_/g, ' ')}</Text>
+                          </View>
+                        </View>
+
+                        {/* Details */}
+                        <Text numberOfLines={2} style={{ flex: 4, fontSize: FontSize.xs + 1, color: Colors.textPrimary, lineHeight: 20 }}>{log.description}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                ) : (
+                  /* Mobile / iOS View: Responsive Card View (Zero Overlap) */
+                  <View style={{ gap: 10, paddingVertical: 8 }}>
+                    {auditLoading && filteredLogs.length === 0 && (
+                      <View style={{ paddingVertical: 28, alignItems: 'center', gap: 8 }}>
+                        <ActivityIndicator color={Colors.primary} />
+                        <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>Loading activity records...</Text>
+                      </View>
+                    )}
+
+                    {!auditLoading && filteredLogs.map((log) => (
+                      <TouchableOpacity
+                        key={log.id}
+                        onPress={() => setSelectedAuditLog(log)}
+                        activeOpacity={0.7}
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 12,
+                          gap: 8,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                            {log.userName}
+                          </Text>
+                          <View style={{ backgroundColor: log.badgeBg || '#F3E8FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: log.badgeColor || '#7C3AED' }}>
+                              {String(log.eventType || '').replace(/_/g, ' ')}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="time-outline" size={12} color="#64748B" />
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>{log.timestamp}</Text>
+                        </View>
+
+                        <Text style={{ fontSize: 12, color: Colors.textPrimary, lineHeight: 18, marginTop: 2 }} numberOfLines={3}>
+                          {log.description}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
                 {!auditLoading && filteredLogs.length === 0 && (
                   <View style={{ paddingVertical: 28, alignItems: 'center', gap: 6 }}>
@@ -4371,7 +4424,7 @@ const styles = StyleSheet.create({
   analyticsActionText: { fontSize: 13, fontWeight: '700', color: '#334155' },
   analyticsStatsGrid: { flexDirection: 'row', gap: 18 },
   analyticsStack: { flexDirection: 'column' },
-  analyticsStatCard: { flex: 1, minWidth: 210, padding: 16, flexDirection: 'row', gap: 16, alignItems: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatCard: { flex: 1, minWidth: isTablet ? 210 : '100%', width: isTablet ? 'auto' : '100%', padding: 16, flexDirection: 'row', gap: 16, alignItems: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsStatIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   analyticsStatContent: { flex: 1, minWidth: 0, gap: 6 },
   analyticsStatTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
@@ -4379,17 +4432,17 @@ const styles = StyleSheet.create({
   analyticsTrend: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   analyticsTrendText: { fontSize: 12, fontWeight: '800' },
   analyticsStatValue: { fontSize: 25, lineHeight: 30, fontWeight: '900', color: '#111827' },
-  analyticsStatFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  analyticsStatFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
   analyticsStatSubtext: { fontSize: 11, color: '#64748B' },
   analyticsCompareText: { fontSize: 10, color: '#94A3B8' },
   analyticsMainGrid: { flexDirection: 'row', gap: 24 },
   analyticsChartCard: { flex: 2, minWidth: 0, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
-  analyticsDepartmentCard: { flex: 1, minWidth: 300, padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsDepartmentCard: { flex: 1, minWidth: isTablet ? 300 : '100%', width: isTablet ? 'auto' : '100%', padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsDepartmentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, paddingTop: 24, paddingHorizontal: 22, marginBottom: 20 },
-  analyticsCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 20 },
+  analyticsCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
   analyticsCardTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
   analyticsCardSubtitle: { fontSize: 12, color: '#64748B', marginTop: 4 },
-  analyticsPill: { backgroundColor: '#F3E8FF', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8 },
+  analyticsPill: { backgroundColor: '#F3E8FF', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
   analyticsPillText: { fontSize: 12, fontWeight: '800', color: '#7C3AED' },
   analyticsChartArea: { height: 250, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingLeft: 36, paddingRight: 8, paddingTop: 8, paddingBottom: 28, position: 'relative' },
   analyticsGridLine: { position: 'absolute', left: 36, right: 8, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' },
@@ -4416,9 +4469,9 @@ const styles = StyleSheet.create({
   analyticsDeptFooter: { marginTop: 'auto', minHeight: 48, borderTopWidth: 1, borderTopColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
   analyticsDeptFooterText: { fontSize: 13, fontWeight: '700', color: '#111827' },
   analyticsBottomGrid: { flexDirection: 'row', gap: 24 },
-  analyticsPlatformCard: { flex: 1.35, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsPlatformCard: { flex: 1.35, minWidth: isTablet ? 300 : '100%', width: isTablet ? 'auto' : '100%', padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsPlatformGrid: { flexDirection: 'row', gap: 16, marginTop: 16 },
-  analyticsPlatformItem: { flex: 1, minWidth: 190, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, position: 'relative', overflow: 'hidden' },
+  analyticsPlatformItem: { flex: 1, minWidth: isTablet ? 190 : '100%', width: isTablet ? 'auto' : '100%', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, position: 'relative', overflow: 'hidden' },
   analyticsPlatformTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 20 },
   analyticsPlatformIdentity: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
   analyticsPlatformIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -4430,7 +4483,7 @@ const styles = StyleSheet.create({
   analyticsPlatformTarget: { fontSize: 11, color: '#64748B', marginTop: 8 },
   analyticsProgressRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   analyticsProgressRingFill: { position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderLeftColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '35deg' }] },
-  analyticsStatusCard: { flex: 1, minWidth: 330, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatusCard: { flex: 1, minWidth: isTablet ? 330 : '100%', width: isTablet ? 'auto' : '100%', padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsStatusBody: { flexDirection: 'row', alignItems: 'center', gap: 28, marginTop: 18 },
   analyticsDonutWrap: { width: 136, alignItems: 'center' },
   analyticsDonutOuter: { width: 118, height: 118, borderRadius: 59, borderWidth: 22, borderColor: '#F97316', borderLeftColor: '#10B981', borderTopColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
