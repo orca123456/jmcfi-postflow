@@ -4569,12 +4569,12 @@ const styles = StyleSheet.create({
 
   // Analytics
   analyticsPage: { gap: 24 },
-  analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, position: 'relative', zIndex: 500 },
   analyticsHeaderStacked: { flexDirection: 'column' },
   analyticsTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
   analyticsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
-  analyticsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', zIndex: 50 },
-  analyticsPeriodDropdownContainer: { position: 'relative', zIndex: 100 },
+  analyticsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', zIndex: 600 },
+  analyticsPeriodDropdownContainer: { position: 'relative', zIndex: 1000 },
   analyticsPeriodDropdown: {
     position: 'absolute',
     top: 46,
@@ -4587,10 +4587,10 @@ const styles = StyleSheet.create({
     minWidth: 160,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 6,
-    zIndex: 9999,
+    elevation: 20,
+    zIndex: 99999,
   },
   analyticsPeriodItem: {
     flexDirection: 'row',
