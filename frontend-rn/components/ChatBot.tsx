@@ -258,8 +258,8 @@ export function ChatBot() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: 12,
+    right: 12,
     alignItems: 'flex-end',
     zIndex: 9999,
   },
@@ -438,8 +438,8 @@ const styles = StyleSheet.create({
     // Shadows removed to prevent rectangular background box on web
   },
   fab: {
-    width: 70,
-    height: 70,
+    width: 52,
+    height: 52,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
