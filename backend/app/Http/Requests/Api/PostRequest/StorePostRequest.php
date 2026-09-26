@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\PostRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StorePostRequest extends FormRequest
 {
@@ -40,7 +41,27 @@ class StorePostRequest extends FormRequest
     {
         return [
             'title.required' => 'A post title is required.',
-            'caption_narrative.required' => 'Please provide a caption for your post.',
+            'caption_narrative.required' => 'Please provide a content caption for your post.',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($this->boolean('is_draft')) {
+                return;
+            }
+
+            if (empty(trim((string) $this->input('caption_narrative')))) {
+                $validator->errors()->add('caption_narrative', 'Please provide a content caption for your post.');
+            }
+
+            $hasMedia = $this->hasFile('media');
+            $hasDocs = $this->hasFile('supporting_docs');
+
+            if (!$hasMedia && !$hasDocs) {
+                $validator->errors()->add('media', 'Please attach at least one photo or media file before submitting.');
+            }
+        });
     }
 }

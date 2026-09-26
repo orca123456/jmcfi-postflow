@@ -109,6 +109,23 @@ Route::get('/storage/{path}', function (string $path) {
         abort(404);
     }
 
+    $disk = config('filesystems.default');
+    $storageDisk = in_array($disk, ['s3', 'b2'], true) ? $disk : 'public';
+
+    try {
+        if (Storage::disk($storageDisk)->exists($path)) {
+            $content = Storage::disk($storageDisk)->get($path);
+            $mime = Storage::disk($storageDisk)->mimeType($path) ?: 'image/jpeg';
+            return response($content, 200, [
+                'Content-Type' => $mime,
+                'Content-Length' => (string) strlen($content),
+                'Cache-Control' => 'public, max-age=31536000, immutable',
+            ]);
+        }
+    } catch (Throwable) {
+        // Fallback
+    }
+
     if (Storage::disk('public')->exists($path)) {
         return response()->file(Storage::disk('public')->path($path), [
             'Cache-Control' => 'public, max-age=31536000, immutable',
