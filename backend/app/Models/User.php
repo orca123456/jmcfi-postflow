@@ -59,8 +59,18 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         $version = $this->updated_at?->getTimestamp();
+        $path = '/profile-photo/' . $this->getKey() . ($version ? '?v=' . $version : '');
 
-        return url('/profile-photo/' . $this->getKey()) . ($version ? '?v=' . $version : '');
+        $railwayDomain = env('RAILWAY_PUBLIC_DOMAIN');
+        if ($railwayDomain) {
+            return 'https://' . rtrim($railwayDomain, '/') . $path;
+        }
+
+        if (request()->hasHeader('Host')) {
+            return request()->schemeAndHttpHost() . $path;
+        }
+
+        return url($path);
     }
 
     public function getDepartmentLogoUrlAttribute(): ?string

@@ -71,16 +71,24 @@ class PostMedia extends Model
     public function getUrlAttribute(): string
     {
         $disk = config('filesystems.default');
-        $normalizedPath = str_replace('\\', '/', $this->file_path);
+        $normalizedPath = ltrim(str_replace('\\', '/', $this->file_path), '/');
 
         if ($disk === 's3' || $disk === 'b2') {
             return \Illuminate\Support\Facades\Storage::disk($disk)->url($normalizedPath);
         }
 
-        // 1. If RENDER_EXTERNAL_URL is set (Render production), use it as base
-        $renderUrl = config('app.render_external_url');
-        if ($renderUrl) {
-            return rtrim($renderUrl, '/') . '/storage/' . $normalizedPath;
+        $railwayDomain = env('RAILWAY_PUBLIC_DOMAIN');
+        if ($railwayDomain) {
+            return 'https://' . rtrim($railwayDomain, '/') . '/storage/' . $normalizedPath;
+        }
+
+        $appUrl = config('app.url');
+        if ($appUrl && !str_contains($appUrl, 'localhost')) {
+            return rtrim($appUrl, '/') . '/storage/' . $normalizedPath;
+        }
+
+        if (request()->hasHeader('Host')) {
+            return request()->schemeAndHttpHost() . '/storage/' . $normalizedPath;
         }
 
         return asset('storage/' . $normalizedPath);
