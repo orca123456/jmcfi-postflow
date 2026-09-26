@@ -20,11 +20,10 @@ interface Message {
   timestamp: Date;
 }
 
-const QUICK_REPLIES = [
-  'How does the workflow work?',
-  'What are the user roles?',
-  'What post statuses exist?',
-  'How do I schedule a post?',
+const SUGGESTED_QUESTIONS = [
+  'How do I upload a document?',
+  'Show pending requirements',
+  'Summarize this file',
 ];
 
 export function ChatBot() {
@@ -33,7 +32,7 @@ export function ChatBot() {
     {
       id: '0',
       role: 'bot',
-      text: "👋 Hi! I'm the PostFlow Assistant. I can help you navigate the JMCFI content approval system. How can I help you today?",
+      text: 'Hello! How can I help you today?',
       timestamp: new Date(),
     },
   ]);
@@ -152,7 +151,11 @@ export function ChatBot() {
   });
   const fabMarginRight = edgeAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [-26, 0],
+    outputRange: [-24, 0],
+  });
+  const fabMarginBottom = edgeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-18, 0],
   });
 
   return (
@@ -171,16 +174,18 @@ export function ChatBot() {
                 <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               </View>
               <View>
-                <Text style={styles.chatHeaderTitle}>PostFlow Assistant</Text>
-                <View style={styles.onlineRow}>
-                  <View style={styles.onlineDot} />
-                  <Text style={styles.chatHeaderSub}>Online · Powered by AI</Text>
-                </View>
+                <Text style={styles.chatHeaderTitle}>AI Assistant</Text>
+                <Text style={styles.chatHeaderSub}>Ask me anything about accreditation.</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.closeBtn}>
-              <Ionicons name="close" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.headerActionBtn}>
+                <Ionicons name="remove-outline" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.headerActionBtn}>
+                <Ionicons name="close-outline" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Messages */}
@@ -249,26 +254,30 @@ export function ChatBot() {
             )}
           </ScrollView>
 
-          {/* Quick Replies */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.quickRepliesRow}
-            contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}
-          >
-            {QUICK_REPLIES.map((qr) => (
-              <TouchableOpacity key={qr} style={styles.quickReplyChip} onPress={() => sendMessage(qr)}>
-                <Text style={styles.quickReplyText} numberOfLines={1}>{qr}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* Suggested Questions */}
+          <View style={styles.suggestedContainer}>
+            <Text style={styles.suggestedTitle}>Suggested Questions</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.quickRepliesRow}
+              contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 6 }}
+            >
+              {SUGGESTED_QUESTIONS.map((qr) => (
+                <TouchableOpacity key={qr} style={styles.quickReplyChip} onPress={() => sendMessage(qr)}>
+                  <Ionicons name="help-circle-outline" size={12} color="#5B0FB8" style={{ marginRight: 4 }} />
+                  <Text style={styles.quickReplyText} numberOfLines={1}>{qr}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* Input */}
           <View style={styles.inputRow}>
             <TextInput
               style={styles.chatInput}
-              placeholder="Ask me anything..."
-              placeholderTextColor={Colors.textMuted}
+              placeholder="Type your question…"
+              placeholderTextColor="#94A3B8"
               value={inputText}
               onChangeText={setInputText}
               onSubmitEditing={() => sendMessage()}
@@ -285,26 +294,48 @@ export function ChatBot() {
         </Animated.View>
       )}
 
-      {/* FAB - Edge Hugging Drawer */}
+      {/* Corner-Hugging Peeking AI Assistant Mascot */}
       <Animated.View
         style={[
-          styles.fabWrapper,
-          { marginRight: fabMarginRight },
+          styles.cornerPeekingWrap,
+          {
+            marginRight: fabMarginRight,
+            marginBottom: fabMarginBottom,
+          },
         ]}
         {...({
           onMouseEnter: handleMouseEnter,
           onMouseLeave: handleMouseLeave,
         } as any)}
       >
-        <TouchableOpacity style={styles.fab} onPress={handleFabPress} activeOpacity={0.85}>
+        {/* Hover Callout Tooltip */}
+        {isRevealed && !isOpen && (
+          <View style={styles.calloutTooltip}>
+            <Text style={styles.calloutText}>Hi! Need help? 👋</Text>
+            <View style={styles.calloutArrow} />
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.cornerMascotButton} onPress={handleFabPress} activeOpacity={0.9}>
           {isOpen ? (
-            <Ionicons name="close" size={24} color="#0B2545" />
+            <View style={styles.closeIconBox}>
+              <Ionicons name="close" size={22} color="#0B2545" />
+            </View>
           ) : (
-            <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
-          )}
-          {!isOpen && (
-            <View style={styles.fabBadge}>
-              <Text style={styles.fabBadgeText}>AI</Text>
+            <View style={styles.peekingMascotContainer}>
+              {/* Peeled Paper Corner Effect */}
+              <View style={styles.paperFoldCorner}>
+                <View style={styles.paperFoldFlap} />
+              </View>
+              {/* AI Mascot Image Peeking Out */}
+              <View style={styles.mascotImageWrap}>
+                <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              </View>
+              {/* AI Badge */}
+              <View style={styles.cornerAiBadge}>
+                <Ionicons name="sparkles" size={9} color="#0B2545" />
+                <Text style={styles.cornerAiBadgeText}>AI</Text>
+              </View>
             </View>
           )}
         </TouchableOpacity>
@@ -498,23 +529,48 @@ const styles = StyleSheet.create({
   typingDot1: { opacity: 0.4 },
   typingDot2: { opacity: 0.7 },
   typingDot3: { opacity: 1 },
-  quickRepliesRow: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerActionBtn: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  suggestedContainer: {
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
-    maxHeight: 48,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  suggestedTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    paddingHorizontal: 12,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  quickRepliesRow: {
+    backgroundColor: '#FFFFFF',
+    maxHeight: 44,
   },
   quickReplyChip: {
-    backgroundColor: '#EEF4F8',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 16,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: '#D1E3F0',
+    borderColor: '#DDD6FE',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   quickReplyText: {
-    fontSize: 10,
-    color: '#0B2545',
+    fontSize: 11,
+    color: '#5B0FB8',
     fontWeight: FontWeight.medium,
   },
   inputRow: {
@@ -529,48 +585,150 @@ const styles = StyleSheet.create({
   },
   chatInput: {
     flex: 1,
-    height: 36,
+    height: 38,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 18,
+    borderColor: '#CBD5E1',
+    borderRadius: 19,
     paddingHorizontal: 14,
     fontSize: 12,
     color: Colors.textPrimary,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#0B2545',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#5B0FB8',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendBtnDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#94A3B8',
   },
-  fabWrapper: {
-    // Shadows removed to prevent rectangular background box on web
-  },
-  fab: {
-    width: 52,
-    height: 52,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fabBadge: {
+  cornerPeekingWrap: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#FFC72C',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
+    bottom: 0,
+    right: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
   },
-  fabBadgeText: {
-    fontSize: 8,
-    fontWeight: FontWeight.bold,
+  calloutTooltip: {
+    position: 'absolute',
+    bottom: 74,
+    right: 8,
+    backgroundColor: '#0B2545',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100001,
+  },
+  calloutText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calloutArrow: {
+    position: 'absolute',
+    bottom: -5,
+    right: 20,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 5,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#0B2545',
+  },
+  cornerMascotButton: {
+    width: 72,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  peekingMascotContainer: {
+    width: 72,
+    height: 72,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paperFoldCorner: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 66,
+    height: 66,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 36,
+    borderBottomRightRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0B2545',
+    shadowOffset: { width: -3, height: -3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  paperFoldFlap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 26,
+    height: 26,
+    backgroundColor: '#F1F5F9',
+    borderTopLeftRadius: 26,
+    borderBottomRightRadius: 13,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  mascotImageWrap: {
+    width: 50,
+    height: 50,
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+  },
+  cornerAiBadge: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    backgroundColor: '#FFC72C',
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  cornerAiBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
     color: '#0B2545',
   },
 });
