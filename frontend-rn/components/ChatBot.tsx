@@ -69,14 +69,15 @@ export function ChatBot() {
   };
 
   const handleFabPress = () => {
-    if (!isRevealed && !isOpen) {
-      setIsRevealed(true);
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = setTimeout(() => {
-        setIsRevealed(false);
-      }, 4000);
-    } else {
-      setIsOpen((prev) => !prev);
+    setIsRevealed(true);
+    setIsOpen((prev) => !prev);
+  };
+
+  const formatTime = (date: Date) => {
+    try {
+      return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
     }
   };
 
@@ -179,13 +180,14 @@ export function ChatBot() {
             style={styles.messagesArea}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            {...({ role: 'log' } as any)}
           >
             {messages.map((msg) => (
               <View
                 key={msg.id}
                 style={[
-                  styles.messageBubble,
-                  msg.role === 'user' ? styles.userBubble : styles.botBubble,
+                  styles.messageRow,
+                  msg.role === 'user' ? styles.userRow : styles.botRow,
                 ]}
               >
                 {msg.role === 'bot' && (
@@ -193,27 +195,46 @@ export function ChatBot() {
                     <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                   </View>
                 )}
-                <View style={[
-                  styles.bubbleContent,
-                  msg.role === 'user' ? styles.userBubbleContent : styles.botBubbleContent,
-                ]}>
-                  <Text style={[
-                    styles.messageText,
-                    msg.role === 'user' ? styles.userMessageText : styles.botMessageText,
+                <View style={[styles.bubbleWrapper, msg.role === 'user' && { alignItems: 'flex-end' }]}>
+                  {msg.role === 'bot' && <Text style={styles.chatSenderName}>PostFlow AI</Text>}
+                  <View style={[
+                    styles.bubbleContent,
+                    msg.role === 'user' ? styles.userBubbleContent : styles.botBubbleContent,
                   ]}>
-                    {msg.text}
-                  </Text>
+                    <Text style={[
+                      styles.messageText,
+                      msg.role === 'user' ? styles.userMessageText : styles.botMessageText,
+                    ]}>
+                      {msg.text}
+                    </Text>
+                  </View>
+                  <View style={[styles.messageFooter, msg.role === 'user' ? styles.userFooter : styles.botFooter]}>
+                    <Text style={styles.timestampText}>{formatTime(msg.timestamp)}</Text>
+                    {msg.role === 'user' && (
+                      <View style={styles.statusWrap}>
+                        <Ionicons name="checkmark-done" size={12} color="#10B981" />
+                        <Text style={styles.statusText}>Read</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             ))}
 
             {isTyping && (
-              <View style={[styles.messageBubble, styles.botBubble]}>
+              <View style={[styles.messageRow, styles.botRow]}>
                 <View style={styles.botBubbleAvatar}>
                   <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                 </View>
-                <View style={[styles.bubbleContent, styles.botBubbleContent]}>
-                  <Text style={styles.typingDots}>● ● ●</Text>
+                <View style={styles.bubbleWrapper}>
+                  <Text style={styles.chatSenderName}>PostFlow AI</Text>
+                  <View style={[styles.bubbleContent, styles.botBubbleContent, styles.typingBubble]}>
+                    <View style={styles.typingDotRow}>
+                      <View style={[styles.typingDot, styles.typingDot1]} />
+                      <View style={[styles.typingDot, styles.typingDot2]} />
+                      <View style={[styles.typingDot, styles.typingDot3]} />
+                    </View>
+                  </View>
                 </View>
               </View>
             )}
@@ -360,57 +381,111 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
-  messageBubble: {
+  messageRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 6,
-    marginVertical: 2,
+    gap: 8,
+    marginVertical: 4,
   },
-  userBubble: {
+  userRow: {
     justifyContent: 'flex-end',
   },
-  botBubble: {
+  botRow: {
     justifyContent: 'flex-start',
   },
   botBubbleAvatar: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 16,
+  },
+  bubbleWrapper: {
+    maxWidth: '78%',
+  },
+  chatSenderName: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 3,
+    marginLeft: 2,
   },
   bubbleContent: {
-    maxWidth: '80%',
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   userBubbleContent: {
     backgroundColor: '#0B2545',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 3,
   },
   botBubbleContent: {
     backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 3,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
   },
   messageText: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
   userMessageText: {
     color: '#FFFFFF',
   },
   botMessageText: {
-    color: '#1A1A2E',
+    color: '#0F172A',
   },
-  typingDots: {
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    gap: 4,
+  },
+  userFooter: {
+    alignSelf: 'flex-end',
+  },
+  botFooter: {
+    alignSelf: 'flex-start',
+    marginLeft: 2,
+  },
+  timestampText: {
     fontSize: 10,
-    color: Colors.textMuted,
-    letterSpacing: 2,
+    color: '#94A3B8',
   },
+  statusWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  statusText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  typingBubble: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  typingDotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#94A3B8',
+  },
+  typingDot1: { opacity: 0.4 },
+  typingDot2: { opacity: 0.7 },
+  typingDot3: { opacity: 1 },
   quickRepliesRow: {
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
