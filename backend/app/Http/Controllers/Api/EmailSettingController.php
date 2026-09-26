@@ -132,13 +132,15 @@ class EmailSettingController extends Controller
             return response()->json(['message' => "Test email sent to {$adminEmail}. Please check your inbox!"]);
         } catch (\Exception $e) {
             Log::error("Failed to send test email: " . $e->getMessage());
-            $errorMsg = $e->getMessage();
-            $lower = strtolower($errorMsg);
+            $rawMsg = $e->getMessage();
+            $lower = strtolower($rawMsg);
 
             if (str_contains($lower, '530') || str_contains($lower, '535') || str_contains($lower, '534') || str_contains($lower, 'authentication') || str_contains($lower, 'bad credentials')) {
                 $errorMsg = 'Gmail Authentication Failed (530/535). Please double check your 16-character Gmail App Password and click "Save Settings".';
-            } elseif (str_contains($lower, 'connection') || str_contains($lower, 'timeout')) {
-                $errorMsg = 'Could not connect to SMTP server (smtp.gmail.com:587). Please verify your internet connection.';
+            } elseif (str_contains($lower, 'connection') || str_contains($lower, 'stream') || str_contains($lower, 'timeout') || str_contains($lower, 'refused')) {
+                $errorMsg = "Could not connect to SMTP server ({$host}:{$port}). If hosted on Railway/cloud, try Port 465 with SSL encryption instead of Port 587 TLS.";
+            } else {
+                $errorMsg = "Test failed: {$rawMsg}";
             }
 
             return response()->json(['message' => $errorMsg], 422);
@@ -170,14 +172,29 @@ class EmailSettingController extends Controller
         // Strip spaces from app password if present (Gmail 16-char app passwords are often formatted as "xxxx xxxx xxxx xxxx")
         $cleanPassword = str_replace(' ', '', $password);
 
+        // Auto-detect encryption if port is 465 (SSL) vs 587 (TLS)
+        $effectiveEncryption = $encrypt;
+        if ((int)$port === 465 && ($encrypt === 'tls' || empty($encrypt))) {
+            $effectiveEncryption = 'ssl';
+        } elseif ((int)$port === 587 && ($encrypt === 'ssl' || empty($encrypt))) {
+            $effectiveEncryption = 'tls';
+        }
+
         Config::set('mail.default', $mailer);
         Config::set('mail.mailers.smtp.transport', 'smtp');
         Config::set('mail.mailers.smtp.host', $host);
         Config::set('mail.mailers.smtp.port', (int) $port);
         Config::set('mail.mailers.smtp.username', $username);
         Config::set('mail.mailers.smtp.password', $cleanPassword);
-        Config::set('mail.mailers.smtp.encryption', $encrypt ?: null);
+        Config::set('mail.mailers.smtp.encryption', $effectiveEncryption ?: null);
         Config::set('mail.mailers.smtp.timeout', 12);
+        Config::set('mail.mailers.smtp.stream', [
+            'ssl' => [
+                'allow_self_signed' => true,
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+            ],
+        ]);
         Config::set('mail.from.address', $from ?: 'postflow@jmc.edu.ph');
         Config::set('mail.from.name', $name ?: 'JMCFI PostFlow');
 
