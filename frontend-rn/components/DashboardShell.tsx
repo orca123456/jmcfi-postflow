@@ -398,7 +398,9 @@ export function DashboardShell({
               style={{ width: 28, height: 28, borderRadius: 14 }} 
               resizeMode="contain"
             />
-            <Text style={styles.logoText}>JMCFI PostFLow</Text>
+            <Text style={styles.logoText} numberOfLines={1}>
+              {width > 420 ? 'JMCFI PostFLow' : 'PostFLow'}
+            </Text>
           </TouchableOpacity>
         </View>
         <View style={styles.headerRight}>
@@ -856,14 +858,15 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
+    flexShrink: 1,
   },
   logoText: {
-    fontSize: FontSize.lg,
+    fontSize: 16,
     fontWeight: FontWeight.bold,
     fontFamily: 'Kameron_700Bold',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   headerDivider: {
     width: 1,
@@ -877,14 +880,17 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: 6,
+    flexShrink: 0,
   },
   headerIconButton: {
-    padding: 8,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   topRightNav: {
     flexDirection: 'row',
@@ -911,10 +917,10 @@ const styles = StyleSheet.create({
   profileTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 24,
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   avatarCircleMini: {
@@ -1242,15 +1248,15 @@ const styles = StyleSheet.create({
   },
   unreadBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -3,
+    right: -3,
     backgroundColor: '#EF4444',
     borderRadius: 8,
     minWidth: 16,
     height: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     borderWidth: 1.5,
     borderColor: '#4C007C',
   },
