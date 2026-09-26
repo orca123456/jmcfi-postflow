@@ -1170,7 +1170,7 @@ export default function RequestorDashboard() {
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
               <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
                 {/* Basic Information Card */}
-                <Card style={[styles.formCard, { flex: 1 }, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
+                <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="information-circle" size={18} color={Colors.textPrimary} />
@@ -1248,7 +1248,7 @@ export default function RequestorDashboard() {
               </View>
 
               <View style={styles.rightColumn}>
-                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="share-social" size={18} color={Colors.textPrimary} />
@@ -1300,7 +1300,7 @@ export default function RequestorDashboard() {
             {/* ROW 2 */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
               <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
-                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="document-text" size={18} color={Colors.textPrimary} />
@@ -1334,7 +1334,7 @@ export default function RequestorDashboard() {
               </View>
 
               <View style={styles.rightColumn}>
-                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="calendar" size={18} color={Colors.textPrimary} />
@@ -1379,7 +1379,9 @@ export default function RequestorDashboard() {
                           onChangeText={setPublishDate}
                         />
                       )}
-                      <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
+                      {Platform.OS !== 'web' && (
+                        <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
+                      )}
                     </View>
                   </View>
 
@@ -1412,7 +1414,9 @@ export default function RequestorDashboard() {
                           onChangeText={setPublishTime}
                         />
                       )}
-                      <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
+                      {Platform.OS !== 'web' && (
+                        <Ionicons name="time-outline" size={16} color={Colors.textSecondary} style={styles.inputFieldIcon} />
+                      )}
                     </View>
                   </View>
                   <View style={styles.scheduleInfoBox}>
@@ -1428,7 +1432,7 @@ export default function RequestorDashboard() {
             {/* ROW 3 */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
               <View style={styles.leftColumn}>
-                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="images" size={18} color={Colors.textPrimary} />
@@ -1578,7 +1582,7 @@ export default function RequestorDashboard() {
               </View>
 
               <View style={styles.rightColumn}>
-                <Card style={[styles.formCard, { flex: 1 }] as any}>
+                <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <TouchableOpacity
                       style={[styles.headerIconWrapper, { backgroundColor: Colors.primary }]}
