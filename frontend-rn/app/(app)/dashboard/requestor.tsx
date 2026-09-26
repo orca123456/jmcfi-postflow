@@ -1135,7 +1135,7 @@ export default function RequestorDashboard() {
       {(activeTab === 'post-requests' || activeTab === 'request') && !isInitialLoading && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
-            <View style={styles.breadcrumbColumn}>
+            <View style={[styles.breadcrumbColumn, { flex: 1, maxWidth: '100%' }]}>
               <Text style={styles.breadcrumbText}>
                 POST REQUESTS <Text style={{ color: Colors.textMuted }}>&gt;</Text> NEW REQUEST
               </Text>
@@ -1903,7 +1903,7 @@ export default function RequestorDashboard() {
       {activeTab === 'account-settings' && !isInitialLoading && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
-            <View style={styles.breadcrumbColumn}>
+            <View style={[styles.breadcrumbColumn, { flex: 1, maxWidth: '100%' }]}>
               <Text style={styles.breadcrumbText}>
                 SETTINGS <Text style={{ color: Colors.textMuted }}>&gt;</Text> ACCOUNT SETTINGS
               </Text>
@@ -2011,7 +2011,7 @@ export default function RequestorDashboard() {
       {(activeTab === 'draft' || activeTab === 'drafts') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
-            <View>
+            <View style={{ flex: 1, maxWidth: '100%' }}>
               <Text style={styles.welcomeTitle}>Draft Post Requests</Text>
               <Text style={styles.welcomeSubtitle}>
                 Manage your saved post request drafts. You can edit, update, or submit them for approval.
@@ -2093,12 +2093,12 @@ export default function RequestorDashboard() {
       {/* ----------------- REJECTED TAB ----------------- */}
       {(activeTab === 'rejected' || activeTab === 'rejected-requests') && !isInitialLoading && (
         <View style={styles.dashboardContainer}>
-          <Card style={styles.tableCard}>
-            <View style={styles.tableHeaderArea}>
+          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
+            <View style={[styles.tableHeaderArea, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
               <Text style={styles.tableCardTitle}>Rejected Requests</Text>
 
-              <View style={styles.tableHeaderActions}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, width: 220, borderWidth: 1, borderColor: Colors.border }}>
+              <View style={[styles.tableHeaderActions, !isTablet && { flexDirection: 'column', gap: 8 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: isTablet ? 8 : 0, width: isTablet ? 220 : '100%', borderWidth: 1, borderColor: Colors.border }}>
                   <Ionicons name="search" size={16} color={Colors.textSecondary} />
                   <TextInput
                     style={{ flex: 1, marginLeft: 8, fontSize: 13, color: Colors.textPrimary, ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
@@ -3117,6 +3117,8 @@ const styles = StyleSheet.create({
   welcomeSubtitle: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   createRequestBtnGold: {
     flexDirection: 'row',
@@ -3454,6 +3456,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
   },
   breadcrumbColumn: {
+    flex: 1,
+    maxWidth: '100%',
     gap: 4,
   },
   breadcrumbText: {
@@ -3470,6 +3474,8 @@ const styles = StyleSheet.create({
   mainPageSubtitle: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   actionButtonsContainer: {
     flexDirection: 'row',
