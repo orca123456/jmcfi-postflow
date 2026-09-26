@@ -668,16 +668,6 @@ export default function RequestorDashboard() {
       return;
     }
 
-    if (mediaFiles.length === 0 && supportingDocs.length === 0) {
-      alert('Please attach at least one media or asset file before submitting.');
-      return;
-    }
-
-    if (selectedPlatforms.includes('instagram') && !hasInstagramImage()) {
-      alert('Instagram publishing requires a photo. Please upload an image before submitting this request.');
-      return;
-    }
-
     requestActionLockedRef.current = true;
     setIsSubmittingRequest(true);
     try {

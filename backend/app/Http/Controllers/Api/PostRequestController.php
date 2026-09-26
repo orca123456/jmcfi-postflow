@@ -892,20 +892,7 @@ class PostRequestController extends Controller
 
     private function needsInstagramImage(PostRequest $postRequest): bool
     {
-        $platforms = is_array($postRequest->target_platforms)
-            ? $postRequest->target_platforms
-            : [];
-
-        if (!in_array('instagram', $platforms, true)) {
-            return false;
-        }
-
-        return !$postRequest->media()
-            ->where(function ($query) {
-                $query->where('type', 'image')
-                    ->orWhere('mime_type', 'like', 'image/%');
-            })
-            ->exists();
+        return false;
     }
 
     private function createMediaRecord(
