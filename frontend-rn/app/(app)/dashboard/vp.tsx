@@ -500,11 +500,14 @@ export default function VPDashboard() {
 
                 {/* Filters Row (Bottom Right: Date Filter + Department Filter Side-by-Side) */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: isTablet ? 'flex-end' : 'space-between', zIndex: 100 }}>
-                  {/* Date Range Dropdown Selector */}
-                  <View style={{ position: 'relative', zIndex: 40, flex: isTablet ? undefined : 1 }}>
+                  {/* Date Range Dropdown Selector (Align Left) */}
+                  <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 60 : 40, flex: isTablet ? undefined : 1 }}>
                     <TouchableOpacity
                       style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 120, justifyContent: 'space-between' }]}
-                      onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                      onPress={() => {
+                        setIsDateDropdownOpen(!isDateDropdownOpen);
+                        setIsDeptDropdownOpen(false);
+                      }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
@@ -514,7 +517,7 @@ export default function VPDashboard() {
                     </TouchableOpacity>
 
                     {isDateDropdownOpen && (
-                      <View style={[styles.dropdownMenu, { minWidth: 200 }]}>
+                      <View style={[styles.dropdownMenu, { left: 0, right: 'auto', minWidth: 200 }]}>
                         {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
                           <TouchableOpacity
                             key={opt}
@@ -546,18 +549,21 @@ export default function VPDashboard() {
                     )}
                   </View>
 
-                  {/* Department Dropdown Selector */}
-                  <View style={{ position: 'relative', zIndex: 50, flex: isTablet ? undefined : 1 }}>
+                  {/* Department Dropdown Selector (Align Right) */}
+                  <View style={{ position: 'relative', zIndex: isDeptDropdownOpen ? 60 : 50, flex: isTablet ? undefined : 1 }}>
                     <TouchableOpacity
                       style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, justifyContent: 'space-between' }]}
-                      onPress={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+                      onPress={() => {
+                        setIsDeptDropdownOpen(!isDeptDropdownOpen);
+                        setIsDateDropdownOpen(false);
+                      }}
                     >
                       <Text style={styles.departmentDropdownText} numberOfLines={1}>{selectedDepartment}</Text>
                       <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
                     </TouchableOpacity>
 
                     {isDeptDropdownOpen && (
-                      <ScrollView style={[styles.dropdownMenu, { maxHeight: 300 }]} nestedScrollEnabled>
+                      <ScrollView style={[styles.dropdownMenu, { right: 0, left: 'auto', minWidth: 200, maxHeight: 300 }]} nestedScrollEnabled>
                         {departmentOptions.map((deptOption) => (
                           <TouchableOpacity
                             key={deptOption}
