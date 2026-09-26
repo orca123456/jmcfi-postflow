@@ -3676,7 +3676,7 @@ $response = curl_exec($ch);`}
                     <View style={styles.analyticsStatTopline}>
                       <Text style={styles.analyticsStatLabel}>{stat.title}</Text>
                       <View style={styles.analyticsTrend}>
-                        <Ionicons name={stat.down ? 'arrow-down' : 'arrow-up'} size={12} color={stat.trendColor} />
+                        <Ionicons name={(stat as any).down ? 'arrow-down' : 'arrow-up'} size={12} color={stat.trendColor} />
                         <Text style={[styles.analyticsTrendText, { color: stat.trendColor }]}>{stat.trend}</Text>
                       </View>
                     </View>
