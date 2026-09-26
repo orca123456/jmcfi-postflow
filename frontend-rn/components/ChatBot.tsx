@@ -80,6 +80,10 @@ export function ChatBot() {
     }
   };
 
+  const scrollToBottom = () => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
   const sendMessage = async (text?: string) => {
     const msgText = (text ?? inputText).trim();
     if (!msgText) return;
