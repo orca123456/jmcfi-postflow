@@ -557,6 +557,28 @@ export default function RequestorDashboard() {
 
   const hasInstagramImage = () => mediaFiles.length > 0 ? mediaFiles.some(isImageFile) : editingPostHasImage;
 
+  const getFileBlob = async (item: any): Promise<any> => {
+    if (Platform.OS === 'web') {
+      if (item.file instanceof File || item.file instanceof Blob) {
+        return item.file;
+      }
+      if (typeof item.uri === 'string' && (item.uri.startsWith('blob:') || item.uri.startsWith('data:'))) {
+        try {
+          const res = await fetch(item.uri);
+          const blob = await res.blob();
+          return new File([blob], item.name || 'upload.png', { type: item.mimeType || item.type || blob.type || 'image/png' });
+        } catch (e) {
+          console.warn('Failed to convert URI to File:', e);
+        }
+      }
+    }
+    return {
+      uri: item.uri,
+      name: item.name || 'upload.png',
+      type: item.mimeType || item.type || 'image/jpeg',
+    };
+  };
+
   const handleSaveDraft = async () => {
     if (requestActionLockedRef.current || isSavingDraft || isSubmittingRequest) return;
 
@@ -601,29 +623,15 @@ export default function RequestorDashboard() {
         }
         formData.append('featured_media_index', String(featuredMediaIndex));
 
-        mediaFiles.forEach((file: any, idx: number) => {
-          if (Platform.OS === 'web' && file.file) {
-            formData.append('media[]', file.file);
-          } else {
-            formData.append('media[]', {
-              uri: file.uri,
-              name: file.name,
-              type: file.mimeType || 'image/jpeg',
-            } as any);
-          }
-        });
+        for (const file of mediaFiles) {
+          const blobObj = await getFileBlob(file);
+          formData.append('media[]', blobObj);
+        }
 
-        supportingDocs.forEach((file: any, idx: number) => {
-          if (Platform.OS === 'web' && file.file) {
-            formData.append('supporting_docs[]', file.file);
-          } else {
-            formData.append('supporting_docs[]', {
-              uri: file.uri,
-              name: file.name,
-              type: file.mimeType || 'application/pdf',
-            } as any);
-          }
-        });
+        for (const doc of supportingDocs) {
+          const docObj = await getFileBlob(doc);
+          formData.append('supporting_docs[]', docObj);
+        }
 
         if (editingPostId) {
           await postsApi.updateWithFiles(Number(editingPostId), formData as any);
@@ -709,29 +717,15 @@ export default function RequestorDashboard() {
         }
         formData.append('featured_media_index', String(featuredMediaIndex));
 
-        mediaFiles.forEach((file: any, idx: number) => {
-          if (Platform.OS === 'web' && file.file) {
-            formData.append('media[]', file.file);
-          } else {
-            formData.append('media[]', {
-              uri: file.uri,
-              name: file.name,
-              type: file.mimeType || 'image/jpeg',
-            } as any);
-          }
-        });
+        for (const file of mediaFiles) {
+          const blobObj = await getFileBlob(file);
+          formData.append('media[]', blobObj);
+        }
 
-        supportingDocs.forEach((file: any, idx: number) => {
-          if (Platform.OS === 'web' && file.file) {
-            formData.append('supporting_docs[]', file.file);
-          } else {
-            formData.append('supporting_docs[]', {
-              uri: file.uri,
-              name: file.name,
-              type: file.mimeType || 'application/pdf',
-            } as any);
-          }
-        });
+        for (const doc of supportingDocs) {
+          const docObj = await getFileBlob(doc);
+          formData.append('supporting_docs[]', docObj);
+        }
 
         if (editingPostId) {
           res = await postsApi.updateWithFiles(Number(editingPostId), formData);
