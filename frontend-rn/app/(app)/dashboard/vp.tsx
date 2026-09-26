@@ -28,6 +28,7 @@ import { postsApi, dashboardApi, authApi } from '../../../services/api';
 export default function VPDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const isTablet = width > 768;
   const { user } = useAuthStore();
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
