@@ -191,11 +191,22 @@ export default function ITAdminDashboard() {
 
   // Tab state: 'overview' | 'user-management' | 'all-posts' | 'approval-queue' | 'policy-rules' | 'account-settings'
   const params = useLocalSearchParams();
-  const [activeTab, setActiveTab] = useState(params.tab || 'overview');
+  const normalizeTab = (t?: string): string => {
+    if (!t) return 'overview';
+    if (t === 'account') return 'account-settings';
+    if (t === 'email') return 'email-settings';
+    if (t === 'policy') return 'policy-rules';
+    if (t === 'audit') return 'audit-logs';
+    return t;
+  };
+  const [activeTab, setActiveTab] = useState(normalizeTab(params.tab as string));
 
   useEffect(() => {
-    if (params.tab && params.tab !== activeTab) {
-      setActiveTab(params.tab as string);
+    if (params.tab) {
+      const norm = normalizeTab(params.tab as string);
+      if (norm !== activeTab) {
+        setActiveTab(norm);
+      }
     }
   }, [params.tab]);
 
@@ -2028,8 +2039,8 @@ export default function ITAdminDashboard() {
                 </select>
               </View>
               <View style={styles.formField}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 8 }]} numberOfLines={1}>Department</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                  <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 4 }]} numberOfLines={1}>Department</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <TouchableOpacity
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: newUserRole === 'admin' ? '#F3F4F6' : '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: newUserRole === 'admin' ? 0.65 : 1 }}
@@ -2605,21 +2616,21 @@ export default function ITAdminDashboard() {
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
               <TextInput
-                style={[styles.searchInput, { flex: 1, backgroundColor: '#F9FAFB' }]}
+                style={[styles.searchInput, { flex: 1, minWidth: 180, backgroundColor: '#F9FAFB' }]}
                 placeholder="Token Name (e.g. Main Website)"
                 value={newTokenName}
                 onChangeText={setNewTokenName}
               />
               <TouchableOpacity
-                style={{ backgroundColor: '#0B2545', paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center' }}
+                style={{ backgroundColor: '#0B2545', height: 38, paddingHorizontal: 16, borderRadius: 8, justifyContent: 'center' }}
                 onPress={generateApiToken}
               >
                 <Text style={{ color: '#fff', fontWeight: '600' }}>Generate Token</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ backgroundColor: Colors.background, paddingHorizontal: 20, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                style={{ backgroundColor: Colors.background, height: 38, paddingHorizontal: 16, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}
                 onPress={() => setShowApiDocs(true)}
               >
                 <Ionicons name="document-text-outline" size={18} color="#4B5563" />
@@ -3753,9 +3764,9 @@ $response = curl_exec($ch);`}
                   <Text style={styles.sectionHeader}>Activity Log Records</Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, width: !isTablet ? '100%' : 'auto' }}>
                   {/* Search input */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', width: 300, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: !isTablet ? 1 : undefined, minWidth: !isTablet ? 180 : 280, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
                     <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
                       style={{ flex: 1, fontSize: 14, color: Colors.textPrimary, outlineStyle: 'none' } as any}
@@ -3767,9 +3778,9 @@ $response = curl_exec($ch);`}
                   </View>
 
                   {/* Export Button */}
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 16, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => handleExportAuditLogs(filteredLogs)}>
-                    <Ionicons name="download-outline" size={16} color="#374151" style={{ marginRight: 8 }} />
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Export CSV</Text>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', height: 38, paddingHorizontal: 14, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }} onPress={() => handleExportAuditLogs(filteredLogs)}>
+                    <Ionicons name="download-outline" size={16} color="#374151" style={{ marginRight: 6 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Export CSV</Text>
                   </TouchableOpacity>
                 </View>
               </View>

@@ -258,14 +258,16 @@ export function ChatBot() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
+    bottom: 16,
+    right: 16,
     alignItems: 'flex-end',
     zIndex: 9999,
   },
   chatPanel: {
     width: 340,
+    maxWidth: 'calc(100vw - 32px)' as any,
     height: 480,
+    maxHeight: '75vh' as any,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     marginBottom: 12,
