@@ -26,8 +26,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Strict database/model safety:
-        Model::shouldBeStrict();
+        // Strict database/model safety — only in non-production to prevent
+        // LazyLoadingViolationException crashes when $appends access unloaded relations.
+        Model::shouldBeStrict(!$this->app->environment('production'));
 
         // Enforce HTTPS URLs in production
         if ($this->app->environment('production')) {
