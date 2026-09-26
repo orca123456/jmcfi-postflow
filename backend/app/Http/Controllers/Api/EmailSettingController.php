@@ -92,14 +92,19 @@ class EmailSettingController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        $mailer   = $request->input('mail_mailer')   ?? SystemSetting::where('key', 'mail_mailer')->value('value')   ?? 'smtp';
-        $host     = $request->input('mail_host')     ?? SystemSetting::where('key', 'mail_host')->value('value')     ?? 'smtp.gmail.com';
-        $port     = $request->input('mail_port')     ?? SystemSetting::where('key', 'mail_port')->value('value')     ?? '587';
-        $fromAddr = $request->input('mail_from_address') ?? SystemSetting::where('key', 'mail_from_address')->value('value') ?? '';
-        $username = $request->input('mail_username') ?? SystemSetting::where('key', 'mail_username')->value('value') ?? $fromAddr;
-        $password = $request->input('mail_password') ?? SystemSetting::where('key', 'mail_password')->value('value') ?? '';
-        $encrypt  = $request->input('mail_encryption') ?? SystemSetting::where('key', 'mail_encryption')->value('value') ?? 'tls';
-        $fromName = $request->input('mail_from_name') ?? SystemSetting::where('key', 'mail_from_name')->value('value') ?? 'JMCFI PostFlow';
+        $reqUser = trim((string)$request->input('mail_username'));
+        $reqFrom = trim((string)$request->input('mail_from_address'));
+        $reqPass = trim((string)$request->input('mail_password'));
+
+        $username = !empty($reqUser) ? $reqUser : (!empty($reqFrom) ? $reqFrom : (SystemSetting::where('key', 'mail_username')->value('value') ?: SystemSetting::where('key', 'mail_from_address')->value('value') ?: ''));
+        $password = !empty($reqPass) ? $reqPass : (SystemSetting::where('key', 'mail_password')->value('value') ?: '');
+
+        $host     = !empty($request->input('mail_host'))       ? $request->input('mail_host')       : (SystemSetting::where('key', 'mail_host')->value('value')     ?: 'smtp.gmail.com');
+        $port     = !empty($request->input('mail_port'))       ? $request->input('mail_port')       : (SystemSetting::where('key', 'mail_port')->value('value')     ?: '587');
+        $encrypt  = !empty($request->input('mail_encryption')) ? $request->input('mail_encryption') : (SystemSetting::where('key', 'mail_encryption')->value('value') ?: 'tls');
+        $fromName = !empty($request->input('mail_from_name'))  ? $request->input('mail_from_name')  : (SystemSetting::where('key', 'mail_from_name')->value('value')    ?: 'JMCFI PostFlow');
+        $fromAddr = !empty($reqFrom) ? $reqFrom : $username;
+        $mailer   = !empty($request->input('mail_mailer'))     ? $request->input('mail_mailer')     : (SystemSetting::where('key', 'mail_mailer')->value('value')    ?: 'smtp');
 
         if ($mailer === 'smtp' && (empty($username) || empty($password))) {
             return response()->json([
@@ -108,7 +113,7 @@ class EmailSettingController extends Controller
         }
 
         // Temporarily override mail config with test settings
-        $this->applyMailConfigCustom($mailer, $host, $port, $username, $password, $encrypt, $fromAddr ?: $username, $fromName);
+        $this->applyMailConfigCustom($mailer, $host, $port, $username, $password, $encrypt, $fromAddr, $fromName);
 
         $adminEmail = $request->user()->email;
         $adminName  = $request->user()->full_name;

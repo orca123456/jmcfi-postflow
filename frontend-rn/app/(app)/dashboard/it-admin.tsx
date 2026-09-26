@@ -1044,13 +1044,19 @@ export default function ITAdminDashboard() {
   };
 
   const handleTestEmail = async () => {
-    if (!emailFields.mail_from_address && !emailFields.mail_username) {
-      showToast('Please enter a From Email Address first.', 'warning');
+    const activeFrom = emailFields.mail_from_address || emailFields.mail_username;
+    if (!activeFrom) {
+      showToast('Please enter your From Email Address.', 'warning');
       return;
     }
     setTestingEmail(true);
     try {
-      const res = await (emailSettingsApi as any).test(emailFields);
+      const payload = {
+        ...emailFields,
+        mail_username: emailFields.mail_username || activeFrom,
+        mail_from_address: activeFrom,
+      };
+      const res = await (emailSettingsApi as any).test(payload);
       showToast(res.data.message || 'Test email sent successfully!', 'success');
     } catch (e: any) {
       const errMsg = e.response?.data?.message || e.message || 'Failed to send test email.';
