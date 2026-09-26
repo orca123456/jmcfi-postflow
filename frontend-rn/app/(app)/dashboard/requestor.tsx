@@ -1135,7 +1135,7 @@ export default function RequestorDashboard() {
       {(activeTab === 'post-requests' || activeTab === 'request') && !isInitialLoading && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
-            <View style={[styles.breadcrumbColumn, { flex: 1, maxWidth: '100%' }]}>
+            <View style={styles.breadcrumbColumn}>
               <Text style={styles.breadcrumbText}>
                 POST REQUESTS <Text style={{ color: Colors.textMuted }}>&gt;</Text> NEW REQUEST
               </Text>
@@ -1903,7 +1903,7 @@ export default function RequestorDashboard() {
       {activeTab === 'account-settings' && !isInitialLoading && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
-            <View style={[styles.breadcrumbColumn, { flex: 1, maxWidth: '100%' }]}>
+            <View style={styles.breadcrumbColumn}>
               <Text style={styles.breadcrumbText}>
                 SETTINGS <Text style={{ color: Colors.textMuted }}>&gt;</Text> ACCOUNT SETTINGS
               </Text>
@@ -3457,6 +3457,7 @@ const styles = StyleSheet.create({
   },
   breadcrumbColumn: {
     flex: 1,
+    minWidth: 280,
     maxWidth: '100%',
     gap: 4,
   },
