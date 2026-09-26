@@ -7,6 +7,7 @@ export default function NotFoundScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isMobile = width < 640;
+  const mascotSize = isMobile ? Math.min(width * 0.55, 220) : Math.min(width * 0.32, 340);
 
   // Hover state for the button
   const [isHovered, setIsHovered] = useState(false);
@@ -32,9 +33,9 @@ export default function NotFoundScreen() {
           style={[
             styles.backgroundText,
             {
-              fontSize: isMobile ? Math.min(width * 0.28, 110) : Math.min(width * 0.16, 210),
-              letterSpacing: isMobile ? 4 : 12,
-              top: isMobile ? 45 : 70,
+              fontSize: isMobile ? Math.min(width * 0.28, 100) : Math.min(width * 0.16, 170),
+              letterSpacing: isMobile ? 4 : 8,
+              top: isMobile ? 35 : 40,
             },
           ]}
           numberOfLines={1}
@@ -52,20 +53,30 @@ export default function NotFoundScreen() {
             <View style={isMobile ? styles.triangleBottom : styles.triangleRight} />
           </View>
 
-          {/* Mascot Image with transparent multiply blend so white box never covers 404 */}
+          {/* Mascot Image with native HTML blend mode on Web */}
           <View style={styles.mascotWrapper}>
-            <Image
-              source={require('../assets/images/404-mascot.jpg')}
-              style={[
-                styles.mascot,
-                {
-                  width: isMobile ? Math.min(width * 0.55, 220) : Math.min(width * 0.32, 340),
-                  height: isMobile ? Math.min(width * 0.55, 220) : Math.min(width * 0.32, 340),
-                },
-                Platform.OS === 'web' && ({ mixBlendMode: 'multiply' } as any),
-              ]}
-              resizeMode="contain"
-            />
+            {Platform.OS === 'web' ? (
+              <img
+                src={require('../assets/images/404-mascot.jpg')}
+                style={{
+                  width: mascotSize,
+                  height: mascotSize,
+                  objectFit: 'contain',
+                  mixBlendMode: 'multiply',
+                  display: 'block',
+                }}
+                alt="404 mascot"
+              />
+            ) : (
+              <Image
+                source={require('../assets/images/404-mascot.jpg')}
+                style={{
+                  width: mascotSize,
+                  height: mascotSize,
+                }}
+                resizeMode="contain"
+              />
+            )}
           </View>
         </View>
 
