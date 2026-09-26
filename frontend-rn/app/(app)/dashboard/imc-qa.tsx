@@ -480,7 +480,7 @@ export default function ImcQaDashboard() {
           {/* Main Content Card: Requests List */}
           <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
             {/* Table Control Header */}
-            <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+            <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
               <Text style={styles.tableTitle}>
                 {activeTab === 'dashboard'
                   ? 'Requests Awaiting QA Review'
@@ -491,9 +491,9 @@ export default function ImcQaDashboard() {
                       : 'All Requests'}
               </Text>
 
-              <View style={[styles.tableControlsRight, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
-                {/* Search Bar */}
-                <View style={[styles.searchBox, !isTablet && { width: '100%' }]}>
+              <View style={[styles.tableControlsRight, { flexDirection: 'column', alignItems: isTablet ? 'flex-end' : 'stretch', gap: 8 }]}>
+                {/* Search Bar (Top Right) */}
+                <View style={[styles.searchBox, { width: isTablet ? 240 : '100%' }]}>
                   <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
                   <TextInput
                     style={styles.searchInput}
@@ -503,76 +503,81 @@ export default function ImcQaDashboard() {
                   />
                 </View>
 
-                {/* Department Dropdown Selector */}
-                <View style={{ position: 'relative', zIndex: 50 }}>
-                  <TouchableOpacity
-                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
-                    onPress={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
-                  >
-                    <Text style={styles.departmentDropdownText}>{selectedDepartment}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
-                  </TouchableOpacity>
+                {/* Filters Row (Bottom Right: Date Filter + Department Filter Side-by-Side) */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: isTablet ? 'flex-end' : 'space-between', zIndex: 100 }}>
+                  {/* Date Range Dropdown Selector */}
+                  <View style={{ position: 'relative', zIndex: 40, flex: isTablet ? undefined : 1 }}>
+                    <TouchableOpacity
+                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 120, justifyContent: 'space-between' }]}
+                      onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                        <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
+                      </View>
+                      <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    </TouchableOpacity>
 
-                  {isDeptDropdownOpen && (
-                    <ScrollView style={[styles.dropdownMenu, { maxHeight: 300 }]} nestedScrollEnabled>
-                      {departmentOptions.map((deptOption) => (
-                        <TouchableOpacity
-                          key={deptOption}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setSelectedDepartment(deptOption);
-                            setIsDeptDropdownOpen(false);
-                          }}
-                        >
-                          <Text style={styles.dropdownItemText}>{deptOption}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  )}
-                </View>
-
-                {/* Date Range Dropdown Selector */}
-                <View style={{ position: 'relative', zIndex: 40 }}>
-                  <TouchableOpacity
-                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 140 }]}
-                    onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                  >
-                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                    <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-
-                  {isDateDropdownOpen && (
-                    <View style={[styles.dropdownMenu, { minWidth: 200 }]}>
-                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
-                        <TouchableOpacity
-                          key={opt}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setDateFilter(opt);
-                            if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
-                          }}
-                        >
-                          <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
-                        </TouchableOpacity>
-                      ))}
-                      
-                      {dateFilter === 'Custom Range' && (
-                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
-                          <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
-                          <TouchableOpacity 
-                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
-                            onPress={() => setIsDateDropdownOpen(false)}
+                    {isDateDropdownOpen && (
+                      <View style={[styles.dropdownMenu, { minWidth: 200 }]}>
+                        {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                          <TouchableOpacity
+                            key={opt}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setDateFilter(opt);
+                              if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
+                            }}
                           >
-                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                            <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
                           </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  )}
+                        ))}
+                        
+                        {dateFilter === 'Custom Range' && (
+                          <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                            <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
+                            <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
+                            <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
+                            <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
+                            <TouchableOpacity 
+                              style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
+                              onPress={() => setIsDateDropdownOpen(false)}
+                            >
+                              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Department Dropdown Selector */}
+                  <View style={{ position: 'relative', zIndex: 50, flex: isTablet ? undefined : 1 }}>
+                    <TouchableOpacity
+                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, justifyContent: 'space-between' }]}
+                      onPress={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+                    >
+                      <Text style={styles.departmentDropdownText} numberOfLines={1}>{selectedDepartment}</Text>
+                      <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {isDeptDropdownOpen && (
+                      <ScrollView style={[styles.dropdownMenu, { maxHeight: 300 }]} nestedScrollEnabled>
+                        {departmentOptions.map((deptOption) => (
+                          <TouchableOpacity
+                            key={deptOption}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setSelectedDepartment(deptOption);
+                              setIsDeptDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={styles.dropdownItemText}>{deptOption}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
                 </View>
               </View>
             </View>
