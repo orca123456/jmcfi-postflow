@@ -541,11 +541,19 @@ class DashboardController extends Controller
      * Analytics overview — cached for 120 seconds (heavier computation).
      * Aggregates in the DB instead of loading all rows into PHP memory.
      */
+    /**
+     * Analytics overview — live real-time aggregate computation.
+     */
     public function getAnalyticsOverview(Request $request): JsonResponse
     {
         $cacheKey = 'dashboard_analytics';
 
-        $data = Cache::remember($cacheKey, 120, function () {
+        if ($request->boolean('fresh')) {
+            Cache::forget($cacheKey);
+        }
+
+        // Cache for 5 seconds max so navigation is fast but data stays current
+        $data = Cache::remember($cacheKey, 5, function () {
             // ── Total Volume: single count ──
             $totalVolume = PostRequest::count();
 
@@ -561,27 +569,32 @@ class DashboardController extends Controller
 
             $avgVelocity = '4.2 hrs';
 
-            // ── Department Breakdown: single query with join, no N+1 ──
-            // Note: users.department is a string column (not a FK), so we join on the name match
-            $departmentBreakdown = \App\Models\Department::leftJoin('users', function ($join) {
-                    $join->on('departments.name', '=', 'users.department')
-                         ->orOn('departments.display_name', '=', 'users.department');
-                })
-                ->leftJoin('post_requests', 'users.id', '=', 'post_requests.requestor_id')
-                ->selectRaw('departments.id, departments.name, departments.display_name, COUNT(post_requests.id) as count')
-                ->groupBy('departments.id', 'departments.name', 'departments.display_name')
-                ->get()
-                ->map(function ($dept, $index) use ($totalVolume) {
-                    $colors = ['#1E40AF', '#047857', '#D97706', '#7C3AED', '#6B7280'];
-                    return [
-                        'name'       => $dept->display_name ?? $dept->name,
-                        'count'      => (int) $dept->count,
-                        'percentage' => $totalVolume > 0 ? round(((int) $dept->count / $totalVolume) * 100) : 0,
-                        'barColor'   => $colors[$index % count($colors)],
-                    ];
-                });
+            // ── Department Breakdown ──
+            $departments = \App\Models\Department::all();
+            $postsWithUser = PostRequest::with(['requestor'])->get(['id', 'requestor_id']);
+            $deptCounts = [];
+            foreach ($postsWithUser as $pr) {
+                $uDept = $pr->requestor?->department ?? '';
+                if ($uDept) {
+                    $norm = strtolower(trim($uDept));
+                    $deptCounts[$norm] = ($deptCounts[$norm] ?? 0) + 1;
+                }
+            }
+            $colors = ['#1E40AF', '#047857', '#D97706', '#7C3AED', '#6B7280'];
+            $departmentBreakdown = $departments->map(function ($dept, $index) use ($deptCounts, $totalVolume, $colors) {
+                $deptName = $dept->display_name ?? $dept->name;
+                $normName = strtolower(trim($dept->name ?? ''));
+                $normDisp = strtolower(trim($dept->display_name ?? ''));
+                $count = ($deptCounts[$normName] ?? 0) + ($normName !== $normDisp ? ($deptCounts[$normDisp] ?? 0) : 0);
+                return [
+                    'name'       => $deptName,
+                    'count'      => (int) $count,
+                    'percentage' => $totalVolume > 0 ? round(((int) $count / $totalVolume) * 100) : 0,
+                    'barColor'   => $colors[$index % count($colors)],
+                ];
+            });
 
-            // ── Platform Stats: single query using JSON extraction ──
+            // ── Platform Stats ──
             $platformRaw = PostRequest::selectRaw("
                     COUNT(CASE WHEN target_platforms::text ILIKE '%facebook%' THEN 1 END) as facebook_count,
                     COUNT(CASE WHEN target_platforms::text ILIKE '%instagram%' THEN 1 END) as instagram_count,
@@ -628,15 +641,44 @@ class DashboardController extends Controller
                 PostRequest::STATUS_PENDING_IMC_QA,
             ])->count();
 
-            // ── Monthly Data: single GROUP BY on month ──
-            $currentYear = date('Y');
+            // ── Monthly Data ──
+            $currentYear = (int) date('Y');
             $monthNames  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-            $postsByMonth = PostRequest::selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count')
-                ->whereYear('created_at', $currentYear)
-                ->groupByRaw('EXTRACT(MONTH FROM created_at)')
-                ->pluck('count', 'month')
-                ->toArray();
+            $postsByMonth = [];
+            try {
+                $driver = \DB::getDriverName();
+                if ($driver === 'pgsql') {
+                    $rawMonth = PostRequest::selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count')
+                        ->whereYear('created_at', $currentYear)
+                        ->groupByRaw('EXTRACT(MONTH FROM created_at)')
+                        ->pluck('count', 'month')
+                        ->toArray();
+                } elseif ($driver === 'sqlite') {
+                    $rawMonth = PostRequest::selectRaw("cast(strftime('%m', created_at) as integer) as month, COUNT(*) as count")
+                        ->whereYear('created_at', $currentYear)
+                        ->groupByRaw("strftime('%m', created_at)")
+                        ->pluck('count', 'month')
+                        ->toArray();
+                } else {
+                    $rawMonth = PostRequest::selectRaw('MONTH(created_at) as month, COUNT(*) as count')
+                        ->whereYear('created_at', $currentYear)
+                        ->groupByRaw('MONTH(created_at)')
+                        ->pluck('count', 'month')
+                        ->toArray();
+                }
+                foreach ($rawMonth as $mKey => $mCount) {
+                    $postsByMonth[(int)$mKey] = (int)$mCount;
+                }
+            } catch (\Throwable $e) {
+                $postsThisYear = PostRequest::whereYear('created_at', $currentYear)->get(['created_at']);
+                foreach ($postsThisYear as $pr) {
+                    if ($pr->created_at) {
+                        $m = (int) $pr->created_at->format('n');
+                        $postsByMonth[$m] = ($postsByMonth[$m] ?? 0) + 1;
+                    }
+                }
+            }
 
             $monthsData = [];
             foreach ($monthNames as $index => $month) {

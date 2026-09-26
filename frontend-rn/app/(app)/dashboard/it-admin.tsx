@@ -413,12 +413,10 @@ export default function ITAdminDashboard() {
   useEffect(() => {
     if (isInitialLoading) return;
     
-    if (activeTab === 'overview' && !overviewLoaded) {
-      setOverviewLoaded(true);
+    if (activeTab === 'overview' || activeTab === 'analytics') {
       dashboardApi.getAnalyticsOverview().then(res => {
         if (res.data?.data) setAnalyticsOverview(res.data.data);
       }).catch(() => {});
-      
     }
 
     if (activeTab === 'audit-logs' && !auditLoaded) {
@@ -3526,33 +3524,105 @@ $response = curl_exec($ch);`}
 
       {/* ── ANALYTICS TAB ── */}
       {activeTab === 'analytics' && !isInitialLoading && (() => {
-        const monthsData = analyticsOverview?.monthsData && analyticsOverview.monthsData.length > 0
-          ? analyticsOverview.monthsData
-          : [
-            { month: 'Jan', posts: 0 }, { month: 'Feb', posts: 0 }, { month: 'Mar', posts: 0 },
-            { month: 'Apr', posts: 0 }, { month: 'May', posts: 0 }, { month: 'Jun', posts: 0 },
-            { month: 'Jul', posts: 0 }, { month: 'Aug', posts: 0 }, { month: 'Sep', posts: 0 },
-            { month: 'Oct', posts: 0 }, { month: 'Nov', posts: 0 }, { month: 'Dec', posts: 0 }
-          ];
+        // Fallback calculations directly from active post state
+        const totalVolumeNumber = Math.max(
+          Number(String(analyticsOverview?.totalVolume || '0').replace(/,/g, '')) || 0,
+          allMockPosts.length
+        );
 
-        const maxPosts = Math.max(...monthsData.map((d: any) => d.posts), 10);
-        const totalVolumeNumber = Number(String(analyticsOverview?.totalVolume || '0').replace(/,/g, '')) || 0;
-        const publishedCount = allMockPosts.filter((post: any) => ['published', 'approved'].includes(post.rawStatus)).length;
+        const publishedCount = Math.max(
+          Number(String(analyticsOverview?.contentPublished || '0').replace(/,/g, '')) || 0,
+          allMockPosts.filter((post: any) => ['published', 'approved'].includes(post.rawStatus)).length
+        );
+
         const rejectedCount = allMockPosts.filter((post: any) => ['rejected', 'returned_for_revision', 'publish_failed'].includes(post.rawStatus)).length;
-        const pendingCount = Number(String(analyticsOverview?.pendingApproval || '0').replace(/,/g, '')) || allMockPosts.filter((post: any) => ['pending_office_head', 'pending_vice_president', 'pending_president', 'pending_imc_qa', 'publishing', 'scheduled'].includes(post.rawStatus)).length;
+
+        const pendingCount = Math.max(
+          Number(String(analyticsOverview?.pendingApproval || '0').replace(/,/g, '')) || 0,
+          allMockPosts.filter((post: any) => ['pending_office_head', 'pending_vice_president', 'pending_president', 'pending_imc_qa', 'publishing', 'scheduled'].includes(post.rawStatus)).length
+        );
+
+        const activeUsersCount = Math.max(
+          Number(String(analyticsOverview?.activeUsers || '0').replace(/,/g, '')) || 0,
+          new Set(allMockPosts.map((p: any) => p.requestedBy || p.author)).size
+        );
+
+        const totalDecided = publishedCount + rejectedCount;
+        const complianceRateStr = totalDecided > 0 
+          ? `${((publishedCount / totalDecided) * 100).toFixed(1)}%` 
+          : (analyticsOverview?.complianceRate || '0%');
+
         const draftCount = allMockPosts.filter((post: any) => post.rawStatus === 'draft').length;
         const statusTotal = Math.max(totalVolumeNumber, pendingCount + rejectedCount + publishedCount + draftCount, 1);
-        const topDepartments = (analyticsOverview?.departmentBreakdown || [])
-          .filter((dept: any) => !isStaticSystemDepartment({ name: dept.name, display_name: dept.name }))
-          .sort((a:any, b:any) => b.count - a.count)
-          .slice(0, 4);
-        const platformStats = analyticsOverview?.platformStats || [];
-        const trendStats = [
-          { title: 'Total Submissions', value: analyticsOverview?.totalVolume || '0', subTitle: 'All time volume', icon: 'document-text' as const, color: '#7C3AED', bg: '#F3E8FF', trend: '46%', trendColor: '#10B981' },
-          { title: 'Compliance Rate', value: analyticsOverview?.complianceRate || '0%', subTitle: 'Approved vs Rejected', icon: 'shield-checkmark' as const, color: '#10B981', bg: '#DCFCE7', trend: '100%', trendColor: '#EF4444', down: true },
-          { title: 'Pending Reviews', value: analyticsOverview?.pendingApproval || '0', subTitle: 'Awaiting action', icon: 'time' as const, color: '#F97316', bg: '#FFEDD5', trend: '30%', trendColor: '#F97316' },
-          { title: 'Active Requestors', value: analyticsOverview?.activeUsers || '0', subTitle: 'Users who submitted posts', icon: 'people' as const, color: '#6366F1', bg: '#E0E7FF', trend: '100%', trendColor: '#10B981' },
+
+        // Dynamic monthly data fallback
+        const monthMap: Record<string, number> = { Jan: 0, Feb: 0, Mar: 0, Apr: 0, May: 0, Jun: 0, Jul: 0, Aug: 0, Sep: 0, Oct: 0, Nov: 0, Dec: 0 };
+        allMockPosts.forEach((post: any) => {
+          if (post.rawDate) {
+            const d = new Date(post.rawDate);
+            if (!isNaN(d.getTime())) {
+              const mStr = d.toLocaleDateString('en-US', { month: 'short' });
+              if (monthMap[mStr] !== undefined) monthMap[mStr] += 1;
+            }
+          }
+        });
+        const fallbackMonths = Object.keys(monthMap).map(m => ({ month: m, posts: monthMap[m] }));
+        const monthsData = (analyticsOverview?.monthsData && analyticsOverview.monthsData.some((d: any) => d.posts > 0))
+          ? analyticsOverview.monthsData
+          : fallbackMonths;
+
+        const maxPosts = Math.max(...monthsData.map((d: any) => d.posts), 10);
+
+        // Dynamic department breakdown fallback
+        const deptCounts: Record<string, number> = {};
+        allMockPosts.forEach((p: any) => {
+          const dName = p.department || 'Unknown';
+          if (!isStaticSystemDepartment({ name: dName, display_name: dName })) {
+            deptCounts[dName] = (deptCounts[dName] || 0) + 1;
+          }
+        });
+        const colors = ['#7C3AED', '#10B981', '#F97316', '#6366F1'];
+        const fallbackDepts = Object.keys(deptCounts).map((d, idx) => ({
+          name: d,
+          count: deptCounts[d],
+          percentage: totalVolumeNumber > 0 ? Math.round((deptCounts[d] / totalVolumeNumber) * 100) : 0,
+          barColor: colors[idx % colors.length],
+        })).sort((a, b) => b.count - a.count).slice(0, 4);
+
+        const topDepartments = (analyticsOverview?.departmentBreakdown && analyticsOverview.departmentBreakdown.some((d: any) => d.count > 0))
+          ? analyticsOverview.departmentBreakdown
+              .filter((dept: any) => !isStaticSystemDepartment({ name: dept.name, display_name: dept.name }))
+              .sort((a: any, b: any) => b.count - a.count)
+              .slice(0, 4)
+          : fallbackDepts;
+
+        // Dynamic platform stats fallback
+        const platCounts = { facebook: 0, instagram: 0, website: 0 };
+        allMockPosts.forEach((p: any) => {
+          const platArr = p.platforms || [];
+          platArr.forEach((pl: string) => {
+            const s = String(pl).toLowerCase();
+            if (s.includes('facebook')) platCounts.facebook++;
+            if (s.includes('instagram')) platCounts.instagram++;
+            if (s.includes('web')) platCounts.website++;
+          });
+        });
+        const fallbackPlatforms = [
+          { name: 'Facebook', posts: `${platCounts.facebook} posts`, reach: '10K Reach', icon: 'logo-facebook', color: '#1877F2', bgColor: '#EFF6FF' },
+          { name: 'Instagram', posts: `${platCounts.instagram} posts`, reach: '5K Reach', icon: 'logo-instagram', color: '#E1306C', bgColor: '#FDF2F8' },
+          { name: 'Website', posts: `${platCounts.website} posts`, reach: '2K Reach', icon: 'globe-outline', color: '#059669', bgColor: '#ECFDF5' },
         ];
+        const platformStats = (analyticsOverview?.platformStats && analyticsOverview.platformStats.some((p: any) => parseInt(p.posts) > 0))
+          ? analyticsOverview.platformStats
+          : fallbackPlatforms;
+
+        const trendStats = [
+          { title: 'Total Submissions', value: String(totalVolumeNumber), subTitle: 'All time volume', icon: 'document-text' as const, color: '#7C3AED', bg: '#F3E8FF', trend: 'Live', trendColor: '#10B981' },
+          { title: 'Compliance Rate', value: complianceRateStr, subTitle: 'Approved vs Rejected', icon: 'shield-checkmark' as const, color: '#10B981', bg: '#DCFCE7', trend: '100%', trendColor: '#10B981' },
+          { title: 'Pending Reviews', value: String(pendingCount), subTitle: 'Awaiting action', icon: 'time' as const, color: '#F97316', bg: '#FFEDD5', trend: 'Live', trendColor: '#F97316' },
+          { title: 'Active Requestors', value: String(activeUsersCount), subTitle: 'Users who submitted posts', icon: 'people' as const, color: '#6366F1', bg: '#E0E7FF', trend: 'Live', trendColor: '#10B981' },
+        ];
+
         const statusRows = [
           { label: 'Pending Reviews', value: pendingCount, color: '#F97316' },
           { label: 'Rejected', value: rejectedCount, color: '#10B981' },
