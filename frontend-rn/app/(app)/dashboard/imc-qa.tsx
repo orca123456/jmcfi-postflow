@@ -414,71 +414,71 @@ export default function ImcQaDashboard() {
             </View>
           )}
 
-          {/* Metric Summary Cards Row */}
+          {/* Metric Summary Cards Row (2x2 on Mobile) */}
           {['dashboard', 'approved', 'rejected'].includes(activeTab) && (
-            <View style={styles.metricsGrid}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
               {/* Card 1: For Quality Review */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#EFF6FF' }]}>
                       <Ionicons name="shield-checkmark" size={20} color="#1E40AF" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>For Quality Review</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">For Quality Review</Text>
                   <Text style={styles.metricCount}>{computedStats.pending}</Text>
-                  <Text style={styles.metricSubtext}>Requests awaiting QA clearance</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests awaiting QA clearance</Text>
                 </Card>
               </TouchableOpacity>
 
               {/* Card 2: Approved */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#ECFDF5' }]}>
                       <Ionicons name="checkmark-circle" size={20} color="#047857" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Approved</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Approved</Text>
                   <Text style={styles.metricCount}>{computedStats.approved}</Text>
-                  <Text style={styles.metricSubtext}>Requests approved by QA</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests approved by QA</Text>
                 </Card>
               </TouchableOpacity>
 
               {/* Card 3: Rejected */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
                 <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary, borderWidth: 2 }]}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#FEF2F2' }]}>
                       <Ionicons name="close-circle" size={20} color="#B91C1C" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Rejected</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Rejected</Text>
                   <Text style={styles.metricCount}>{computedStats.rejected}</Text>
-                  <Text style={styles.metricSubtext}>Requests rejected</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests rejected</Text>
                 </Card>
               </TouchableOpacity>
 
               {/* Card 4: Total Requests */}
-              <TouchableOpacity style={{ flex: 1, minWidth: 220 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
+              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
                 <Card style={styles.metricCard}>
                   <View style={styles.metricCardHeader}>
                     <View style={[styles.metricIconBg, { backgroundColor: '#F0FDFA' }]}>
                       <Ionicons name="send" size={20} color="#0D9488" />
                     </View>
                   </View>
-                  <Text style={styles.metricLabel}>Total Requests</Text>
+                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Total Requests</Text>
                   <Text style={styles.metricCount}>{computedStats.total}</Text>
-                  <Text style={styles.metricSubtext}>All requests</Text>
+                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">All requests</Text>
                 </Card>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Main Content Card: Requests List */}
-          <Card style={styles.tableCard}>
+          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
             {/* Table Control Header */}
-            <View style={styles.tableCardHeaderRow}>
+            <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
               <Text style={styles.tableTitle}>
                 {activeTab === 'dashboard'
                   ? 'Requests Awaiting QA Review'
@@ -487,9 +487,9 @@ export default function ImcQaDashboard() {
                     : 'Rejected Requests'}
               </Text>
 
-              <View style={styles.tableControlsRight}>
+              <View style={[styles.tableControlsRight, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
                 {/* Search Bar */}
-                <View style={styles.searchBox}>
+                <View style={[styles.searchBox, !isTablet && { width: '100%' }]}>
                   <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
                   <TextInput
                     style={styles.searchInput}
