@@ -33,7 +33,9 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
     '2': { badgeBg: '#7C3AED', iconBg: '#F3E8FF', iconColor: '#7C3AED', accent: '#7C3AED', iconName: 'shield-checkmark-outline' },
     '3': { badgeBg: '#16A34A', iconBg: '#DCFCE7', iconColor: '#16A34A', accent: '#16A34A', iconName: 'checkmark-circle-outline' },
     '4': { badgeBg: '#DC2626', iconBg: '#FEE2E2', iconColor: '#DC2626', accent: '#DC2626', iconName: 'close-circle-outline' },
-    '5': { badgeBg: '#0B2545', iconBg: '#FEF3C7', iconColor: '#D97706', accent: '#D97706', iconName: 'copy-outline' },
+    '5': { badgeBg: '#D97706', iconBg: '#FEF3C7', iconColor: '#D97706', accent: '#D97706', iconName: 'copy-outline' },
+    '6': { badgeBg: '#2563EB', iconBg: '#EFF6FF', iconColor: '#2563EB', accent: '#2563EB', iconName: 'git-network-outline' },
+    '7': { badgeBg: '#4B5563', iconBg: '#F3F4F6', iconColor: '#374151', accent: '#4B5563', iconName: 'warning-outline' },
   };
 
   const filtered = policySections.filter((sec) => {
@@ -93,21 +95,32 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
               <Text style={styles.sectionTitleText}>{secCleanTitle}</Text>
             </View>
 
-            {/* Section 1: Policy Statement card */}
-            {secNumber === '1' ? (
+            {/* Section Description / Policy Statement White Card Box */}
+            {section.content ? (
               <Card style={styles.statementCard}>
                 <View style={[styles.cardIconSquare, { backgroundColor: colors.iconBg }]}>
                   <Ionicons name={colors.iconName} size={18} color={colors.iconColor} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.statementLabel}>Policy statement</Text>
+                  <Text style={styles.statementLabel}>
+                    {secNumber === '1' ? 'Policy statement' : 'Guidelines & Enforcement'}
+                  </Text>
                   <FormattedText style={styles.statementBody}>
-                    {section.content || ''}
+                    {section.content}
                   </FormattedText>
+                  {section.contact ? (
+                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+                      <FormattedText style={[styles.statementBody, { fontWeight: '600', color: colors.accent }]}>
+                        {section.contact}
+                      </FormattedText>
+                    </View>
+                  ) : null}
                 </View>
               </Card>
-            ) : hasBullets ? (
-              /* Grid cards for bullets/steps */
+            ) : null}
+
+            {/* Grid cards for bullets/steps */}
+            {hasBullets && (
               <View style={styles.gridRow}>
                 {((section.bullets || (section as any).steps) as any[])
                   .filter((b) => {
@@ -127,13 +140,6 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
                       <FormattedText style={styles.cardDesc}>{bullet.desc || bullet.description}</FormattedText>
                     </Card>
                   ))}
-              </View>
-            ) : (
-              /* Simple content box */
-              <View style={styles.simpleContentBox}>
-                <FormattedText style={styles.simpleContentText}>
-                  {section.content || ''}
-                </FormattedText>
               </View>
             )}
           </View>
