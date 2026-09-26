@@ -149,8 +149,13 @@ export const usePolicyStore = create<PolicyStore>((set) => ({
       const cachedEffective = await storage.get('policy_effective_date');
       const cachedUpdated = await storage.get('policy_last_updated');
       if (cachedSections && cachedEffective && cachedUpdated) {
+        const parsed = JSON.parse(cachedSections);
+        const merged = DEFAULT_SECTIONS.map(def => {
+          const found = parsed.find((p: any) => p.id === def.id || p.title === def.title);
+          return found ? { ...def, ...found } : def;
+        });
         set({
-          policySections: JSON.parse(cachedSections),
+          policySections: merged,
           effectiveDate: cachedEffective,
           lastUpdatedDate: cachedUpdated,
         });
