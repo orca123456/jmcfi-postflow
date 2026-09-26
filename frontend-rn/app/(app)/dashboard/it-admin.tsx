@@ -1683,111 +1683,127 @@ export default function ITAdminDashboard() {
           {/* ── ALL CONTENT REQUESTS TABLE ── */}
           <Card style={{ padding: 0, overflow: 'visible', borderWidth: 1, borderColor: '#e5e7eb', zIndex: 10 }}>
             {/* Table Controls */}
-            <View style={{ flexDirection: isTablet ? 'row' : 'column', justifyContent: 'space-between', alignItems: isTablet ? 'center' : 'stretch', padding: isTablet ? 20 : 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', flexWrap: 'wrap', gap: 12, zIndex: 20 }}>
-              <Text style={{ fontSize: isTablet ? 18 : 16, fontWeight: '700', color: Colors.textPrimary }}>All Content Requests</Text>
-              <View style={{ flexDirection: isTablet ? 'row' : 'column', alignItems: isTablet ? 'center' : 'stretch', gap: 12, flexWrap: 'wrap', zIndex: 30 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 6, paddingHorizontal: 12, height: 36, borderWidth: 1, borderColor: '#e5e7eb' }}>
-                  <Ionicons name="search" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
-                  <TextInput id="search-requests" placeholder="Search requests..." style={{ fontSize: 13, minWidth: 160, outlineStyle: 'none' } as any} value={requestsSearch} onChangeText={setRequestsSearch} />
+            <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', zIndex: 20 }}>
+              {/* Top Row: Title + Search */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, width: '100%' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: Colors.textPrimary }}>All Content Requests</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, paddingHorizontal: 10, height: 36, borderWidth: 1, borderColor: '#e2e8f0', flex: 1, maxWidth: 240, minWidth: 140 }}>
+                  <Ionicons name="search-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
+                  <TextInput
+                    id="search-requests"
+                    placeholder="Search requests..."
+                    placeholderTextColor="#94a3b8"
+                    style={{ fontSize: 13, flex: 1, outlineStyle: 'none' } as any}
+                    value={requestsSearch}
+                    onChangeText={setRequestsSearch}
+                  />
                 </View>
-                <View style={{ position: 'relative', zIndex: 40 }}>
+              </View>
+
+              {/* Bottom Row: Inline Filters */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12, zIndex: 40 }}>
+                {/* All Departments */}
+                <View style={{ position: 'relative', zIndex: 50 }}>
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' }}
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }}
                     onPress={() => setIsRequestsDeptDropdownOpen(!isRequestsDeptDropdownOpen)}
                   >
-                    <Text style={{ fontSize: 13, color: Colors.textPrimary, marginRight: 8 }}>{requestsDept}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginRight: 6 }} numberOfLines={1}>{requestsDept}</Text>
+                    <Ionicons name="chevron-down-outline" size={13} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isRequestsDeptDropdownOpen && (
-                    <ScrollView style={{ position: 'absolute', top: 40, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb', minWidth: 180, maxHeight: 300, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 }} nestedScrollEnabled>
+                    <ScrollView style={{ position: 'absolute', top: 38, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 180, maxHeight: 260, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }} nestedScrollEnabled>
                       <TouchableOpacity
-                        style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsDept === 'All Departments' ? '#f3f4f6' : 'transparent' }}
+                        style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 6, backgroundColor: requestsDept === 'All Departments' ? '#f1f5f9' : 'transparent' }}
                         onPress={() => {
                           setRequestsDept('All Departments');
                           setIsRequestsDeptDropdownOpen(false);
                         }}
                       >
-                        <Text style={{ fontSize: 13, color: requestsDept === 'All Departments' ? Colors.primary : Colors.textPrimary, fontWeight: requestsDept === 'All Departments' ? '600' : '400' }}>All Departments</Text>
+                        <Text style={{ fontSize: 12, color: requestsDept === 'All Departments' ? Colors.primary : Colors.textPrimary, fontWeight: requestsDept === 'All Departments' ? '600' : '400' }}>All Departments</Text>
                       </TouchableOpacity>
                       {departmentsList.filter((d: any) => !d.is_system).map((d: any) => (
                         <TouchableOpacity
                           key={d.id}
-                          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsDept === d.display_name ? '#f3f4f6' : 'transparent' }}
+                          style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 6, backgroundColor: requestsDept === d.display_name ? '#f1f5f9' : 'transparent' }}
                           onPress={() => {
                             setRequestsDept(d.display_name);
                             setIsRequestsDeptDropdownOpen(false);
                           }}
                         >
-                          <Text style={{ fontSize: 13, color: requestsDept === d.display_name ? Colors.primary : Colors.textPrimary, fontWeight: requestsDept === d.display_name ? '600' : '400' }}>{d.display_name}</Text>
+                          <Text style={{ fontSize: 12, color: requestsDept === d.display_name ? Colors.primary : Colors.textPrimary, fontWeight: requestsDept === d.display_name ? '600' : '400' }}>{d.display_name}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
                   )}
                 </View>
 
-                <View style={{ position: 'relative', zIndex: 40 }}>
+                {/* All Status */}
+                <View style={{ position: 'relative', zIndex: 50 }}>
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' }}
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }}
                     onPress={() => setIsRequestsStatusDropdownOpen(!isRequestsStatusDropdownOpen)}
                   >
-                    <Text style={{ fontSize: 13, color: Colors.textPrimary, marginRight: 8 }}>{requestsStatus}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginRight: 6 }}>{requestsStatus}</Text>
+                    <Ionicons name="chevron-down-outline" size={13} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isRequestsStatusDropdownOpen && (
-                    <View style={{ position: 'absolute', top: 40, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb', minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 }}>
+                    <View style={{ position: 'absolute', top: 38, left: 0, backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
                       {['All Status', 'Pending', 'Published', 'Rejected', 'Draft'].map((opt: any) => (
                         <TouchableOpacity
                           key={opt}
-                          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsStatus === opt ? '#f3f4f6' : 'transparent' }}
+                          style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 6, backgroundColor: requestsStatus === opt ? '#f1f5f9' : 'transparent' }}
                           onPress={() => {
                             setRequestsStatus(opt);
                             setIsRequestsStatusDropdownOpen(false);
                           }}
                         >
-                          <Text style={{ fontSize: 13, color: requestsStatus === opt ? Colors.primary : Colors.textPrimary, fontWeight: requestsStatus === opt ? '600' : '400' }}>{opt}</Text>
+                          <Text style={{ fontSize: 12, color: requestsStatus === opt ? Colors.primary : Colors.textPrimary, fontWeight: requestsStatus === opt ? '600' : '400' }}>{opt}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
                   )}
                 </View>
-                <View style={{ position: 'relative', zIndex: 40 }}>
+
+                {/* All Time (With Calendar Icon) */}
+                <View style={{ position: 'relative', zIndex: 50 }}>
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' }}
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }}
                     onPress={() => setIsRequestsDateDropdownOpen(!isRequestsDateDropdownOpen)}
                   >
-                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 13, color: Colors.textPrimary, marginRight: 8 }}>{requestsDate}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    <Ionicons name="calendar-outline" size={13} color={Colors.textSecondary} style={{ marginRight: 5 }} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginRight: 6 }}>{requestsDate}</Text>
+                    <Ionicons name="chevron-down-outline" size={13} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isRequestsDateDropdownOpen && (
-                    <View style={{ position: 'absolute', top: 40, right: 0, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb', minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 }}>
+                    <View style={{ position: 'absolute', top: 38, right: 0, backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
                       {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
                         <TouchableOpacity
                           key={opt}
-                          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: requestsDate === opt ? '#f3f4f6' : 'transparent' }}
+                          style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 6, backgroundColor: requestsDate === opt ? '#f1f5f9' : 'transparent' }}
                           onPress={() => {
                             setRequestsDate(opt);
                             if (opt !== 'Custom Range') setIsRequestsDateDropdownOpen(false);
                           }}
                         >
-                          <Text style={{ fontSize: 13, color: requestsDate === opt ? Colors.primary : Colors.textPrimary, fontWeight: requestsDate === opt ? '600' : '400' }}>{opt}</Text>
+                          <Text style={{ fontSize: 12, color: requestsDate === opt ? Colors.primary : Colors.textPrimary, fontWeight: requestsDate === opt ? '600' : '400' }}>{opt}</Text>
                         </TouchableOpacity>
                       ))}
                       
                       {requestsDate === 'Custom Range' && (
-                        <View style={{ padding: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
-                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={requestsCustomStartDate} onChange={(e) => setRequestsCustomStartDate(e.target.value)} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
-                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={requestsCustomEndDate} onChange={(e) => setRequestsCustomEndDate(e.target.value)} />
+                        <View style={{ padding: 8, marginTop: 4, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                          <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                          <input type="date" style={{ height: 30, fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0', paddingLeft: 6, paddingRight: 6, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 6 }} value={requestsCustomStartDate} onChange={(e) => setRequestsCustomStartDate(e.target.value)} />
+                          <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                          <input type="date" style={{ height: 30, fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0', paddingLeft: 6, paddingRight: 6, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 6 }} value={requestsCustomEndDate} onChange={(e) => setRequestsCustomEndDate(e.target.value)} />
                           <TouchableOpacity 
-                            style={{ backgroundColor: Colors.primary, paddingVertical: 8, borderRadius: 6, alignItems: 'center', marginTop: 4 }}
+                            style={{ backgroundColor: Colors.primary, paddingVertical: 6, borderRadius: 6, alignItems: 'center', marginTop: 2 }}
                             onPress={() => setIsRequestsDateDropdownOpen(false)}
                           >
-                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Apply</Text>
+                            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Apply</Text>
                           </TouchableOpacity>
                         </View>
                       )}
