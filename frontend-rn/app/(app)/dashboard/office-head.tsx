@@ -615,15 +615,16 @@ export default function OfficeHeadDashboard() {
             </View>
 
             {/* Requests Table */}
-            <View style={styles.table}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
-                <Text style={[styles.tableHeaderCell, styles.flexDept]}>DEPARTMENT</Text>
-                <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
-                <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
-                <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
-                <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
-              </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ minWidth: isTablet ? '100%' : 760 }}>
+              <View style={styles.table}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
+                  <Text style={[styles.tableHeaderCell, styles.flexDept]}>DEPARTMENT</Text>
+                  <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
+                  <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
+                  <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
+                  <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
+                </View>
 
               {paginatedRequests.map((req) => (
                 <TouchableOpacity
@@ -720,6 +721,7 @@ export default function OfficeHeadDashboard() {
                 </TouchableOpacity>
               ))}
             </View>
+          </ScrollView>
 
             <PaginationControl
               currentPage={postsPage}
@@ -1494,13 +1496,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Column Flex Multipliers
-  flexTitle: { flex: 2 },
-  flexDept: { flex: 2.2 },
-  flexUser: { flex: 1.5 },
-  flexDate: { flex: 1.2 },
-  flexPlatforms: { flex: 1 },
-  flexActions: { flex: 1.5 },
+  // Column Flex Multipliers & Min-Widths to Prevent Overlap
+  flexTitle: { flex: 2, minWidth: 160 },
+  flexDept: { flex: 2.2, minWidth: 140 },
+  flexUser: { flex: 1.5, minWidth: 120 },
+  flexDate: { flex: 1.2, minWidth: 110 },
+  flexPlatforms: { flex: 1, minWidth: 90 },
+  flexActions: { flex: 1.5, minWidth: 150 },
   alignRight: { textAlign: 'right' },
 
   tableRow: {
