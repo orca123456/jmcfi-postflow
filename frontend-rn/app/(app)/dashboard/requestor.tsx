@@ -482,12 +482,15 @@ export default function RequestorDashboard() {
           statusBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
           badgeColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
           badgeBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
-          thumbnailUrl: Array.isArray(p.media)
-            ? (p.media.find((m: any) => m?.is_featured && (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')))?.url
-               || p.media.find((m: any) => m?.is_featured)?.url
-               || p.media.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url
-               || p.media[0]?.url
-               || null)
+          thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
+            ? (() => {
+                const getUrl = (m: any) => m?.url || m?.file_url || m?.file_path || null;
+                const featured = p.media.find((m: any) => m?.is_featured && getUrl(m));
+                if (featured) return getUrl(featured);
+                const imageMedia = p.media.find((m: any) => (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')) && getUrl(m));
+                if (imageMedia) return getUrl(imageMedia);
+                return getUrl(p.media[0]);
+              })()
             : null,
           thumbnailIcon: 'document-text-outline' as const,
           thumbnailBg: '#E0F2FE',
