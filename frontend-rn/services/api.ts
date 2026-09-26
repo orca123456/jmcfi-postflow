@@ -183,7 +183,7 @@ export const tokenSettingsApi = {
 export const emailSettingsApi = {
   get: () => api.get('/email-settings'),
   update: (data: object) => api.post('/email-settings', data),
-  test: () => api.post('/email-settings/test'),
+  test: () => api.post('/email-settings/test', {}, { timeout: 15000 }),
 };
 
 // ── API Tokens endpoints (Developer API) ──────────────────────────────────

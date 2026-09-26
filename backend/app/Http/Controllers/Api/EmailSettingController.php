@@ -91,6 +91,16 @@ class EmailSettingController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
+        $mailer   = SystemSetting::where('key', 'mail_mailer')->value('value')   ?? 'smtp';
+        $username = SystemSetting::where('key', 'mail_username')->value('value') ?? '';
+        $password = SystemSetting::where('key', 'mail_password')->value('value') ?? '';
+
+        if ($mailer === 'smtp' && (empty($username) || empty($password))) {
+            return response()->json([
+                'message' => 'Please enter and save your Email Address and Gmail App Password before sending a test email.'
+            ], 422);
+        }
+
         // Temporarily override mail config from database settings
         $this->applyMailConfig();
 
@@ -111,7 +121,13 @@ class EmailSettingController extends Controller
             return response()->json(['message' => "Test email sent to {$adminEmail}. Please check your inbox!"]);
         } catch (\Exception $e) {
             Log::error("Failed to send test email: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to send test email: ' . $e->getMessage()], 422);
+            $errorMsg = $e->getMessage();
+            if (str_contains(strtolower($errorMsg), 'connection') || str_contains(strtolower($errorMsg), 'timeout')) {
+                $errorMsg = 'Could not connect to SMTP server (smtp.gmail.com:587). Please verify your network connection and SMTP port.';
+            } elseif (str_contains(strtolower($errorMsg), 'authentication') || str_contains(strtolower($errorMsg), '535')) {
+                $errorMsg = 'SMTP Authentication failed. Please verify your Gmail address and 16-character App Password.';
+            }
+            return response()->json(['message' => 'Test failed: ' . $errorMsg], 422);
         }
     }
 
@@ -120,7 +136,7 @@ class EmailSettingController extends Controller
      */
     private function applyMailConfig(): void
     {
-        $mailer   = SystemSetting::where('key', 'mail_mailer')->value('value')   ?? 'log';
+        $mailer   = SystemSetting::where('key', 'mail_mailer')->value('value')   ?? 'smtp';
         $host     = SystemSetting::where('key', 'mail_host')->value('value')     ?? 'smtp.gmail.com';
         $port     = SystemSetting::where('key', 'mail_port')->value('value')     ?? '587';
         $username = SystemSetting::where('key', 'mail_username')->value('value') ?? '';
@@ -129,13 +145,22 @@ class EmailSettingController extends Controller
         $from     = SystemSetting::where('key', 'mail_from_address')->value('value') ?? 'postflow@jmc.edu.ph';
         $name     = SystemSetting::where('key', 'mail_from_name')->value('value')    ?? 'JMCFI PostFlow';
 
+        // Strip spaces from app password if present (Gmail 16-char app passwords are often formatted as "xxxx xxxx xxxx xxxx")
+        $password = str_replace(' ', '', $password);
+
         Config::set('mail.default', $mailer);
+        Config::set('mail.mailers.smtp.transport', 'smtp');
         Config::set('mail.mailers.smtp.host', $host);
         Config::set('mail.mailers.smtp.port', (int) $port);
         Config::set('mail.mailers.smtp.username', $username);
         Config::set('mail.mailers.smtp.password', $password);
         Config::set('mail.mailers.smtp.encryption', $encrypt ?: null);
+        Config::set('mail.mailers.smtp.timeout', 10);
         Config::set('mail.from.address', $from);
         Config::set('mail.from.name', $name);
+
+        // Purge mailer instances so Laravel rebuilds transport with new config
+        Mail::purge('smtp');
+        Mail::purge($mailer);
     }
 }
