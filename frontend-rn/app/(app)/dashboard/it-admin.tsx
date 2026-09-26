@@ -3557,7 +3557,7 @@ $response = curl_exec($ch);`}
           { label: 'Pending Reviews', value: pendingCount, color: '#F97316' },
           { label: 'Rejected', value: rejectedCount, color: '#10B981' },
           { label: 'Published', value: publishedCount, color: '#3B82F6' },
-          { label: 'Draft', value: draftCount, color: '#6B7280' },
+          { label: 'Draft', value: draftCount, color: '#94A3B8' },
         ];
 
         return (
@@ -3714,9 +3714,9 @@ $response = curl_exec($ch);`}
                 </View>
               </Card>
 
-              <Card style={styles.analyticsStatusCard}>
+              <Card style={[styles.analyticsStatusCard, { padding: isTablet ? 22 : 16 }]}>
                 <Text style={styles.analyticsCardTitle}>Submissions Status</Text>
-                <View style={[styles.analyticsStatusBody, !isLargeScreen && styles.analyticsStack]}>
+                <View style={styles.analyticsStatusBody}>
                   <View style={styles.analyticsDonutWrap}>
                     <View style={styles.analyticsDonutOuter}>
                       <View style={styles.analyticsDonutMiddle}>
@@ -3732,7 +3732,7 @@ $response = curl_exec($ch);`}
                         <View key={row.label} style={styles.analyticsStatusRow}>
                           <View style={styles.analyticsStatusLabelWrap}>
                             <View style={[styles.analyticsStatusDot, { backgroundColor: row.color }]} />
-                            <Text style={styles.analyticsStatusLabel}>{row.label}</Text>
+                            <Text style={styles.analyticsStatusLabel} numberOfLines={1}>{row.label}</Text>
                           </View>
                           <Text style={styles.analyticsStatusValue}>{row.value} ({pct}%)</Text>
                         </View>
@@ -4484,18 +4484,18 @@ const styles = StyleSheet.create({
   analyticsProgressRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   analyticsProgressRingFill: { position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderLeftColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '35deg' }] },
   analyticsStatusCard: { flex: 1, minWidth: 0, width: '100%', padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
-  analyticsStatusBody: { flexDirection: 'row', alignItems: 'center', gap: 28, marginTop: 18 },
-  analyticsDonutWrap: { width: 136, alignItems: 'center' },
-  analyticsDonutOuter: { width: 118, height: 118, borderRadius: 59, borderWidth: 22, borderColor: '#F97316', borderLeftColor: '#10B981', borderTopColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
-  analyticsDonutMiddle: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  analyticsDonutValue: { fontSize: 23, fontWeight: '900', color: '#111827' },
-  analyticsDonutLabel: { fontSize: 10, color: '#64748B' },
-  analyticsStatusLegendList: { flex: 1, gap: 15 },
-  analyticsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18 },
-  analyticsStatusLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
-  analyticsStatusDot: { width: 8, height: 8, borderRadius: 4 },
-  analyticsStatusLabel: { fontSize: 12, color: '#64748B' },
-  analyticsStatusValue: { fontSize: 12, fontWeight: '800', color: '#111827' },
+  analyticsStatusBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 18 },
+  analyticsDonutWrap: { width: 110, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  analyticsDonutOuter: { width: 106, height: 106, borderRadius: 53, borderWidth: 18, borderColor: '#F97316', borderLeftColor: '#10B981', borderTopColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
+  analyticsDonutMiddle: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  analyticsDonutValue: { fontSize: 22, fontWeight: '900', color: '#0F172A' },
+  analyticsDonutLabel: { fontSize: 11, color: '#64748B', marginTop: 1 },
+  analyticsStatusLegendList: { flex: 1, gap: 10, minWidth: 0 },
+  analyticsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  analyticsStatusLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  analyticsStatusDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  analyticsStatusLabel: { fontSize: 12, color: '#64748B', flexShrink: 1 },
+  analyticsStatusValue: { fontSize: 12, fontWeight: '800', color: '#0F172A', flexShrink: 0 },
   analyticsEmptyText: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 20, alignSelf: 'center' },
 
   // Platform integrations
