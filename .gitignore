@@ -33,3 +33,6 @@ backend/storage/logs/*.log
 backend/storage/framework/cache/
 backend/storage/framework/sessions/
 backend/storage/framework/views/
+backend/storage/app/public/*
+backend/storage/app/uploads/*
+!backend/storage/app/public/.gitignore

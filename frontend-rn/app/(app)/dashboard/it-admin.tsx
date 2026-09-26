@@ -1613,55 +1613,59 @@ export default function ITAdminDashboard() {
         waiting for the 5 background tab-requests on the single-threaded server. */}
       {activeTab === 'overview' && !isInitialLoading && (
         <>
-          <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: isTablet ? 20 : 12, flexWrap: 'wrap', marginBottom: 24 }}>
-            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.7}>
-              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'All Status' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="document-text" size={24} color="#7e22ce" />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 24, justifyContent: 'space-between', width: '100%' }}>
+            {/* Stat Card 1: TOTAL CONTENT */}
+            <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.8}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'All Status' ? 2 : 1.5, borderColor: requestsStatus === 'All Status' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Ionicons name="document-text" size={17} color="#7C3AED" />
                 </View>
-                <View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Total Content</Text>
-                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.total}</Text>
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>All content requests</Text>
-                </View>
-              </Card>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('Published')} activeOpacity={0.7}>
-              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Published' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="checkmark-circle" size={24} color="#1877F2" />
-                </View>
-                <View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Approved & Published</Text>
-                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.published}</Text>
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>Ready or live</Text>
+                <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">TOTAL CONTENT</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.total}</Text>
+                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">All content requests</Text>
                 </View>
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('Pending')} activeOpacity={0.7}>
-              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Pending' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#fdf2f8', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="time" size={24} color="#E1306C" />
+            {/* Stat Card 2: PENDING */}
+            <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('Pending')} activeOpacity={0.8}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Pending' ? 2 : 1.5, borderColor: requestsStatus === 'Pending' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFE4E6', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Ionicons name="time" size={17} color="#E11D48" />
                 </View>
-                <View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Pending</Text>
-                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.pending}</Text>
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>Awaiting approval</Text>
+                <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">PENDING</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.pending}</Text>
+                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Awaiting approval</Text>
                 </View>
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: isTablet ? 1 : undefined, minWidth: isTablet ? 220 : undefined }} onPress={() => setRequestsStatus('Drafts')} activeOpacity={0.7}>
-              <Card style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, height: '100%', ...(requestsStatus === 'Drafts' ? { borderColor: Colors.primary, borderWidth: 2 } : {}) }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="document" size={24} color="#16a34a" />
+            {/* Stat Card 3: APPROVED & PUBLISHED */}
+            <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('Published')} activeOpacity={0.8}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Published' ? 2 : 1.5, borderColor: requestsStatus === 'Published' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Ionicons name="checkmark-circle" size={17} color="#0284C7" />
                 </View>
-                <View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase' }}>Drafts</Text>
-                  <Text style={{ fontSize: 28, fontWeight: '700', color: Colors.textPrimary }}>{computedStats.draft}</Text>
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>Work in progress</Text>
+                <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">APPROVED & PUBLISHED</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.published}</Text>
+                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Ready or live</Text>
+                </View>
+              </Card>
+            </TouchableOpacity>
+
+            {/* Stat Card 4: DRAFTS */}
+            <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('Drafts')} activeOpacity={0.8}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Drafts' ? 2 : 1.5, borderColor: requestsStatus === 'Drafts' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Ionicons name="document-text" size={17} color="#16A34A" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">DRAFTS</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.draft}</Text>
+                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Work in progress</Text>
                 </View>
               </Card>
             </TouchableOpacity>
@@ -4525,12 +4529,12 @@ const styles = StyleSheet.create({
   // User management
   userTabContainer: { gap: Spacing.md },
   userCard: { padding: Spacing.md },
-  userListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  searchInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, fontSize: FontSize.sm, width: 200 },
+  userListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
+  searchInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, fontSize: FontSize.sm, width: '100%', maxWidth: 220, flexGrow: 1 },
   formRow: { gap: Spacing.md, marginBottom: Spacing.md },
   formRowLayout: { flexDirection: 'row', flexWrap: 'wrap' },
   formColumnLayout: { flexDirection: 'column' },
-  formField: { flex: 1, minWidth: 180, gap: 6, justifyContent: 'flex-end' },
+  formField: { flex: 1, minWidth: 140, gap: 6, justifyContent: 'flex-end' },
   formLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textSecondary },
   formInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.sm, backgroundColor: Colors.surface },
   fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textSecondary, marginBottom: 6 },
@@ -4541,8 +4545,8 @@ const styles = StyleSheet.create({
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0F172A', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignSelf: 'flex-start' },
   createBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
-  userRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  userRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 200 },
   userAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   userAvatarText: { fontSize: 12, fontWeight: FontWeight.bold },
   userEmail: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textPrimary },
@@ -4559,18 +4563,18 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: Colors.textSecondary, fontSize: 12 },
 
   // All posts
-  postListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  postListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   statusFilterBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   statusFilterText: { fontSize: FontSize.sm, color: Colors.textPrimary },
   statusDropdown: { position: 'absolute', top: 38, right: 0, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, zIndex: 100, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
   statusDropdownItem: { paddingHorizontal: 14, paddingVertical: 10 },
   statusDropdownText: { fontSize: FontSize.sm, color: Colors.textPrimary },
-  postRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
-  postInfo: { flex: 1, gap: 4 },
+  postRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
+  postInfo: { flex: 1, minWidth: 200, gap: 4 },
   postTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textPrimary },
   postMeta: { fontSize: FontSize.xs, color: Colors.textMuted },
   approvedMeta: { fontSize: FontSize.xs, color: Colors.success },
-  platformTagRow: { flexDirection: 'row', gap: 4, marginTop: 4 },
+  platformTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   platformTag: { backgroundColor: '#EFF6FF', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   platformTagText: { fontSize: 10, fontWeight: '600', color: '#2563EB' },
   postStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: 2 },
@@ -4603,8 +4607,8 @@ const styles = StyleSheet.create({
   settingsMainTitle: { fontSize: 28, fontWeight: '900', color: Colors.textPrimary },
   settingsSubtitle: { fontSize: FontSize.sm, color: Colors.textSecondary },
   settingsLayout: { flexDirection: 'row', gap: Spacing.xl, flexWrap: 'wrap' },
-  settingsColumnLeft: { flex: 2, minWidth: 320, padding: 0, overflow: 'hidden' },
-  settingsColumnRight: { flex: 1, minWidth: 280, padding: 0, overflow: 'hidden', height: 'auto', alignSelf: 'flex-start' },
+  settingsColumnLeft: { flex: 2, minWidth: Platform.OS === 'web' ? 280 : '100%', maxWidth: '100%', padding: 0, overflow: 'hidden' },
+  settingsColumnRight: { flex: 1, minWidth: Platform.OS === 'web' ? 260 : '100%', maxWidth: '100%', padding: 0, overflow: 'hidden', height: 'auto', alignSelf: 'flex-start' },
   settingsCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.lg },
   settingsCardTitle: { fontSize: FontSize.md, fontWeight: 'bold', color: Colors.textPrimary },
   configCardTitle: {
