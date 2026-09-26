@@ -346,7 +346,6 @@ export function DashboardShell({
         { id: 'overview', label: 'Overview', icon: 'grid-outline' as const, active: active === 'overview' },
         { id: 'user-management', label: 'User Management', icon: 'people-outline' as const, active: active === 'user-management' },
         { id: 'analytics', label: 'Analytics', icon: 'bar-chart-outline' as const, active: active === 'analytics' },
-        { id: 'account-settings', label: 'Account', icon: 'settings-outline' as const, active: active === 'account-settings' },
         { id: 'audit-logs', label: 'Audit Logs', icon: 'shield-checkmark-outline' as const, active: active === 'audit-logs' },
         { id: 'tokens', label: 'Tokens', icon: 'key-outline' as const, active: active === 'tokens' },
         { id: 'developer-api', label: 'Developer API', icon: 'code-slash-outline' as const, active: active === 'developer-api' },
@@ -710,6 +709,76 @@ export function DashboardShell({
                       </Animated.View>
                     </AnimatedTouchable>
                   ))}
+                </View>
+
+                <View style={styles.sidebarDivider} />
+
+                <View style={{ gap: 4, paddingBottom: 16 }}>
+                  <AnimatedTouchable
+                    style={[
+                      styles.sidebarNavItem,
+                      activeTab === 'account-settings' && styles.sidebarNavItemActivePurple,
+                      {
+                        width: sidebarWidthAnim.interpolate({
+                          inputRange: [MIN_WIDTH, MAX_WIDTH],
+                          outputRange: [48, MAX_WIDTH - 16]
+                        })
+                      }
+                    ]}
+                    onPress={() => {
+                      if (onTabChange) onTabChange('account-settings');
+                      if (sidebarOpenedByHover) closeSidebar();
+                    }}
+                  >
+                    <View style={styles.sidebarNavIconWrapper}>
+                      <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+                    </View>
+                    <Animated.View style={{ 
+                      opacity: sidebarWidthAnim.interpolate({
+                        inputRange: [MIN_WIDTH, MAX_WIDTH],
+                        outputRange: [0, 1]
+                      }) 
+                    }}>
+                      <Text
+                        style={[
+                          styles.sidebarNavLabel,
+                          activeTab === 'account-settings' && styles.sidebarNavLabelActivePurple,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        Account Settings
+                      </Text>
+                    </Animated.View>
+                  </AnimatedTouchable>
+                  <AnimatedTouchable
+                    style={[
+                      styles.sidebarNavItem,
+                      {
+                        width: sidebarWidthAnim.interpolate({
+                          inputRange: [MIN_WIDTH, MAX_WIDTH],
+                          outputRange: [48, MAX_WIDTH - 16]
+                        })
+                      }
+                    ]}
+                    onPress={() => {
+                      if (sidebarOpenedByHover) closeSidebar();
+                      handleLogout();
+                    }}
+                  >
+                    <View style={styles.sidebarNavIconWrapper}>
+                      <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+                    </View>
+                    <Animated.View style={{ 
+                      opacity: sidebarWidthAnim.interpolate({
+                        inputRange: [MIN_WIDTH, MAX_WIDTH],
+                        outputRange: [0, 1]
+                      }) 
+                    }}>
+                      <Text style={styles.sidebarNavLabel} numberOfLines={1}>
+                        Sign Out
+                      </Text>
+                    </Animated.View>
+                  </AnimatedTouchable>
                 </View>
               </View>
 
