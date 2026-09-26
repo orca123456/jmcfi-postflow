@@ -3677,7 +3677,7 @@ $response = curl_exec($ch);`}
             </View>
 
             <View style={[styles.analyticsBottomGrid, !isLargeScreen && styles.analyticsStack]}>
-              <Card style={styles.analyticsPlatformCard}>
+              <Card style={[styles.analyticsPlatformCard, !isLargeScreen && { flex: 0 }]}>
                 <Text style={styles.analyticsCardTitle}>Platform Targets Breakdown</Text>
                 <View style={[styles.analyticsPlatformGrid, !isLargeScreen && { flexDirection: 'column', gap: 12 }]}>
                   {platformStats.map((platform: any, idx: number) => {
@@ -3714,7 +3714,7 @@ $response = curl_exec($ch);`}
                 </View>
               </Card>
 
-              <Card style={[styles.analyticsStatusCard, { padding: isTablet ? 22 : 16 }]}>
+              <Card style={[styles.analyticsStatusCard, { padding: isTablet ? 22 : 16 }, !isLargeScreen && { flex: 0 }]}>
                 <Text style={styles.analyticsCardTitle}>Submissions Status</Text>
                 <View style={styles.analyticsStatusBody}>
                   <View style={styles.analyticsDonutWrap}>
@@ -4483,7 +4483,7 @@ const styles = StyleSheet.create({
   analyticsPlatformTarget: { fontSize: 11, color: '#64748B', marginTop: 8 },
   analyticsProgressRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   analyticsProgressRingFill: { position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderLeftColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '35deg' }] },
-  analyticsStatusCard: { flex: 1, minWidth: 0, width: '100%', padding: 16, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatusCard: { flex: 1, minWidth: 0, width: '100%', padding: 16, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsStatusBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 14, paddingBottom: 2 },
   analyticsDonutWrap: { width: 96, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   analyticsDonutOuter: { width: 92, height: 92, borderRadius: 46, borderWidth: 15, borderColor: '#F97316', borderLeftColor: '#10B981', borderTopColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
