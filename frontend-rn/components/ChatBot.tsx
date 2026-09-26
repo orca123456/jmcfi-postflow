@@ -56,6 +56,15 @@ export function ChatBot() {
     }).start();
   }, [isRevealed, isOpen]);
 
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: isOpen ? 1 : 0,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 14,
+    }).start();
+  }, [isOpen]);
+
   const handleMouseEnter = () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     setIsRevealed(true);
