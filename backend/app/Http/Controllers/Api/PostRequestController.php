@@ -362,6 +362,15 @@ class PostRequestController extends Controller
                 'message' => 'Post submitted for approval',
             ]);
         });
+        } catch (\Throwable $e) {
+            Log::error('Submit for approval failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'post_id' => $postRequest->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to submit request: ' . $e->getMessage(),
+            ], 500);
         } finally {
             $lock->release();
         }

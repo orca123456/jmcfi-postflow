@@ -16,7 +16,7 @@ class UpdatePostRequest extends FormRequest
         return [
             'title' => ['sometimes', 'string', 'max:255'],
             'caption_narrative' => ['sometimes', 'string', 'max:5000'],
-            'category_id' => ['nullable', 'integer', 'exists:post_categories,id'],
+            'category_id' => ['nullable', 'integer'],
             'other_category_name' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'string', 'max:255'],
             'target_platforms' => ['nullable', 'array'],
