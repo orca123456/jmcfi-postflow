@@ -73,29 +73,37 @@ class ApprovalWorkflowService
 
     public function notifyApprovers(PostRequest $postRequest): void
     {
-        $firstStage = $postRequest->approvalWorkflows()
-            ->where('stage_order', 1)
-            ->first();
+        try {
+            $firstStage = $postRequest->approvalWorkflows()
+                ->where('stage_order', 1)
+                ->first();
 
-        if ($firstStage && $firstStage->approver_id) {
-            $approver = User::find($firstStage->approver_id);
-            if ($approver) {
-                $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest));
+            if ($firstStage && $firstStage->approver_id) {
+                $approver = User::find($firstStage->approver_id);
+                if ($approver) {
+                    $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest));
+                }
             }
+        } catch (\Exception $e) {
+            Log::warning("Failed to notify first stage approver. Error: " . $e->getMessage());
         }
     }
 
     public function notifyNextApprover(PostRequest $postRequest, string $nextStage): void
     {
-        $approval = $postRequest->approvalWorkflows()
-            ->where('stage', $nextStage)
-            ->first();
+        try {
+            $approval = $postRequest->approvalWorkflows()
+                ->where('stage', $nextStage)
+                ->first();
 
-        if ($approval && $approval->approver_id) {
-            $approver = User::find($approval->approver_id);
-            if ($approver) {
-                $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest, $nextStage));
+            if ($approval && $approval->approver_id) {
+                $approver = User::find($approval->approver_id);
+                if ($approver) {
+                    $approver->notify(new \App\Notifications\ApprovalNeededNotification($postRequest, $nextStage));
+                }
             }
+        } catch (\Exception $e) {
+            Log::warning("Failed to notify next stage ({$nextStage}) approver. Error: " . $e->getMessage());
         }
     }
 
