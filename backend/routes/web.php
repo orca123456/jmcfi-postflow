@@ -103,8 +103,11 @@ Route::get('/profile-photo/{user}', function (User $user) {
 })->whereNumber('user')->name('profile.photo');
 
 Route::get('/storage/{path}', function (string $path) {
-    $cleanPath = ltrim(str_replace(['\\', '../', '..\\'], ['/', '', ''], $path), '/');
-    if (empty($cleanPath) || str_contains($cleanPath, '..')) {
+    $filename = basename($path);
+    $directory = trim(dirname($path), '/\\.');
+    $cleanPath = (!empty($directory) && $directory !== '.') ? $directory . '/' . $filename : $filename;
+
+    if (empty($cleanPath) || str_contains($path, '..') || str_starts_with($path, '/')) {
         abort(404);
     }
 
@@ -122,17 +125,9 @@ Route::get('/storage/{path}', function (string $path) {
                     'Cache-Control' => 'public, max-age=31536000, immutable',
                 ]);
             }
-
-            $content = Storage::disk($storageDisk)->get($cleanPath);
-            $mime = Storage::disk($storageDisk)->mimeType($cleanPath) ?: 'image/jpeg';
-            return response($content, 200, [
-                'Content-Type' => $mime,
-                'Content-Length' => (string) strlen($content),
-                'Cache-Control' => 'public, max-age=31536000, immutable',
-            ]);
         }
     } catch (Throwable) {
-        // Fallback
+        // Fallback to database media table
     }
 
     if (!Schema::hasTable('post_media_files')) {
