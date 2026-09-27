@@ -324,9 +324,9 @@ class ExternalIntegrationController extends Controller
     private function storeMediaFileContent(PostMedia $media, string $content): void
     {
         if (DB::getDriverName() === 'pgsql') {
-            DB::table('post_media_files')->insert([
-                'post_media_id' => $media->id,
-                'content' => DB::raw("decode('" . bin2hex($content) . "', 'hex')"),
+            DB::statement('INSERT INTO post_media_files (post_media_id, content) VALUES (?, decode(?, \'hex\'))', [
+                $media->id,
+                bin2hex($content),
             ]);
 
             return;
