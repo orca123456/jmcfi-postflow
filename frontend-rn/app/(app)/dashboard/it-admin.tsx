@@ -2876,14 +2876,17 @@ $response = curl_exec($ch);`}
 
       {activeTab === 'email-settings' && !isInitialLoading && (
         <View style={styles.emailPage}>
-          <Card style={styles.emailHeroCard}>
-            <View style={styles.emailHeroIcon}>
-              <Ionicons name="mail" size={24} color="#4F46E5" />
+          <Card style={[styles.emailHeroCard, { flexWrap: 'wrap' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, flex: 1, minWidth: 280 }}>
+              <View style={styles.emailHeroIcon}>
+                <Ionicons name="mail" size={24} color="#4F46E5" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.emailHeroTitle}>Email Notification Settings</Text>
+                <Text style={styles.emailHeroSubtitle}>Configure the SMTP server used to send approval, publishing, and alert emails to users and admins.</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.emailHeroTitle}>Email Notification Settings</Text>
-              <Text style={styles.emailHeroSubtitle}>Configure the SMTP server used to send approval, publishing, and alert emails to users and admins.</Text>
-            </View>
+
             <TouchableOpacity
               onPress={() => setIsTemplateModalOpen(true)}
               style={{
@@ -2891,17 +2894,18 @@ $response = curl_exec($ch);`}
                 alignItems: 'center',
                 gap: 8,
                 backgroundColor: emailFields.email_template_brand_color || '#800000',
-                paddingHorizontal: 16,
-                paddingVertical: 10,
+                paddingHorizontal: 18,
+                paddingVertical: 12,
                 borderRadius: 8,
-                shadowColor: emailFields.email_template_brand_color || '#800000',
+                flexShrink: 0,
+                shadowColor: '#800000',
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.25,
                 shadowRadius: 4,
                 elevation: 3,
               }}
             >
-              <Ionicons name="color-palette" size={18} color="#FFFFFF" />
+              <Ionicons name="color-palette" size={20} color="#FFFFFF" />
               <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>🎨 Customize Email Template</Text>
             </TouchableOpacity>
           </Card>
@@ -3051,6 +3055,31 @@ $response = curl_exec($ch);`}
                   </View>
                 </View>
               </Card>
+
+              <TouchableOpacity
+                onPress={() => setIsTemplateModalOpen(true)}
+                style={{
+                  minHeight: 66,
+                  borderRadius: 8,
+                  backgroundColor: emailFields.email_template_brand_color || '#800000',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 14,
+                  paddingHorizontal: 18,
+                  shadowColor: '#800000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 10,
+                  elevation: 4,
+                }}
+              >
+                <Ionicons name="color-palette" size={24} color="#FFFFFF" />
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>Customize Email Template</Text>
+                  <Text style={{ fontSize: 12, color: '#FCA5A5', marginTop: 2 }}>Edit header, logo, brand colors & live preview</Text>
+                </View>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleTestEmail}
