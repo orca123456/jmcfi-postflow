@@ -1,0 +1,344 @@
+
+K__sonar_lambda_backend\app\Http\Resources\Api\PostRequestResource.php_77_76@
+6backend\app\Http\Resources\Api\PostRequestResource.phpML M(T"1*q
+2T2 T(4
+T2 T(4
+%13"$Array>
+<
+T  T(4
+%11"__id*#
+
+__unknown_file (
+
+%13*
+3*Ä
+3T4 T(4
+Œ
+O [(
+%14"__mapSet*"
+
+__unknown_file (
+
+%2*&
+
+__unknown_file (
+
+checks*#
+
+__unknown_file (
+
+%11W
+U
+U* U(B
+%16"__id*<
+
+__unknown_file ( *
+
+$check"
+violations_found>
+<
+U* U(H
+%15"__id*#
+
+__unknown_file (
+
+%16*
+
+4
+5*q
+4UF U(H
+UF U(H
+%17"$Array>
+<
+U* U(H
+%15"__id*#
+
+__unknown_file (
+
+%17*
+5*Ï
+5UH U(H™
+–
+O [(
+%18"__mapSet*"
+
+__unknown_file (
+
+%2*0
+
+__unknown_file (
+violations_found*#
+
+__unknown_file (
+
+%15X
+V
+V+ V(D
+%20"__id*=
+
+__unknown_file (!*
+
+$check"
+suggested_caption>
+<
+V+ V(J
+%19"__id*#
+
+__unknown_file (
+
+%20*
+
+6
+7*q
+6VH V(J
+VH V(J
+%21"$Array>
+<
+V+ V(J
+%19"__id*#
+
+__unknown_file (
+
+%21*
+7*ë	
+7VJ V(Jš
+—
+O [(
+%22"__mapSet*"
+
+__unknown_file (
+
+%2*1
+
+__unknown_file (
+suggested_caption*#
+
+__unknown_file (
+
+%19a
+_
+W4 W(V
+%23"__id*F
+
+__unknown_file (**(
+
+$check"
+suggested_rejection_reason£
+ 
+O [(
+%24"__mapSet*"
+
+__unknown_file (
+
+%2*:
+
+__unknown_file (
+suggested_rejection_reason*#
+
+__unknown_file (
+
+%23b
+`
+X5 X(X
+%25"__id*G
+
+__unknown_file (+*)
+
+$check"
+suggested_revision_guidance¤
+¡
+O [(
+%26"__mapSet*"
+
+__unknown_file (
+
+%2*;
+
+__unknown_file (
+suggested_revision_guidance*#
+
+__unknown_file (
+
+%25Q
+O
+Y$ Y(6
+%27"__id*6
+
+__unknown_file (*
+
+$check"
+
+model_used“
+
+O [(
+%28"__mapSet*"
+
+__unknown_file (
+
+%2**
+
+__unknown_file (
+
+model_used*#
+
+__unknown_file (
+
+%27Q
+O
+Z$ Z(6
+%29"__id*6
+
+__unknown_file (*
+
+$check"
+
+created_atEC
+Z$ Z(F
+%30*#
+
+__unknown_file (
+
+%292toisostring“
+
+O [(
+%31"__mapSet*"
+
+__unknown_file (
+
+%2**
+
+__unknown_file (
+
+created_at*#
+
+__unknown_file (
+
+%30"
+O [(
+
+%2*´
+
+1N N(2{
+y
+N N(1
+%1"__id*a
+
+__unknown_file (E*C,
+*app\http\resources\api\postrequestresource"
+aiComplianceCheck@
+>
+N N(1
+$check"__id*"
+
+__unknown_file (
+
+%1
+O [(
+%2"$ArrayH
+F
+P P(&
+%3"__id*.
+
+__unknown_file (*
+
+$check"
+id‰
+†
+O [(
+%4"__mapSet*"
+
+__unknown_file (
+
+%2*"
+
+__unknown_file (
+id*"
+
+__unknown_file (
+
+%3T
+R
+Q( Q(>
+%5"__id*:
+
+__unknown_file (*
+
+$check"
+overall_status•
+’
+O [(
+%6"__mapSet*"
+
+__unknown_file (
+
+%2*.
+
+__unknown_file (
+overall_status*"
+
+__unknown_file (
+
+%5Z
+X
+R. R(J
+%7"__id*@
+
+__unknown_file ($*"
+
+$check"
+overall_status_label›
+˜
+O [(
+%8"__mapSet*"
+
+__unknown_file (
+
+%2*4
+
+__unknown_file (
+overall_status_label*"
+
+__unknown_file (
+
+%7V
+T
+S* S(B
+%9"__id*<
+
+__unknown_file ( *
+
+$check"
+compliance_score˜
+•
+O [(
+%10"__mapSet*"
+
+__unknown_file (
+
+%2*0
+
+__unknown_file (
+compliance_score*"
+
+__unknown_file (
+
+%9M
+K
+T  T(.
+%12"__id*2
+
+__unknown_file (*
+
+$check"
+checks>
+<
+T  T(4
+%11"__id*#
+
+__unknown_file (
+
+%12*
+
+2
+3B.,
+*app\http\resources\api\postrequestresourceH

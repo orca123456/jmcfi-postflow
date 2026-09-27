@@ -1,0 +1,163 @@
+
+;app\notifications\postpublishingfailednotification::toarrayH
+>backend\app\Notifications\PostPublishingFailedNotification.php* *("1*Ї
+1, 2(
+V
+T
+* *(
+$notifiable"__id*3
+
+__unknown_file (
+
+$notifiableobject
+, 2(	
+%1"$ArrayЯ
+Ь
+, 2(	
+%2"__mapSet*"
+
+__unknown_file (
+
+%1*$
+
+__unknown_file (
+type*6
+
+__unknown_file (
+post_publishing_failed}
+{
+.! .(3
+%3"__id*c
+
+__unknown_file (G*E4
+2app\notifications\postpublishingfailednotification"
+postRequestD
+B
+.! .(7
+%4"__id**
+
+__unknown_file (*
+
+%3"
+idЦ
+У
+, 2(	
+%5"__mapSet*"
+
+__unknown_file (
+
+%1*/
+
+__unknown_file (
+post_request_id*"
+
+__unknown_file (
+
+%4}
+{
+/! /(3
+%6"__id*c
+
+__unknown_file (G*E4
+2app\notifications\postpublishingfailednotification"
+postRequestG
+E
+/! /(:
+%7"__id*-
+
+__unknown_file (*
+
+%6"
+titleС
+О
+, 2(	
+%8"__mapSet*"
+
+__unknown_file (
+
+%1**
+
+__unknown_file (
+
+post_title*"
+
+__unknown_file (
+
+%7~
+|
+0! 0(4
+%9"__id*d
+
+__unknown_file (H*F4
+2app\notifications\postpublishingfailednotification"
+errorMessageХ
+Т
+, 2(	
+%10"__mapSet*"
+
+__unknown_file (
+
+%1*-
+
+__unknown_file (
+error_message*"
+
+__unknown_file (
+
+%9~
+|
+19 1(K
+%11"__id*c
+
+__unknown_file (G*E4
+2app\notifications\postpublishingfailednotification"
+postRequestI
+G
+19 1(R
+%12"__id*.
+
+__unknown_file (*
+
+%11"
+title
+}
+1W 1(j
+%13"__id*d
+
+__unknown_file (H*F4
+2app\notifications\postpublishingfailednotification"
+errorMessageЙ
+Ж
+1! 1(l
+%14"__concat**
+1" 1(8
+тЪая╕П Failed to publish '*
+1S 1(V
+': *
+18 1(S
+
+%12*
+1V 1(k
+
+%13Р
+Н
+, 2(	
+%15"__mapSet*"
+
+__unknown_file (
+
+%1*'
+
+__unknown_file (	
+message*#
+
+__unknown_file (
+
+%14"
+, 2(
+
+
+%1:!
+* *(.
+$notifiableobjectB64
+2app\notifications\postpublishingfailednotificationHr*PostPublishingFailedNotification.toArray()

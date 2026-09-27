@@ -1,0 +1,53 @@
+
+.app\http\requests\api\auth\loginrequest::rules=
+3backend\app\Http\Requests\Api\Auth\LoginRequest.php ("1*˜
+1 (
+
+ (	
+%1"$Array˜
+•
+ (	
+%2"__mapSet*"
+
+__unknown_file (
+
+%1*%
+
+__unknown_file (	
+email*.
+
+__unknown_file (
+required|emailœ
+™
+ (	
+%3"__mapSet*"
+
+__unknown_file (
+
+%1*(
+
+__unknown_file (
+
+password*/
+
+__unknown_file (
+required|stringž
+›
+ (	
+%4"__mapSet*"
+
+__unknown_file (
+
+%1*(
+
+__unknown_file (
+
+remember*1
+
+__unknown_file (
+sometimes|boolean"
+ (
+
+
+%1B+)
+'app\http\requests\api\auth\loginrequestHrLoginRequest.rules()

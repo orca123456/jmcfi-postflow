@@ -1,0 +1,52 @@
+
+!app\models\policyviolation::casts0
+&backend\app\Models\PolicyViolation.php ("1*Š
+1  (
+
+  (	
+%1"$Array•
+’
+  (	
+%2"__mapSet*"
+
+__unknown_file (
+
+%1*+
+
+__unknown_file (
+ai_analysis*%
+
+__unknown_file (	
+array—
+”
+  (	
+%3"__mapSet*"
+
+__unknown_file (
+
+%1*+
+
+__unknown_file (
+is_resolved*'
+
+__unknown_file (	
+boolean˜
+•
+  (	
+%4"__mapSet*"
+
+__unknown_file (
+
+%1*+
+
+__unknown_file (
+resolved_at*(
+
+__unknown_file (
+
+datetime"
+  (
+
+
+%1B
+app\models\policyviolationHrPolicyViolation.casts()

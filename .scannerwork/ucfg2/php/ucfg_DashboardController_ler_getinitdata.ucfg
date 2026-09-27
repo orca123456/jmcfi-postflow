@@ -1,0 +1,44 @@
+
+9app\http\controllers\api\dashboardcontroller::getinitdataB
+8backend\app\Http\Controllers\Api\DashboardController.php ("1*þ
+1 (4 
+
+ (
+%1"__entrypoint¼¹
+ (#
+$requestilluminate\http\request".illuminate\http\request::__sonar_inject_symbol*A
+
+__unknown_file (%
+#
+$requestilluminate\http\request2__sonar_inject_symbola
+_
+ (
+
+$request"__id*A
+
+__unknown_file (%
+#
+$requestilluminate\http\requestœ™
+ (3
+%2*L
+
+__unknown_file (0.
+,app\http\controllers\api\dashboardcontroller*(
+
+__unknown_file (
+
+
+$request2getfastinitdataZ
+X
+ (4"
+%3illuminate\http\jsonresponse"__id*"
+
+__unknown_file (
+
+%2"0
+ (4$
+"
+%3illuminate\http\jsonresponse:/
+  (0#
+$requestilluminate\http\requestB0.
+,app\http\controllers\api\dashboardcontrollerHr!DashboardController.getInitData()

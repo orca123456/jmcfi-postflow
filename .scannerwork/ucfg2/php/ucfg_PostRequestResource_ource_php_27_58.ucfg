@@ -1,0 +1,128 @@
+
+K__sonar_lambda_backend\app\Http\Resources\Api\PostRequestResource.php_27_58@
+6backend\app\Http\Resources\Api\PostRequestResource.php: (B"1*É
+1 !(
+ !(
+%1"$Arrays
+q
+ (,
+%2"__id*Y
+
+__unknown_file (=*;,
+*app\http\resources\api\postrequestresource"
+	requestorD
+B
+ (0
+%3"__id**
+
+__unknown_file (*
+
+%2"
+idâ
+Ü
+ !(
+%4"__mapSet*"
+
+__unknown_file (
+
+%1*"
+
+__unknown_file (
+id*"
+
+__unknown_file (
+
+%3s
+q
+# (3
+%5"__id*Y
+
+__unknown_file (=*;,
+*app\http\resources\api\postrequestresource"
+	requestorK
+I
+# (>
+%6"__id*1
+
+__unknown_file (*
+
+%5"
+	full_nameê
+ç
+ !(
+%7"__mapSet*"
+
+__unknown_file (
+
+%1*)
+
+__unknown_file (
+	full_name*"
+
+__unknown_file (
+
+%6s
+q
+ (/
+%8"__id*Y
+
+__unknown_file (=*;,
+*app\http\resources\api\postrequestresource"
+	requestorG
+E
+ (6
+%9"__id*-
+
+__unknown_file (*
+
+%8"
+emailç
+ä
+ !(
+%10"__mapSet*"
+
+__unknown_file (
+
+%1*%
+
+__unknown_file (	
+email*"
+
+__unknown_file (
+
+%9t
+r
+ $  (4
+%11"__id*Y
+
+__unknown_file (=*;,
+*app\http\resources\api\postrequestresource"
+	requestorN
+L
+ $  (@
+%12"__id*3
+
+__unknown_file (*
+
+%11"
+
+departmentì
+ê
+ !(
+%13"__mapSet*"
+
+__unknown_file (
+
+%1**
+
+__unknown_file (
+
+department*#
+
+__unknown_file (
+
+%12"
+ !(
+
+%1B.,
+*app\http\resources\api\postrequestresourceH

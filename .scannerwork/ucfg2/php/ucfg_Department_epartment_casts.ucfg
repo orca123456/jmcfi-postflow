@@ -1,0 +1,51 @@
+
+app\models\department::casts+
+!backend\app\Models\Department.php ("1*‰
+1 (
+
+ (	
+%1"$Array•
+’
+ (	
+%2"__mapSet*"
+
+__unknown_file (
+
+%1*)
+
+__unknown_file (
+	is_active*'
+
+__unknown_file (	
+boolean•
+’
+ (	
+%3"__mapSet*"
+
+__unknown_file (
+
+%1*)
+
+__unknown_file (
+	is_system*'
+
+__unknown_file (	
+boolean™
+–
+ (	
+%4"__mapSet*"
+
+__unknown_file (
+
+%1*/
+
+__unknown_file (
+role_categories*%
+
+__unknown_file (	
+array"
+ (
+
+
+%1B
+app\models\departmentHrDepartment.casts()
