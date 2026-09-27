@@ -1,0 +1,453 @@
+Ω
+app\models\postcategory"illuminate\database\eloquent\model'
+castsapp\models\postcategory::casts?
+defaultcategories*app\models\postcategory::defaultcategories"fillable*
+
+fillable≠
+,app\notifications\approvalneedednotification%illuminate\notifications\notificationH
+__construct9app\notifications\approvalneedednotification::__construct@
+toarray5app\notifications\approvalneedednotification::toarray>
+tomail4app\notifications\approvalneedednotification::tomail8
+via1app\notifications\approvalneedednotification::via"forStage"postRequest*
+forStagestring*%
+postRequestapp\models\postrequestã
+#app\http\resources\api\userresource+illuminate\http\resources\json\jsonresource7
+toarray,app\http\resources\api\userresource::toarrayv
+%database\seeders\systemsettingsseederilluminate\database\seeder1
+run*database\seeders\systemsettingsseeder::runÆ
+app\models\postmedia"illuminate\database\eloquent\model$
+castsapp\models\postmedia::casts"
+fileapp\models\postmedia::fileL
+getformattedsizeattribute/app\models\postmedia::getformattedsizeattributeD
+gettypelabelattribute+app\models\postmedia::gettypelabelattribute8
+geturlattribute%app\models\postmedia::geturlattribute0
+postrequest!app\models\postmedia::postrequest"appends"fillable*	
+appends*
+
+fillable◊
+*app\notifications\postapprovednotification%illuminate\notifications\notificationF
+__construct7app\notifications\postapprovednotification::__construct>
+toarray3app\notifications\postapprovednotification::toarray<
+tomail2app\notifications\postapprovednotification::tomail6
+via/app\notifications\postapprovednotification::via"approvedByStage"approverName"postRequest*
+approvedByStagestring*
+approverNamestring*%
+postRequestapp\models\postrequestÀ
+'app\http\requests\api\auth\loginrequest&illuminate\foundation\http\formrequest?
+	authorize2app\http\requests\api\auth\loginrequest::authorize7
+rules.app\http\requests\api\auth\loginrequest::rules°
+app\models\role"illuminate\database\eloquent\model
+castsapp\models\role::casts3
+getroutekeyname app\models\role::getroutekeyname"fillable*
+
+fillable¶
+app\jobs\autopublishjob3
+__construct$app\jobs\autopublishjob::__construct9
+externalpostid'app\jobs\autopublishjob::externalpostid;
+externalposturl(app\jobs\autopublishjob::externalposturl)
+failedapp\jobs\autopublishjob::failedC
+fallbackpublisherid,app\jobs\autopublishjob::fallbackpublisheridC
+formatpublisherrors,app\jobs\autopublishjob::formatpublisherrorsE
+friendlypublisherror-app\jobs\autopublishjob::friendlypublisherror)
+handleapp\jobs\autopublishjob::handle9
+notifyitadmins'app\jobs\autopublishjob::notifyitadminsK
+recordpublishingresults0app\jobs\autopublishjob::recordpublishingresultsE
+savepublishingrecord-app\jobs\autopublishjob::savepublishingrecord-
+uniqueid!app\jobs\autopublishjob::uniqueid"backoff"postRequest"publishedBy"timeout"tries"	uniqueFor*
+backoffarray*%
+postRequestapp\models\postrequest*
+publishedByint*
+timeoutint*
+triesint*
+	uniqueForintä
+2app\http\requests\api\postrequest\storepostrequest&illuminate\foundation\http\formrequestJ
+	authorize=app\http\requests\api\postrequest\storepostrequest::authorizeH
+messages<app\http\requests\api\postrequest\storepostrequest::messagesB
+rules9app\http\requests\api\postrequest\storepostrequest::rulesR
+withvalidatorAapp\http\requests\api\postrequest\storepostrequest::withvalidatorn
+!database\seeders\departmentseederilluminate\database\seeder-
+run&database\seeders\departmentseeder::runÌ
+6app\http\controllers\api\externalintegrationcontrollerapp\http\controllers\controllerR
+__constructCapp\http\controllers\api\externalintegrationcontroller::__construct`
+assertsafeimageurlJapp\http\controllers\api\externalintegrationcontroller::assertsafeimageurlR
+resolvehostCapp\http\controllers\api\externalintegrationcontroller::resolvehostf
+storemediafilecontentMapp\http\controllers\api\externalintegrationcontroller::storemediafilecontentV
+submitrequestEapp\http\controllers\api\externalintegrationcontroller::submitrequest"workflowService*7
+workflowService$app\services\approvalworkflowserviceñ
+*app\http\requests\api\auth\registerrequest&illuminate\foundation\http\formrequestB
+	authorize5app\http\requests\api\auth\registerrequest::authorize@
+messages4app\http\requests\api\auth\registerrequest::messages:
+rules1app\http\requests\api\auth\registerrequest::rulesÙ
+app\models\aicompliancecheck"illuminate\database\eloquent\model,
+casts#app\models\aicompliancecheck::casts4
+	checkedby'app\models\aicompliancecheck::checkedby^
+getoverallstatuslabelattribute<app\models\aicompliancecheck::getoverallstatuslabelattributeX
+getviolationscountattribute9app\models\aicompliancecheck::getviolationscountattribute8
+postrequest)app\models\aicompliancecheck::postrequest2
+statuses&app\models\aicompliancecheck::statuses"fillable"table*
+
+fillable*
+table 
+app\services\workflowserviceH
+getapproverforstage1app\services\workflowservice::getapproverforstage<
+getstageorder+app\services\workflowservice::getstageorderH
+getworkflowprogress1app\services\workflowservice::getworkflowprogressF
+initializeworkflow0app\services\workflowservice::initializeworkflow@
+notifyapprovers-app\services\workflowservice::notifyapproversD
+notifyitpublisher/app\services\workflowservice::notifyitpublisherF
+notifynextapprover0app\services\workflowservice::notifynextapprover@
+notifyrequestor-app\services\workflowservice::notifyrequestorb
+database\seeders\userseederilluminate\database\seeder'
+run database\seeders\userseeder::runb
+database\seeders\roleseederilluminate\database\seeder'
+run database\seeders\roleseeder::run◊
+app\services\aiclient1
+__construct"app\services\aiclient::__construct+
+completeapp\services\aiclient::complete'
+verifyapp\services\aiclient::verify"settings*+
+settingsapp\services\aiprovidersettings¥
+
+7app\http\controllers\api\sanctumsecurity\authcontrollerapp\http\controllers\controller_
+clearfailedloginsJapp\http\controllers\api\sanctumsecurity\authcontroller::clearfailedloginsG
+login>app\http\controllers\api\sanctumsecurity\authcontroller::loginW
+logincachekeyFapp\http\controllers\api\sanctumsecurity\authcontroller::logincachekeyc
+loginlockoutsecondsLapp\http\controllers\api\sanctumsecurity\authcontroller::loginlockoutseconds]
+loginthrottlekeyIapp\http\controllers\api\sanctumsecurity\authcontroller::loginthrottlekeyI
+logout?app\http\controllers\api\sanctumsecurity\authcontroller::logout_
+recordfailedloginJapp\http\controllers\api\sanctumsecurity\authcontroller::recordfailedloginM
+registerAapp\http\controllers\api\sanctumsecurity\authcontroller::registerS
+removephotoDapp\http\controllers\api\sanctumsecurity\authcontroller::removephotoq
+shoulduseredisloginlockoutSapp\http\controllers\api\sanctumsecurity\authcontroller::shoulduseredisloginlockoutY
+updatepasswordGapp\http\controllers\api\sanctumsecurity\authcontroller::updatepasswordW
+updateprofileFapp\http\controllers\api\sanctumsecurity\authcontroller::updateprofileS
+uploadphotoDapp\http\controllers\api\sanctumsecurity\authcontroller::uploadphotoE
+user=app\http\controllers\api\sanctumsecurity\authcontroller::user˚
+-app\http\controllers\api\publishingcontrollerapp\http\controllers\controllerI
+__construct:app\http\controllers\api\publishingcontroller::__constructO
+externalpostid=app\http\controllers\api\publishingcontroller::externalpostidQ
+externalposturl>app\http\controllers\api\publishingcontroller::externalposturlY
+formatpublisherrorsBapp\http\controllers\api\publishingcontroller::formatpublisherrors[
+friendlypublisherrorCapp\http\controllers\api\publishingcontroller::friendlypublisherrorU
+instagramimageurl@app\http\controllers\api\publishingcontroller::instagramimageurlA
+publish6app\http\controllers\api\publishingcontroller::publisha
+recordpublishingresultsFapp\http\controllers\api\publishingcontroller::recordpublishingresultsC
+schedule7app\http\controllers\api\publishingcontroller::schedule"auditLogService*/
+auditLogServiceapp\services\auditlogservice§
+app\models\policyviolation"illuminate\database\eloquent\model*
+casts!app\models\policyviolation::casts2
+	flaggedby%app\models\policyviolation::flaggedbyR
+getseveritycolorattribute5app\models\policyviolation::getseveritycolorattributeR
+getseveritylabelattribute5app\models\policyviolation::getseveritylabelattributeJ
+gettypelabelattribute1app\models\policyviolation::gettypelabelattribute6
+postrequest'app\models\policyviolation::postrequest4
+
+resolvedby&app\models\policyviolation::resolvedby4
+
+severities&app\models\policyviolation::severities*
+types!app\models\policyviolation::types(
+user app\models\policyviolation::user"fillable*
+
+fillable∑
+4app\notifications\postreadyforpublishingnotification%illuminate\notifications\notificationP
+__constructAapp\notifications\postreadyforpublishingnotification::__constructH
+toarray=app\notifications\postreadyforpublishingnotification::toarrayF
+tomail<app\notifications\postreadyforpublishingnotification::tomail@
+via9app\notifications\postreadyforpublishingnotification::via"postRequest*%
+postRequestapp\models\postrequestÇ
+app\models\auditlog"illuminate\database\eloquent\model!
+userapp\models\auditlog::user"casts"fillable*
+casts*
+
+fillable‰
+-app\http\controllers\api\departmentcontrollerapp\http\controllers\controllerA
+destroy6app\http\controllers\api\departmentcontroller::destroy=
+index4app\http\controllers\api\departmentcontroller::indexG
+
+removelogo9app\http\controllers\api\departmentcontroller::removelogo=
+store4app\http\controllers\api\departmentcontroller::store?
+update5app\http\controllers\api\departmentcontroller::updateG
+
+uploadlogo9app\http\controllers\api\departmentcontroller::uploadlogoà
+app\mail\sendgridtransport4symfony\component\mailer\transport\abstracttransport6
+__construct'app\mail\sendgridtransport::__construct4
+
+__tostring&app\mail\sendgridtransport::__tostring,
+dosend"app\mail\sendgridtransport::dosend"apiKey*
+apiKeystringò
+app\models\postmediafile"illuminate\database\eloquent\model(
+mediaapp\models\postmediafile::media"fillable"
+timestamps*
+
+fillable*
+
+timestampsj
+database\seeders\databaseseederilluminate\database\seeder+
+run$database\seeders\databaseseeder::runâ
++app\http\controllers\api\apitokencontrollerapp\http\controllers\controller?
+destroy4app\http\controllers\api\apitokencontroller::destroy;
+index2app\http\controllers\api\apitokencontroller::index;
+store2app\http\controllers\api\apitokencontroller::store≥
+'app\services\instagrampublishingserviceC
+__construct4app\services\instagrampublishingservice::__constructC
+publishpost4app\services\instagrampublishingservice::publishpost"accessToken"businessAccountId"graphApiVersion*
+accessTokenstring*
+businessAccountIdstring*
+graphApiVersionstring˘
+'app\http\controllers\api\rolecontrollerapp\http\controllers\controller;
+destroy0app\http\controllers\api\rolecontroller::destroy7
+index.app\http\controllers\api\rolecontroller::index7
+store.app\http\controllers\api\rolecontroller::storeö
+&app\services\facebookpublishingserviceB
+__construct3app\services\facebookpublishingservice::__constructB
+publishpost3app\services\facebookpublishingservice::publishpost"accessToken"graphApiVersion"pageId*
+accessTokenstring*
+graphApiVersionstring*
+pageIdstringœ
+app\models\department"illuminate\database\eloquent\model%
+castsapp\models\department::castsA
+getlogourlattribute*app\models\department::getlogourlattribute"appends"fillable*	
+appends*
+
+fillableô
+*app\http\resources\api\postrequestresource+illuminate\http\resources\json\jsonresource>
+toarray3app\http\resources\api\postrequestresource::toarray™
+'app\http\controllers\api\usercontrollerapp\http\controllers\controller;
+destroy0app\http\controllers\api\usercontroller::destroy=
+getroles1app\http\controllers\api\usercontroller::getroles7
+index.app\http\controllers\api\usercontroller::index5
+show-app\http\controllers\api\usercontroller::show7
+store.app\http\controllers\api\usercontroller::store9
+update/app\http\controllers\api\usercontroller::updateã
++app\http\controllers\api\categorycontrollerapp\http\controllers\controller;
+index2app\http\controllers\api\categorycontroller::index\
+#app\http\middleware\securityheaders5
+handle+app\http\middleware\securityheaders::handle”
+2app\notifications\postpublishingfailednotification%illuminate\notifications\notificationN
+__construct?app\notifications\postpublishingfailednotification::__constructF
+toarray;app\notifications\postpublishingfailednotification::toarrayD
+tomail:app\notifications\postpublishingfailednotification::tomail>
+via7app\notifications\postpublishingfailednotification::via"errorMessage"postRequest*
+errorMessagestring*%
+postRequestapp\models\postrequest÷	
+app\models\postrequest"illuminate\database\eloquent\model>
+aicompliancecheck)app\models\postrequest::aicompliancecheck8
+approvalstages&app\models\postrequest::approvalstages>
+approvalworkflows)app\models\postrequest::approvalworkflows:
+canbeapprovedby'app\models\postrequest::canbeapprovedby6
+canbeeditedby%app\models\postrequest::canbeeditedby&
+castsapp\models\postrequest::casts,
+category app\models\postrequest::categoryD
+currentapprovalstage,app\models\postrequest::currentapprovalstage0
+
+department"app\models\postrequest::department6
+featuredmedia%app\models\postrequest::featuredmedia\
+ getcurrentapprovalstageattribute8app\models\postrequest::getcurrentapprovalstageattributeV
+getcurrentstagelabelattribute5app\models\postrequest::getcurrentstagelabelattribute4
+getnextstage$app\models\postrequest::getnextstageJ
+getstatuslabelattribute/app\models\postrequest::getstatuslabelattribute&
+mediaapp\models\postrequest::media<
+policyviolations(app\models\postrequest::policyviolations>
+publishingrecords)app\models\postrequest::publishingrecords.
+	requestor!app\models\postrequest::requestor,
+statuses app\models\postrequest::statuses"appends"fillable*	
+appends*
+
+fillable◊
+'app\services\wordpresspublishingservice9
+client/app\services\wordpresspublishingservice::clientK
+openmediastream8app\services\wordpresspublishingservice::openmediastreamQ
+openmediaurlstream;app\services\wordpresspublishingservice::openmediaurlstreamM
+publishedarticle9app\services\wordpresspublishingservice::publishedarticleC
+publishpost4app\services\wordpresspublishingservice::publishpost=
+response1app\services\wordpresspublishingservice::response!
+app\http\controllers\controller»
+app\services\aiprovidersettings3
+current(app\services\aiprovidersettings::currentA
+publicsettings/app\services\aiprovidersettings::publicsettings-
+save%app\services\aiprovidersettings::saveÔ
+3app\http\requests\api\postrequest\updatepostrequest&illuminate\foundation\http\formrequestK
+	authorize>app\http\requests\api\postrequest\updatepostrequest::authorizeC
+rules:app\http\requests\api\postrequest\updatepostrequest::rules¬
+app\services\auditlogservice(
+log!app\services\auditlogservice::log6
+
+logforuser(app\services\auditlogservice::logforuser@
+sanitizepayload-app\services\auditlogservice::sanitizepayload÷
+2app\notifications\postpublishedsuccessnotification%illuminate\notifications\notificationN
+__construct?app\notifications\postpublishedsuccessnotification::__constructF
+toarray;app\notifications\postpublishedsuccessnotification::toarrayD
+tomail:app\notifications\postpublishedsuccessnotification::tomail>
+via7app\notifications\postpublishedsuccessnotification::via"postRequest"publishResults*%
+postRequestapp\models\postrequest*
+publishResultsarray—
+0app\http\controllers\api\policysettingcontrollerapp\http\controllers\controllerZ
+getdefaultsectionsDapp\http\controllers\api\policysettingcontroller::getdefaultsectionsL
+getsettings=app\http\controllers\api\policysettingcontroller::getsettingsR
+updatesettings@app\http\controllers\api\policysettingcontroller::updatesettingsØ
+/app\http\controllers\api\notificationcontrollerapp\http\controllers\controller?
+index6app\http\controllers\api\notificationcontroller::indexO
+markallasread>app\http\controllers\api\notificationcontroller::markallasreadI
+
+markasread;app\http\controllers\api\notificationcontroller::markasreadr
+#database\seeders\postcategoryseederilluminate\database\seeder/
+run(database\seeders\postcategoryseeder::run~
+app\models\systemsetting"illuminate\database\eloquent\model(
+castsapp\models\systemsetting::casts"fillable*
+
+fillableÄ
+app\models\targetplatform"illuminate\database\eloquent\model)
+casts app\models\targetplatform::casts"fillable*
+
+fillableP
+app\http\middleware\checkrole/
+handle%app\http\middleware\checkrole::handle“
++app\http\controllers\api\auditlogcontrollerapp\http\controllers\controllerE
+
+eventstyle7app\http\controllers\api\auditlogcontroller::eventstyle;
+index2app\http\controllers\api\auditlogcontroller::index€
+,app\http\controllers\api\dashboardcontrollerapp\http\controllers\controllerP
+buildactivities=app\http\controllers\api\dashboardcontroller::buildactivitiesF
+
+buildstats8app\http\controllers\api\dashboardcontroller::buildstatsZ
+getanalyticsoverviewBapp\http\controllers\api\dashboardcontroller::getanalyticsoverviewP
+getfastinitdata=app\http\controllers\api\dashboardcontroller::getfastinitdataH
+getinitdata9app\http\controllers\api\dashboardcontroller::getinitdataT
+getrecentactivity?app\http\controllers\api\dashboardcontroller::getrecentactivityB
+getstats6app\http\controllers\api\dashboardcontroller::getstatsB
+mediaurl6app\http\controllers\api\dashboardcontroller::mediaurlH
+postsummary9app\http\controllers\api\dashboardcontroller::postsummaryP
+scopedpostquery=app\http\controllers\api\dashboardcontroller::scopedpostqueryÉ
+5app\notifications\postreturnedforrevisionnotification%illuminate\notifications\notificationQ
+__constructBapp\notifications\postreturnedforrevisionnotification::__constructI
+toarray>app\notifications\postreturnedforrevisionnotification::toarrayG
+tomail=app\notifications\postreturnedforrevisionnotification::tomailA
+via:app\notifications\postreturnedforrevisionnotification::via"postRequest"reason"revisionGuidance*%
+postRequestapp\models\postrequest*
+reasonstring*
+revisionGuidancearray…
+/app\http\controllers\api\tokensettingcontrollerapp\http\controllers\controller]
+checkmetapermissionsEapp\http\controllers\api\tokensettingcontroller::checkmetapermissionsU
+connectionstatusAapp\http\controllers\api\tokensettingcontroller::connectionstatusW
+friendlymetaerrorBapp\http\controllers\api\tokensettingcontroller::friendlymetaerrorE
+getlabel9app\http\controllers\api\tokensettingcontroller::getlabelG
+	gettokens:app\http\controllers\api\tokensettingcontroller::gettokens_
+requestvalueorsettingFapp\http\controllers\api\tokensettingcontroller::requestvalueorsettingM
+updatetokens=app\http\controllers\api\tokensettingcontroller::updatetokensQ
+validatetokens?app\http\controllers\api\tokensettingcontroller::validatetokensS
+verifywordpress@app\http\controllers\api\tokensettingcontroller::verifywordpress
+app\models\approvalworkflow"illuminate\database\eloquent\model/
+actions$app\models\approvalworkflow::actions1
+approver%app\models\approvalworkflow::approver+
+casts"app\models\approvalworkflow::castsO
+getactionlabelattribute4app\models\approvalworkflow::getactionlabelattributeM
+getstagelabelattribute3app\models\approvalworkflow::getstagelabelattribute7
+postrequest(app\models\approvalworkflow::postrequest-
+stages#app\models\approvalworkflow::stages"fillable*
+
+fillableü
+*app\notifications\postrejectednotification%illuminate\notifications\notificationF
+__construct7app\notifications\postrejectednotification::__construct>
+toarray3app\notifications\postrejectednotification::toarray<
+tomail2app\notifications\postrejectednotification::tomail6
+via/app\notifications\postrejectednotification::via"postRequest"reason*%
+postRequestapp\models\postrequest*
+reasonstring‚
+$app\services\approvalworkflowserviceP
+getapproverforstage9app\services\approvalworkflowservice::getapproverforstageN
+initializeworkflow8app\services\approvalworkflowservice::initializeworkflowH
+notifyapprovers5app\services\approvalworkflowservice::notifyapproversL
+notifyitpublisher7app\services\approvalworkflowservice::notifyitpublisherN
+notifynextapprover8app\services\approvalworkflowservice::notifynextapproverH
+notifyrequestor5app\services\approvalworkflowservice::notifyrequestorf
+notifyrequestorofstageapprovalDapp\services\approvalworkflowservice::notifyrequestorofstageapprovalä
+*app\http\controllers\api\chatbotcontrollerapp\http\controllers\controllerF
+__construct7app\http\controllers\api\chatbotcontroller::__constructJ
+handlemessage9app\http\controllers\api\chatbotcontroller::handlemessage"client*
+clientapp\services\aiclient˝
+.app\http\controllers\api\postrequestcontrollerapp\http\controllers\controllerJ
+__construct;app\http\controllers\api\postrequestcontroller::__constructf
+applypendingapprovalscopeIapp\http\controllers\api\postrequestcontroller::applypendingapprovalscopeT
+applyrolescoping@app\http\controllers\api\postrequestcontroller::applyrolescopingB
+approve7app\http\controllers\api\postrequestcontroller::approveB
+canview7app\http\controllers\api\postrequestcontroller::canviewZ
+cleardashboardcacheCapp\http\controllers\api\postrequestcontroller::cleardashboardcacheV
+createmediarecordAapp\http\controllers\api\postrequestcontroller::createmediarecordB
+destroy7app\http\controllers\api\postrequestcontroller::destroyV
+getdashboardstatsAapp\http\controllers\api\postrequestcontroller::getdashboardstatsL
+getmediatype<app\http\controllers\api\postrequestcontroller::getmediatype>
+index5app\http\controllers\api\postrequestcontroller::indexZ
+needsinstagramimageCapp\http\controllers\api\postrequestcontroller::needsinstagramimageT
+recordaudittrail@app\http\controllers\api\postrequestcontroller::recordaudittrail@
+reject6app\http\controllers\api\postrequestcontroller::rejectV
+returnforrevisionAapp\http\controllers\api\postrequestcontroller::returnforrevisionH
+
+runaicheck:app\http\controllers\api\postrequestcontroller::runaicheckR
+rundraftaicheck?app\http\controllers\api\postrequestcontroller::rundraftaicheckT
+setfeaturedmedia@app\http\controllers\api\postrequestcontroller::setfeaturedmedia<
+show4app\http\controllers\api\postrequestcontroller::show>
+store5app\http\controllers\api\postrequestcontroller::store^
+storemediafilecontentEapp\http\controllers\api\postrequestcontroller::storemediafilecontentV
+submitforapprovalAapp\http\controllers\api\postrequestcontroller::submitforapproval@
+update6app\http\controllers\api\postrequestcontroller::update"	aiService"workflowService*-
+	aiService app\services\aicomplianceservice*7
+workflowService$app\services\approvalworkflowserviceú
+/app\http\controllers\api\emailsettingcontrollerapp\http\controllers\controllerS
+applymailconfig@app\http\controllers\api\emailsettingcontroller::applymailconfig_
+applymailconfigcustomFapp\http\controllers\api\emailsettingcontroller::applymailconfigcustomK
+getsettings<app\http\controllers\api\emailsettingcontroller::getsettingsO
+sendtestemail>app\http\controllers\api\emailsettingcontroller::sendtestemailQ
+updatesettings?app\http\controllers\api\emailsettingcontroller::updatesettings"allowedKeys*
+allowedKeysarrayÑ
+app\models\publishingrecord"illuminate\database\eloquent\model+
+casts"app\models\publishingrecord::castsS
+getplatformlabelattribute6app\models\publishingrecord::getplatformlabelattributeO
+getstatuslabelattribute4app\models\publishingrecord::getstatuslabelattribute3
+	platforms&app\models\publishingrecord::platforms7
+postrequest(app\models\publishingrecord::postrequest7
+publishedby(app\models\publishingrecord::publishedby1
+statuses%app\models\publishingrecord::statuses"fillable*
+
+fillableÆ
+ app\providers\appserviceprovider"illuminate\support\serviceprovider.
+boot&app\providers\appserviceprovider::boot6
+register*app\providers\appserviceprovider::register≥
+,app\http\controllers\api\aisettingcontrollerapp\http\controllers\controllerH
+__construct9app\http\controllers\api\aisettingcontroller::__construct<
+clear3app\http\controllers\api\aisettingcontroller::clear:
+show2app\http\controllers\api\aisettingcontroller::show>
+update4app\http\controllers\api\aisettingcontroller::update"client"settings*
+clientapp\services\aiclient*+
+settingsapp\services\aiprovidersettingsv
+%database\seeders\targetplatformseederilluminate\database\seeder1
+run*database\seeders\targetplatformseeder::runè
+ app\services\aicomplianceservice<
+__construct-app\services\aicomplianceservice::__constructP
+buildcomplianceprompt7app\services\aicomplianceservice::buildcompliancepromptD
+checkcompliance1app\services\aicomplianceservice::checkcomplianceN
+checkdraftcompliance6app\services\aicomplianceservice::checkdraftcomplianceR
+createpolicyviolations8app\services\aicomplianceservice::createpolicyviolationsT
+generaterejectionreason9app\services\aicomplianceservice::generaterejectionreasonV
+generaterevisionguidance:app\services\aicomplianceservice::generaterevisionguidanceD
+getsystemprompt1app\services\aicomplianceservice::getsystempromptT
+parsecomplianceresponse9app\services\aicomplianceservice::parsecomplianceresponse"client*
+clientapp\services\aiclientÊ
+app\models\userilluminate\foundation\auth\user9
+aicompliancechecks#app\models\user::aicompliancechecks7
+approvalworkflows"app\models\user::approvalworkflows
+castsapp\models\user::castsO
+getdepartmentlogourlattribute.app\models\user::getdepartmentlogourlattributeC
+getdisplaynameattribute(app\models\user::getdisplaynameattribute=
+getfullnameattribute%app\models\user::getfullnameattribute=
+getphotourlattribute%app\models\user::getphotourlattribute%
+isactiveapp\models\user::isactive5
+policyviolations!app\models\user::policyviolations-
+postrequestsapp\models\user::postrequests7
+publishingrecords"app\models\user::publishingrecords-
+rolecategoryapp\models\user::rolecategory)
+
+rolelabelsapp\models\user::rolelabels-
+workflowroleapp\models\user::workflowrole"appends"fillable"hidden*	
+appends*
+
+fillable*
+hidden

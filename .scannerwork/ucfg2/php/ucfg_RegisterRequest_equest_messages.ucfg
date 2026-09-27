@@ -1,0 +1,25 @@
+
+4app\http\requests\api\auth\registerrequest::messages@
+6backend\app\Http\Requests\Api\Auth\RegisterRequest.php ("1*‰
+1! #(
+
+! #(	
+%1"$ArrayÉ
+Æ
+! #(	
+%2"__mapSet*"
+
+__unknown_file (
+
+%1*+
+
+__unknown_file (
+email.regex*Y
+
+__unknown_file (=;
+9Only @jmc.edu.ph email addresses are allowed to register."
+! #(
+
+
+%1B.,
+*app\http\requests\api\auth\registerrequestHrRegisterRequest.messages()

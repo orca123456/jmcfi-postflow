@@ -1,0 +1,38 @@
+
+<app\http\requests\api\postrequest\storepostrequest::messagesH
+>backend\app\Http\Requests\Api\PostRequest\StorePostRequest.php* *("1*½
+1, /(
+
+, /(	
+%1"$Array¬
+©
+, /(	
+%2"__mapSet*"
+
+__unknown_file (
+
+%1*.
+
+__unknown_file (
+title.required*9
+
+__unknown_file (
+A post title is required.Î
+Ë
+, /(	
+%3"__mapSet*"
+
+__unknown_file (
+
+%1*:
+
+__unknown_file (
+caption_narrative.required*O
+
+__unknown_file (31
+/Please provide a content caption for your post."
+, /(
+
+
+%1B64
+2app\http\requests\api\postrequest\storepostrequestHrStorePostRequest.messages()

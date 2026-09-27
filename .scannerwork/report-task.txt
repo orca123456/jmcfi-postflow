@@ -1,0 +1,7 @@
+organization=orca123456
+projectKey=orca123456_jmcfi-postflow
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.108320
+dashboardUrl=https://sonarcloud.io/dashboard?id=orca123456_jmcfi-postflow
+ceTaskId=AaDjGGEbVijnsZnprCy0
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AaDjGGEbVijnsZnprCy0

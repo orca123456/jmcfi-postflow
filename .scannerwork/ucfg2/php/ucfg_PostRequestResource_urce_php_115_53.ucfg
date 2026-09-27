@@ -1,0 +1,247 @@
+
+L__sonar_lambda_backend\app\Http\Resources\Api\PostRequestResource.php_115_53@
+6backend\app\Http\Resources\Api\PostRequestResource.phps5 s(="1*Ò
+1t (
+t (
+%1"$ArrayI
+G
+u  u(+
+%2"__id*/
+
+__unknown_file (*
+	
+$record"
+idâ
+Ü
+t (
+%3"__mapSet*"
+
+__unknown_file (
+
+%1*"
+
+__unknown_file (
+id*"
+
+__unknown_file (
+
+%2O
+M
+v& v(7
+%4"__id*5
+
+__unknown_file (*
+	
+$record"
+
+platformè
+å
+t (
+%5"__mapSet*"
+
+__unknown_file (
+
+%1*(
+
+__unknown_file (
+
+platform*"
+
+__unknown_file (
+
+%4U
+S
+w, w(C
+%6"__id*;
+
+__unknown_file (*
+	
+$record"
+platform_labelï
+í
+t (
+%7"__mapSet*"
+
+__unknown_file (
+
+%1*.
+
+__unknown_file (
+platform_label*"
+
+__unknown_file (
+
+%6W
+U
+x. x(G
+%8"__id*=
+
+__unknown_file (!*
+	
+$record"
+external_post_idó
+î
+t (
+%9"__mapSet*"
+
+__unknown_file (
+
+%1*0
+
+__unknown_file (
+external_post_id*"
+
+__unknown_file (
+
+%8T
+R
+y* y(?
+%10"__id*9
+
+__unknown_file (*
+	
+$record"
+external_urlï
+í
+t (
+%11"__mapSet*"
+
+__unknown_file (
+
+%1*,
+
+__unknown_file (
+external_url*#
+
+__unknown_file (
+
+%10N
+L
+z$ z(3
+%12"__id*3
+
+__unknown_file (*
+	
+$record"
+statusè
+å
+t (
+%13"__mapSet*"
+
+__unknown_file (
+
+%1*&
+
+__unknown_file (
+
+status*#
+
+__unknown_file (
+
+%12T
+R
+{* {(?
+%14"__id*9
+
+__unknown_file (*
+	
+$record"
+status_labelï
+í
+t (
+%15"__mapSet*"
+
+__unknown_file (
+
+%1*,
+
+__unknown_file (
+status_label*#
+
+__unknown_file (
+
+%14T
+R
+|* |(?
+%16"__id*9
+
+__unknown_file (*
+	
+$record"
+scheduled_atEC
+|* |(O
+%17*#
+
+__unknown_file (
+
+%162toisostringï
+í
+t (
+%18"__mapSet*"
+
+__unknown_file (
+
+%1*,
+
+__unknown_file (
+scheduled_at*#
+
+__unknown_file (
+
+%17T
+R
+}* }(?
+%19"__id*9
+
+__unknown_file (*
+	
+$record"
+published_atEC
+}* }(O
+%20*#
+
+__unknown_file (
+
+%192toisostringï
+í
+t (
+%21"__mapSet*"
+
+__unknown_file (
+
+%1*,
+
+__unknown_file (
+published_at*#
+
+__unknown_file (
+
+%20U
+S
+~+ ~(A
+%22"__id*:
+
+__unknown_file (*
+	
+$record"
+error_messageñ
+ì
+t (
+%23"__mapSet*"
+
+__unknown_file (
+
+%1*-
+
+__unknown_file (
+error_message*#
+
+__unknown_file (
+
+%22"
+t (
+
+%1:
+s? s(F	
+$recordB.,
+*app\http\resources\api\postrequestresourceH
