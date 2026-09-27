@@ -447,70 +447,70 @@ export default function RequestorDashboard() {
     refetchIntervalInBackground: true,
   });
 
+  const mapPost = (p: any) => {
+    let rejectedBy = '';
+    if ((p.status === 'rejected' || p.status === 'returned_for_revision') && p.approval_workflows && Array.isArray(p.approval_workflows)) {
+      const rejectionLog = p.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
+      if (rejectionLog && rejectionLog.approver) {
+        let approverTitle = 'Approver';
+        if (rejectionLog.stage === 'office_head') approverTitle = 'Department Head';
+        if (rejectionLog.stage === 'vice_president') approverTitle = 'Vice President';
+        if (rejectionLog.stage === 'imc_qa') approverTitle = 'QA / Branding Checker';
+
+        rejectedBy = `${approverTitle}, ${rejectionLog.approver.full_name}`;
+      }
+    }
+
+    return {
+      ...p,
+      id: p.id ? p.id.toString() : String(Date.now()),
+      title: p.title || 'Untitled',
+      caption: p.caption_narrative || '',
+      platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
+      category: p.category?.name || 'Category',
+      department: p.requestor?.department || 'Department',
+      date: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+      time: p.created_at ? new Date(p.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
+      dateSaved: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+      rawStatus: p.status, // Add rawStatus for reliable filtering
+      status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
+      statusLabel: p.status_label || p.status,
+      statusColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
+      statusBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
+      badgeColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
+      badgeBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
+      thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
+        ? (() => {
+            const getUrl = (m: any) => m?.url || m?.file_url || m?.file_path || null;
+            const featured = p.media.find((m: any) => m?.is_featured && getUrl(m));
+            if (featured) return getUrl(featured);
+            const imageMedia = p.media.find((m: any) => (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')) && getUrl(m));
+            if (imageMedia) return getUrl(imageMedia);
+            return getUrl(p.media[0]);
+          })()
+        : null,
+      thumbnailIcon: 'document-text-outline' as const,
+      thumbnailBg: '#E0F2FE',
+      actionIcon1: 'eye-outline' as const,
+      actionIcon2: 'pencil-outline' as const,
+      rejectedDate: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '',
+      rejectionReason: p.rejection_reason || 'No reason provided.',
+      nextAction: 'Pending review.',
+      steps: [
+        { label: 'Submitted', state: 'completed' },
+        { label: 'Dept Head', state: ['pending_office_head'].includes(p.status) ? 'active' : 'completed' },
+        { label: 'Vice President', state: p.status === 'pending_vice_president' ? 'active' : 'upcoming' },
+        { label: 'IMC QA', state: ['pending_imc_qa'].includes(p.status) ? 'active' : 'upcoming' },
+        { label: 'Publisher', state: ['approved', 'scheduled', 'published'].includes(p.status) ? 'active' : 'upcoming' },
+      ],
+      comments: [],
+      rejectedBy,
+    };
+  };
+
   useEffect(() => {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
-      const mapPost = (p: any) => {
-        let rejectedBy = '';
-        if ((p.status === 'rejected' || p.status === 'returned_for_revision') && p.approval_workflows && Array.isArray(p.approval_workflows)) {
-          const rejectionLog = p.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
-          if (rejectionLog && rejectionLog.approver) {
-            let approverTitle = 'Approver';
-            if (rejectionLog.stage === 'office_head') approverTitle = 'Department Head';
-            if (rejectionLog.stage === 'vice_president') approverTitle = 'Vice President';
-            if (rejectionLog.stage === 'imc_qa') approverTitle = 'QA / Branding Checker';
-
-            rejectedBy = `${approverTitle}, ${rejectionLog.approver.full_name}`;
-          }
-        }
-
-        return {
-          ...p,
-          id: p.id.toString(),
-          title: p.title || 'Untitled',
-          caption: p.caption_narrative || '',
-          platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
-          category: p.category?.name || 'Category',
-          department: p.requestor?.department || 'Department',
-          date: new Date(p.created_at).toLocaleDateString(),
-          time: new Date(p.created_at).toLocaleTimeString(),
-          dateSaved: new Date(p.created_at).toLocaleDateString(),
-          rawStatus: p.status, // Add rawStatus for reliable filtering
-          status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
-          statusLabel: p.status_label || p.status,
-          statusColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
-          statusBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
-          badgeColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
-          badgeBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
-          thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
-            ? (() => {
-                const getUrl = (m: any) => m?.url || m?.file_url || m?.file_path || null;
-                const featured = p.media.find((m: any) => m?.is_featured && getUrl(m));
-                if (featured) return getUrl(featured);
-                const imageMedia = p.media.find((m: any) => (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')) && getUrl(m));
-                if (imageMedia) return getUrl(imageMedia);
-                return getUrl(p.media[0]);
-              })()
-            : null,
-          thumbnailIcon: 'document-text-outline' as const,
-          thumbnailBg: '#E0F2FE',
-          actionIcon1: 'eye-outline' as const,
-          actionIcon2: 'pencil-outline' as const,
-          rejectedDate: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '',
-          rejectionReason: p.rejection_reason || 'No reason provided.',
-          nextAction: 'Pending review.',
-          steps: [
-            { label: 'Submitted', state: 'completed' },
-            { label: 'Dept Head', state: ['pending_office_head'].includes(p.status) ? 'active' : 'completed' },
-            { label: 'Vice President', state: p.status === 'pending_vice_president' ? 'active' : 'upcoming' },
-            { label: 'IMC QA', state: ['pending_imc_qa'].includes(p.status) ? 'active' : 'upcoming' },
-            { label: 'Publisher', state: ['approved', 'scheduled', 'published'].includes(p.status) ? 'active' : 'upcoming' },
-          ],
-          comments: [],
-          rejectedBy,
-        };
-      };
-
       const mapped = posts.map(mapPost);
       setMockRequests(mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision'));
       setMockQueuePosts(mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision'));
@@ -747,9 +747,12 @@ export default function RequestorDashboard() {
         await postsApi.submit(Number(editingPostId));
       }
 
-      // Optimistically add to queue so it shows instantly
-      const submittedPost = { ...res.data.data, status: 'PENDING_OFFICE_HEAD' };
-      setMockQueuePosts((prev: any) => [submittedPost, ...prev.filter((p: any) => p.id !== submittedPost.id)]);
+      // Optimistically add to queue & mockRequests so it shows instantly in Recent Post Requests
+      if (res?.data?.data) {
+        const formattedSubmitted = mapPost(res.data.data);
+        setMockRequests((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
+        setMockQueuePosts((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
+      }
 
       showToast('Content request submitted successfully!');
       setEditingPostId(null);

@@ -28,10 +28,12 @@ class StorePostRequest extends FormRequest
 
         if ($this->hasFile('media')) {
             $rules['media'] = ['nullable'];
+            $rules['media.*'] = ['nullable', 'file', 'max:32768'];
         }
 
         if ($this->hasFile('supporting_docs')) {
             $rules['supporting_docs'] = ['nullable'];
+            $rules['supporting_docs.*'] = ['nullable', 'file', 'max:32768'];
         }
 
         return $rules;

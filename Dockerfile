@@ -55,7 +55,10 @@ RUN for attempt in 1 2 3; do \
 
 # Configure production PHP limits for FrankenPHP runtime
 RUN printf '%s\n' \
-    'memory_limit=128M' \
+    'memory_limit=256M' \
+    'upload_max_filesize=64M' \
+    'post_max_size=64M' \
+    'max_file_uploads=50' \
     'opcache.enable=1' \
     'opcache.enable_cli=1' \
     'opcache.memory_consumption=64' \
