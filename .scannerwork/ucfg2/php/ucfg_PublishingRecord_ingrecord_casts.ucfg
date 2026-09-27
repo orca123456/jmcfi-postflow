@@ -1,53 +1,0 @@
-
-"app\models\publishingrecord::casts1
-'backend\app\Models\PublishingRecord.php ("1*“
-1  (
-
-  (	
-%1"$Array›
-˜
-  (	
-%2"__mapSet*"
-
-__unknown_file (
-
-%1*1
-
-__unknown_file (
-platform_response*%
-
-__unknown_file (	
-array™
-–
-  (	
-%3"__mapSet*"
-
-__unknown_file (
-
-%1*,
-
-__unknown_file (
-scheduled_at*(
-
-__unknown_file (
-
-datetime™
-–
-  (	
-%4"__mapSet*"
-
-__unknown_file (
-
-%1*,
-
-__unknown_file (
-published_at*(
-
-__unknown_file (
-
-datetime"
-  (
-
-
-%1B
-app\models\publishingrecordHrPublishingRecord.casts()

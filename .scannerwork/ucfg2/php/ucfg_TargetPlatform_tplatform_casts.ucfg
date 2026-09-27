@@ -1,38 +1,0 @@
-
- app\models\targetplatform::casts/
-%backend\app\Models\TargetPlatform.php ("1*ï
-1 (
-
- (	
-%1"$Array—
-”
- (	
-%2"__mapSet*"
-
-__unknown_file (
-
-%1*-
-
-__unknown_file (
-config_schema*%
-
-__unknown_file (	
-array•
-’
- (	
-%3"__mapSet*"
-
-__unknown_file (
-
-%1*)
-
-__unknown_file (
-	is_active*'
-
-__unknown_file (	
-boolean"
- (
-
-
-%1B
-app\models\targetplatformHrTargetPlatform.casts()

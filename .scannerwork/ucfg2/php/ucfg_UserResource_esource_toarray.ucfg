@@ -1,445 +1,0 @@
-
-,app\http\resources\api\userresource::toarray9
-/backend\app\Http\Resources\Api\UserResource.php
- 
-("1*Ù)
-1 "(
- 
-
-
- 
-(
-%1"__entrypointºπ
-
- 
-(#
-$requestilluminate\http\request".illuminate\http\request::__sonar_inject_symbol*A
-
-__unknown_file (%
-#
-$requestilluminate\http\request2__sonar_inject_symbola
-_
-
- 
-(
-
-$request"__id*A
-
-__unknown_file (%
-#
-$requestilluminate\http\request
- "(	
-%2"$Arraye
-c
- (
-%3"__id*K
-
-__unknown_file (/*-%
-#app\http\resources\api\userresource"
-idâ
-Ü
- "(	
-%4"__mapSet*"
-
-__unknown_file (
-
-%2*"
-
-__unknown_file (
-id*"
-
-__unknown_file (
-
-%3n
-l
- (/
-%5"__id*T
-
-__unknown_file (8*6%
-#app\http\resources\api\userresource"
-employee_idí
-è
- "(	
-%6"__mapSet*"
-
-__unknown_file (
-
-%2*+
-
-__unknown_file (
-employee_id*"
-
-__unknown_file (
-
-%5m
-k
- (-
-%7"__id*S
-
-__unknown_file (7*5%
-#app\http\resources\api\userresource"
-
-first_nameë
-é
- "(	
-%8"__mapSet*"
-
-__unknown_file (
-
-%2**
-
-__unknown_file (
-
-first_name*"
-
-__unknown_file (
-
-%7n
-l
- (/
-%9"__id*T
-
-__unknown_file (8*6%
-#app\http\resources\api\userresource"
-middle_nameì
-ê
- "(	
-%10"__mapSet*"
-
-__unknown_file (
-
-%2*+
-
-__unknown_file (
-middle_name*"
-
-__unknown_file (
-
-%9m
-k
- (+
-%11"__id*R
-
-__unknown_file (6*4%
-#app\http\resources\api\userresource"
-	last_nameí
-è
- "(	
-%12"__mapSet*"
-
-__unknown_file (
-
-%2*)
-
-__unknown_file (
-	last_name*#
-
-__unknown_file (
-
-%11m
-k
- (+
-%13"__id*R
-
-__unknown_file (6*4%
-#app\http\resources\api\userresource"
-	full_nameí
-è
- "(	
-%14"__mapSet*"
-
-__unknown_file (
-
-%2*)
-
-__unknown_file (
-	full_name*#
-
-__unknown_file (
-
-%13i
-g
- (#
-%15"__id*N
-
-__unknown_file (2*0%
-#app\http\resources\api\userresource"
-emailé
-ã
- "(	
-%16"__mapSet*"
-
-__unknown_file (
-
-%2*%
-
-__unknown_file (	
-email*#
-
-__unknown_file (
-
-%15i
-g
- (#
-%17"__id*N
-
-__unknown_file (2*0%
-#app\http\resources\api\userresource"
-phoneé
-ã
- "(	
-%18"__mapSet*"
-
-__unknown_file (
-
-%2*%
-
-__unknown_file (	
-phone*#
-
-__unknown_file (
-
-%17n
-l
- (-
-%19"__id*S
-
-__unknown_file (7*5%
-#app\http\resources\api\userresource"
-
-departmentì
-ê
- "(	
-%20"__mapSet*"
-
-__unknown_file (
-
-%2**
-
-__unknown_file (
-
-department*#
-
-__unknown_file (
-
-%19l
-j
- ()
-%21"__id*Q
-
-__unknown_file (5*3%
-#app\http\resources\api\userresource"
-
-positionë
-é
- "(	
-%22"__mapSet*"
-
-__unknown_file (
-
-%2*(
-
-__unknown_file (
-
-position*#
-
-__unknown_file (
-
-%21j
-h
- (%
-%23"__id*O
-
-__unknown_file (3*1%
-#app\http\resources\api\userresource"
-statusè
-å
- "(	
-%24"__mapSet*"
-
-__unknown_file (
-
-%2*&
-
-__unknown_file (
-
-status*#
-
-__unknown_file (
-
-%23m
-k
- (+
-%25"__id*R
-
-__unknown_file (6*4%
-#app\http\resources\api\userresource"
-	photo_urlí
-è
- "(	
-%26"__mapSet*"
-
-__unknown_file (
-
-%2*)
-
-__unknown_file (
-	photo_url*#
-
-__unknown_file (
-
-%25w
-u
-% (?
-%27"__id*\
-
-__unknown_file (@*>%
-#app\http\resources\api\userresource"
-department_logo_urlú
-ô
- "(	
-%28"__mapSet*"
-
-__unknown_file (
-
-%2*3
-
-__unknown_file (
-department_logo_url*#
-
-__unknown_file (
-
-%27ç
-ä
-2 (
-%29"__declareFunction*d
-
-__unknown_file (HF
-D__sonar_lambda_backend\app\Http\Resources\Api\UserResource.php_26_50±Æ
- (
-%30*C
-
-__unknown_file ('%
-#app\http\resources\api\userresource*%
-
-__unknown_file (	
-roles*#
-
-__unknown_file (
-
-%292
-whenloadedé
-ã
- "(	
-%31"__mapSet*"
-
-__unknown_file (
-
-%2*%
-
-__unknown_file (	
-roles*#
-
-__unknown_file (
-
-%30ç
-ä
-> (
-%32"__declareFunction*d
-
-__unknown_file (HF
-D__sonar_lambda_backend\app\Http\Resources\Api\UserResource.php_29_62∑¥
- (
-%33*C
-
-__unknown_file ('%
-#app\http\resources\api\userresource*+
-
-__unknown_file (
-permissions*#
-
-__unknown_file (
-
-%322
-whenloadedî
-ë
- "(	
-%34"__mapSet*"
-
-__unknown_file (
-
-%2*+
-
-__unknown_file (
-permissions*#
-
-__unknown_file (
-
-%33n
-l
-   (-
-%35"__id*S
-
-__unknown_file (7*5%
-#app\http\resources\api\userresource"
-
-created_atEC
-   (=
-%36*#
-
-__unknown_file (
-
-%352toisostringì
-ê
- "(	
-%37"__mapSet*"
-
-__unknown_file (
-
-%2**
-
-__unknown_file (
-
-created_at*#
-
-__unknown_file (
-
-%36n
-l
-! !(-
-%38"__id*S
-
-__unknown_file (7*5%
-#app\http\resources\api\userresource"
-
-updated_atEC
-! !(=
-%39*#
-
-__unknown_file (
-
-%382toisostringì
-ê
- "(	
-%40"__mapSet*"
-
-__unknown_file (
-
-%2**
-
-__unknown_file (
-
-updated_at*#
-
-__unknown_file (
-
-%39"
- "(
-
-
-%2:/
-
- 
-(,#
-$requestilluminate\http\requestB'%
-#app\http\resources\api\userresourceHrUserResource.toArray()

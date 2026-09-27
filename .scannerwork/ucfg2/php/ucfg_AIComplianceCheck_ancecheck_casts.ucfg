@@ -1,107 +1,0 @@
-
-#app\models\aicompliancecheck::casts2
-(backend\app\Models\AIComplianceCheck.php ("1*ª	
-1 '(
-
- '(	
-%1"$Array—
-”
- '(	
-%2"__mapSet*"
-
-__unknown_file (
-
-%1*-
-
-__unknown_file (
-check_results*%
-
-__unknown_file (	
-arrayš
-—
- '(	
-%3"__mapSet*"
-
-__unknown_file (
-
-%1*0
-
-__unknown_file (
-violations_found*%
-
-__unknown_file (	
-array¥
-¢
- '(	
-%4"__mapSet*"
-
-__unknown_file (
-
-%1*:
-
-__unknown_file (
-suggested_rejection_reason*&
-
-__unknown_file (
-
-string¦
-£
- '(	
-%5"__mapSet*"
-
-__unknown_file (
-
-%1*;
-
-__unknown_file (
-suggested_revision_guidance*&
-
-__unknown_file (
-
-string¥
-¢
- '(	
-%6"__mapSet*"
-
-__unknown_file (
-
-%1*:
-
-__unknown_file (
-suggested_improved_caption*&
-
-__unknown_file (
-
-string™
-–
- '(	
-%7"__mapSet*"
-
-__unknown_file (
-
-%1*.
-
-__unknown_file (
-overall_status*&
-
-__unknown_file (
-
-stringž
-›
- '(	
-%8"__mapSet*"
-
-__unknown_file (
-
-%1*0
-
-__unknown_file (
-confidence_score*)
-
-__unknown_file (
-	decimal:2"
- '(
-
-
-%1B 
-app\models\aicompliancecheckHrAIComplianceCheck.casts()

@@ -1,113 +1,0 @@
-
-app\models\user::rolelabels'
-backend\app\Models\User.php£ £(%"1*Ò	
-1
-¥ ­(
-
-
-¥ ­(	
-%1"$Array²
-¯
-
-¥ ­(	
-%2"__mapSet*"
-
-__unknown_file (
-
-%1*)
-
-__unknown_file (
-	requestor*B
-
-__unknown_file (&$
-"Department Head / Programming Head
-š
-
-¥ ­(	
-%3"__mapSet*"
-
-__unknown_file (
-
-%1*+
-
-__unknown_file (
-office_head*+
-
-__unknown_file (
-Office Head£
- 
-
-¥ ­(	
-%4"__mapSet*"
-
-__unknown_file (
-
-%1*.
-
-__unknown_file (
-vice_president*.
-
-__unknown_file (
-Vice President™
-–
-
-¥ ­(	
-%5"__mapSet*"
-
-__unknown_file (
-
-%1*)
-
-__unknown_file (
-	president*)
-
-__unknown_file (
-	President¥
-¢
-
-¥ ­(	
-%6"__mapSet*"
-
-__unknown_file (
-
-%1*.
-
-__unknown_file (
-imc_qa_checker*0
-
-__unknown_file (
-IMC / QA Checker±
-®
-
-¥ ­(	
-%7"__mapSet*"
-
-__unknown_file (
-
-%1*,
-
-__unknown_file (
-it_publisher*>
-
-__unknown_file (" 
-IT Publisher / System Operator™
-–
-
-¥ ­(	
-%8"__mapSet*"
-
-__unknown_file (
-
-%1*%
-
-__unknown_file (	
-admin*-
-
-__unknown_file (
-Administrator"
-
-¥ ­(
-
-
-%1B
-app\models\userHrUser.roleLabels()
