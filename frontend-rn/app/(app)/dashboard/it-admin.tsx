@@ -1000,11 +1000,17 @@ export default function ITAdminDashboard() {
     mail_encryption: 'tls',
     mail_from_address: '',
     mail_from_name: 'JMCFI PostFlow',
+    email_template_header_title: 'Jose Maria College Foundation, Inc.',
+    email_template_brand_color: '#800000',
+    email_template_footer_text: '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
+    email_template_logo_url: '',
   });
   const [emailPasswordSet, setEmailPasswordSet] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [showEmailPassword, setShowEmailPassword] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateScenario, setTemplateScenario] = useState<'rejected' | 'approved' | 'revision'>('rejected');
 
   useEffect(() => {
     if (activeTab === 'email-settings') {
@@ -1020,6 +1026,10 @@ export default function ITAdminDashboard() {
             mail_encryption: s.mail_encryption || 'tls',
             mail_from_address: s.mail_from_address || '',
             mail_from_name: s.mail_from_name || 'JMCFI PostFlow',
+            email_template_header_title: s.email_template_header_title || 'Jose Maria College Foundation, Inc.',
+            email_template_brand_color: s.email_template_brand_color || '#800000',
+            email_template_footer_text: s.email_template_footer_text || '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
+            email_template_logo_url: s.email_template_logo_url || '',
           }));
           setEmailPasswordSet(!!s.mail_password_set);
         })
@@ -2874,6 +2884,26 @@ $response = curl_exec($ch);`}
               <Text style={styles.emailHeroTitle}>Email Notification Settings</Text>
               <Text style={styles.emailHeroSubtitle}>Configure the SMTP server used to send approval, publishing, and alert emails to users and admins.</Text>
             </View>
+            <TouchableOpacity
+              onPress={() => setIsTemplateModalOpen(true)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: emailFields.email_template_brand_color || '#800000',
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 8,
+                shadowColor: emailFields.email_template_brand_color || '#800000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 3,
+              }}
+            >
+              <Ionicons name="color-palette" size={18} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>🎨 Customize Email Template</Text>
+            </TouchableOpacity>
           </Card>
 
           <View style={[styles.emailLayout, !isLargeScreen && styles.emailLayoutStacked]}>
@@ -3047,6 +3077,565 @@ $response = curl_exec($ch);`}
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      )}
+
+      {/* Live Email Template Builder Modal */}
+      <Modal
+        visible={isTemplateModalOpen}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsTemplateModalOpen(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 16,
+        }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 1080,
+            maxHeight: '92%',
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 10,
+            overflow: 'hidden',
+            flexDirection: 'column',
+          }}>
+            {/* Modal Header */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 24,
+              paddingVertical: 18,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E2E8F0',
+              backgroundColor: '#F8FAFC',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  backgroundColor: emailFields.email_template_brand_color || '#800000',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons name="color-palette" size={22} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
+                    Email Template Builder & Live Preview
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                    Design custom headers, logo branding, and accent colors for automated system emails.
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsTemplateModalOpen(false)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: '#E2E8F0',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="close" size={20} color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Body */}
+            <ScrollView contentContainerStyle={{ padding: 24 }}>
+              <View style={{
+                flexDirection: isLargeScreen ? 'row' : 'column',
+                gap: 24,
+                alignItems: 'flex-start',
+              }}>
+                {/* Left Side: Customization Controls */}
+                <View style={{ flex: 1, width: '100%', gap: 18 }}>
+                  <View style={{
+                    padding: 16,
+                    backgroundColor: '#F1F5F9',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E293B', marginBottom: 4 }}>
+                      🎨 Template Settings
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      Changes saved here automatically apply to approval notifications, rejection notices, and test emails.
+                    </Text>
+                  </View>
+
+                  {/* Header Title */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
+                      Header Title / Organization Name
+                    </Text>
+                    <View style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      paddingHorizontal: 12,
+                      justifyContent: 'center',
+                    }}>
+                      <TextInput
+                        style={{ fontSize: 13, color: '#0F172A', outlineStyle: 'none' } as any}
+                        value={emailFields.email_template_header_title}
+                        onChangeText={v => setEmailFields(p => ({ ...p, email_template_header_title: v }))}
+                        placeholder="Jose Maria College Foundation, Inc."
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Brand Color Swatches & Hex */}
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
+                      Brand Accent Color
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                      {[
+                        { name: 'JMC Maroon', hex: '#800000' },
+                        { name: 'Deep Navy', hex: '#1E3A8A' },
+                        { name: 'Teal', hex: '#0D9488' },
+                        { name: 'Emerald', hex: '#059669' },
+                        { name: 'Royal Blue', hex: '#2563EB' },
+                        { name: 'Amber', hex: '#D97706' },
+                      ].map(color => {
+                        const isSelected = (emailFields.email_template_brand_color || '#800000').toLowerCase() === color.hex.toLowerCase();
+                        return (
+                          <TouchableOpacity
+                            key={color.hex}
+                            onPress={() => setEmailFields(p => ({ ...p, email_template_brand_color: color.hex }))}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              borderRadius: 20,
+                              borderWidth: 2,
+                              borderColor: isSelected ? color.hex : '#E2E8F0',
+                              backgroundColor: isSelected ? `${color.hex}15` : '#FFFFFF',
+                            }}
+                          >
+                            <View style={{
+                              width: 14,
+                              height: 14,
+                              borderRadius: 7,
+                              backgroundColor: color.hex,
+                            }} />
+                            <Text style={{
+                              fontSize: 12,
+                              fontWeight: isSelected ? '800' : '600',
+                              color: isSelected ? color.hex : '#475569',
+                            }}>
+                              {color.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {/* Custom Hex Code Input */}
+                    <View style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 12,
+                      gap: 10,
+                      marginTop: 4,
+                    }}>
+                      <View style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: emailFields.email_template_brand_color || '#800000',
+                        borderWidth: 1,
+                        borderColor: '#CBD5E1',
+                      }} />
+                      <TextInput
+                        style={{ flex: 1, fontSize: 13, color: '#0F172A', outlineStyle: 'none' } as any}
+                        value={emailFields.email_template_brand_color}
+                        onChangeText={v => setEmailFields(p => ({ ...p, email_template_brand_color: v }))}
+                        placeholder="#800000"
+                        placeholderTextColor="#94A3B8"
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Logo URL */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
+                      Logo Image URL (Optional)
+                    </Text>
+                    <View style={{
+                      minHeight: 44,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      paddingHorizontal: 12,
+                      justifyContent: 'center',
+                    }}>
+                      <TextInput
+                        style={{ fontSize: 13, color: '#0F172A', outlineStyle: 'none' } as any}
+                        value={emailFields.email_template_logo_url}
+                        onChangeText={v => setEmailFields(p => ({ ...p, email_template_logo_url: v }))}
+                        placeholder="https://example.com/logo.png"
+                        placeholderTextColor="#94A3B8"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                      HTTPS link to school or institutional logo (recommended height 40px - 60px).
+                    </Text>
+                  </View>
+
+                  {/* Footer Text */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
+                      Footer Copyright & Address
+                    </Text>
+                    <View style={{
+                      minHeight: 60,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      padding: 10,
+                    }}>
+                      <TextInput
+                        style={{ fontSize: 13, color: '#0F172A', outlineStyle: 'none' } as any}
+                        value={emailFields.email_template_footer_text}
+                        onChangeText={v => setEmailFields(p => ({ ...p, email_template_footer_text: v }))}
+                        placeholder="© 2026 Jose Maria College Foundation, Inc. All rights reserved."
+                        placeholderTextColor="#94A3B8"
+                        multiline
+                      />
+                    </View>
+                  </View>
+
+                  {/* Sample Scenario Toggle */}
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
+                      Preview Email Scenario:
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      {[
+                        { id: 'rejected', label: '❌ Rejected', color: '#DC2626' },
+                        { id: 'approved', label: '✅ Approved', color: '#16A34A' },
+                        { id: 'revision', label: '⚠️ Revision', color: '#D97706' },
+                      ].map(scen => {
+                        const isSelected = templateScenario === scen.id;
+                        return (
+                          <TouchableOpacity
+                            key={scen.id}
+                            onPress={() => setTemplateScenario(scen.id as any)}
+                            style={{
+                              flex: 1,
+                              paddingVertical: 8,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isSelected ? scen.color : '#E2E8F0',
+                              backgroundColor: isSelected ? `${scen.color}15` : '#F8FAFC',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 12,
+                              fontWeight: isSelected ? '800' : '600',
+                              color: isSelected ? scen.color : '#64748B',
+                            }}>
+                              {scen.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Right Side: Simulated Email Client Preview */}
+                <View style={{
+                  flex: 1.2,
+                  width: '100%',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  overflow: 'hidden',
+                }}>
+                  {/* Email Client Top Bar */}
+                  <View style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    backgroundColor: '#0F172A',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#F59E0B' }} />
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' }} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#94A3B8', marginLeft: 10 }}>
+                        Live Email Previewer
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>HTML Rendering Mode</Text>
+                  </View>
+
+                  {/* Mail Envelope Header */}
+                  <View style={{
+                    paddingHorizontal: 20,
+                    paddingVertical: 14,
+                    backgroundColor: '#FFFFFF',
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E2E8F0',
+                    gap: 4,
+                  }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                      Subject: {templateScenario === 'rejected' ? '[JMCFI PostFlow] ❌ Post Revision Requested' : templateScenario === 'approved' ? '[JMCFI PostFlow] ✅ Post Approved & Published' : '[JMCFI PostFlow] ⚠️ Action Required on Post'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      From: <Text style={{ fontWeight: '700', color: '#334155' }}>{emailFields.mail_from_name || 'JMCFI PostFlow'}</Text> &lt;{emailFields.mail_from_address || emailFields.mail_username || 'postflow@jmc.edu.ph'}&gt;
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      To: <Text style={{ fontWeight: '700', color: '#334155' }}>faculty.requestor@jmc.edu.ph</Text>
+                    </Text>
+                  </View>
+
+                  {/* Email Body Canvas */}
+                  <View style={{ padding: 20, backgroundColor: '#F1F5F9' }}>
+                    {/* Simulated Email Card */}
+                    <View style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 10,
+                      elevation: 3,
+                    }}>
+                      {/* Email Brand Header Bar */}
+                      <View style={{
+                        backgroundColor: emailFields.email_template_brand_color || '#800000',
+                        paddingVertical: 20,
+                        paddingHorizontal: 24,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 12,
+                      }}>
+                        {emailFields.email_template_logo_url ? (
+                          <Image
+                            source={{ uri: emailFields.email_template_logo_url }}
+                            style={{ width: 36, height: 36, borderRadius: 6, resizeMode: 'contain' }}
+                          />
+                        ) : null}
+                        <Text style={{
+                          color: '#FFFFFF',
+                          fontSize: 17,
+                          fontWeight: '800',
+                          textAlign: 'center',
+                          letterSpacing: 0.5,
+                        }}>
+                          {emailFields.email_template_header_title || 'Jose Maria College Foundation, Inc.'}
+                        </Text>
+                      </View>
+
+                      {/* Main Email Content */}
+                      <View style={{ padding: 24, gap: 16 }}>
+                        {/* Status Badge */}
+                        <View style={{
+                          alignSelf: 'flex-start',
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          backgroundColor: templateScenario === 'rejected' ? '#FEF2F2' : templateScenario === 'approved' ? '#F0FDF4' : '#FFFBEB',
+                          borderWidth: 1,
+                          borderColor: templateScenario === 'rejected' ? '#FECACA' : templateScenario === 'approved' ? '#BBF7D0' : '#FDE68A',
+                        }}>
+                          <Text style={{
+                            fontSize: 12,
+                            fontWeight: '800',
+                            color: templateScenario === 'rejected' ? '#DC2626' : templateScenario === 'approved' ? '#16A34A' : '#D97706',
+                          }}>
+                            {templateScenario === 'rejected' ? '❌ POST REJECTED / NEEDS REVISION' : templateScenario === 'approved' ? '✅ POST APPROVED FOR PUBLISHING' : '⚠️ REVISION REQUIRED BY APPROVER'}
+                          </Text>
+                        </View>
+
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>
+                          Hello Prof. Juan Dela Cruz,
+                        </Text>
+
+                        <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20 }}>
+                          {templateScenario === 'rejected'
+                            ? 'Your submitted post announcement has been reviewed by the department head and requires changes before it can be published.'
+                            : templateScenario === 'approved'
+                            ? 'Great news! Your post announcement has been officially approved and scheduled for multi-channel publishing.'
+                            : 'Your post announcement is currently under review and requires minor updates.'}
+                        </Text>
+
+                        {/* Post Details Container */}
+                        <View style={{
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 8,
+                          padding: 16,
+                          borderLeftWidth: 4,
+                          borderLeftColor: emailFields.email_template_brand_color || '#800000',
+                          gap: 6,
+                        }}>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                            📌 Post Title: Annual Student Orientation 2026
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>
+                            Department: College of Computer Studies
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>
+                            Target Channels: Facebook, Instagram, Student Portal
+                          </Text>
+                          {templateScenario === 'rejected' && (
+                            <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
+                                Reviewer Remarks: "Please attach the official high-resolution event flyer and update the venue to Main Auditorium."
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Action CTA Button */}
+                        <TouchableOpacity style={{
+                          backgroundColor: emailFields.email_template_brand_color || '#800000',
+                          paddingVertical: 12,
+                          paddingHorizontal: 20,
+                          borderRadius: 8,
+                          alignSelf: 'flex-start',
+                          marginTop: 4,
+                        }}>
+                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                            {templateScenario === 'rejected' ? 'Edit & Resubmit Post' : 'View Post Status in Dashboard'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Simulated Email Footer */}
+                      <View style={{
+                        paddingVertical: 14,
+                        paddingHorizontal: 20,
+                        backgroundColor: '#F8FAFC',
+                        borderTopWidth: 1,
+                        borderTopColor: '#E2E8F0',
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center' }}>
+                          {emailFields.email_template_footer_text || '© 2026 Jose Maria College Foundation, Inc. All rights reserved.'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Modal Footer Actions */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 24,
+              paddingVertical: 16,
+              borderTopWidth: 1,
+              borderTopColor: '#E2E8F0',
+              backgroundColor: '#F8FAFC',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}>
+              <TouchableOpacity
+                onPress={handleTestEmail}
+                disabled={testingEmail}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  borderWidth: 1.5,
+                  borderColor: emailFields.email_template_brand_color || '#800000',
+                  backgroundColor: '#FFFFFF',
+                  opacity: testingEmail ? 0.6 : 1,
+                }}
+              >
+                <Ionicons name="paper-plane-outline" size={18} color={emailFields.email_template_brand_color || '#800000'} />
+                <Text style={{ fontSize: 13, fontWeight: '800', color: emailFields.email_template_brand_color || '#800000' }}>
+                  {testingEmail ? 'Sending Test...' : '✉️ Send Test Email'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setIsTemplateModalOpen(false)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={async () => {
+                    await handleSaveEmailSettings();
+                    setIsTemplateModalOpen(false);
+                  }}
+                  disabled={savingEmail}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    backgroundColor: emailFields.email_template_brand_color || '#800000',
+                    opacity: savingEmail ? 0.6 : 1,
+                  }}
+                >
+                  <Ionicons name="save-outline" size={18} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                    {savingEmail ? 'Saving...' : '💾 Save Template Settings'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
         </View>
       )}
 

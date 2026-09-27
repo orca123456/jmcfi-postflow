@@ -24,14 +24,30 @@ class PostRejectedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+
+        $viewData = [
+            'headerTitle' => $tmplHeader,
+            'brandColor' => $tmplColor,
+            'footerText' => $tmplFooter,
+            'logoUrl' => $tmplLogo,
+            'userName' => $notifiable->first_name ?? $notifiable->full_name ?? 'User',
+            'statusType' => 'rejected',
+            'statusLabel' => 'Post Request Rejected',
+            'bodyMessage' => 'Your post request has been reviewed and rejected by the approval authority.',
+            'postTitle' => $this->postRequest->title,
+            'reason' => $this->reason ?? 'No specific reason provided.',
+            'targetPlatforms' => $this->postRequest->target_platforms ?? [],
+            'actionUrl' => url(config('app.frontend_url') . "/requestor/posts/{$this->postRequest->id}"),
+            'buttonText' => 'View Post Request'
+        ];
+
         return (new MailMessage)
             ->subject("Post Rejected: {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line("Your post request has been rejected.")
-            ->line("**Post:** {$this->postRequest->title}")
-            ->line("**Reason:** " . ($this->reason ?? 'No specific reason provided'))
-            ->action('View Post', url(config('app.frontend_url') . "/requestor/posts/{$this->postRequest->id}"))
-            ->line('You may create a new post request addressing the concerns raised.');
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array

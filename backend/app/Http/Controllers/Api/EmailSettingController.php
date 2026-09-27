@@ -20,6 +20,10 @@ class EmailSettingController extends Controller
         'mail_from_address',
         'mail_from_name',
         'mail_encryption',
+        'email_template_header_title',
+        'email_template_brand_color',
+        'email_template_footer_text',
+        'email_template_logo_url',
     ];
 
     /**
@@ -52,14 +56,18 @@ class EmailSettingController extends Controller
         }
 
         $validated = $request->validate([
-            'mail_mailer'       => 'required|string|in:smtp,log,sendmail',
-            'mail_host'         => 'nullable|string|max:255',
-            'mail_port'         => 'nullable|string|max:10',
-            'mail_username'     => 'nullable|string|max:255',
-            'mail_password'     => 'nullable|string|max:255',
-            'mail_encryption'   => 'nullable|string|in:tls,ssl,',
-            'mail_from_address' => 'nullable|email|max:255',
-            'mail_from_name'    => 'nullable|string|max:255',
+            'mail_mailer'                 => 'required|string|in:smtp,log,sendmail',
+            'mail_host'                   => 'nullable|string|max:255',
+            'mail_port'                   => 'nullable|string|max:10',
+            'mail_username'               => 'nullable|string|max:255',
+            'mail_password'               => 'nullable|string|max:255',
+            'mail_encryption'             => 'nullable|string|in:tls,ssl,',
+            'mail_from_address'           => 'nullable|email|max:255',
+            'mail_from_name'              => 'nullable|string|max:255',
+            'email_template_header_title' => 'nullable|string|max:255',
+            'email_template_brand_color'   => 'nullable|string|max:50',
+            'email_template_footer_text'  => 'nullable|string|max:1000',
+            'email_template_logo_url'     => 'nullable|string|max:2000',
         ]);
 
         foreach ($this->allowedKeys as $key) {
@@ -171,18 +179,36 @@ class EmailSettingController extends Controller
             }
         }
 
+        $tmplHeader = $request->input('email_template_header_title') ?: (SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification');
+        $tmplColor  = $request->input('email_template_brand_color')   ?: (SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000');
+        $tmplFooter = $request->input('email_template_footer_text')  ?: (SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.');
+        $tmplLogo   = $request->input('email_template_logo_url')     ?: (SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '');
+
         try {
-            Mail::raw(
-                "Hello {$adminName},\n\nThis is a test email from JMCFI PostFlow.\n\nIf you received this, your email configuration is working correctly!\n\n— JMCFI PostFlow System",
-                function ($message) use ($adminEmail, $adminName) {
-                    $message->to($adminEmail, $adminName)
-                            ->subject('[JMCFI PostFlow] ✅ Test Email — Configuration Successful!');
-                }
-            );
+            $viewData = [
+                'headerTitle' => $tmplHeader,
+                'brandColor' => $tmplColor,
+                'footerText' => $tmplFooter,
+                'logoUrl' => $tmplLogo,
+                'userName' => $adminName,
+                'statusType' => 'approved',
+                'statusLabel' => 'Configuration Verified',
+                'bodyMessage' => 'This is a test notification from JMCFI PostFlow. Your custom email template styling has been applied!',
+                'postTitle' => 'Annual Campus Activity Request 2026',
+                'reason' => 'All approval requirements satisfied.',
+                'targetPlatforms' => ['facebook', 'instagram', 'portal'],
+                'actionUrl' => url(config('app.frontend_url') ?? 'https://jmcfi-postflow-production.up.railway.app'),
+                'buttonText' => 'View System Dashboard'
+            ];
+
+            Mail::send('emails.custom-template', $viewData, function ($message) use ($adminEmail, $adminName, $fromName) {
+                $message->to($adminEmail, $adminName)
+                        ->subject("[{$fromName}] ✅ Email Template Test — Configuration Verified!");
+            });
 
             Log::info("Test email sent successfully to {$adminEmail}");
 
-            return response()->json(['message' => "Test email sent to {$adminEmail}. Please check your inbox!"]);
+            return response()->json(['message' => "Test email with custom template styling sent to {$adminEmail}. Please check your inbox!"]);
         } catch (\Exception $e) {
             Log::error("Failed to send test email: " . $e->getMessage());
             $rawMsg = $e->getMessage();
