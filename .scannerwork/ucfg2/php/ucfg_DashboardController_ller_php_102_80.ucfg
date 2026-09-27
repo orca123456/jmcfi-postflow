@@ -1,62 +1,0 @@
-
-N__sonar_lambda_backend\app\Http\Controllers\Api\DashboardController.php_102_80B
-8backend\app\Http\Controllers\Api\DashboardController.phpfP f(X"1*¾
-1g j(,@
->
-gB g(F
-
-%1bool"__id* 
-
-__unknown_file (2½
-º
-g g(G
-%2"app\models\department::where*5
-
-__unknown_file ("
-app\models\department*)
-
-__unknown_file (
-	is_active*(
-
-__unknown_file (
-
-
-%1bool¼¹
-g h(?
-%3*"
-
-__unknown_file (
-
-%2*,
-
-__unknown_file (
-display_name*$
-
-__unknown_file (
-LIKE*(
-
-__unknown_file (
-
-College%2wheremk
-g i(-
-%4*"
-
-__unknown_file (
-
-%3*,
-
-__unknown_file (
-display_name2orderbyki
-g j(+
-%5*"
-
-__unknown_file (
-
-%4*,
-
-__unknown_file (
-display_name2pluck"
-g j(,
-
-%5B0.
-,app\http\controllers\api\dashboardcontrollerH
