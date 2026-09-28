@@ -26,7 +26,7 @@ class AuthCheckCommand extends Command
     /**
      * Execute the console command.
      */
-    public function meHandle(): int
+    public function handle(): int
     {
         $this->info('====================================');
         $this->info('    JMCFI PostFlow Auth Status      ');
@@ -38,7 +38,7 @@ class AuthCheckCommand extends Command
         }
 
         $totalUsers = User::count();
-        $this->line("<fg=cyan>Total Registered Users:</fg=cyan> {$totalUsers}");
+        $this->line("\n<fg=cyan;options=bold>Total Registered Users:</fg=cyan;options=bold> {$totalUsers}");
 
         if ($totalUsers > 0) {
             $users = User::all();
@@ -58,16 +58,35 @@ class AuthCheckCommand extends Command
         }
 
         if (Schema::hasTable('personal_access_tokens')) {
-            $tokenCount = PersonalAccessToken::count();
-            $this->line("<fg=cyan>Active Sanctum Tokens:</fg=cyan> {$tokenCount}");
+            $tokens = PersonalAccessToken::with('tokenable')->orderBy('created_at', 'desc')->get();
+            $tokenCount = $tokens->count();
+
+            $this->line("\n<fg=cyan;options=bold>Active Sanctum Tokens:</fg=cyan;options=bold> {$tokenCount}");
+
+            if ($tokenCount > 0) {
+                $tokenHeaders = ['Token ID', 'User Name', 'Token Name', 'Last Used At', 'Created At'];
+                $tokenRows = $tokens->map(function ($t) {
+                    $user = $t->tokenable;
+                    $userName = $user ? ($user->full_name ?? ($user->first_name . ' ' . $user->last_name)) . " (#{$user->id})" : 'Unknown User';
+                    $lastUsed = $t->last_used_at ? $t->last_used_at->diffForHumans() : 'Never';
+                    $createdAt = $t->created_at ? $t->created_at->diffForHumans() : 'N/A';
+
+                    return [
+                        $t->id,
+                        $userName,
+                        $t->name,
+                        $lastUsed,
+                        $createdAt,
+                    ];
+                });
+
+                $this->table($tokenHeaders, $tokenRows);
+            } else {
+                $this->comment('No active Sanctum tokens in database.');
+            }
         }
 
         $this->info("\n[OK] Auth system is configured and ready.");
         return Command::SUCCESS;
-    }
-
-    public function handle(): int
-    {
-        return $this->meHandle();
     }
 }
