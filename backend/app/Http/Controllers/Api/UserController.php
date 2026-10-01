@@ -136,6 +136,25 @@ class UserController extends Controller
 
         if ($request->has('role')) {
             $user->syncRoles([$validated['role']]);
+            if (!$request->has('position')) {
+                $category = match ($validated['role']) {
+                    'it_publisher', 'it_admin' => 'admin',
+                    'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
+                    default => 'requestor',
+                };
+                if ($category === 'approver') {
+                    $user->position = match ($validated['role']) {
+                        'vice_president' => 'Vice President',
+                        'imc_qa_checker' => 'QA / Branding Checker',
+                        default => 'Department Head',
+                    };
+                } elseif ($category === 'admin') {
+                    $user->position = 'IT Administrator';
+                } else {
+                    $user->position = 'Staff / Faculty';
+                }
+                $user->save();
+            }
         }
 
         AuditLogService::log('USER_UPDATED', 'Updated institutional account: ' . $user->full_name, 'INFO', [
