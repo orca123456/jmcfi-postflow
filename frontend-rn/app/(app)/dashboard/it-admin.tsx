@@ -328,17 +328,31 @@ export default function ITAdminDashboard() {
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'it_admin';
   usePrefetchAllTabs(rawRole, isInitialLoading);
 
-  // Signal the HTML loading shell to fade out once real data arrives
+  // Signal the HTML loading shell to fade out instantly once real data arrives
   useEffect(() => {
     if (!isInitialLoading) {
-      // Small delay to allow prefetches to start firing before shell hides
-      const t = setTimeout(() => signalPostflowReady(), 200);
-      return () => clearTimeout(t);
+      signalPostflowReady();
     }
   }, [isInitialLoading]);
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+  const [rolesList, setRolesList] = useState<{ label: string, value: string }[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('this_month');
+  const [analyticsOverview, setAnalyticsOverview] = useState<any>({
+    totalVolume: '0',
+    avgVelocity: '0 hrs',
+    complianceRate: '0%',
+    activeUsers: '0',
+    departmentBreakdown: [],
+    platformStats: [],
+    contentPublished: '0',
+    pendingApproval: '0',
+    monthsData: [],
+    platformReach: { facebook: 0, instagram: 0, other: 0 }
+  });
   const [publishingPostId, setPublishingPostId] = useState<string | number | null>(null);
 
   const handleAction = (type: string, title: string) => {
@@ -520,8 +534,7 @@ export default function ITAdminDashboard() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
-  const [rolesList, setRolesList] = useState<{ label: string, value: string }[]>([]);
-  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+
   const [newUserRole, setNewUserRole] = useState('requestor');
   const [newUserDepartment, setNewUserDepartment] = useState('');
   const [newUserPosition, setNewUserPosition] = useState('');
@@ -1303,7 +1316,6 @@ export default function ITAdminDashboard() {
   ];
 
   // Analytics Period Filter State
-  const [analyticsPeriod, setAnalyticsPeriod] = useState('this_month');
   const [isAnalyticsPeriodOpen, setIsAnalyticsPeriodOpen] = useState(false);
 
   const handleSelectAnalyticsPeriod = (periodValue: string) => {
@@ -1321,7 +1333,7 @@ export default function ITAdminDashboard() {
   const [auditEventTypeFilter, setAuditEventTypeFilter] = useState('ALL');
   const [selectedAuditLog, setSelectedAuditLog] = useState<any | null>(null);
 
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
 
   const handleExportAuditLogs = async (logs: any[]) => {
     if (logs.length === 0) {
@@ -1388,18 +1400,7 @@ export default function ITAdminDashboard() {
   };
 
 
-  const [analyticsOverview, setAnalyticsOverview] = useState<any>({
-    totalVolume: '0',
-    avgVelocity: '0 hrs',
-    complianceRate: '0%',
-    activeUsers: '0',
-    departmentBreakdown: [],
-    platformStats: [],
-    contentPublished: '0',
-    pendingApproval: '0',
-    monthsData: [],
-    platformReach: { facebook: 0, instagram: 0, other: 0 }
-  });
+
 
   const handleCreateAccount = async () => {
     if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { showToast('Please fill in all required fields.', 'warning'); return; }

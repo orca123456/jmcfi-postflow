@@ -37,7 +37,7 @@ const SKELETON_CSS = `
       display: flex;
       background: #f1f5f9;
       z-index: 9999;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #postflow-shell.pf-hidden {
       opacity: 0;
@@ -195,12 +195,12 @@ const SKELETON_HTML = `
         if (dismissed) return;
         dismissed = true;
         s.classList.add('pf-hidden');
-        setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 400);
+        setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 180);
       }
       // PRIMARY: wait for React to fire 'postflow-ready' (dispatched when data loads)
       window.addEventListener('postflow-ready', dismiss, { once: true });
-      // FALLBACK: hide after 8 seconds max regardless
-      setTimeout(dismiss, 8000);
+      // FALLBACK: hide after 4 seconds max regardless
+      setTimeout(dismiss, 4000);
     })();
   </script>`;
 

@@ -546,11 +546,10 @@ export default function RequestorDashboard() {
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'requestor';
   usePrefetchAllTabs(rawRole, isInitialLoading);
 
-  // Signal the HTML loading shell to fade out once real data arrives
+  // Signal the HTML loading shell to fade out instantly once real data arrives
   useEffect(() => {
     if (!isInitialLoading) {
-      const t = setTimeout(() => signalPostflowReady(), 200);
-      return () => clearTimeout(t);
+      signalPostflowReady();
     }
   }, [isInitialLoading]);
 
