@@ -263,7 +263,7 @@ export default function ImcQaDashboard() {
       const depts = data.departments || [];
       setDepartmentOptions(['All Departments', ...depts]);
       setIsInitialLoading(false);
-      setTimeout(() => signalPostflowReady(), 200);
+      signalPostflowReady();
     }
   }, [initDataRes, user?.department, optimisticallyRemovedIds]);
 
