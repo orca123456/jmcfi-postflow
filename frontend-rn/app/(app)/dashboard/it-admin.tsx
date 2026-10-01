@@ -490,6 +490,33 @@ export default function ITAdminDashboard() {
         setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
       }
     }).catch(() => {});
+
+    // 5. Preload Social & AI Tokens for Tab [tokens] so it's 100% instant
+    tokenSettingsApi.get().then(res => {
+      const t = res.data?.tokens || {};
+      setSavedTokenFields(t);
+      setVerifiedConnections(res.data?.connections || {});
+      setTokenFields(prev => ({
+        ...prev,
+        facebook_page_id: t.facebook_page_id || '',
+        facebook_access_token: t.facebook_access_token || '',
+        instagram_business_account_id: t.instagram_business_account_id || '',
+        instagram_access_token: t.instagram_access_token || '',
+        wordpress_url: t.wordpress_url || '',
+        wordpress_username: t.wordpress_username || '',
+        wordpress_app_password: t.wordpress_app_password || '',
+      }));
+      setTokenLastUpdated(res.data?.last_updated || 'Never');
+    }).catch(() => {});
+
+    tokenSettingsApi.getAI().then(res => {
+      const data = res.data;
+      if (Platform.OS === 'web' && data) {
+        try {
+          localStorage.setItem('postflow_ai_settings_cache', JSON.stringify(data));
+        } catch (_) {}
+      }
+    }).catch(() => {});
   }, [isInitialLoading]);
 
   // Re-fetch analytics only if period explicitly changes

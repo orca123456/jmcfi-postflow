@@ -76,6 +76,12 @@ export function usePrefetchAllTabs(role: string | undefined, isInitialLoading: b
           queryFn: () => tokenSettingsApi.get(),
           staleTime: 5 * 60 * 1000,
         }),
+        // AI settings
+        queryClient.prefetchQuery({
+          queryKey: ['ai-settings-prefetch'],
+          queryFn: () => tokenSettingsApi.getAI(),
+          staleTime: 5 * 60 * 1000,
+        }),
         // Email settings tab
         queryClient.prefetchQuery({
           queryKey: ['email-settings-prefetch'],

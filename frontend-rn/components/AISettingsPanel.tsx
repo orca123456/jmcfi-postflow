@@ -38,13 +38,35 @@ function getProviderMeta(id: string) {
 
 type Props = { isVisible?: boolean };
 
+const getInitialSettings = (): Settings | null => {
+  if (Platform.OS === 'web') {
+    try {
+      const c = localStorage.getItem('postflow_ai_settings_cache');
+      if (c) {
+        const parsed = JSON.parse(c);
+        return {
+          ...parsed,
+          providers: Array.isArray(parsed?.providers) ? parsed.providers : [
+            { id: 'deepseek', name: 'DeepSeek' },
+            { id: 'openai', name: 'OpenAI' },
+            { id: 'gemini', name: 'Google Gemini' },
+            { id: 'groq', name: 'Groq' },
+            { id: 'openrouter', name: 'OpenRouter' },
+          ]
+        };
+      }
+    } catch (_) {}
+  }
+  return null;
+};
+
 export function AISettingsPanel({ isVisible = true }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 1024;
 
-  const [saved, setSaved] = useState<Settings | null>(null);
-  const [provider, setProvider] = useState('deepseek');
-  const [model, setModel] = useState('');
+  const [saved, setSaved] = useState<Settings | null>(getInitialSettings);
+  const [provider, setProvider] = useState(() => getInitialSettings()?.provider || 'deepseek');
+  const [model, setModel] = useState(() => getInitialSettings()?.model || '');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -67,6 +89,11 @@ export function AISettingsPanel({ isVisible = true }: Props) {
         { id: 'openrouter', name: 'OpenRouter' },
       ]
     };
+    if (Platform.OS === 'web') {
+      try {
+        localStorage.setItem('postflow_ai_settings_cache', JSON.stringify(sanitized));
+      } catch (_) {}
+    }
     setSaved(sanitized);
     setProvider(sanitized.provider || 'deepseek');
     setModel(sanitized.model || '');
@@ -75,42 +102,46 @@ export function AISettingsPanel({ isVisible = true }: Props) {
     setConfirmClear(false);
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent && !saved) {
+      setLoading(true);
+    }
     setError('');
     try {
       accept((await tokenSettingsApi.getAI()).data);
     } catch {
-      setError('Unable to load AI settings.');
+      if (!saved) {
+        setError('Unable to load AI settings.');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [saved]);
 
   // Initial load
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(true); }, [load]);
 
   // Re-load whenever the panel becomes visible (e.g. user switches to the Tokens tab)
-  // and the data hasn't successfully loaded yet.
+  // and silently revalidate if already loaded, or full load if not.
   const prevVisible = useRef(isVisible);
   useEffect(() => {
-    if (isVisible && !prevVisible.current && !saved) {
-      load();
+    if (isVisible && !prevVisible.current) {
+      load(true);
     }
     prevVisible.current = isVisible;
-  }, [isVisible, load, saved]);
+  }, [isVisible, load]);
 
   // On web: retry when the browser tab regains focus (handles page-level visibility)
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && isVisible && !saved) {
-        load();
+      if (document.visibilityState === 'visible' && isVisible) {
+        load(true);
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [isVisible, saved, load]);
+  }, [isVisible, load]);
 
   const save = async (clear = false) => {
     if (inFlight.current) return;
