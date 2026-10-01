@@ -17,6 +17,7 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
+import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { Card } from '../../../components/ui/Card';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { useAuthStore } from '../../../store/auth';
@@ -176,6 +177,10 @@ export default function ImcQaDashboard() {
     refetchIntervalInBackground: true,
   });
 
+  // Pre-fetch ALL tab data in parallel while skeleton is showing
+  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'imc_qa_checker';
+  usePrefetchAllTabs(rawRole, isInitLoading);
+
   useEffect(() => {
     if (initDataRes?.data) {
       const data = initDataRes.data;
@@ -258,7 +263,7 @@ export default function ImcQaDashboard() {
       const depts = data.departments || [];
       setDepartmentOptions(['All Departments', ...depts]);
       setIsInitialLoading(false);
-      signalPostflowReady();
+      setTimeout(() => signalPostflowReady(), 200);
     }
   }, [initDataRes, user?.department, optimisticallyRemovedIds]);
 

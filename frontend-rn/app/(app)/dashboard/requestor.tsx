@@ -29,6 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
+import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -541,10 +542,15 @@ export default function RequestorDashboard() {
 
   const isInitialLoading = isInitLoading;
 
+  // Pre-fetch ALL tab data in parallel while skeleton is showing
+  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'requestor';
+  usePrefetchAllTabs(rawRole, isInitialLoading);
+
   // Signal the HTML loading shell to fade out once real data arrives
   useEffect(() => {
     if (!isInitialLoading) {
-      signalPostflowReady();
+      const t = setTimeout(() => signalPostflowReady(), 200);
+      return () => clearTimeout(t);
     }
   }, [isInitialLoading]);
 
