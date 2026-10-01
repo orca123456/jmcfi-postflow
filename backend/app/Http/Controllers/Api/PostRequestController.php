@@ -160,18 +160,29 @@ class PostRequestController extends Controller
                     $this->workflowService->initializeWorkflow($post);
                 }
 
-                // Send notifications to approvers (safely)
-                if (!$request->is_draft) {
-                    $this->workflowService->notifyApprovers($post);
-                }
+                $postId = $post->id;
+                $isDraft = (bool) $request->is_draft;
+                $postTitle = $post->title;
+                $platforms = $post->target_platforms;
+                $workflowService = $this->workflowService;
 
-                AuditLogService::log(
-                    $request->is_draft ? 'CONTENT_DRAFT_CREATED' : 'CONTENT_SUBMITTED',
-                    ($request->is_draft ? 'Saved draft: ' : 'Submitted content request: ') . $post->title,
-                    'INFO',
-                    ['post_id' => $post->id, 'platforms' => $post->target_platforms],
-                    $request
-                );
+                app()->terminating(function () use ($workflowService, $postId, $isDraft, $postTitle, $platforms, $request) {
+                    try {
+                        $p = PostRequest::find($postId);
+                        if ($p && !$isDraft) {
+                            $workflowService->notifyApprovers($p);
+                        }
+                        AuditLogService::log(
+                            $isDraft ? 'CONTENT_DRAFT_CREATED' : 'CONTENT_SUBMITTED',
+                            ($isDraft ? 'Saved draft: ' : 'Submitted content request: ') . $postTitle,
+                            'INFO',
+                            ['post_id' => $postId, 'platforms' => $platforms],
+                            $request
+                        );
+                    } catch (\Throwable $e) {
+                        logger()->warning('Background store notifications/audit failed: ' . $e->getMessage());
+                    }
+                });
 
                 $this->clearDashboardCache();
 
@@ -342,27 +353,27 @@ class PostRequestController extends Controller
             ]);
 
             $this->workflowService->initializeWorkflow($postRequest);
-            $this->workflowService->notifyApprovers($postRequest);
-
             $this->clearDashboardCache();
 
-            AuditLogService::log('CONTENT_SUBMITTED', 'Submitted draft for approval: ' . $postRequest->title, 'INFO', [
-                'post_id' => $postRequest->id,
-                'platforms' => $postRequest->target_platforms,
-            ]);
-
-            // Run AI compliance check in background so submit returns instantly
-            // (The DeepSeek API call can take 5-30 seconds, which blocks the user)
             $aiService = $this->aiService;
+            $workflowService = $this->workflowService;
             $postId = $postRequest->id;
-            app()->terminating(function () use ($aiService, $postId) {
+            $postTitle = $postRequest->title;
+            $platforms = $postRequest->target_platforms;
+
+            app()->terminating(function () use ($aiService, $workflowService, $postId, $postTitle, $platforms) {
                 try {
                     $post = PostRequest::find($postId);
                     if ($post) {
+                        $workflowService->notifyApprovers($post);
                         $aiService->checkCompliance($post);
                     }
-                } catch (\Exception $e) {
-                    logger()->warning('Background AI compliance check failed: ' . $e->getMessage());
+                    AuditLogService::log('CONTENT_SUBMITTED', 'Submitted draft for approval: ' . $postTitle, 'INFO', [
+                        'post_id' => $postId,
+                        'platforms' => $platforms,
+                    ]);
+                } catch (\Throwable $e) {
+                    logger()->warning('Background submitForApproval tasks failed: ' . $e->getMessage());
                 }
             });
 
@@ -569,9 +580,21 @@ class PostRequestController extends Controller
                 ]);
             }
 
-            // Record audit trail
-            AuditLogService::log('CONTENT_REJECT', 'Rejected post: ' . $postRequest->title, 'WARNING', ['post_id' => $postRequest->id, 'reason' => $reason], $request);
-            $this->workflowService->notifyRequestor($postRequest, 'rejected', $reason);
+            $postId = $postRequest->id;
+            $postTitle = $postRequest->title;
+            $workflowService = $this->workflowService;
+
+            app()->terminating(function () use ($workflowService, $postId, $postTitle, $reason, $request) {
+                try {
+                    $p = PostRequest::find($postId);
+                    if ($p) {
+                        $workflowService->notifyRequestor($p, 'rejected', $reason);
+                    }
+                    AuditLogService::log('CONTENT_REJECT', 'Rejected post: ' . $postTitle, 'WARNING', ['post_id' => $postId, 'reason' => $reason], $request);
+                } catch (\Throwable $e) {
+                    logger()->warning('Background reject notifications/audit failed: ' . $e->getMessage());
+                }
+            });
 
             $this->clearDashboardCache();
 
@@ -626,9 +649,21 @@ class PostRequestController extends Controller
                 'revision_count' => $postRequest->revision_count + 1,
             ]);
 
-            // Record audit trail
-            AuditLogService::log('CONTENT_REVISION', 'Returned post for revision: ' . $postRequest->title, 'WARNING', ['post_id' => $postRequest->id, 'reason' => $reason], $request);
-            $this->workflowService->notifyRequestor($postRequest, 'returned_for_revision', $reason);
+            $postId = $postRequest->id;
+            $postTitle = $postRequest->title;
+            $workflowService = $this->workflowService;
+
+            app()->terminating(function () use ($workflowService, $postId, $postTitle, $reason, $request) {
+                try {
+                    $p = PostRequest::find($postId);
+                    if ($p) {
+                        $workflowService->notifyRequestor($p, 'returned_for_revision', $reason);
+                    }
+                    AuditLogService::log('CONTENT_REVISION', 'Returned post for revision: ' . $postTitle, 'WARNING', ['post_id' => $postId, 'reason' => $reason], $request);
+                } catch (\Throwable $e) {
+                    logger()->warning('Background returnForRevision notifications/audit failed: ' . $e->getMessage());
+                }
+            });
 
             $this->clearDashboardCache();
 

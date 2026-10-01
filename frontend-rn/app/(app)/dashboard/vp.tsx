@@ -283,17 +283,17 @@ export default function VPDashboard() {
 
   const handleApprove = async (req: any) => {
     setModalError(null);
+    const reqId = req.id;
+
+    // Instant optimistic update (0ms UI latency)
+    setRequestsList(prev => prev.filter(r => r.id !== reqId));
+    setOptimisticallyRemovedIds(prev => [...prev, reqId]);
+    setApprovedRequests(prev => [{ ...req, status: 'APPROVED' }, ...prev]);
+    setSelectedRequest(null);
 
     try {
-      await postsApi.approve(req.id, {});
-      setRequestsList(prev => prev.filter(r => r.id !== req.id));
-      setOptimisticallyRemovedIds(prev => [...prev, req.id]);
-      setApprovedRequests(prev => [{ ...req, status: 'APPROVED' }, ...prev]);
-      setSelectedRequest(null);
+      await postsApi.approve(reqId, {});
       loadData(false);
-      setTimeout(() => {
-        alert(`Request Approved: "${req.title}"`);
-      }, 100);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to approve request.');
       loadData(false);
@@ -313,22 +313,21 @@ export default function VPDashboard() {
     }
     setModalError(null);
 
-    const reqTitle = requestToReject?.title;
     const reqId = requestToReject?.id;
     const reason = rejectComment;
+    const targetReq = requestToReject;
+
+    // Instant optimistic update (0ms UI latency)
+    setRequestsList(prev => prev.filter(r => r.id !== reqId));
+    setOptimisticallyRemovedIds(prev => [...prev, reqId]);
+    if (targetReq) setRejectedRequests(prev => [{ ...targetReq, status: 'REJECTED' }, ...prev]);
+    setIsRejectModalVisible(false);
+    setRequestToReject(null);
+    setSelectedRequest(null);
 
     try {
       await postsApi.reject(reqId, { reason });
-      setRequestsList(prev => prev.filter(r => r.id !== reqId));
-      setOptimisticallyRemovedIds(prev => [...prev, reqId]);
-      if (requestToReject) setRejectedRequests(prev => [{ ...requestToReject, status: 'REJECTED' }, ...prev]);
-      setIsRejectModalVisible(false);
-      setRequestToReject(null);
-      setSelectedRequest(null);
       loadData(false);
-      setTimeout(() => {
-        alert(`Request Rejected: "${reqTitle}"\nReason: ${reason}`);
-      }, 100);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to reject request.');
       loadData(false);
@@ -336,14 +335,17 @@ export default function VPDashboard() {
   };
 
   const handleRequestRevision = async (req: any) => {
+    const reqId = req.id;
+
+    // Instant optimistic update (0ms UI latency)
+    setRequestsList(prev => prev.filter(r => r.id !== reqId));
+    setOptimisticallyRemovedIds(prev => [...prev, reqId]);
+    setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
+    setSelectedRequest(null);
+
     try {
-      await postsApi.returnRevision(req.id, { reason: 'Revision requested by Vice President' });
-      setRequestsList(prev => prev.filter(r => r.id !== req.id));
-      setOptimisticallyRemovedIds(prev => [...prev, req.id]);
-      setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
-      setSelectedRequest(null);
+      await postsApi.returnRevision(reqId, { reason: 'Revision requested by Vice President' });
       loadData(false);
-      alert(`Revision Requested for: "${req.title}"`);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to return for revision.');
       loadData(false);
