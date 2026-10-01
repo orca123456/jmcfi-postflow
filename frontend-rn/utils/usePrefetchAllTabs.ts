@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   dashboardApi,
@@ -49,13 +50,40 @@ export function usePrefetchAllTabs(role: string | undefined, isInitialLoading: b
         // User Management tab
         queryClient.prefetchQuery({
           queryKey: ['users-prefetch'],
-          queryFn: () => usersApi.list(),
+          queryFn: async () => {
+            const res = await usersApi.list();
+            const raw = res.data?.data;
+            if (raw && Array.isArray(raw)) {
+              const mappedUsers = raw.map((u: any) => ({
+                ...u,
+                role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+                created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+              }));
+              if (Platform.OS === 'web' && mappedUsers.length > 0) {
+                try {
+                  localStorage.setItem('postflow_users_cache', JSON.stringify(mappedUsers));
+                } catch (_) {}
+              }
+            }
+            return res;
+          },
           staleTime: 5 * 60 * 1000,
         }),
         // Departments
         queryClient.prefetchQuery({
           queryKey: ['departments-prefetch'],
-          queryFn: () => departmentsApi.list(),
+          queryFn: async () => {
+            const res = await departmentsApi.list();
+            const fetchedDepts = res.data?.data;
+            if (fetchedDepts && Array.isArray(fetchedDepts)) {
+              if (Platform.OS === 'web' && fetchedDepts.length > 0) {
+                try {
+                  localStorage.setItem('postflow_departments_cache', JSON.stringify(fetchedDepts));
+                } catch (_) {}
+              }
+            }
+            return res;
+          },
           staleTime: 5 * 60 * 1000,
         }),
         // Analytics tab

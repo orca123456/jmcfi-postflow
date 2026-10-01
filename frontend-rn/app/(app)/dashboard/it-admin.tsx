@@ -194,6 +194,36 @@ const ANALYTICS_PERIOD_OPTIONS = [
   { value: 'all_time', label: 'All Time' },
 ];
 
+const getInitialUsers = (): any[] => {
+  if (Platform.OS === 'web') {
+    try {
+      const c = localStorage.getItem('postflow_users_cache');
+      if (c) return JSON.parse(c);
+    } catch (_) {}
+  }
+  return [];
+};
+
+const getInitialDepartments = (): any[] => {
+  if (Platform.OS === 'web') {
+    try {
+      const c = localStorage.getItem('postflow_departments_cache');
+      if (c) return JSON.parse(c);
+    } catch (_) {}
+  }
+  return [];
+};
+
+const getInitialAuditLogs = (): any[] => {
+  if (Platform.OS === 'web') {
+    try {
+      const c = localStorage.getItem('postflow_audit_logs_cache');
+      if (c) return JSON.parse(c);
+    } catch (_) {}
+  }
+  return [];
+};
+
 export default function ITAdminDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -335,10 +365,10 @@ export default function ITAdminDashboard() {
   }, [isInitialLoading]);
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
-  const [rolesList, setRolesList] = useState<{ label: string, value: string }[]>([]);
+  const [users, setUsers] = useState<any[]>(getInitialUsers);
+  const [auditLogs, setAuditLogs] = useState<any[]>(getInitialAuditLogs);
+  const [departmentsList, setDepartmentsList] = useState<any[]>(getInitialDepartments);
+  const [rolesList, setRolesList] = useState<{ label: string, value: string }[]>(ROLE_CATEGORIES);
   const [analyticsPeriod, setAnalyticsPeriod] = useState('this_month');
   const [analyticsOverview, setAnalyticsOverview] = useState<any>({
     totalVolume: '0',
@@ -442,17 +472,15 @@ export default function ITAdminDashboard() {
   }
 
   // ── Lazy Loader State ──
-  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(() => getInitialUsers().length > 0);
   const [overviewLoaded, setOverviewLoaded] = useState(false);
-  const [auditLoaded, setAuditLoaded] = useState(false);
+  const [auditLoaded, setAuditLoaded] = useState(() => getInitialAuditLogs().length > 0);
   const [auditLoading, setAuditLoading] = useState(false);
 
   // ── Pre-populate ALL modules on initial load ──
-  // When admin logs in or reloads, all tabs (users, audit logs, analytics, depts)
+  // When admin logs in or reloads, all tabs (users, audit logs, analytics, depts, tokens)
   // are fetched and populated into memory in parallel so visiting other tabs never shows loading!
   useEffect(() => {
-    if (isInitialLoading) return;
-
     // 1. Analytics
     dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
       if (res.data?.data) {
@@ -466,28 +494,44 @@ export default function ITAdminDashboard() {
       if (res.data?.data) {
         setAuditLogs(res.data.data);
         setAuditLoaded(true);
+        if (Platform.OS === 'web' && res.data.data.length > 0) {
+          try {
+            localStorage.setItem('postflow_audit_logs_cache', JSON.stringify(res.data.data));
+          } catch (_) {}
+        }
       }
     }).catch(() => {});
 
     // 3. User Management
     usersApi.list().then(res => {
       const raw = res.data?.data;
-      const mappedUsers = (raw || []).map((u: any) => ({
-        ...u,
-        role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
-        created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-      }));
-      setUsers(mappedUsers);
-      setUsersLoaded(true);
+      if (raw && Array.isArray(raw)) {
+        const mappedUsers = raw.map((u: any) => ({
+          ...u,
+          role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+          created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+        }));
+        setUsers(mappedUsers);
+        setUsersLoaded(true);
+        if (Platform.OS === 'web') {
+          try {
+            localStorage.setItem('postflow_users_cache', JSON.stringify(mappedUsers));
+          } catch (_) {}
+        }
+      }
     }).catch(() => {});
 
     // 4. Roles & Departments
-    setRolesList(ROLE_CATEGORIES);
-    setNewUserRole('requestor');
     departmentsApi.list().then(res => {
       const fetchedDepts = res.data?.data;
       if (fetchedDepts && fetchedDepts.length > 0) {
-        setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
+        const mapped = fetchedDepts.map((d: any) => ({ ...d }));
+        setDepartmentsList(mapped);
+        if (Platform.OS === 'web') {
+          try {
+            localStorage.setItem('postflow_departments_cache', JSON.stringify(mapped));
+          } catch (_) {}
+        }
       }
     }).catch(() => {});
 
@@ -517,7 +561,29 @@ export default function ITAdminDashboard() {
         } catch (_) {}
       }
     }).catch(() => {});
-  }, [isInitialLoading]);
+  }, []);
+
+  // Background silent revalidation on visiting user-management tab
+  useEffect(() => {
+    if (activeTab === 'user-management') {
+      usersApi.list().then(res => {
+        const raw = res.data?.data;
+        if (raw && Array.isArray(raw)) {
+          const mappedUsers = raw.map((u: any) => ({
+            ...u,
+            role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+            created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+          }));
+          setUsers(mappedUsers);
+          if (Platform.OS === 'web') {
+            try {
+              localStorage.setItem('postflow_users_cache', JSON.stringify(mappedUsers));
+            } catch (_) {}
+          }
+        }
+      }).catch(() => {});
+    }
+  }, [activeTab]);
 
   // Re-fetch analytics only if period explicitly changes
   useEffect(() => {
@@ -636,7 +702,13 @@ export default function ITAdminDashboard() {
         const categories = ['requestor', 'approver'];
         await departmentsApi.create({ name: val, display_name: deptName, role_categories: categories });
         const res = await departmentsApi.listFresh();
-        setDepartmentsList(res.data?.data || []);
+        const updatedDepts = res.data?.data || [];
+        setDepartmentsList(updatedDepts);
+        if (Platform.OS === 'web') {
+          try {
+            localStorage.setItem('postflow_departments_cache', JSON.stringify(updatedDepts));
+          } catch (_) {}
+        }
         setNewUserDepartment(deptName);
         showToast(`Department added to ${newUserRole}.`, 'success');
       } catch (e: any) {
@@ -660,6 +732,11 @@ export default function ITAdminDashboard() {
       const res = await departmentsApi.listFresh();
       const fresh = res.data?.data || [];
       setDepartmentsList(fresh);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_departments_cache', JSON.stringify(fresh));
+        } catch (_) {}
+      }
       const visible = departmentsForRole(newUserRole, fresh);
       if (visible.length > 0) {
         setNewUserDepartment(visible[0].display_name);
@@ -690,7 +767,13 @@ export default function ITAdminDashboard() {
             return next;
           });
           const res = await departmentsApi.listFresh();
-          setDepartmentsList(res.data?.data || []);
+          const fresh = res.data?.data || [];
+          setDepartmentsList(fresh);
+          if (Platform.OS === 'web') {
+            try {
+              localStorage.setItem('postflow_departments_cache', JSON.stringify(fresh));
+            } catch (_) {}
+          }
           showToast('Department logo uploaded successfully.', 'success');
         } catch (e: any) {
           showToast('Failed to upload department logo.', 'error');
@@ -707,11 +790,17 @@ export default function ITAdminDashboard() {
     try {
       await departmentsApi.delete(deptId);
       const res = await departmentsApi.listFresh();
-      setDepartmentsList(res.data?.data || []);
+      const fresh = res.data?.data || [];
+      setDepartmentsList(fresh);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_departments_cache', JSON.stringify(fresh));
+        } catch (_) {}
+      }
       
       // Update form default if the currently selected one was deleted
-      if (res.data?.data?.length > 0) {
-        setNewUserDepartment(res.data.data[0].display_name);
+      if (fresh.length > 0) {
+        setNewUserDepartment(fresh[0].display_name);
       } else {
         setNewUserDepartment('');
       }
@@ -1432,7 +1521,13 @@ export default function ITAdminDashboard() {
         role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
         created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
       };
-      setUsers([newAccount, ...users]);
+      const updatedUsers = [newAccount, ...users];
+      setUsers(updatedUsers);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_users_cache', JSON.stringify(updatedUsers));
+        } catch (_) {}
+      }
       setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
       showToast('Institutional account created successfully!', 'success');
     } catch (e: any) {
@@ -1450,7 +1545,13 @@ export default function ITAdminDashboard() {
     const id = confirmDeleteUserId;
     try {
       await usersApi.delete(id);
-      setUsers(users.filter(u => String(u.id) !== String(id)));
+      const updated = users.filter(u => String(u.id) !== String(id));
+      setUsers(updated);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_users_cache', JSON.stringify(updated));
+        } catch (_) {}
+      }
     } catch (e: any) {
       showToast('Failed to delete user: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
@@ -1466,7 +1567,13 @@ export default function ITAdminDashboard() {
         ? editingUserOriginalRole
         : granularRoleFor(editingUserRole, editingUserDept);
       await usersApi.update(id, { role: roleToSend });
-      setUsers(users.map(u => u.id === id ? { ...u, role: roleToSend } : u));
+      const updated = users.map(u => u.id === id ? { ...u, role: roleToSend } : u);
+      setUsers(updated);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_users_cache', JSON.stringify(updated));
+        } catch (_) {}
+      }
       setEditingUserId(null);
       showToast('User role updated successfully!', 'success');
     } catch (e: any) {
@@ -1534,7 +1641,7 @@ export default function ITAdminDashboard() {
       const res = await usersApi.update(selectedUser.id, payload);
       const updatedUser = res.data.data;
       // Refresh user list in-place
-      setUsers(users.map(u => String(u.id) === String(selectedUser.id) ? {
+      const updatedList = users.map(u => String(u.id) === String(selectedUser.id) ? {
         ...u,
         first_name: updatedUser.first_name,
         last_name: updatedUser.last_name,
@@ -1543,7 +1650,13 @@ export default function ITAdminDashboard() {
         role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
         status: updatedUser.status,
         photo_url: updatedUser.photo_url,
-      } : u));
+      } : u);
+      setUsers(updatedList);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_users_cache', JSON.stringify(updatedList));
+        } catch (_) {}
+      }
       showToast('Profile updated successfully!', 'success');
 
       // If the edited user is the currently logged-in user, sync global state
@@ -1595,7 +1708,16 @@ export default function ITAdminDashboard() {
     }
   };
 
-  const filteredUsers = users.filter(u => u.email.toLowerCase().includes(userFilter.toLowerCase()));
+  const filteredUsers = React.useMemo(() => {
+    const q = (userFilter || '').trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(u =>
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.first_name || '').toLowerCase().includes(q) ||
+      (u.last_name || '').toLowerCase().includes(q) ||
+      (u.department || '').toLowerCase().includes(q)
+    );
+  }, [users, userFilter]);
   const postsToShow = statusFilter === 'all' ? allMockPosts : allMockPosts.filter(p => p.status === statusFilter);
 
   const filteredTablePosts = mockTablePosts.filter((post) => {
