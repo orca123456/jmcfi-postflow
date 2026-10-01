@@ -15,7 +15,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
-import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
@@ -122,12 +121,10 @@ export default function OfficeHeadDashboard() {
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'office_head';
   usePrefetchAllTabs(rawRole, isInitialLoading);
 
-  // Signal the HTML loading shell to fade out instantly once real data arrives
+  // Signal the HTML loading shell to fade out into real content
   useEffect(() => {
-    if (!isInitialLoading) {
-      signalPostflowReady();
-    }
-  }, [isInitialLoading]);
+    signalPostflowReady();
+  }, []);
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -464,11 +461,8 @@ export default function OfficeHeadDashboard() {
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       userPhotoUrl={profilePhotoUrl}
     >
-      {/* ── LOADING SKELETON ── */}
-      {isInitialLoading && <DashboardSkeleton />}
-
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && !isInitialLoading && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
@@ -778,12 +772,12 @@ export default function OfficeHeadDashboard() {
       )}
 
       {/* ----------------- POLICY RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && !isInitialLoading && (
+      {activeTab === 'policy-rules' && (
         <PolicyRulesView accentColor="#D97706" />
       )}
 
       {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && !isInitialLoading && (
+      {activeTab === 'account-settings' && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>

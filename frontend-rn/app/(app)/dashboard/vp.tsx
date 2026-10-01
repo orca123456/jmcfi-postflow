@@ -15,7 +15,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
-import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
@@ -210,6 +209,10 @@ export default function VPDashboard() {
       signalPostflowReady();
     }
   }, [initDataRes, user?.department, optimisticallyRemovedIds]);
+
+  useEffect(() => {
+    signalPostflowReady();
+  }, []);
 
   const loadData = (showLoading = true) => {
     refetchInitData();
@@ -409,11 +412,8 @@ export default function VPDashboard() {
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       userPhotoUrl={profilePhotoUrl}
     >
-      {/* ── LOADING SKELETON ── */}
-      {isInitialLoading && <DashboardSkeleton />}
-
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && !isInitialLoading && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting and Department Filter */}
           {activeTab === 'dashboard' && (
@@ -715,12 +715,12 @@ export default function VPDashboard() {
       )}
 
       {/* ----------------- POLICY RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && !isInitialLoading && (
+      {activeTab === 'policy-rules' && (
         <PolicyRulesView accentColor="#7C3AED" />
       )}
 
       {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && !isInitialLoading && (
+      {activeTab === 'account-settings' && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>

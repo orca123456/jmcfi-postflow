@@ -7,6 +7,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleDashboardPath } from '../../store/auth';
+import { signalPostflowReady } from '../../utils/postflowReady';
 
 // ── Floating Label Input Component (Facebook Style) ───────────────
 interface FloatingLabelProps extends TextInputProps {
@@ -112,6 +113,9 @@ FloatingLabelInput.displayName = 'FloatingLabelInput';
 // ─────────────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
+  useEffect(() => {
+    signalPostflowReady();
+  }, []);
   const router = useRouter();
   const { login, error, clearError, lockUntil, setLockUntil } = useAuthStore();
   const [email, setEmail] = useState('');

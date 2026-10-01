@@ -25,7 +25,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
-import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
@@ -357,12 +356,10 @@ export default function ITAdminDashboard() {
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'it_admin';
   usePrefetchAllTabs(rawRole, isInitialLoading);
 
-  // Signal the HTML loading shell to fade out instantly once real data arrives
+  // Signal the HTML loading shell to fade out into real dashboard content
   useEffect(() => {
-    if (!isInitialLoading) {
-      signalPostflowReady();
-    }
-  }, [isInitialLoading]);
+    signalPostflowReady();
+  }, []);
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>(getInitialUsers);
@@ -1808,17 +1805,8 @@ export default function ITAdminDashboard() {
 
       {/* GLOBAL TOAST NOTIFICATION DELETED - NOW USING GLOBAL ALERT MODAL */}
 
-      {/* ── LOADING SKELETON ──
-        The overview only needs the react-query init fetch (isLoading), while
-        the other tabs wait for their background data (isInitialLoading). */}
-      {isInitialLoading && (
-        <DashboardSkeleton />
-      )}
-
-      {/* ── OVERVIEW TAB ──
-        Renders as soon as the essential init data arrives (isLoading), without
-        waiting for the 5 background tab-requests on the single-threaded server. */}
-      {activeTab === 'overview' && !isInitialLoading && (
+      {/* ── OVERVIEW TAB ── */}
+      {activeTab === 'overview' && (
         <>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 24, justifyContent: 'space-between', width: '100%' }}>
             {/* Stat Card 1: TOTAL CONTENT */}
@@ -2208,7 +2196,7 @@ export default function ITAdminDashboard() {
       )}
 
       {/* ── USER MANAGEMENT TAB ── */}
-      {activeTab === 'user-management' && !isInitialLoading && (
+      {activeTab === 'user-management' && (
         <View style={styles.userTabContainer}>
           <Card style={styles.userCard}>
             <Text style={styles.sectionHeader}>Create New Institutional Account</Text>
@@ -2660,7 +2648,7 @@ export default function ITAdminDashboard() {
         </View>
       )}
 
-      {activeTab === 'tokens' && !isInitialLoading && (
+      {activeTab === 'tokens' && (
         (() => {
           const platformCards = [
             {
@@ -2836,7 +2824,7 @@ export default function ITAdminDashboard() {
       )}
 
       {/* ── EMAIL SETTINGS TAB ── */}
-      {activeTab === 'developer-api' && !isInitialLoading && (
+      {activeTab === 'developer-api' && (
         <View style={{ gap: 20 }}>
           <Card style={styles.userCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -3044,7 +3032,7 @@ $response = curl_exec($ch);`}
         </View>
       )}
 
-      {activeTab === 'email-settings' && !isInitialLoading && (
+      {activeTab === 'email-settings' && (
         <View style={styles.emailPage}>
           <Card style={[styles.emailHeroCard, { flexWrap: 'wrap' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, flex: 1, minWidth: 280 }}>
@@ -3837,7 +3825,7 @@ $response = curl_exec($ch);`}
       </Modal>
 
       {/* ── POLICY RULES TAB ── */}
-      {activeTab === 'policy-rules' && !isInitialLoading && (
+      {activeTab === 'policy-rules' && (
         <View style={styles.policyRulesContainer}>
           {/* Header Row */}
           <View style={styles.policyHeaderRow}>
@@ -4095,7 +4083,7 @@ $response = curl_exec($ch);`}
       )}
 
       {/* ── ACCOUNT SETTINGS TAB ── */}
-      {activeTab === 'account-settings' && !isInitialLoading && (
+      {activeTab === 'account-settings' && (
         <View style={styles.settingsContainer}>
           <View style={styles.settingsHeaderContainer}>
             <Text style={styles.settingsBreadcrumb}>SETTINGS &gt; ACCOUNT SETTINGS</Text>
@@ -4200,7 +4188,7 @@ $response = curl_exec($ch);`}
       )}
 
       {/* ── ANALYTICS TAB ── */}
-      {activeTab === 'analytics' && !isInitialLoading && (() => {
+      {activeTab === 'analytics' && (() => {
         // Fallback calculations directly from active post state
         const totalVolumeNumber = Math.max(
           Number(String(analyticsOverview?.totalVolume || '0').replace(/,/g, '')) || 0,
@@ -4530,7 +4518,7 @@ $response = curl_exec($ch);`}
       })()}
 
       {/* ── AUDIT LOGS TAB ── */}
-      {activeTab === 'audit-logs' && !isInitialLoading && (() => {
+      {activeTab === 'audit-logs' && (() => {
         const filteredLogs = auditLogs.filter((log) => {
           const matchesQuery =
             (log.userName || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||

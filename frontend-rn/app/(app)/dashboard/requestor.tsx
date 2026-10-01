@@ -26,7 +26,6 @@ import { Toast } from '../../../components/ui/Toast';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, authApi, dashboardApi, categoriesApi } from '../../../services/api';
 import { useQuery } from '@tanstack/react-query';
-import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
@@ -546,12 +545,10 @@ export default function RequestorDashboard() {
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'requestor';
   usePrefetchAllTabs(rawRole, isInitialLoading);
 
-  // Signal the HTML loading shell to fade out instantly once real data arrives
+  // Signal the HTML loading shell to fade out into real content
   useEffect(() => {
-    if (!isInitialLoading) {
-      signalPostflowReady();
-    }
-  }, [isInitialLoading]);
+    signalPostflowReady();
+  }, []);
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -950,11 +947,8 @@ export default function RequestorDashboard() {
       userPhotoUrl={profilePhotoUrl}
     >
       <Toast visible={toastVisible} message={toastMessage} type={toastType} onHide={() => setToastVisible(false)} />
-      {/* ── LOADING SKELETON ── */}
-      {isInitialLoading && <DashboardSkeleton />}
-
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
-      {activeTab === 'dashboard' && !isInitialLoading && (
+      {activeTab === 'dashboard' && (
         <View style={styles.dashboardContainer}>
           <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
             <View>
@@ -1157,7 +1151,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- CREATE NEW REQUEST TAB ----------------- */}
-      {(activeTab === 'post-requests' || activeTab === 'request') && !isInitialLoading && (
+      {(activeTab === 'post-requests' || activeTab === 'request') && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
             <View style={styles.breadcrumbColumn}>
@@ -1859,7 +1853,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- APPROVAL QUEUE TAB ----------------- */}
-      {activeTab === 'approval-queue' && !isInitialLoading && (
+      {activeTab === 'approval-queue' && (
         <View style={styles.dashboardContainer}>
           <View style={styles.titleSection}>
             <Text style={styles.welcomeTitle}>Content Approval Tracking Queue</Text>
@@ -1925,7 +1919,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && !isInitialLoading && (
+      {activeTab === 'account-settings' && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
             <View style={styles.breadcrumbColumn}>
@@ -2028,12 +2022,12 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- POLICY & RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && !isInitialLoading && (
+      {activeTab === 'policy-rules' && (
         <PolicyRulesView accentColor="#0B2545" />
       )}
 
       {/* ----------------- DRAFTS TAB ----------------- */}
-      {(activeTab === 'draft' || activeTab === 'drafts') && !isInitialLoading && (
+      {(activeTab === 'draft' || activeTab === 'drafts') && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View style={{ flex: 1, maxWidth: '100%' }}>
@@ -2116,7 +2110,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* ----------------- REJECTED TAB ----------------- */}
-      {(activeTab === 'rejected' || activeTab === 'rejected-requests') && !isInitialLoading && (
+      {(activeTab === 'rejected' || activeTab === 'rejected-requests') && (
         <View style={styles.dashboardContainer}>
           <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
             <View style={[styles.tableHeaderArea, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
@@ -2276,7 +2270,7 @@ export default function RequestorDashboard() {
       )}
 
       {/* Other Placeholder tabs */}
-      {activeTab !== 'dashboard' && activeTab !== 'request' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'draft' && activeTab !== 'drafts' && activeTab !== 'rejected' && activeTab !== 'rejected-requests' && !isInitialLoading && (
+      {activeTab !== 'dashboard' && activeTab !== 'request' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'draft' && activeTab !== 'drafts' && activeTab !== 'rejected' && activeTab !== 'rejected-requests' && (
         <Card style={styles.formCard}>
           <Text style={styles.cardTitle}>{(activeTab as string).replace(/-/g, ' ').toUpperCase()}</Text>
           <Text style={styles.mainPageSubtitle}>This section is currently under development.</Text>
