@@ -3,7 +3,20 @@ import { Stack, usePathname, useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Data stays "fresh" for 5 minutes — no background refetch on tab focus
+      staleTime: 5 * 60 * 1000,
+      // Keep unused query data in memory for 10 minutes
+      gcTime: 10 * 60 * 1000,
+      // Don't refetch on window focus (reduces API spam when switching tabs)
+      refetchOnWindowFocus: false,
+      // Retry once on failure (default 3 is too aggressive for mobile)
+      retry: 1,
+    },
+  },
+});
 
 // All dashboard routes that exist in the app
 const ALL_DASHBOARDS = [

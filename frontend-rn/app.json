@@ -11,7 +11,8 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/jmc_logo.png"
+      "favicon": "./assets/images/jmc_logo.png",
+      "htmlTemplate": "./web/index.html"
     },
     "plugins": [
       "expo-router",
