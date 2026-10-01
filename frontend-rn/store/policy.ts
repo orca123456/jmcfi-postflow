@@ -165,7 +165,10 @@ export const usePolicyStore = create<PolicyStore>((set) => ({
     // Then attempt API fetch
     try {
       const response = await policyApi.get();
-      const { effective_date, last_updated, sections } = response.data;
+      const payload = response.data?.data || response.data || {};
+      const effective_date = payload.effective_date || 'Jun 26, 2026';
+      const last_updated = payload.last_updated || 'July 15, 2026';
+      const sections = Array.isArray(payload.sections) && payload.sections.length > 0 ? payload.sections : DEFAULT_SECTIONS;
       
       // Save to cache
       await storage.set('policy_sections', JSON.stringify(sections));
@@ -180,7 +183,7 @@ export const usePolicyStore = create<PolicyStore>((set) => ({
       });
     } catch (err: any) {
       console.log('Failed to fetch policy from API, using cached/default state');
-      set({ isLoading: false });
+      set({ isLoading: false, policySections: DEFAULT_SECTIONS });
     }
   },
 
