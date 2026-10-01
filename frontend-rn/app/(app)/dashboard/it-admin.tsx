@@ -180,8 +180,9 @@ const autoPositionFor = (category: string, department: string): string => {
   if (category === 'approver') {
     if (isImcDepartment(department)) return 'QA / Branding Checker';
     if (department === 'Office of the President' || isVicePresidentDepartment(department)) return 'Vice President';
-    return 'Requestor';
+    return 'Department Head';
   }
+  if (category === 'requestor') return 'Staff / Faculty';
   return '';
 };
 
@@ -1618,7 +1619,7 @@ export default function ITAdminDashboard() {
       };
       if (profileMiddleName) payload.middle_name = profileMiddleName;
       if (profilePhone) payload.phone = profilePhone;
-      if (profilePosition) payload.position = profilePosition;
+      payload.position = autoPositionFor(profileRole, profileDepartment);
 
       if (profilePassword) {
         if (profilePassword.length < 8) {
@@ -2529,7 +2530,7 @@ export default function ITAdminDashboard() {
                           </View>
                         </View>
                         <View style={styles.wideFieldRow}>
-                          <View style={styles.wideFieldHalf}>
+                          <View style={styles.wideFieldFull}>
                             <Text style={styles.wideFieldLabel}>Department</Text>
                             <select
                               value={profileDepartment}
@@ -2538,10 +2539,6 @@ export default function ITAdminDashboard() {
                             >
                               {profileFilteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                             </select>
-                          </View>
-                          <View style={styles.wideFieldHalf}>
-                            <Text style={styles.wideFieldLabel}>Position</Text>
-                            <TextInput style={styles.wideFieldInput} value={profilePosition} onChangeText={setProfilePosition} placeholder="(Optional)" />
                           </View>
                         </View>
                       </View>
