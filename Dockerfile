@@ -8,7 +8,7 @@ COPY frontend-rn/package*.json ./
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci
 COPY frontend-rn/ ./
-RUN npx expo export -p web
+RUN npx expo export -p web && node inject-shell.js
 
 # ==========================================
 # STAGE 2: Setup FrankenPHP and Laravel
