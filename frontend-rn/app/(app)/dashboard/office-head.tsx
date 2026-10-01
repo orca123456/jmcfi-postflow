@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
+import { signalPostflowReady } from '../../../utils/postflowReady';
 import { Card } from '../../../components/ui/Card';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { useAuthStore } from '../../../store/auth';
@@ -115,6 +116,13 @@ export default function OfficeHeadDashboard() {
   });
 
   const isInitialLoading = isInitLoading;
+
+  // Signal the HTML loading shell to fade out once real data arrives
+  useEffect(() => {
+    if (!isInitialLoading) {
+      signalPostflowReady();
+    }
+  }, [isInitialLoading]);
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
