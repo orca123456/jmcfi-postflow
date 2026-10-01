@@ -86,7 +86,15 @@ export default function OfficeHeadDashboard() {
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
-  const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [requestsList, setRequestsList] = useState<any[]>(() => {
+    if (Platform.OS === 'web') {
+      try {
+        const cached = localStorage.getItem('postflow_cached_oh_requests');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({
@@ -274,9 +282,16 @@ export default function OfficeHeadDashboard() {
           approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
         }
 
-        setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status) && !optimisticallyRemovedIds.includes(p.id)));
+        const pending = mapped.filter((p: any) => pendingStatuses.includes(p.status) && !optimisticallyRemovedIds.includes(p.id));
+        setRequestsList(pending);
         setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
         setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+
+        if (Platform.OS === 'web') {
+          try {
+            localStorage.setItem('postflow_cached_oh_requests', JSON.stringify(pending));
+          } catch (e) {}
+        }
       }
 
       const statsData = data.stats || {};
