@@ -289,16 +289,15 @@ export default function ITAdminDashboard() {
   };
 
   useEffect(() => {
-    if (user && activeTab === 'developer-api') {
+    if (user) {
       fetchApiTokens();
     }
-  }, [user, activeTab]);
+  }, [user]);
 
   const [isEditingPolicyMode, setIsEditingPolicyMode] = useState(false);
 
   useEffect(() => { 
-    const timer = setTimeout(() => fetchPolicy(), 7000);
-    return () => clearTimeout(timer);
+    fetchPolicy();
   }, []);
   useEffect(() => {
     if (policySections) setEditableSections(JSON.parse(JSON.stringify(policySections)));
@@ -448,86 +447,59 @@ export default function ITAdminDashboard() {
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [auditLoading, setAuditLoading] = useState(false);
 
-  // ── Master data loader: use prefetch cache first, fall back to API ──
+  // ── Pre-populate ALL modules on initial load ──
+  // When admin logs in or reloads, all tabs (users, audit logs, analytics, depts)
+  // are fetched and populated into memory in parallel so visiting other tabs never shows loading!
   useEffect(() => {
     if (isInitialLoading) return;
 
-    if (activeTab === 'overview' || activeTab === 'analytics') {
-      // Use prefetch cache — only re-fetch if cache miss
-      const cached = queryClient.getQueryData(['analytics-overview', analyticsPeriod]);
-      if (cached) {
-        const d = cached as any;
-        if (d?.data?.data) setAnalyticsOverview(d.data.data);
-      } else {
-        dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
-          if (res.data?.data) setAnalyticsOverview(res.data.data);
-        }).catch(() => {});
+    // 1. Analytics
+    dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
+      if (res.data?.data) {
+        setAnalyticsOverview(res.data.data);
+        setOverviewLoaded(true);
       }
-    }
+    }).catch(() => {});
 
-    if (activeTab === 'audit-logs' && !auditLoaded) {
-      setAuditLoaded(true);
-      // Check prefetch cache first
-      const cached = queryClient.getQueryData(['audit-logs-prefetch']);
-      if (cached) {
-        const d = cached as any;
-        if (d?.data?.data) { setAuditLogs(d.data.data); return; }
+    // 2. Audit Logs
+    auditLogsApi.list({ per_page: 100 }).then(res => {
+      if (res.data?.data) {
+        setAuditLogs(res.data.data);
+        setAuditLoaded(true);
       }
-      setAuditLoading(true);
-      auditLogsApi.list({ per_page: 100 }).then(res => {
-        if (res.data?.data) setAuditLogs(res.data.data);
-      }).catch(() => {
-        showToast('Failed to load activity records.', 'error');
-      }).finally(() => setAuditLoading(false));
-    }
+    }).catch(() => {});
 
-    if (activeTab === 'user-management' && !usersLoaded) {
+    // 3. User Management
+    usersApi.list().then(res => {
+      const raw = res.data?.data;
+      const mappedUsers = (raw || []).map((u: any) => ({
+        ...u,
+        role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+        created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+      }));
+      setUsers(mappedUsers);
       setUsersLoaded(true);
+    }).catch(() => {});
 
-      // Check prefetch cache first for users
-      const cachedUsers = queryClient.getQueryData(['users-prefetch']);
-      if (cachedUsers) {
-        const raw = (cachedUsers as any)?.data?.data;
-        if (raw) {
-          const mappedUsers = raw.map((u: any) => ({
-            ...u,
-            role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
-            created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-          }));
-          setUsers(mappedUsers);
-        }
-      } else {
-        usersApi.list().then(res => {
-          const raw = res.data?.data;
-          const mappedUsers = (raw || []).map((u: any) => ({
-            ...u,
-            role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
-            created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-          }));
-          setUsers(mappedUsers);
-        }).catch(() => {});
+    // 4. Roles & Departments
+    setRolesList(ROLE_CATEGORIES);
+    setNewUserRole('requestor');
+    departmentsApi.list().then(res => {
+      const fetchedDepts = res.data?.data;
+      if (fetchedDepts && fetchedDepts.length > 0) {
+        setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
       }
+    }).catch(() => {});
+  }, [isInitialLoading]);
 
-      setRolesList(ROLE_CATEGORIES);
-      setNewUserRole('requestor');
-
-      // Check prefetch cache for departments
-      const cachedDepts = queryClient.getQueryData(['departments-prefetch']);
-      if (cachedDepts) {
-        const fetchedDepts = (cachedDepts as any)?.data?.data;
-        if (fetchedDepts && fetchedDepts.length > 0) {
-          setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
-        }
-      } else {
-        departmentsApi.list().then(res => {
-          const fetchedDepts = res.data?.data;
-          if (fetchedDepts && fetchedDepts.length > 0) {
-            setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
-          }
-        }).catch(() => {});
-      }
+  // Re-fetch analytics only if period explicitly changes
+  useEffect(() => {
+    if (!isInitialLoading) {
+      dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
+        if (res.data?.data) setAnalyticsOverview(res.data.data);
+      }).catch(() => {});
     }
-  }, [isInitialLoading, activeTab, overviewLoaded, usersLoaded, auditLoaded, analyticsPeriod]);
+  }, [analyticsPeriod]);
 
 
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -953,26 +925,24 @@ export default function ITAdminDashboard() {
   const [showTokenField, setShowTokenField] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (activeTab === 'tokens') {
-      tokenSettingsApi.get()
-        .then(res => {
-          const t = res.data.tokens || {};
-          setSavedTokenFields(t);
-          setVerifiedConnections(res.data.connections || {});
-          setTokenFields(prev => ({
-            ...prev,
-            facebook_page_id: t.facebook_page_id || '',
-            facebook_access_token: t.facebook_access_token || '',
-            instagram_business_account_id: t.instagram_business_account_id || '',
-            instagram_access_token: t.instagram_access_token || '',
-            wordpress_url: t.wordpress_url || '',
-            wordpress_username: t.wordpress_username || '',
-            wordpress_app_password: t.wordpress_app_password || '',
-          }));
-          setTokenLastUpdated(res.data.last_updated || 'Never');
-        })
-        .catch(() => { });
-    }
+    tokenSettingsApi.get()
+      .then(res => {
+        const t = res.data.tokens || {};
+        setSavedTokenFields(t);
+        setVerifiedConnections(res.data.connections || {});
+        setTokenFields(prev => ({
+          ...prev,
+          facebook_page_id: t.facebook_page_id || '',
+          facebook_access_token: t.facebook_access_token || '',
+          instagram_business_account_id: t.instagram_business_account_id || '',
+          instagram_access_token: t.instagram_access_token || '',
+          wordpress_url: t.wordpress_url || '',
+          wordpress_username: t.wordpress_username || '',
+          wordpress_app_password: t.wordpress_app_password || '',
+        }));
+        setTokenLastUpdated(res.data.last_updated || 'Never');
+      })
+      .catch(() => { });
   }, [activeTab]);
 
   const handleSaveTokens = async () => {
@@ -1078,28 +1048,26 @@ export default function ITAdminDashboard() {
   const [templateScenario, setTemplateScenario] = useState<'rejected' | 'approved' | 'revision'>('rejected');
 
   useEffect(() => {
-    if (activeTab === 'email-settings') {
-      (emailSettingsApi as any).get()
-        .then((res: any) => {
-          const s = res.data.settings || {};
-          setEmailFields(prev => ({
-            ...prev,
-            mail_mailer: 'smtp', // Always smtp
-            mail_host: s.mail_host || 'smtp.gmail.com',
-            mail_port: s.mail_port || '587',
-            mail_username: s.mail_username || '',
-            mail_encryption: s.mail_encryption || 'tls',
-            mail_from_address: s.mail_from_address || '',
-            mail_from_name: s.mail_from_name || 'JMCFI PostFlow',
-            email_template_header_title: s.email_template_header_title || 'Jose Maria College Foundation, Inc.',
-            email_template_brand_color: s.email_template_brand_color || '#800000',
-            email_template_footer_text: s.email_template_footer_text || '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
-            email_template_logo_url: s.email_template_logo_url || '',
-          }));
-          setEmailPasswordSet(!!s.mail_password_set);
-        })
-        .catch(() => { });
-    }
+    (emailSettingsApi as any).get()
+      .then((res: any) => {
+        const s = res.data.settings || {};
+        setEmailFields(prev => ({
+          ...prev,
+          mail_mailer: 'smtp', // Always smtp
+          mail_host: s.mail_host || 'smtp.gmail.com',
+          mail_port: s.mail_port || '587',
+          mail_username: s.mail_username || '',
+          mail_encryption: s.mail_encryption || 'tls',
+          mail_from_address: s.mail_from_address || '',
+          mail_from_name: s.mail_from_name || 'JMCFI PostFlow',
+          email_template_header_title: s.email_template_header_title || 'Jose Maria College Foundation, Inc.',
+          email_template_brand_color: s.email_template_brand_color || '#800000',
+          email_template_footer_text: s.email_template_footer_text || '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
+          email_template_logo_url: s.email_template_logo_url || '',
+        }));
+        setEmailPasswordSet(!!s.mail_password_set);
+      })
+      .catch(() => { });
   }, [activeTab]);
 
   const handleSaveEmailSettings = async () => {

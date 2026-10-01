@@ -57,9 +57,19 @@ export function AISettingsPanel({ isVisible = true }: Props) {
   const [focused, setFocused] = useState('');
 
   const accept = (settings: Settings) => {
-    setSaved(settings);
-    setProvider(settings.provider);
-    setModel(settings.model);
+    const sanitized = {
+      ...settings,
+      providers: Array.isArray(settings?.providers) ? settings.providers : [
+        { id: 'deepseek', name: 'DeepSeek' },
+        { id: 'openai', name: 'OpenAI' },
+        { id: 'gemini', name: 'Google Gemini' },
+        { id: 'groq', name: 'Groq' },
+        { id: 'openrouter', name: 'OpenRouter' },
+      ]
+    };
+    setSaved(sanitized);
+    setProvider(sanitized.provider || 'deepseek');
+    setModel(sanitized.model || '');
     setApiKey('');
     setShowKey(false);
     setConfirmClear(false);
@@ -129,7 +139,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
 
   const edited = () => { setError(''); setMessage(''); };
 
-  const providerName = saved?.providers.find(p => p.id === provider)?.name ?? provider;
+  const providerName = (saved?.providers || []).find(p => p.id === provider)?.name ?? provider;
   const canKeepKey   = saved?.configured && saved.provider === provider;
   const canSave      = !!saved && !!model.trim() && (!!apiKey.trim() || canKeepKey) && !busy;
   const dirty        = !!saved && (provider !== saved.provider || model.trim() !== saved.model || !!apiKey.trim());
@@ -337,7 +347,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {saved?.providers.map(opt => {
+              {(saved?.providers || []).map(opt => {
                 const m = getProviderMeta(opt.id);
                 const sel = provider === opt.id;
                 return (
