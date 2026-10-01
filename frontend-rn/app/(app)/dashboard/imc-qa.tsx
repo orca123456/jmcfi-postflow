@@ -404,6 +404,71 @@ export default function ImcQaDashboard() {
 
   const isLargeScreen = width > 1024;
 
+  const isPendingStatus = (status: string) => status === 'PENDING_IMC_QA';
+  const isApprovedStatus = (status: string) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(status);
+
+  const renderActionBadge = (req: any) => {
+    if (activeTab === 'dashboard' || (activeTab === 'all' && isPendingStatus(req.status))) {
+      return (
+        <>
+          <TouchableOpacity
+            style={styles.btnApproveRow}
+            onPress={() => handleApprove(req)}
+          >
+            <Ionicons name="checkmark" size={13} color="#16A34A" style={{ marginRight: 3 }} />
+            <Text style={styles.btnApproveRowText}>Approve</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.btnRejectRow}
+            onPress={() => handleRejectClick(req)}
+          >
+            <Ionicons name="close" size={13} color="#DC2626" style={{ marginRight: 3 }} />
+            <Text style={styles.btnRejectRowText}>Reject</Text>
+          </TouchableOpacity>
+        </>
+      );
+    }
+
+    if (req.status === 'REJECTED' || activeTab === 'rejected') {
+      return (
+        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+          <Text style={{ color: '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+            Rejected
+          </Text>
+        </View>
+      );
+    }
+
+    if (req.status === 'RETURNED_FOR_REVISION') {
+      return (
+        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+          <Text style={{ color: '#D97706', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+            Revision
+          </Text>
+        </View>
+      );
+    }
+
+    if (isApprovedStatus(req.status) || activeTab === 'approved') {
+      return (
+        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+          <Text style={{ color: '#15803D', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+            Approved
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+        <Text style={{ color: '#1E40AF', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
+          {req.status ? req.status.replace(/_/g, ' ') : 'Pending'}
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <DashboardShell
       title="IMC/QA — Institutional Quality Review"
@@ -676,32 +741,7 @@ export default function ImcQaDashboard() {
 
                     {/* ACTIONS */}
                     <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
-
-                      {activeTab === 'dashboard' ? (
-                        <>
-                          <TouchableOpacity
-                            style={styles.btnApproveRow}
-                            onPress={() => handleApprove(req)}
-                          >
-                            <Ionicons name="checkmark" size={13} color="#16A34A" style={{ marginRight: 3 }} />
-                            <Text style={styles.btnApproveRowText}>Approve</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.btnRejectRow}
-                            onPress={() => handleRejectClick(req)}
-                          >
-                            <Ionicons name="close" size={13} color="#DC2626" style={{ marginRight: 3 }} />
-                            <Text style={styles.btnRejectRowText}>Reject</Text>
-                          </TouchableOpacity>
-                        </>
-                      ) : (
-                        <View style={{ backgroundColor: activeTab === 'approved' ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                          <Text style={{ color: activeTab === 'approved' ? '#15803D' : '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
-                            {activeTab === 'approved' ? 'PUBLISHED' : 'Rejected'}
-                          </Text>
-                        </View>
-                      )}
+                      {renderActionBadge(req)}
                     </View>
                   </TouchableOpacity>
                 ))}
