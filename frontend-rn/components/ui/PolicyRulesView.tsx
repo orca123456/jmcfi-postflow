@@ -38,7 +38,8 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
     '7': { badgeBg: '#4B5563', iconBg: '#F3F4F6', iconColor: '#374151', accent: '#4B5563', iconName: 'warning-outline' },
   };
 
-  const filtered = policySections.filter((sec) => {
+  const sectionsList = Array.isArray(policySections) ? policySections : [];
+  const filtered = sectionsList.filter((sec) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
