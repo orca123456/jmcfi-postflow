@@ -21,12 +21,26 @@ const queryClient = new QueryClient({
   },
 });
 
-// Persists the ENTIRE React Query cache to localStorage.
+// Persists the ENTIRE React Query cache to localStorage safely.
 // On F5: all tab data loads at 0ms from storage. Background sync updates stale data.
 const persister = createSyncStoragePersister({
   storage: Platform.OS === 'web' && typeof window !== 'undefined' ? window.localStorage : undefined,
   key: 'postflow-rq-v1',
   throttleTime: 1000,
+  serialize: (data) => {
+    try {
+      return JSON.stringify(data);
+    } catch (e) {
+      return '';
+    }
+  },
+  deserialize: (str) => {
+    try {
+      return str ? JSON.parse(str) : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  },
 });
 
 // All dashboard routes that exist in the app
@@ -39,9 +53,6 @@ const ALL_DASHBOARDS = [
 ];
 
 // Raw DB role -> the ONLY dashboard that role is allowed to open.
-// Each role is locked to exactly ONE dashboard so URL manipulation
-// (e.g. admin editing /dashboard/it-admin into /dashboard/vp) cannot
-// navigate into another role's dashboard.
 const ROLE_PATHS: Record<string, string[]> = {
   it_publisher: ['/dashboard/it-admin'],
   it_admin: ['/dashboard/it-admin'],
@@ -50,8 +61,6 @@ const ROLE_PATHS: Record<string, string[]> = {
   imc_qa_checker: ['/dashboard/imc-qa'],
   content_requestor: ['/dashboard/requestor'],
   requestor: ['/dashboard/requestor'],
-  // normalized fallbacks (roles[] is always present from the API, so these
-  // only apply to malformed/stale sessions — default to the most restricted)
   admin: ['/dashboard/it-admin'],
   approver: ['/dashboard/requestor'],
 };
@@ -85,36 +94,33 @@ const resolveRawRole = (user: any): string => {
 };
 
 export default function AppLayout() {
-  const { user } = useAuthStore();
+  const { user, isInitialized } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
 
-  // NOTE: All hooks must run on every render (no early return before hooks),
-  // otherwise React throws "Rendered fewer hooks than expected". Redirects
-  // are done inside the effect via router.replace() (expo-router <Redirect>
-  // does not fire from a layout).
   useEffect(() => {
+    // Don't make routing decisions until auth storage initialization has finished
+    if (!isInitialized) return;
+
     // Not logged in -> go to login
     if (!user) {
       router.replace('/(auth)/login');
       return;
     }
 
-    // Determine the user's role (raw DB role preferred, normalized role as fallback)
+    // Determine the user's role
     const rawRole = resolveRawRole(user);
     const allowed = ROLE_PATHS[rawRole] || ROLE_PATHS[user.role || ''] || ['/dashboard/requestor'];
 
-    // Block URL manipulation: if the requested path is a dashboard the role
-    // cannot access, send them to their own dashboard instead.
+    // Block URL manipulation
     if (ALL_DASHBOARDS.includes(pathname) && !allowed.includes(pathname)) {
       const home = ROLE_HOME[rawRole] || ROLE_HOME[user.role || ''] || '/dashboard/requestor';
       router.replace(home as any);
     }
-  }, [pathname, user, router]);
+  }, [pathname, user, isInitialized, router]);
 
-  // While auth is still resolving, render nothing (avoids flashing the
-  // protected stack before the redirect above fires).
-  if (!user) {
+  // While auth is still loading from storage or not logged in, render null (HTML shell will show)
+  if (!isInitialized || !user) {
     return null;
   }
 

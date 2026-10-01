@@ -22,6 +22,7 @@ interface AuthStore {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+  isInitialized: boolean;
   error: string | null;
   lockUntil: number | null;
 
@@ -89,6 +90,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   token: null,
   isLoading: false,
+  isInitialized: false,
   error: null,
   lockUntil: null,
 
@@ -105,7 +107,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       await storage.set('auth_token', token);
       await storage.set('auth_user', JSON.stringify(user));
 
-      set({ user, token, isLoading: false });
+      set({ user, token, isLoading: false, isInitialized: true });
       return true;
     } catch (err: any) {
       if (err.response?.status === 429 && err.response?.data?.retry_after) {
@@ -130,17 +132,21 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (_) {}
     await storage.remove('auth_token');
     await storage.remove('auth_user');
-    set({ user: null, token: null });
+    set({ user: null, token: null, isInitialized: true });
   },
 
   loadFromStorage: async () => {
-    const token = await storage.get('auth_token');
-    const userStr = await storage.get('auth_user');
-    if (token && userStr) {
-      try {
+    try {
+      const token = await storage.get('auth_token');
+      const userStr = await storage.get('auth_user');
+      if (token && userStr) {
         const user = normalizeAuthUser(JSON.parse(userStr));
-        set({ user, token });
-      } catch (_) {}
+        set({ user, token, isInitialized: true });
+      } else {
+        set({ isInitialized: true });
+      }
+    } catch (_) {
+      set({ isInitialized: true });
     }
   },
 
