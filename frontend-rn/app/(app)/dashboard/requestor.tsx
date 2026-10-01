@@ -337,8 +337,16 @@ export default function RequestorDashboard() {
     'Finance Department',
   ];
 
-  // Posts State
-  const [mockRequests, setMockRequests] = useState<any[]>([]);
+  // Posts State (hydrated instantly from local storage cache for 0ms reload speed)
+  const [mockRequests, setMockRequests] = useState<any[]>(() => {
+    if (Platform.OS === 'web') {
+      try {
+        const cached = localStorage.getItem('postflow_cached_req_posts');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [newRequestType, setNewRequestType] = useState('News & Updates');
 
   const filteredRequests = useMemo(() => {
@@ -512,10 +520,17 @@ export default function RequestorDashboard() {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
       const mapped = posts.map(mapPost);
-      setMockRequests(mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision'));
-      setMockQueuePosts(mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision'));
+      const filtered = mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
+      setMockRequests(filtered);
+      setMockQueuePosts(filtered);
       setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
       setRejectedPosts(mapped.filter((p: any) => p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision'));
+
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_cached_req_posts', JSON.stringify(filtered));
+        } catch (e) {}
+      }
     }
   }, [postsDataRes]);
 
