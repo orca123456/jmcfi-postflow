@@ -18,7 +18,28 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // When using PgBouncer transaction pooling with PDO::ATTR_EMULATE_PREPARES,
+        // Laravel's default prepareBindings converts booleans to integer 1/0,
+        // which causes PostgreSQL to throw: "operator does not exist: boolean = integer".
+        // Binding booleans as 'true' / 'false' strings ensures PostgreSQL handles them correctly.
+        \Illuminate\Database\Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+            return new class($connection, $database, $prefix, $config) extends \Illuminate\Database\PostgresConnection {
+                public function prepareBindings(array $bindings)
+                {
+                    $grammar = $this->getQueryGrammar();
+
+                    foreach ($bindings as $key => $value) {
+                        if ($value instanceof \DateTimeInterface) {
+                            $bindings[$key] = $value->format($grammar->getDateFormat());
+                        } elseif (is_bool($value)) {
+                            $bindings[$key] = $value ? 'true' : 'false';
+                        }
+                    }
+
+                    return $bindings;
+                }
+            };
+        });
     }
 
     /**

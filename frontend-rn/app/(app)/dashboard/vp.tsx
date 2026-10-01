@@ -353,6 +353,15 @@ export default function VPDashboard() {
   const getRequestsForTab = () => {
     if (activeTab === 'approved') return approvedRequests;
     if (activeTab === 'rejected') return rejectedRequests;
+    if (activeTab === 'all') {
+      const combined = [...requestsList, ...approvedRequests, ...rejectedRequests];
+      const seen = new Set();
+      return combined.filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+    }
     return requestsList;
   };
 

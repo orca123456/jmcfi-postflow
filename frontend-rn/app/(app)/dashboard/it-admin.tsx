@@ -1731,7 +1731,7 @@ export default function ITAdminDashboard() {
         matchesStatus = ['published', 'approved'].includes(post.rawStatus);
       } else if (requestsStatus === 'Rejected') {
         matchesStatus = ['rejected', 'returned_for_revision'].includes(post.rawStatus);
-      } else if (requestsStatus === 'Draft') {
+      } else if (requestsStatus === 'Draft' || requestsStatus === 'Drafts') {
         matchesStatus = post.rawStatus === 'draft';
       }
     }
