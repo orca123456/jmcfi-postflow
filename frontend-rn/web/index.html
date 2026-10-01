@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>JMCFI PostFlow</title>
+    <meta name="description" content="JMCFI PostFlow — Post Request Management System" />
+
+    <!-- The `react-native-web` recommended style reset -->
+    <style id="expo-reset">
+      html, body { height: 100%; margin: 0; padding: 0; }
+      body { overflow: hidden; }
+      #root { display: flex; height: 100%; flex: 1; }
+    </style>
+
+    <!-- ===== INSTANT LOADING SHELL ===== -->
+    <!-- This renders BEFORE any JS is downloaded, giving users immediate visual feedback -->
+    <style>
+      :root {
+        --brand-navy: #1a2744;
+        --brand-blue: #2563eb;
+        --brand-gold: #f59e0b;
+        --sidebar-w: 240px;
+        --topbar-h: 60px;
+      }
+
+      #postflow-shell {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        background: #f1f5f9;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+
+      #postflow-shell.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Sidebar skeleton */
+      .shell-sidebar {
+        width: var(--sidebar-w);
+        background: var(--brand-navy);
+        display: flex;
+        flex-direction: column;
+        padding: 20px 0;
+        flex-shrink: 0;
+      }
+
+      .shell-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 20px 24px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+
+      .shell-logo-icon {
+        width: 36px;
+        height: 36px;
+        background: var(--brand-gold);
+        border-radius: 8px;
+        flex-shrink: 0;
+      }
+
+      .shell-logo-text {
+        width: 110px;
+        height: 16px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 4px;
+      }
+
+      .shell-nav-items {
+        padding: 20px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .shell-nav-item {
+        height: 40px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.06);
+      }
+
+      .shell-nav-item.active {
+        background: var(--brand-blue);
+      }
+
+      /* Main content skeleton */
+      .shell-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .shell-topbar {
+        height: var(--topbar-h);
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+        gap: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+
+      .shell-topbar-title {
+        width: 180px;
+        height: 20px;
+        background: #e2e8f0;
+        border-radius: 4px;
+      }
+
+      .shell-topbar-spacer { flex: 1; }
+
+      .shell-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--brand-blue);
+        opacity: 0.3;
+      }
+
+      .shell-content {
+        flex: 1;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        overflow: hidden;
+      }
+
+      /* Stats row skeleton */
+      .shell-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+
+      .shell-stat-card {
+        background: white;
+        border-radius: 12px;
+        height: 100px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .shell-stat-label {
+        width: 70%;
+        height: 12px;
+        background: #e2e8f0;
+        border-radius: 3px;
+      }
+
+      .shell-stat-value {
+        width: 40%;
+        height: 28px;
+        background: #e8edf5;
+        border-radius: 6px;
+      }
+
+      /* Table skeleton */
+      .shell-table-card {
+        background: white;
+        border-radius: 12px;
+        flex: 1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow: hidden;
+      }
+
+      .shell-table-header {
+        width: 200px;
+        height: 18px;
+        background: #e2e8f0;
+        border-radius: 4px;
+        margin-bottom: 4px;
+      }
+
+      .shell-table-row {
+        height: 44px;
+        background: #f8fafc;
+        border-radius: 8px;
+      }
+
+      /* Shimmer animation */
+      @keyframes shimmer {
+        0% { background-position: -600px 0; }
+        100% { background-position: 600px 0; }
+      }
+
+      .shell-stat-label,
+      .shell-stat-value,
+      .shell-logo-text,
+      .shell-nav-item:not(.active),
+      .shell-topbar-title,
+      .shell-table-header,
+      .shell-table-row {
+        background-image: linear-gradient(
+          90deg,
+          #e2e8f0 0px,
+          #f1f5f9 40px,
+          #e2e8f0 80px
+        );
+        background-size: 600px;
+        animation: shimmer 1.5s infinite linear;
+      }
+
+      /* Spinner overlay while React boots */
+      .shell-spinner {
+        position: absolute;
+        bottom: 24px;
+        right: 24px;
+        width: 28px;
+        height: 28px;
+        border: 3px solid #e2e8f0;
+        border-top-color: var(--brand-blue);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Mobile responsiveness */
+      @media (max-width: 768px) {
+        .shell-sidebar { display: none; }
+        .shell-stats { grid-template-columns: repeat(2, 1fr); }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ===== INSTANT SKELETON SHELL ===== -->
+    <!-- Visible IMMEDIATELY when HTML arrives, hidden once React mounts -->
+    <div id="postflow-shell" aria-hidden="true">
+      <div class="shell-sidebar">
+        <div class="shell-logo">
+          <div class="shell-logo-icon"></div>
+          <div class="shell-logo-text"></div>
+        </div>
+        <div class="shell-nav-items">
+          <div class="shell-nav-item active"></div>
+          <div class="shell-nav-item"></div>
+          <div class="shell-nav-item"></div>
+          <div class="shell-nav-item"></div>
+          <div class="shell-nav-item"></div>
+        </div>
+      </div>
+      <div class="shell-main">
+        <div class="shell-topbar">
+          <div class="shell-topbar-title"></div>
+          <div class="shell-topbar-spacer"></div>
+          <div class="shell-avatar"></div>
+        </div>
+        <div class="shell-content">
+          <div class="shell-stats">
+            <div class="shell-stat-card">
+              <div class="shell-stat-label"></div>
+              <div class="shell-stat-value"></div>
+            </div>
+            <div class="shell-stat-card">
+              <div class="shell-stat-label"></div>
+              <div class="shell-stat-value"></div>
+            </div>
+            <div class="shell-stat-card">
+              <div class="shell-stat-label"></div>
+              <div class="shell-stat-value"></div>
+            </div>
+            <div class="shell-stat-card">
+              <div class="shell-stat-label"></div>
+              <div class="shell-stat-value"></div>
+            </div>
+          </div>
+          <div class="shell-table-card">
+            <div class="shell-table-header"></div>
+            <div class="shell-table-row"></div>
+            <div class="shell-table-row"></div>
+            <div class="shell-table-row"></div>
+            <div class="shell-table-row"></div>
+            <div class="shell-table-row"></div>
+          </div>
+        </div>
+      </div>
+      <div class="shell-spinner"></div>
+    </div>
+
+    <!-- React mounts here -->
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <!-- Hide the shell once React has mounted -->
+    <script>
+      (function() {
+        var shell = document.getElementById('postflow-shell');
+        // Watch for React to insert content into #root
+        var observer = new MutationObserver(function() {
+          var root = document.getElementById('root');
+          if (root && root.children.length > 0) {
+            shell.classList.add('hidden');
+            setTimeout(function() {
+              if (shell.parentNode) shell.parentNode.removeChild(shell);
+            }, 400);
+            observer.disconnect();
+          }
+        });
+        observer.observe(document.getElementById('root'), { childList: true, subtree: true });
+        // Fallback: hide after 8 seconds max
+        setTimeout(function() {
+          shell.classList.add('hidden');
+          observer.disconnect();
+        }, 8000);
+      })();
+    </script>
+  </body>
+</html>
