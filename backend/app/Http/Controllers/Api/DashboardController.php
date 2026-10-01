@@ -31,7 +31,7 @@ class DashboardController extends Controller
             $request->merge(['per_page' => 15]);
             $postsData = $postController->index($request)->getData(true);
 
-            $departments = \App\Models\Department::where('is_active', true)
+            $departments = \App\Models\Department::whereRaw('"is_active" IS TRUE')
                 ->where('display_name', 'LIKE', 'College%')
                 ->pluck('display_name');
 
@@ -100,7 +100,7 @@ class DashboardController extends Controller
         $departments = collect();
         if ($category === 'admin' || in_array($role, ['vice_president', 'imc_qa_checker'], true)) {
             $departments = Cache::remember('dashboard_college_departments', 60, function () {
-                return \App\Models\Department::where('is_active', true)
+                return \App\Models\Department::whereRaw('"is_active" IS TRUE')
                     ->where('display_name', 'LIKE', 'College%')
                     ->orderBy('display_name')
                     ->pluck('display_name');

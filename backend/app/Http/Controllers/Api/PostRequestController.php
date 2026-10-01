@@ -76,7 +76,7 @@ class PostRequestController extends Controller
         $query->orderBy($sortBy, $sortDir);
 
         // Paginate
-        $perPage = min(max((int) $request->get('per_page', 15), 1), 15);
+        $perPage = min(max((int) $request->get('per_page', 15), 1), 1000);
         $posts = $query->paginate($perPage);
 
         return response()->json([
@@ -452,6 +452,19 @@ class PostRequestController extends Controller
                 $postRequest->update([
                     'status' => $statusMap[$nextStage] ?? PostRequest::STATUS_APPROVED,
                 ]);
+
+                // Ensure next stage has an approval workflow record assigned
+                if ($nextStage !== 'it_publisher' && !$postRequest->approvalWorkflows()->where('stage', $nextStage)->exists()) {
+                    $nextApprover = $this->workflowService->getApproverForStage($nextStage, $postRequest);
+                    if ($nextApprover) {
+                        $postRequest->approvalWorkflows()->create([
+                            'stage' => $nextStage,
+                            'approver_id' => $nextApprover->id,
+                            'action' => 'pending',
+                            'stage_order' => $postRequest->approvalWorkflows()->count() + 1,
+                        ]);
+                    }
+                }
             } else {
                 // All approvals done — IMC gave final sign-off
                 $postRequest->update([
