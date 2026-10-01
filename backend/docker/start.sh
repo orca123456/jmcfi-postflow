@@ -10,6 +10,10 @@ if { [ "$QUEUE_CONNECTION" = "redis" ] || [ "${CACHE_STORE:-${CACHE_DRIVER:-}}" 
     export QUEUE_CONNECTION=database CACHE_STORE=database CACHE_DRIVER=database
 fi
 
+if [ -n "${REDIS_URL:-}" ] || [ -n "${REDIS_HOST:-}" ]; then
+    export SESSION_DRIVER="${SESSION_DRIVER:-redis}"
+fi
+
 export QUEUE_WORKER_ENABLED=true
 if [ "$QUEUE_CONNECTION" = "sync" ]; then
     export QUEUE_WORKER_ENABLED=false
