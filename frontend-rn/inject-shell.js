@@ -213,10 +213,15 @@ const SKELETON_HTML = `
         s.classList.add('pf-hidden');
         setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 180);
       }
-      // PRIMARY: wait for React to fire 'postflow-ready' (dispatched when data loads)
+      // If on login or auth paths, dismiss immediately
+      var p = (window.location.pathname || '') + (window.location.hash || '');
+      if (p.indexOf('login') !== -1 || p.indexOf('forgot') !== -1 || p.indexOf('reset') !== -1) {
+        dismiss();
+      }
+      // PRIMARY: wait for React to fire 'postflow-ready' (dispatched when data loads or view mounts)
       window.addEventListener('postflow-ready', dismiss, { once: true });
-      // FALLBACK: hide after 4 seconds max regardless
-      setTimeout(dismiss, 4000);
+      // FALLBACK: hide after 3 seconds max regardless
+      setTimeout(dismiss, 3000);
     })();
   </script>`;
 

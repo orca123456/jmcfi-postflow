@@ -14,7 +14,6 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
-import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
@@ -180,6 +179,11 @@ export default function ImcQaDashboard() {
   // Pre-fetch ALL tab data in parallel while skeleton is showing
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'imc_qa_checker';
   usePrefetchAllTabs(rawRole, isInitLoading);
+
+  // Signal the HTML loading shell to fade out into real content
+  useEffect(() => {
+    signalPostflowReady();
+  }, []);
 
   useEffect(() => {
     if (initDataRes?.data) {
@@ -408,11 +412,8 @@ export default function ImcQaDashboard() {
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       userPhotoUrl={profilePhotoUrl}
     >
-      {/* ── LOADING SKELETON ── */}
-      {isInitialLoading && <DashboardSkeleton />}
-
       {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && !isInitialLoading && (
+      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
@@ -720,12 +721,12 @@ export default function ImcQaDashboard() {
       )}
 
       {/* ----------------- POLICY RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && !isInitialLoading && (
+      {activeTab === 'policy-rules' && (
         <PolicyRulesView accentColor="#1E40AF" />
       )}
 
       {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && !isInitialLoading && (
+      {activeTab === 'account-settings' && (
         <View style={styles.dashboardContainer}>
           <View style={styles.dashboardHeaderRow}>
             <View>
