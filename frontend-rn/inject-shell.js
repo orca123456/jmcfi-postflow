@@ -39,6 +39,9 @@ const SKELETON_CSS = `
       z-index: 9999;
       transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    html.pf-hide-shell #postflow-shell {
+      display: none !important;
+    }
     #postflow-shell.pf-hidden {
       opacity: 0;
       pointer-events: none;
@@ -146,7 +149,20 @@ const SKELETON_CSS = `
 // ─── Skeleton HTML ────────────────────────────────────────────────────────────
 const SKELETON_HTML = `
   <!-- ===== POSTFLOW INSTANT LOADING SHELL ===== -->
-  <!-- Visible immediately when HTML arrives, before any JS loads -->
+  <!-- Check whether user is authenticated & visiting dashboard before rendering navy shell -->
+  <script>
+    (function() {
+      try {
+        var token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+        var path = (window.location && window.location.pathname) || '';
+        var isAuthPage = path.indexOf('login') !== -1 || path.indexOf('auth') !== -1;
+        var isDashboard = path.indexOf('dashboard') !== -1;
+        if (!token || isAuthPage || (!isDashboard && path === '/')) {
+          document.documentElement.classList.add('pf-hide-shell');
+        }
+      } catch(e) {}
+    })();
+  </script>
   <div id="postflow-shell" aria-hidden="true">
     <div class="pf-sidebar">
       <div class="pf-logo">
