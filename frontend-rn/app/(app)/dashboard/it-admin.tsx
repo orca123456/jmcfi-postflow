@@ -22,7 +22,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
@@ -37,6 +37,7 @@ import { RichTextEditor } from '../../../components/ui/RichTextEditor';
 import { AISettingsPanel } from '../../../components/AISettingsPanel';
 import { triggerCsvDownload } from '../../../utils/export';
 import { signalPostflowReady } from '../../../utils/postflowReady';
+import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 
 interface StatCardProps {
   label: string;
@@ -197,6 +198,7 @@ export default function ITAdminDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user, setUser } = useAuthStore();
+  const queryClient = useQueryClient();
 
   // Tab state: 'overview' | 'user-management' | 'all-posts' | 'approval-queue' | 'policy-rules' | 'account-settings'
   const params = useLocalSearchParams();
@@ -321,10 +323,17 @@ export default function ITAdminDashboard() {
   });
   const isInitialLoading = isLoading;
 
+  // Pre-fetch ALL tab data in parallel while skeleton is showing
+  // so every tab is instantly ready when the skeleton hides
+  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'it_admin';
+  usePrefetchAllTabs(rawRole, isInitialLoading);
+
   // Signal the HTML loading shell to fade out once real data arrives
   useEffect(() => {
     if (!isInitialLoading) {
-      signalPostflowReady();
+      // Small delay to allow prefetches to start firing before shell hides
+      const t = setTimeout(() => signalPostflowReady(), 200);
+      return () => clearTimeout(t);
     }
   }, [isInitialLoading]);
   const [stats, setStats] = useState<any>(null);
@@ -425,18 +434,31 @@ export default function ITAdminDashboard() {
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [auditLoading, setAuditLoading] = useState(false);
 
-  // ── Master data loader: fetch background data ONLY when needed ──
+  // ── Master data loader: use prefetch cache first, fall back to API ──
   useEffect(() => {
     if (isInitialLoading) return;
-    
+
     if (activeTab === 'overview' || activeTab === 'analytics') {
-      dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
-        if (res.data?.data) setAnalyticsOverview(res.data.data);
-      }).catch(() => {});
+      // Use prefetch cache — only re-fetch if cache miss
+      const cached = queryClient.getQueryData(['analytics-overview', analyticsPeriod]);
+      if (cached) {
+        const d = cached as any;
+        if (d?.data?.data) setAnalyticsOverview(d.data.data);
+      } else {
+        dashboardApi.getAnalyticsOverview({ period: analyticsPeriod }).then(res => {
+          if (res.data?.data) setAnalyticsOverview(res.data.data);
+        }).catch(() => {});
+      }
     }
 
     if (activeTab === 'audit-logs' && !auditLoaded) {
       setAuditLoaded(true);
+      // Check prefetch cache first
+      const cached = queryClient.getQueryData(['audit-logs-prefetch']);
+      if (cached) {
+        const d = cached as any;
+        if (d?.data?.data) { setAuditLogs(d.data.data); return; }
+      }
       setAuditLoading(true);
       auditLogsApi.list({ per_page: 100 }).then(res => {
         if (res.data?.data) setAuditLogs(res.data.data);
@@ -447,30 +469,52 @@ export default function ITAdminDashboard() {
 
     if (activeTab === 'user-management' && !usersLoaded) {
       setUsersLoaded(true);
-      
-      usersApi.list().then(res => {
-        const raw = res.data?.data;
-        const mappedUsers = (raw || []).map((u: any) => ({
-          ...u,
-          role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
-          created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-        }));
-        setUsers(mappedUsers);
-      }).catch(() => {});
 
-      rolesApi.list().then(() => {
-        setRolesList(ROLE_CATEGORIES);
-        setNewUserRole('requestor');
-      }).catch(() => {});
+      // Check prefetch cache first for users
+      const cachedUsers = queryClient.getQueryData(['users-prefetch']);
+      if (cachedUsers) {
+        const raw = (cachedUsers as any)?.data?.data;
+        if (raw) {
+          const mappedUsers = raw.map((u: any) => ({
+            ...u,
+            role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+            created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+          }));
+          setUsers(mappedUsers);
+        }
+      } else {
+        usersApi.list().then(res => {
+          const raw = res.data?.data;
+          const mappedUsers = (raw || []).map((u: any) => ({
+            ...u,
+            role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+            created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+          }));
+          setUsers(mappedUsers);
+        }).catch(() => {});
+      }
 
-      departmentsApi.list().then(res => {
-        const fetchedDepts = res.data?.data;
+      setRolesList(ROLE_CATEGORIES);
+      setNewUserRole('requestor');
+
+      // Check prefetch cache for departments
+      const cachedDepts = queryClient.getQueryData(['departments-prefetch']);
+      if (cachedDepts) {
+        const fetchedDepts = (cachedDepts as any)?.data?.data;
         if (fetchedDepts && fetchedDepts.length > 0) {
           setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
         }
-      }).catch(() => {});
+      } else {
+        departmentsApi.list().then(res => {
+          const fetchedDepts = res.data?.data;
+          if (fetchedDepts && fetchedDepts.length > 0) {
+            setDepartmentsList(fetchedDepts.map((d: any) => ({ ...d })));
+          }
+        }).catch(() => {});
+      }
     }
-  }, [isInitialLoading, activeTab, overviewLoaded, usersLoaded, auditLoaded]);
+  }, [isInitialLoading, activeTab, overviewLoaded, usersLoaded, auditLoaded, analyticsPeriod]);
+
 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');

@@ -18,6 +18,7 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
+import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { Card } from '../../../components/ui/Card';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { useAuthStore } from '../../../store/auth';
@@ -117,10 +118,15 @@ export default function OfficeHeadDashboard() {
 
   const isInitialLoading = isInitLoading;
 
+  // Pre-fetch ALL tab data in parallel while skeleton is showing
+  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'office_head';
+  usePrefetchAllTabs(rawRole, isInitialLoading);
+
   // Signal the HTML loading shell to fade out once real data arrives
   useEffect(() => {
     if (!isInitialLoading) {
-      signalPostflowReady();
+      const t = setTimeout(() => signalPostflowReady(), 200);
+      return () => clearTimeout(t);
     }
   }, [isInitialLoading]);
 
