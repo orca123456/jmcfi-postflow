@@ -447,9 +447,14 @@ export default function OfficeHeadDashboard() {
   const viewerIsVicePresident = viewerRawRole === 'vice_president' || viewerDepartment.includes('vice president');
   const viewerIsImcQa = viewerRawRole === 'imc_qa_checker' || viewerDepartment.includes('institutional marketing communication');
 
-  let userPosition = user?.position || 'Department Head';
-  if (viewerIsVicePresident) userPosition = 'Vice President';
-  if (viewerIsImcQa) userPosition = 'QA / Branding Checker';
+  let userPosition = 'Department Head';
+  if (viewerIsVicePresident) {
+    userPosition = 'Vice President';
+  } else if (viewerIsImcQa) {
+    userPosition = 'QA / Branding Checker';
+  } else if (user?.position && user.position.toLowerCase() !== 'requestor' && user.position.toLowerCase() !== 'approver') {
+    userPosition = user.position;
+  }
 
   const greetingName = user?.name ? `${userPosition} ${user.name}` : userPosition;
 
