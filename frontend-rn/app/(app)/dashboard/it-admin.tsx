@@ -36,6 +36,7 @@ import { FormattedText } from '../../../components/ui/FormattedText';
 import { RichTextEditor } from '../../../components/ui/RichTextEditor';
 import { AISettingsPanel } from '../../../components/AISettingsPanel';
 import { triggerCsvDownload } from '../../../utils/export';
+import { signalPostflowReady } from '../../../utils/postflowReady';
 
 interface StatCardProps {
   label: string;
@@ -319,6 +320,13 @@ export default function ITAdminDashboard() {
     staleTime: 5000
   });
   const isInitialLoading = isLoading;
+
+  // Signal the HTML loading shell to fade out once real data arrives
+  useEffect(() => {
+    if (!isInitialLoading) {
+      signalPostflowReady();
+    }
+  }, [isInitialLoading]);
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);

@@ -28,6 +28,7 @@ import { postsApi, authApi, dashboardApi, categoriesApi } from '../../../service
 import { useQuery } from '@tanstack/react-query';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
+import { signalPostflowReady } from '../../../utils/postflowReady';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -539,6 +540,13 @@ export default function RequestorDashboard() {
   };
 
   const isInitialLoading = isInitLoading;
+
+  // Signal the HTML loading shell to fade out once real data arrives
+  useEffect(() => {
+    if (!isInitialLoading) {
+      signalPostflowReady();
+    }
+  }, [isInitialLoading]);
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import DashboardSkeleton from '../../../components/DashboardSkeleton';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
+import { signalPostflowReady } from '../../../utils/postflowReady';
 import { Card } from '../../../components/ui/Card';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { useAuthStore } from '../../../store/auth';
@@ -257,6 +258,7 @@ export default function ImcQaDashboard() {
       const depts = data.departments || [];
       setDepartmentOptions(['All Departments', ...depts]);
       setIsInitialLoading(false);
+      signalPostflowReady();
     }
   }, [initDataRes, user?.department, optimisticallyRemovedIds]);
 

@@ -186,20 +186,21 @@ const SKELETON_HTML = `
     </div>
     <div class="pf-spinner"></div>
   </div>
-  <!-- Hide shell once React mounts into #root -->
+  <!-- Hide shell ONLY when React signals real content is ready (not when skeleton mounts) -->
   <script>
     (function() {
       var s = document.getElementById('postflow-shell');
-      var o = new MutationObserver(function() {
-        var r = document.getElementById('root');
-        if (r && r.children.length > 0) {
-          s.classList.add('pf-hidden');
-          setTimeout(function() { if (s.parentNode) s.parentNode.removeChild(s); }, 400);
-          o.disconnect();
-        }
-      });
-      o.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
-      setTimeout(function() { s.classList.add('pf-hidden'); o.disconnect(); }, 10000);
+      var dismissed = false;
+      function dismiss() {
+        if (dismissed) return;
+        dismissed = true;
+        s.classList.add('pf-hidden');
+        setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 400);
+      }
+      // PRIMARY: wait for React to fire 'postflow-ready' (dispatched when data loads)
+      window.addEventListener('postflow-ready', dismiss, { once: true });
+      // FALLBACK: hide after 8 seconds max regardless
+      setTimeout(dismiss, 8000);
     })();
   </script>`;
 
