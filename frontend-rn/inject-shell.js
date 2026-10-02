@@ -26,8 +26,8 @@ const SKELETON_CSS = `
   <style id="postflow-shell-css">
     :root {
       --brand-navy: rgb(91, 15, 184);
-      --brand-blue: #2563eb;
-      --brand-gold: #f59e0b;
+      --brand-blue: hsla(0, 0%, 100%, 1.00);
+      --brand-gold: #ffffffff;
       --sidebar-w: 240px;
       --topbar-h: 60px;
     }
