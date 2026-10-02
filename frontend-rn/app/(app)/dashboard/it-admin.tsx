@@ -1414,6 +1414,10 @@ export default function ITAdminDashboard() {
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditEventTypeFilter, setAuditEventTypeFilter] = useState('ALL');
   const [selectedAuditLog, setSelectedAuditLog] = useState<any | null>(null);
+  const [auditDateFilter, setAuditDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Custom Range'>('All Time');
+  const [isAuditDateDropdownOpen, setIsAuditDateDropdownOpen] = useState(false);
+  const [auditCustomStartDate, setAuditCustomStartDate] = useState('');
+  const [auditCustomEndDate, setAuditCustomEndDate] = useState('');
 
 
 
@@ -4521,7 +4525,60 @@ $response = curl_exec($ch);`}
             (log.userName || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
             (log.description || '').toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
             (log.eventType || '').toLowerCase().includes(auditSearchQuery.toLowerCase());
-          return matchesQuery;
+          if (!matchesQuery) return false;
+
+          if (auditDateFilter === 'All Time') return true;
+
+          // Parse log date reliably
+          let logDate: Date | null = null;
+          if (log.rawDate) {
+            const d = new Date(log.rawDate);
+            if (!isNaN(d.getTime())) logDate = d;
+          }
+          if (!logDate && log.date) {
+            const d = new Date(log.date + 'T00:00:00');
+            if (!isNaN(d.getTime())) logDate = d;
+          }
+          if (!logDate && log.timestamp) {
+            const firstPart = String(log.timestamp).split(' - ')[0];
+            const d = new Date(firstPart);
+            if (!isNaN(d.getTime())) logDate = d;
+          }
+          if (!logDate) return true;
+
+          const now = new Date();
+          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+          const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+          if (auditDateFilter === 'Today') {
+            return logDate >= startOfToday && logDate <= endOfToday;
+          }
+          if (auditDateFilter === 'Yesterday') {
+            const startOfYesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+            const endOfYesterday = new Date(endOfToday.getTime() - 24 * 60 * 60 * 1000);
+            return logDate >= startOfYesterday && logDate <= endOfYesterday;
+          }
+          if (auditDateFilter === 'Last 7 Days') {
+            const startOf7Days = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+            return logDate >= startOf7Days && logDate <= endOfToday;
+          }
+          if (auditDateFilter === 'This Month') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+            return logDate >= startOfMonth && logDate <= endOfToday;
+          }
+          if (auditDateFilter === 'Custom Range') {
+            if (auditCustomStartDate) {
+              const start = new Date(auditCustomStartDate + 'T00:00:00');
+              if (!isNaN(start.getTime()) && logDate < start) return false;
+            }
+            if (auditCustomEndDate) {
+              const end = new Date(auditCustomEndDate + 'T23:59:59');
+              if (!isNaN(end.getTime()) && logDate > end) return false;
+            }
+            return true;
+          }
+
+          return true;
         });
 
         return (
@@ -4532,19 +4589,101 @@ $response = curl_exec($ch);`}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
                 <View style={{ gap: 2 }}>
                   <Text style={styles.sectionHeader}>Activity Log Records</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSecondary }}>
+                    Review institutional events, security audits, and administrative operations.
+                  </Text>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, width: !isTablet ? '100%' : 'auto' }}>
                   {/* Search input */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: !isTablet ? 1 : undefined, minWidth: !isTablet ? 180 : 280, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: !isTablet ? 1 : undefined, minWidth: !isTablet ? 180 : 260, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
                     <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
-                      style={{ flex: 1, fontSize: 14, color: Colors.textPrimary, outlineStyle: 'none' } as any}
+                      style={{ flex: 1, fontSize: 13, color: Colors.textPrimary, outlineStyle: 'none' } as any}
                       placeholder="Search audit logs..."
                       placeholderTextColor="#9CA3AF"
                       value={auditSearchQuery}
                       onChangeText={setAuditSearchQuery}
                     />
+                    {auditSearchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setAuditSearchQuery('')}>
+                        <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Date Filter Dropdown */}
+                  <View style={{ position: 'relative', zIndex: 60 }}>
+                    <TouchableOpacity
+                      onPress={() => setIsAuditDateDropdownOpen(prev => !prev)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        height: 38,
+                        paddingHorizontal: 12,
+                        backgroundColor: auditDateFilter !== 'All Time' ? '#EEF2FF' : '#F9FAFB',
+                        borderWidth: 1,
+                        borderColor: auditDateFilter !== 'All Time' ? '#6366F1' : Colors.border,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color={auditDateFilter !== 'All Time' ? '#4F46E5' : '#6B7280'} />
+                      <Text style={{ fontSize: 13, fontWeight: auditDateFilter !== 'All Time' ? '700' : '500', color: auditDateFilter !== 'All Time' ? '#4F46E5' : Colors.textPrimary }}>
+                        {auditDateFilter}
+                      </Text>
+                      <Ionicons name={isAuditDateDropdownOpen ? "chevron-up" : "chevron-down"} size={14} color={auditDateFilter !== 'All Time' ? '#4F46E5' : '#6B7280'} />
+                    </TouchableOpacity>
+
+                    {isAuditDateDropdownOpen && (
+                      <View style={{
+                        position: 'absolute',
+                        top: 44,
+                        right: 0,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                        borderRadius: 10,
+                        paddingVertical: 6,
+                        width: 190,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.12,
+                        shadowRadius: 10,
+                        elevation: 10,
+                        zIndex: 999,
+                      }}>
+                        {(['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'This Month', 'Custom Range'] as const).map(option => {
+                          const isSelected = auditDateFilter === option;
+                          return (
+                            <TouchableOpacity
+                              key={option}
+                              onPress={() => {
+                                setAuditDateFilter(option);
+                                setIsAuditDateDropdownOpen(false);
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingHorizontal: 14,
+                                paddingVertical: 9,
+                                backgroundColor: isSelected ? '#F5F3FF' : 'transparent',
+                              }}
+                            >
+                              <Text style={{
+                                fontSize: 13,
+                                fontWeight: isSelected ? '700' : '500',
+                                color: isSelected ? '#7C3AED' : '#374151',
+                              }}>
+                                {option}
+                              </Text>
+                              {isSelected && <Ionicons name="checkmark" size={16} color="#7C3AED" />}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
 
                   {/* Export Button */}
@@ -4553,6 +4692,142 @@ $response = curl_exec($ch);`}
                     <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Export CSV</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Custom Date Range Picker Bar */}
+                {auditDateFilter === 'Custom Range' && (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                    padding: 10,
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    width: '100%',
+                  }}>
+                    <Ionicons name="calendar" size={16} color="#6366F1" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>From:</Text>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          type="date"
+                          value={auditCustomStartDate}
+                          onChange={(e: any) => setAuditCustomStartDate(e.target.value)}
+                          style={{
+                            height: 32,
+                            padding: '0 8px',
+                            borderRadius: 6,
+                            border: '1px solid #CBD5E1',
+                            fontSize: 13,
+                            color: '#0F172A',
+                            backgroundColor: '#FFFFFF',
+                            outline: 'none',
+                          }}
+                        />
+                      ) : (
+                        <TextInput
+                          placeholder="YYYY-MM-DD"
+                          value={auditCustomStartDate}
+                          onChangeText={setAuditCustomStartDate}
+                          style={{ height: 32, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', fontSize: 13 }}
+                        />
+                      )}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>To:</Text>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          type="date"
+                          value={auditCustomEndDate}
+                          onChange={(e: any) => setAuditCustomEndDate(e.target.value)}
+                          style={{
+                            height: 32,
+                            padding: '0 8px',
+                            borderRadius: 6,
+                            border: '1px solid #CBD5E1',
+                            fontSize: 13,
+                            color: '#0F172A',
+                            backgroundColor: '#FFFFFF',
+                            outline: 'none',
+                          }}
+                        />
+                      ) : (
+                        <TextInput
+                          placeholder="YYYY-MM-DD"
+                          value={auditCustomEndDate}
+                          onChangeText={setAuditCustomEndDate}
+                          style={{ height: 32, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', fontSize: 13 }}
+                        />
+                      )}
+                    </View>
+
+                    {(auditCustomStartDate || auditCustomEndDate) && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setAuditCustomStartDate('');
+                          setAuditCustomEndDate('');
+                        }}
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F1F5F9', borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1' }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B' }}>Clear Dates</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Active Filters Bar */}
+                {(auditDateFilter !== 'All Time' || auditSearchQuery.trim().length > 0) && (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    width: '100%',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>
+                        Showing <Text style={{ fontWeight: '700', color: '#0F172A' }}>{filteredLogs.length}</Text> of {auditLogs.length} records
+                      </Text>
+                      {auditDateFilter !== 'All Time' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#4F46E5' }}>📅 {auditDateFilter}</Text>
+                          <TouchableOpacity onPress={() => { setAuditDateFilter('All Time'); setAuditCustomStartDate(''); setAuditCustomEndDate(''); }}>
+                            <Ionicons name="close-circle" size={14} color="#6366F1" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {auditSearchQuery.trim().length > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>🔍 "{auditSearchQuery}"</Text>
+                          <TouchableOpacity onPress={() => setAuditSearchQuery('')}>
+                            <Ionicons name="close-circle" size={14} color="#9CA3AF" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAuditDateFilter('All Time');
+                        setAuditCustomStartDate('');
+                        setAuditCustomEndDate('');
+                        setAuditSearchQuery('');
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#6366F1' }}>Reset all filters</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {/* Logs Table Matching Screenshot */}
@@ -4643,10 +4918,31 @@ $response = curl_exec($ch);`}
                 )}
 
                 {!auditLoading && filteredLogs.length === 0 && (
-                  <View style={{ paddingVertical: 28, alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="file-tray-outline" size={28} color={Colors.textMuted} />
-                    <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' }}>No activity records found</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: FontSize.xs }}>New logins, content actions, account changes, and settings updates will appear here.</Text>
+                  <View style={{ paddingVertical: 36, alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="calendar-clear-outline" size={32} color="#94A3B8" />
+                    <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '700' }}>
+                      {auditDateFilter !== 'All Time' || auditSearchQuery.trim()
+                        ? 'No activity records match your filter criteria'
+                        : 'No activity records found'}
+                    </Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: FontSize.xs, textAlign: 'center', maxWidth: 420 }}>
+                      {auditDateFilter !== 'All Time' || auditSearchQuery.trim()
+                        ? 'Try choosing a broader date range or clearing your search keywords.'
+                        : 'New logins, content actions, account changes, and settings updates will appear here.'}
+                    </Text>
+                    {(auditDateFilter !== 'All Time' || auditSearchQuery.trim()) && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setAuditDateFilter('All Time');
+                          setAuditCustomStartDate('');
+                          setAuditCustomEndDate('');
+                          setAuditSearchQuery('');
+                        }}
+                        style={{ marginTop: 6, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#EEF2FF', borderRadius: 8, borderWidth: 1, borderColor: '#C7D2FE' }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#4F46E5' }}>Reset All Filters</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
