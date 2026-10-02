@@ -37,6 +37,7 @@ import { AISettingsPanel } from '../../../components/AISettingsPanel';
 import { triggerCsvDownload } from '../../../utils/export';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
+import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 
 interface StatCardProps {
   label: string;
@@ -861,6 +862,8 @@ export default function ITAdminDashboard() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [profilePhotoLoadFailed, setProfilePhotoLoadFailed] = useState(false);
   const [brokenUserPhotoIds, setBrokenUserPhotoIds] = useState<Set<string>>(new Set());
+  const [cropperModalVisible, setCropperModalVisible] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === 'account-settings') {
@@ -875,43 +878,48 @@ export default function ITAdminDashboard() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.onchange = async (e: any) => {
+      input.onchange = (e: any) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Instant local preview so the user immediately sees the photo
-        let previewUrl: string | null = null;
-        try {
-          previewUrl = URL.createObjectURL(file);
-          setProfilePhotoUrl(previewUrl);
-          setProfilePhotoLoadFailed(false);
-        } catch (_) {}
-
-        setUploadingPhoto(true);
-        try {
-          const res = await authApi.uploadPhoto(file);
-          const updatedUser = res.data?.user;
-          const rawPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
-          const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
-          setProfilePhotoUrl(nextPhotoUrl);
-          setProfilePhotoLoadFailed(false);
-          if (user) {
-            await setUser({
-              ...user,
-              ...(updatedUser || {}),
-              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
-              photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
-            });
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setCropImageUri(event.target.result as string);
+            setCropperModalVisible(true);
           }
-          setUsers(currentUsers => currentUsers.map(u => String(u.id) === String(user?.id) ? { ...u, photo_url: nextPhotoUrl } : u));
-          showToast('Photo updated!', 'success');
-        } catch (e: any) {
-          showToast('Upload failed.', 'error');
-        } finally {
-          setUploadingPhoto(false);
-        }
+        };
+        reader.readAsDataURL(file);
       };
       input.click();
+    }
+  };
+
+  const handleSaveCroppedPhoto = async (croppedFile: File, previewUrl: string) => {
+    setProfilePhotoUrl(previewUrl);
+    setProfilePhotoLoadFailed(false);
+    setUploadingPhoto(true);
+    try {
+      const res = await authApi.uploadPhoto(croppedFile);
+      const updatedUser = res.data?.user;
+      const rawPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+      const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
+      setProfilePhotoUrl(nextPhotoUrl);
+      setProfilePhotoLoadFailed(false);
+      if (user) {
+        await setUser({
+          ...user,
+          ...(updatedUser || {}),
+          role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+          photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
+        });
+      }
+      setUsers(currentUsers => currentUsers.map(u => String(u.id) === String(user?.id) ? { ...u, photo_url: nextPhotoUrl } : u));
+      showToast('Photo updated!', 'success');
+    } catch (e: any) {
+      showToast('Upload failed.', 'error');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -4199,6 +4207,16 @@ $response = curl_exec($ch);`}
               </TouchableOpacity>
             </Card>
           </View>
+
+          <ProfilePictureCropperModal
+            visible={cropperModalVisible}
+            imageUri={cropImageUri}
+            onClose={() => {
+              setCropperModalVisible(false);
+              setCropImageUri(null);
+            }}
+            onSave={handleSaveCroppedPhoto}
+          />
         </View>
       )}
 

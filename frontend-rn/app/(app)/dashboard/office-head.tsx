@@ -25,6 +25,7 @@ import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../co
 import { usePolicyStore } from '../../../store/policy';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, dashboardApi, authApi, resolveImageUrl } from '../../../services/api';
+import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 
 export default function OfficeHeadDashboard() {
   const router = useRouter();
@@ -128,6 +129,8 @@ export default function OfficeHeadDashboard() {
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropperModalVisible, setCropperModalVisible] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState<string | null>(null);
   const [acctFullName, setAcctFullName] = useState('');
   const [acctCurrentPw, setAcctCurrentPw] = useState('');
   const [acctNewPw, setAcctNewPw] = useState('');
@@ -146,36 +149,43 @@ export default function OfficeHeadDashboard() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.onchange = async (e: any) => {
+      input.onchange = (e: any) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        let previewUrl: string | null = null;
-        try {
-          previewUrl = URL.createObjectURL(file);
-          setProfilePhotoUrl(previewUrl);
-        } catch (_) {}
-        setUploadingPhoto(true);
-        try {
-          const res = await authApi.uploadPhoto(file);
-          const updatedUser = res.data?.user;
-          const rawPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
-          const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
-          setProfilePhotoUrl(nextPhotoUrl);
-          if (user) {
-            await useAuthStore.getState().setUser({
-              ...user,
-              ...(updatedUser || {}),
-              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
-              photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
-            });
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setCropImageUri(event.target.result as string);
+            setCropperModalVisible(true);
           }
-        } catch {
-          alert('Upload failed.');
-        } finally {
-          setUploadingPhoto(false);
-        }
+        };
+        reader.readAsDataURL(file);
       };
       input.click();
+    }
+  };
+
+  const handleSaveCroppedPhoto = async (croppedFile: File, previewUrl: string) => {
+    setProfilePhotoUrl(previewUrl);
+    setUploadingPhoto(true);
+    try {
+      const res = await authApi.uploadPhoto(croppedFile);
+      const updatedUser = res.data?.user;
+      const rawPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+      const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
+      setProfilePhotoUrl(nextPhotoUrl);
+      if (user) {
+        await useAuthStore.getState().setUser({
+          ...user,
+          ...(updatedUser || {}),
+          role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+          photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
+        });
+      }
+    } catch {
+      alert('Upload failed.');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
   const handleRemovePhoto = async () => {
@@ -943,6 +953,16 @@ export default function OfficeHeadDashboard() {
               </Card>
             </View>
           </View>
+
+          <ProfilePictureCropperModal
+            visible={cropperModalVisible}
+            imageUri={cropImageUri}
+            onClose={() => {
+              setCropperModalVisible(false);
+              setCropImageUri(null);
+            }}
+            onSave={handleSaveCroppedPhoto}
+          />
         </View>
       )}
 
