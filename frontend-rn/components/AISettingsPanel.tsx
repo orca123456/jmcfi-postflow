@@ -36,6 +36,14 @@ function getProviderMeta(id: string) {
   return PROVIDER_META[id] ?? PROVIDER_META.default;
 }
 
+const DEFAULT_MODELS: Record<string, string> = {
+  deepseek: 'deepseek-chat',
+  openai: 'gpt-4o-mini',
+  gemini: 'gemini-1.5-flash',
+  groq: 'llama-3.3-70b-versatile',
+  openrouter: 'deepseek/deepseek-chat',
+};
+
 type Props = { isVisible?: boolean };
 
 const getInitialSettings = (): Settings | null => {
@@ -66,7 +74,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
 
   const [saved, setSaved] = useState<Settings | null>(getInitialSettings);
   const [provider, setProvider] = useState(() => getInitialSettings()?.provider || 'deepseek');
-  const [model, setModel] = useState(() => getInitialSettings()?.model || '');
+  const [model, setModel] = useState(() => getInitialSettings()?.model || DEFAULT_MODELS['deepseek']);
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -78,7 +86,15 @@ export function AISettingsPanel({ isVisible = true }: Props) {
   const [message, setMessage] = useState('');
   const [focused, setFocused] = useState('');
 
-  const accept = (settings: Settings) => {
+  // Keep refs so background updates never wipe active user input
+  const apiKeyRef = useRef(apiKey);
+  apiKeyRef.current = apiKey;
+
+  const dirty = !!saved && (provider !== saved.provider || model.trim() !== saved.model || !!apiKey.trim());
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  const accept = useCallback((settings: Settings, isExplicitSave = false) => {
     const sanitized = {
       ...settings,
       providers: Array.isArray(settings?.providers) ? settings.providers : [
@@ -95,48 +111,62 @@ export function AISettingsPanel({ isVisible = true }: Props) {
       } catch (_) {}
     }
     setSaved(sanitized);
-    setProvider(sanitized.provider || 'deepseek');
-    setModel(sanitized.model || '');
-    setApiKey('');
-    setShowKey(false);
-    setConfirmClear(false);
-  };
+
+    // Only clear apiKey and reset inputs if user explicitly saved or cleared credentials
+    if (isExplicitSave) {
+      setProvider(sanitized.provider || 'deepseek');
+      setModel(sanitized.model || DEFAULT_MODELS[sanitized.provider] || '');
+      setApiKey('');
+      setShowKey(false);
+      setConfirmClear(false);
+      return;
+    }
+
+    // For background/initial loads: NEVER wipe user's entered apiKey or unsaved model/provider
+    if (!dirtyRef.current && !apiKeyRef.current.trim()) {
+      setProvider(sanitized.provider || 'deepseek');
+      setModel(sanitized.model || DEFAULT_MODELS[sanitized.provider] || '');
+    }
+  }, []);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent && !saved) {
+    if (!silent) {
       setLoading(true);
     }
-    setError('');
     try {
-      accept((await tokenSettingsApi.getAI()).data);
+      const res = await tokenSettingsApi.getAI();
+      accept(res.data, false);
     } catch {
-      if (!saved) {
-        setError('Unable to load AI settings.');
-      }
+      // Keep existing cached state if available
     } finally {
       setLoading(false);
     }
-  }, [saved]);
+  }, [accept]);
 
-  // Initial load
-  useEffect(() => { load(true); }, [load]);
+  // Initial load - run once on mount with stable callback
+  useEffect(() => {
+    load(true);
+  }, [load]);
 
-  // Re-load whenever the panel becomes visible (e.g. user switches to the Tokens tab)
-  // and silently revalidate if already loaded, or full load if not.
+  // Re-load only when becoming visible IF user has not typed an unsaved API key
   const prevVisible = useRef(isVisible);
   useEffect(() => {
     if (isVisible && !prevVisible.current) {
-      load(true);
+      if (!apiKeyRef.current.trim() && !dirtyRef.current) {
+        load(true);
+      }
     }
     prevVisible.current = isVisible;
   }, [isVisible, load]);
 
-  // On web: retry when the browser tab regains focus (handles page-level visibility)
+  // On web: do NOT reload if the user is typing/pasting an API key or has unsaved changes
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const onVisibility = () => {
       if (document.visibilityState === 'visible' && isVisible) {
-        load(true);
+        if (!apiKeyRef.current.trim() && !dirtyRef.current) {
+          load(true);
+        }
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
@@ -153,7 +183,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
       const response = clear
         ? await tokenSettingsApi.clearAI()
         : await tokenSettingsApi.updateAI({ provider, model: model.trim(), api_key: apiKey.trim() || undefined });
-      accept(response.data);
+      accept(response.data, true);
       setMessage(clear ? 'AI credentials cleared. AI is disabled.' : 'Connection tested and settings saved.');
     } catch (e: any) {
       const errors = e.response?.data?.errors;
@@ -171,9 +201,8 @@ export function AISettingsPanel({ isVisible = true }: Props) {
   const edited = () => { setError(''); setMessage(''); };
 
   const providerName = (saved?.providers || []).find(p => p.id === provider)?.name ?? provider;
-  const canKeepKey   = saved?.configured && saved.provider === provider;
+  const canKeepKey   = Boolean(saved?.configured && saved.provider === provider);
   const canSave      = !!saved && !!model.trim() && (!!apiKey.trim() || canKeepKey) && !busy;
-  const dirty        = !!saved && (provider !== saved.provider || model.trim() !== saved.model || !!apiKey.trim());
   const connected    = !!saved?.configured && !!saved.verified_at;
   const meta         = getProviderMeta(provider);
   const status       = !saved
@@ -292,7 +321,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                     editable={!busy && !loading}
                     maxLength={2048}
                     placeholderTextColor="#94A3B8"
-                    placeholder={canKeepKey ? '•••••• Saved key (unchanged)' : 'Enter API Key (Optional)'}
+                    placeholder={canKeepKey ? '•••••••••••••••• (Encrypted on server)' : 'Enter API Key'}
                   />
                   <TouchableOpacity
                     accessibilityRole="button"
@@ -305,8 +334,10 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                     <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={17} color="#94A3B8" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.fieldHint}>
-                  {canKeepKey && !apiKey ? 'Leave blank to keep saved key' : 'Enter provider API key'}
+                <Text style={[styles.fieldHint, canKeepKey && !apiKey ? { color: '#059669', fontWeight: '500' } : null]}>
+                  {canKeepKey && !apiKey
+                    ? '✓ Active API key is encrypted and stored safely on server. Enter a new key only to replace.'
+                    : 'Enter provider API key. It will be verified before saving.'}
                 </Text>
               </View>
             </View>
@@ -393,7 +424,8 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                         setProvider(opt.id);
                         setApiKey('');
                         setShowKey(false);
-                        setModel(opt.id === saved.provider ? saved.model : '');
+                        const nextModel = (saved && opt.id === saved.provider) ? saved.model : (DEFAULT_MODELS[opt.id] || '');
+                        setModel(nextModel);
                         edited();
                         setConfirmClear(false);
                       }
