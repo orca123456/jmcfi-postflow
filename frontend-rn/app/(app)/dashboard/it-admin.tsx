@@ -4585,8 +4585,8 @@ $response = curl_exec($ch);`}
           <View style={{ gap: Spacing.lg }}>
 
             {/* Main Table Card */}
-            <Card style={styles.userCard}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+            <Card style={[styles.userCard, { overflow: 'visible', position: 'relative', zIndex: 100 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18, position: 'relative', zIndex: 500 }}>
                 <View style={{ gap: 2 }}>
                   <Text style={styles.sectionHeader}>Activity Log Records</Text>
                   <Text style={{ fontSize: 13, color: Colors.textSecondary }}>
@@ -4594,7 +4594,7 @@ $response = curl_exec($ch);`}
                   </Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, width: !isTablet ? '100%' : 'auto' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, width: !isTablet ? '100%' : 'auto', position: 'relative', zIndex: 600 }}>
                   {/* Search input */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: !isTablet ? 1 : undefined, minWidth: !isTablet ? 180 : 260, height: 38, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
                     <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
@@ -4613,7 +4613,37 @@ $response = curl_exec($ch);`}
                   </View>
 
                   {/* Date Filter Dropdown */}
-                  <View style={{ position: 'relative', zIndex: 60 }}>
+                  <View style={{ position: 'relative', zIndex: isAuditDateDropdownOpen ? 1000 : 50 }}>
+                    {isAuditDateDropdownOpen && (
+                      Platform.OS === 'web' ? (
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          onPress={() => setIsAuditDateDropdownOpen(false)}
+                          style={{
+                            position: 'fixed' as any,
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 99990,
+                          }}
+                        />
+                      ) : (
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          onPress={() => setIsAuditDateDropdownOpen(false)}
+                          style={{
+                            position: 'absolute',
+                            top: -1000,
+                            left: -1000,
+                            right: -1000,
+                            bottom: -1000,
+                            zIndex: 99990,
+                          }}
+                        />
+                      )
+                    )}
+
                     <TouchableOpacity
                       onPress={() => setIsAuditDateDropdownOpen(prev => !prev)}
                       style={{
@@ -4642,16 +4672,16 @@ $response = curl_exec($ch);`}
                         right: 0,
                         backgroundColor: '#FFFFFF',
                         borderWidth: 1,
-                        borderColor: '#E5E7EB',
+                        borderColor: '#E2E8F0',
                         borderRadius: 10,
                         paddingVertical: 6,
                         width: 190,
                         shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.12,
-                        shadowRadius: 10,
-                        elevation: 10,
-                        zIndex: 999,
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.18,
+                        shadowRadius: 16,
+                        elevation: 50,
+                        zIndex: 99999,
                       }}>
                         {(['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'This Month', 'Custom Range'] as const).map(option => {
                           const isSelected = auditDateFilter === option;
@@ -4831,7 +4861,7 @@ $response = curl_exec($ch);`}
               </View>
 
               {/* Logs Table Matching Screenshot */}
-              <View style={styles.table}>
+              <View style={[styles.table, { position: 'relative', zIndex: 1 }]}>
                 {isTablet ? (
                   /* Desktop / Tablet Table View */
                   <>
