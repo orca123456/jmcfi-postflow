@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use App\Models\PostMedia;
 use App\Models\User;
+use App\Http\Controllers\Api\SanctumSecurity\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -74,33 +75,7 @@ Route::get('/instagram-media/{media}.jpg', function (PostMedia $media) {
     ]);
 })->name('instagram.media');
 
-Route::get('/profile-photo/{user}', function (User $user) {
-    $path = str_replace('\\', '/', (string) $user->photo_path);
-
-    if ($path === '' || str_contains($path, '..') || str_starts_with($path, '/')) {
-        abort(404);
-    }
-
-    $defaultDisk = config('filesystems.default');
-    $disk = $defaultDisk === 'local' ? 'public' : $defaultDisk;
-
-    try {
-        if (! Storage::disk($disk)->exists($path)) {
-            abort(404);
-        }
-
-        $content = Storage::disk($disk)->get($path);
-        $mimeType = Storage::disk($disk)->mimeType($path) ?: 'image/jpeg';
-    } catch (Throwable) {
-        abort(404);
-    }
-
-    return response($content, 200, [
-        'Content-Type' => $mimeType,
-        'Content-Length' => (string) strlen($content),
-        'Cache-Control' => 'public, max-age=300',
-    ]);
-})->whereNumber('user')->name('profile.photo');
+Route::match(['GET', 'HEAD', 'OPTIONS'], '/profile-photo/{user}', [AuthController::class, 'getPhoto'])->whereNumber('user')->name('profile.photo');
 
 Route::get('/storage/{path}', function (string $path) {
     $filename = basename($path);

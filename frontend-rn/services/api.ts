@@ -10,6 +10,28 @@ const getToken = async (): Promise<string | null> => {
   return SecureStore.getItemAsync('auth_token');
 };
 
+export const resolveImageUrl = (url?: string | null): string | null => {
+  if (!url || typeof url !== 'string' || url.trim() === '') return null;
+  const trimmed = url.trim();
+  if (
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://')
+  ) {
+    return trimmed;
+  }
+  const base = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const hostBase = base.replace(/\/api\/?$/, '');
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+  if (Platform.OS === 'web' && process.env.NODE_ENV === 'production') {
+    return cleanPath;
+  }
+
+  return `${hostBase}${cleanPath}`;
+};
+
 const API_BASE_URL = Platform.OS === 'web' && process.env.NODE_ENV === 'production' 
   ? '/api' 
   : (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api');

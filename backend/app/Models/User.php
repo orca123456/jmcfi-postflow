@@ -58,12 +58,22 @@ class User extends Authenticatable implements MustVerifyEmail
             return null;
         }
 
+        $disk = config('filesystems.default');
+        if ($disk === 's3' || $disk === 'b2') {
+            return \Illuminate\Support\Facades\Storage::disk($disk)->url($this->photo_path);
+        }
+
         $version = $this->updated_at?->getTimestamp();
-        $path = '/profile-photo/' . $this->getKey() . ($version ? '?v=' . $version : '');
+        $path = '/api/profile-photo/' . $this->getKey() . ($version ? '?v=' . $version : '');
 
         $railwayDomain = env('RAILWAY_PUBLIC_DOMAIN');
         if ($railwayDomain) {
             return 'https://' . rtrim($railwayDomain, '/') . $path;
+        }
+
+        $appUrl = config('app.url');
+        if ($appUrl && !str_contains($appUrl, 'localhost')) {
+            return rtrim($appUrl, '/') . $path;
         }
 
         if (request()->hasHeader('Host')) {
