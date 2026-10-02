@@ -25,6 +25,7 @@ import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, dashboardApi, authApi, resolveImageUrl } from '../../../services/api';
+import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 
 export default function VPDashboard() {
   const router = useRouter();
@@ -97,6 +98,8 @@ export default function VPDashboard() {
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropperModalVisible, setCropperModalVisible] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState<string | null>(null);
   const [acctFullName, setAcctFullName] = useState('');
   const [acctCurrentPw, setAcctCurrentPw] = useState('');
   const [acctNewPw, setAcctNewPw] = useState('');
@@ -227,32 +230,39 @@ export default function VPDashboard() {
   const handleUploadPhoto = () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
-      input.onchange = async (e: any) => {
+      input.onchange = (e: any) => {
         const f = e.target.files?.[0]; if (!f) return;
-        let previewUrl: string | null = null;
-        try {
-          previewUrl = URL.createObjectURL(f);
-          setProfilePhotoUrl(previewUrl);
-        } catch (_) {}
-        setUploadingPhoto(true);
-        try {
-          const r = await authApi.uploadPhoto(f);
-          const updatedUser = r.data?.user;
-          const rawPhotoUrl = r.data?.photo_url || updatedUser?.photo_url || null;
-          const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
-          setProfilePhotoUrl(nextPhotoUrl);
-          if (user) {
-            await useAuthStore.getState().setUser({
-              ...user,
-              ...(updatedUser || {}),
-              role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
-              photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
-            });
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setCropImageUri(event.target.result as string);
+            setCropperModalVisible(true);
           }
-        } catch { } finally { setUploadingPhoto(false); }
+        };
+        reader.readAsDataURL(f);
       };
       input.click();
     }
+  };
+
+  const handleSaveCroppedPhoto = async (croppedFile: File, previewUrl: string) => {
+    setProfilePhotoUrl(previewUrl);
+    setUploadingPhoto(true);
+    try {
+      const r = await authApi.uploadPhoto(croppedFile);
+      const updatedUser = r.data?.user;
+      const rawPhotoUrl = r.data?.photo_url || updatedUser?.photo_url || null;
+      const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
+      setProfilePhotoUrl(nextPhotoUrl);
+      if (user) {
+        await useAuthStore.getState().setUser({
+          ...user,
+          ...(updatedUser || {}),
+          role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
+          photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
+        });
+      }
+    } catch { } finally { setUploadingPhoto(false); }
   };
   const handleRemovePhoto = async () => {
     setUploadingPhoto(true);
@@ -871,6 +881,16 @@ export default function VPDashboard() {
               </Card>
             </View>
           </View>
+
+          <ProfilePictureCropperModal
+            visible={cropperModalVisible}
+            imageUri={cropImageUri}
+            onClose={() => {
+              setCropperModalVisible(false);
+              setCropImageUri(null);
+            }}
+            onSave={handleSaveCroppedPhoto}
+          />
         </View>
       )}
 
