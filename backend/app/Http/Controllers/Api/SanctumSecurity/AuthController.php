@@ -20,6 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    private const MAX_LOGIN_ATTEMPTS = 3;
+
     public function login(LoginRequest $request): JsonResponse
     {
         $throttleKey = $this->loginThrottleKey($request);
@@ -91,7 +93,7 @@ class AuthController extends Controller
     private function loginLockoutSeconds(string $key): int
     {
         if ($this->shouldUseRedisLoginLockout()) {
-            return RateLimiter::tooManyAttempts($key, 6)
+            return RateLimiter::tooManyAttempts($key, self::MAX_LOGIN_ATTEMPTS)
                 ? max(1, RateLimiter::availableIn($key))
                 : 0;
         }
@@ -150,7 +152,7 @@ class AuthController extends Controller
         if ($this->shouldUseRedisLoginLockout()) {
             RateLimiter::hit($key, 59);
 
-            return RateLimiter::tooManyAttempts($key, 6)
+            return RateLimiter::tooManyAttempts($key, self::MAX_LOGIN_ATTEMPTS)
                 ? max(1, RateLimiter::availableIn($key))
                 : 0;
         }
@@ -168,8 +170,8 @@ class AuthController extends Controller
 
                 $attempts++;
                 $payload = [
-                    'attempts' => min($attempts, 6),
-                    'locked_until' => $attempts >= 6 ? $windowEndsAt : null,
+                    'attempts' => min($attempts, self::MAX_LOGIN_ATTEMPTS),
+                    'locked_until' => $attempts >= self::MAX_LOGIN_ATTEMPTS ? $windowEndsAt : null,
                     'expires_at' => $windowEndsAt,
                     'updated_at' => $now,
                 ];
@@ -183,14 +185,14 @@ class AuthController extends Controller
                     ]));
                 }
 
-                return $attempts >= 6 ? 59 : 0;
+                return $attempts >= self::MAX_LOGIN_ATTEMPTS ? 59 : 0;
             });
         }
 
         if (! Schema::hasTable('cache')) {
             RateLimiter::hit($key, 59);
 
-            return RateLimiter::tooManyAttempts($key, 6)
+            return RateLimiter::tooManyAttempts($key, self::MAX_LOGIN_ATTEMPTS)
                 ? 59
                 : 0;
         }
@@ -208,10 +210,10 @@ class AuthController extends Controller
             }
 
             $attempts++;
-            $lockedUntil = $attempts >= 6 ? $expiresAt : null;
+            $lockedUntil = $attempts >= self::MAX_LOGIN_ATTEMPTS ? $expiresAt : null;
             $payload = [
                 'value' => json_encode([
-                    'attempts' => min($attempts, 6),
+                    'attempts' => min($attempts, self::MAX_LOGIN_ATTEMPTS),
                     'locked_until' => $lockedUntil,
                 ]),
                 'expiration' => $expiresAt,
@@ -225,7 +227,7 @@ class AuthController extends Controller
                 ]));
             }
 
-            return $attempts >= 6 ? 59 : 0;
+            return $attempts >= self::MAX_LOGIN_ATTEMPTS ? 59 : 0;
         });
     }
 
