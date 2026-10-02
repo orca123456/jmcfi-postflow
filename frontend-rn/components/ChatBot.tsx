@@ -249,6 +249,162 @@ export function ChatBot() {
     };
   }, [isOpen]);
 
+  const renderFormattedMessage = (rawText: string, isUser: boolean) => {
+    if (!rawText) return null;
+
+    const baseTextStyle = [
+      styles.messageText,
+      isUser ? styles.userMessageText : styles.botMessageText,
+    ];
+
+    const boldTextStyle = {
+      fontWeight: '700' as const,
+      color: isUser ? '#FFFFFF' : '#0F172A',
+    };
+
+    const renderInline = (lineContent: string, keyPrefix: string) => {
+      // Split by **bold**, __bold__, *italic*, or `code`
+      const regex = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*]+\*)/g;
+      const segments = lineContent.split(regex);
+
+      return segments.map((seg, idx) => {
+        if (!seg) return null;
+
+        // **bold** or __bold__
+        if (
+          (seg.startsWith('**') && seg.endsWith('**') && seg.length >= 4) ||
+          (seg.startsWith('__') && seg.endsWith('__') && seg.length >= 4)
+        ) {
+          return (
+            <Text key={`${keyPrefix}-b-${idx}`} style={[baseTextStyle, boldTextStyle]}>
+              {seg.slice(2, -2)}
+            </Text>
+          );
+        }
+
+        // *italic*
+        if (seg.startsWith('*') && seg.endsWith('*') && seg.length >= 2) {
+          return (
+            <Text key={`${keyPrefix}-i-${idx}`} style={[baseTextStyle, { fontStyle: 'italic' }]}>
+              {seg.slice(1, -1)}
+            </Text>
+          );
+        }
+
+        // `code`
+        if (seg.startsWith('`') && seg.endsWith('`') && seg.length >= 2) {
+          return (
+            <Text
+              key={`${keyPrefix}-c-${idx}`}
+              style={[
+                baseTextStyle,
+                {
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : '#F1F5F9',
+                  paddingHorizontal: 4,
+                  borderRadius: 3,
+                },
+              ]}
+            >
+              {seg.slice(1, -1)}
+            </Text>
+          );
+        }
+
+        // Clean any leftover double asterisks or loose backticks
+        const cleanSeg = seg.replace(/\*\*/g, '').replace(/`/g, '');
+        return (
+          <Text key={`${keyPrefix}-t-${idx}`} style={baseTextStyle}>
+            {cleanSeg}
+          </Text>
+        );
+      });
+    };
+
+    const lines = rawText.split('\n');
+    const elements: React.ReactNode[] = [];
+    let currentListItems: React.ReactNode[] = [];
+
+    const flushList = (flushKey: string) => {
+      if (currentListItems.length > 0) {
+        elements.push(
+          <View key={`list-${flushKey}`} style={styles.messageListContainer}>
+            {currentListItems}
+          </View>
+        );
+        currentListItems = [];
+      }
+    };
+
+    lines.forEach((line, lineIdx) => {
+      const trimmed = line.trim();
+
+      // Empty line -> small spacer
+      if (!trimmed) {
+        flushList(`flush-${lineIdx}`);
+        elements.push(<View key={`spacer-${lineIdx}`} style={{ height: 6 }} />);
+        return;
+      }
+
+      // Bullet item (- or * or •)
+      const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
+      if (bulletMatch) {
+        const content = bulletMatch[1];
+        currentListItems.push(
+          <View key={`bullet-${lineIdx}`} style={styles.messageBulletRow}>
+            <Text style={[styles.messageBulletDot, { color: isUser ? '#FFFFFF' : '#7C3AED' }]}>•</Text>
+            <Text style={[styles.messageBulletText, isUser ? styles.userMessageText : styles.botMessageText]}>
+              {renderInline(content, `b-${lineIdx}`)}
+            </Text>
+          </View>
+        );
+        return;
+      }
+
+      // Numbered list item (1. or 2.)
+      const numberMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if (numberMatch) {
+        const num = numberMatch[1];
+        const content = numberMatch[2];
+        currentListItems.push(
+          <View key={`num-${lineIdx}`} style={styles.messageBulletRow}>
+            <Text style={[styles.messageNumberIndex, { color: isUser ? '#FFFFFF' : '#7C3AED' }]}>{num}.</Text>
+            <Text style={[styles.messageBulletText, isUser ? styles.userMessageText : styles.botMessageText]}>
+              {renderInline(content, `n-${lineIdx}`)}
+            </Text>
+          </View>
+        );
+        return;
+      }
+
+      // If it's a regular line, flush any pending list items
+      flushList(`flush-${lineIdx}`);
+
+      // Markdown header (### or ## or #)
+      const headerMatch = trimmed.match(/^(#{1,3})\s+(.*)$/);
+      if (headerMatch) {
+        const content = headerMatch[2];
+        elements.push(
+          <Text key={`h-${lineIdx}`} style={[baseTextStyle, boldTextStyle, { fontSize: 13, marginTop: 4, marginBottom: 2 }]}>
+            {renderInline(content, `h-${lineIdx}`)}
+          </Text>
+        );
+        return;
+      }
+
+      // Regular paragraph line
+      elements.push(
+        <Text key={`p-${lineIdx}`} style={baseTextStyle}>
+          {renderInline(line, `p-${lineIdx}`)}
+        </Text>
+      );
+    });
+
+    flushList('final');
+    return <View style={{ gap: 2 }}>{elements}</View>;
+  };
+
   const sendMessage = async (text?: string) => {
     const msgText = (text ?? inputText).trim();
     if (!msgText) return;
@@ -382,12 +538,7 @@ export function ChatBot() {
                     styles.bubbleContent,
                     msg.role === 'user' ? styles.userBubbleContent : styles.botBubbleContent,
                   ]}>
-                    <Text style={[
-                      styles.messageText,
-                      msg.role === 'user' ? styles.userMessageText : styles.botMessageText,
-                    ]}>
-                      {msg.text}
-                    </Text>
+                    {renderFormattedMessage(msg.text, msg.role === 'user')}
                   </View>
                   <View style={[styles.messageFooter, msg.role === 'user' ? styles.userFooter : styles.botFooter]}>
                     <Text style={styles.timestampText}>{formatTime(msg.timestamp)}</Text>
@@ -680,6 +831,32 @@ const styles = StyleSheet.create({
   },
   botMessageText: {
     color: '#0F172A',
+  },
+  messageListContainer: {
+    gap: 4,
+    marginVertical: 2,
+  },
+  messageBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingLeft: 2,
+  },
+  messageBulletDot: {
+    fontSize: 12,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  messageNumberIndex: {
+    fontSize: 12,
+    lineHeight: 19,
+    fontWeight: '700',
+    minWidth: 16,
+  },
+  messageBulletText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
   },
   messageFooter: {
     flexDirection: 'row',
