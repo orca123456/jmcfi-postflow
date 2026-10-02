@@ -16,6 +16,14 @@ class AuditLogController extends Controller
             $query->where('event_type', $request->event_type);
         }
 
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
         if ($request->filled('search')) {
             $search = (string) $request->search;
             $query->where(function ($q) use ($search) {
@@ -38,6 +46,8 @@ class AuditLogController extends Controller
             return [
                 'id' => 'log-' . $log->id,
                 'timestamp' => $log->created_at->format('M d, Y - h:i:s A'),
+                'rawDate' => $log->created_at->toIso8601String(),
+                'date' => $log->created_at->format('Y-m-d'),
                 'userName' => $log->user ? $log->user->full_name : 'System',
                 'userEmail' => $log->user ? $log->user->email : '',
                 'userRole' => $log->user && $log->user->roles->count() > 0 ? ($log->user->roles->first()->display_name ?? $log->user->roles->first()->name) : 'User',
