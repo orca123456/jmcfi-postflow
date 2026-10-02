@@ -9,6 +9,7 @@ import {
   Animated,
   Image,
   PanResponder,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../constants/theme';
@@ -25,6 +26,8 @@ const SUGGESTED_QUESTIONS = [
   'How do I upload a document?',
   'Show pending requirements',
   'Summarize this file',
+  'Check post guidelines',
+  'Compliance policies',
 ];
 
 export function ChatBot() {
@@ -42,6 +45,14 @@ export function ChatBot() {
   const [isRevealed, setIsRevealed] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+  const suggestedScrollRef = useRef<ScrollView>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const isDraggingSuggested = useRef(false);
+  const dragStartX = useRef(0);
+  const dragScrollLeft = useRef(0);
+  const dragMoved = useRef(false);
+
   const slideAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const edgeAnim = useRef(new Animated.Value(0)).current;
@@ -142,6 +153,101 @@ export function ChatBot() {
   const scrollToBottom = () => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
+
+  const checkSuggestedScroll = () => {
+    if (Platform.OS === 'web' && suggestedScrollRef.current) {
+      const node = (suggestedScrollRef.current as any)?.getScrollableNode?.() || (suggestedScrollRef.current as any);
+      if (node) {
+        setCanScrollLeft(node.scrollLeft > 4);
+        setCanScrollRight(node.scrollLeft < node.scrollWidth - node.clientWidth - 4);
+      }
+    }
+  };
+
+  const handleSuggestedScrollBy = (offset: number) => {
+    if (Platform.OS === 'web' && suggestedScrollRef.current) {
+      const node = (suggestedScrollRef.current as any)?.getScrollableNode?.() || (suggestedScrollRef.current as any);
+      if (node && typeof node.scrollBy === 'function') {
+        node.scrollBy({ left: offset, behavior: 'smooth' });
+        setTimeout(checkSuggestedScroll, 200);
+        return;
+      }
+    }
+    suggestedScrollRef.current?.scrollTo({ x: offset > 0 ? 300 : 0, animated: true });
+  };
+
+  const handleChipPress = (qr: string) => {
+    if (dragMoved.current) {
+      return;
+    }
+    sendMessage(qr);
+  };
+
+  // Enable horizontal mouse wheel scrolling and mouse dragging on web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !isOpen) return;
+
+    const cleanupFns: (() => void)[] = [];
+
+    const timer = setTimeout(() => {
+      const node = (suggestedScrollRef.current as any)?.getScrollableNode?.() || (suggestedScrollRef.current as any);
+      if (!node || !node.addEventListener) return;
+
+      checkSuggestedScroll();
+      node.style.cursor = 'grab';
+
+      const onWheel = (e: WheelEvent) => {
+        if (e.deltaY !== 0 || e.deltaX !== 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          node.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+          checkSuggestedScroll();
+        }
+      };
+
+      const onMouseDown = (e: MouseEvent) => {
+        isDraggingSuggested.current = true;
+        dragMoved.current = false;
+        dragStartX.current = e.pageX;
+        dragScrollLeft.current = node.scrollLeft;
+        node.style.cursor = 'grabbing';
+      };
+
+      const onMouseMove = (e: MouseEvent) => {
+        if (!isDraggingSuggested.current) return;
+        const diff = e.pageX - dragStartX.current;
+        if (Math.abs(diff) > 4) {
+          dragMoved.current = true;
+        }
+        node.scrollLeft = dragScrollLeft.current - diff;
+        checkSuggestedScroll();
+      };
+
+      const onMouseUp = () => {
+        if (isDraggingSuggested.current) {
+          isDraggingSuggested.current = false;
+          node.style.cursor = 'grab';
+        }
+      };
+
+      node.addEventListener('wheel', onWheel, { passive: false });
+      node.addEventListener('mousedown', onMouseDown);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+
+      cleanupFns.push(() => {
+        node.removeEventListener('wheel', onWheel);
+        node.removeEventListener('mousedown', onMouseDown);
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      cleanupFns.forEach((fn) => fn());
+    };
+  }, [isOpen]);
 
   const sendMessage = async (text?: string) => {
     const msgText = (text ?? inputText).trim();
@@ -317,15 +423,43 @@ export function ChatBot() {
 
           {/* Suggested Questions */}
           <View style={styles.suggestedContainer}>
-            <Text style={styles.suggestedTitle}>Suggested Questions</Text>
+            <View style={styles.suggestedHeaderRow}>
+              <Text style={styles.suggestedTitle}>Suggested Questions</Text>
+              <View style={styles.suggestedArrows}>
+                <TouchableOpacity
+                  onPress={() => handleSuggestedScrollBy(-160)}
+                  style={[styles.suggestedArrowBtn, !canScrollLeft && styles.suggestedArrowBtnDisabled]}
+                  disabled={!canScrollLeft}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="chevron-back" size={13} color={canScrollLeft ? '#5B0FB8' : '#CBD5E1'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleSuggestedScrollBy(160)}
+                  style={[styles.suggestedArrowBtn, !canScrollRight && styles.suggestedArrowBtnDisabled]}
+                  disabled={!canScrollRight}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="chevron-forward" size={13} color={canScrollRight ? '#5B0FB8' : '#CBD5E1'} />
+                </TouchableOpacity>
+              </View>
+            </View>
             <ScrollView
+              ref={suggestedScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
+              onScroll={checkSuggestedScroll}
+              scrollEventThrottle={16}
               style={styles.quickRepliesRow}
               contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 6 }}
             >
               {SUGGESTED_QUESTIONS.map((qr) => (
-                <TouchableOpacity key={qr} style={styles.quickReplyChip} onPress={() => sendMessage(qr)}>
+                <TouchableOpacity
+                  key={qr}
+                  style={styles.quickReplyChip}
+                  onPress={() => handleChipPress(qr)}
+                  activeOpacity={0.7}
+                >
                   <Ionicons name="help-circle-outline" size={12} color="#5B0FB8" style={{ marginRight: 4 }} />
                   <Text style={styles.quickReplyText} numberOfLines={1}>{qr}</Text>
                 </TouchableOpacity>
@@ -606,20 +740,43 @@ const styles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
     paddingTop: 8,
-    paddingBottom: 2,
+    paddingBottom: 4,
+  },
+  suggestedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    marginBottom: 4,
   },
   suggestedTitle: {
     fontSize: 10,
     fontWeight: '800',
     color: '#64748B',
-    paddingHorizontal: 12,
-    marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  suggestedArrows: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  suggestedArrowBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer' as any,
+  },
+  suggestedArrowBtnDisabled: {
+    opacity: 0.35,
+    cursor: 'default' as any,
+  },
   quickRepliesRow: {
     backgroundColor: '#FFFFFF',
-    maxHeight: 44,
+    maxHeight: 46,
   },
   quickReplyChip: {
     backgroundColor: '#F5F3FF',
@@ -630,6 +787,9 @@ const styles = StyleSheet.create({
     borderColor: '#DDD6FE',
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
+    userSelect: 'none' as any,
+    cursor: 'pointer' as any,
   },
   quickReplyText: {
     fontSize: 11,
