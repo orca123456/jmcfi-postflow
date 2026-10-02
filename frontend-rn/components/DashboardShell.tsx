@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleLabel, getRoleColor, getRoleDashboardPath, getAvatarColors } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../constants/theme';
+import { resolveImageUrl } from '../services/api';
 import { ChatBot } from './ChatBot';
 import { departmentsApi, authApi, notificationsApi } from '../services/api';
 
@@ -182,7 +183,8 @@ export function DashboardShell({
   const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
   const finalDeptName = departmentName || user?.department || 'JMCFI';
   const photoFromUser = (user as any)?.photo_url;
-  const finalPhotoUrl = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
+  const rawPhoto = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
+  const finalPhotoUrl = resolveImageUrl(rawPhoto);
   const shouldShowPhoto = Boolean(finalPhotoUrl && !photoLoadFailed);
 
   React.useEffect(() => {

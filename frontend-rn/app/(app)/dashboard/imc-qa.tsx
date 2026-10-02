@@ -23,7 +23,7 @@ import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
-import { postsApi, dashboardApi, authApi } from '../../../services/api';
+import { postsApi, dashboardApi, authApi, resolveImageUrl } from '../../../services/api';
 import { useQuery } from '@tanstack/react-query';
 
 export default function ImcQaDashboard() {
@@ -106,7 +106,7 @@ export default function ImcQaDashboard() {
   useEffect(() => {
     if (user) {
       setAcctFullName(`${user.first_name || ''} ${user.last_name || ''}`.trim());
-      setProfilePhotoUrl(user.photo_url || null);
+      setProfilePhotoUrl(resolveImageUrl(user.photo_url));
     }
   }, [user?.id, user?.photo_url]);
 
@@ -115,18 +115,24 @@ export default function ImcQaDashboard() {
       const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
       input.onchange = async (e: any) => {
         const f = e.target.files?.[0]; if (!f) return;
+        let previewUrl: string | null = null;
+        try {
+          previewUrl = URL.createObjectURL(f);
+          setProfilePhotoUrl(previewUrl);
+        } catch (_) {}
         setUploadingPhoto(true);
         try {
           const r = await authApi.uploadPhoto(f);
           const updatedUser = r.data?.user;
-          const nextPhotoUrl = r.data?.photo_url || updatedUser?.photo_url || null;
+          const rawPhotoUrl = r.data?.photo_url || updatedUser?.photo_url || null;
+          const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
           setProfilePhotoUrl(nextPhotoUrl);
           if (user) {
             await useAuthStore.getState().setUser({
               ...user,
               ...(updatedUser || {}),
               role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
-              photo_url: nextPhotoUrl || undefined,
+              photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
             });
           }
         } catch { } finally { setUploadingPhoto(false); }
@@ -803,9 +809,9 @@ export default function ImcQaDashboard() {
 
                 {/* Profile Picture Upload Section */}
                 <View style={styles.profilePicUploadContainer}>
-                  <View style={styles.profilePicLarge}>
+                  <View style={[styles.profilePicLarge, { overflow: 'hidden' }]}>
                     {profilePhotoUrl ? (
-                      <Image source={{ uri: profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
+                      <Image source={{ uri: resolveImageUrl(profilePhotoUrl) || profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
                     ) : (
                       <Text style={styles.profilePicLargeText}>
                         {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'QA'}

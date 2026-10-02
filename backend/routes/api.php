@@ -40,6 +40,8 @@ Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->middlewar
 Route::put('/auth/password', [AuthController::class, 'updatePassword'])->middleware('auth:sanctum');
 Route::post('/auth/profile-photo', [AuthController::class, 'uploadPhoto'])->middleware('auth:sanctum');
 Route::delete('/auth/profile-photo', [AuthController::class, 'removePhoto'])->middleware('auth:sanctum');
+Route::match(['GET', 'HEAD', 'OPTIONS'], '/profile-photo/{user}', [AuthController::class, 'getPhoto'])->whereNumber('user');
+Route::match(['GET', 'HEAD', 'OPTIONS'], '/auth/profile-photo/{user}', [AuthController::class, 'getPhoto'])->whereNumber('user');
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

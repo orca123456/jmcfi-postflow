@@ -28,7 +28,7 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
-import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi } from '../../../services/api';
+import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi, resolveImageUrl } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
@@ -864,7 +864,8 @@ export default function ITAdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'account-settings') {
-      setProfilePhotoUrl(user?.photo_url || null);
+      const resolved = resolveImageUrl(user?.photo_url);
+      setProfilePhotoUrl(resolved);
       setProfilePhotoLoadFailed(false);
     }
   }, [activeTab, user?.photo_url]);
@@ -877,11 +878,21 @@ export default function ITAdminDashboard() {
       input.onchange = async (e: any) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Instant local preview so the user immediately sees the photo
+        let previewUrl: string | null = null;
+        try {
+          previewUrl = URL.createObjectURL(file);
+          setProfilePhotoUrl(previewUrl);
+          setProfilePhotoLoadFailed(false);
+        } catch (_) {}
+
         setUploadingPhoto(true);
         try {
           const res = await authApi.uploadPhoto(file);
           const updatedUser = res.data?.user;
-          const nextPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+          const rawPhotoUrl = res.data?.photo_url || updatedUser?.photo_url || null;
+          const nextPhotoUrl = resolveImageUrl(rawPhotoUrl) || previewUrl;
           setProfilePhotoUrl(nextPhotoUrl);
           setProfilePhotoLoadFailed(false);
           if (user) {
@@ -889,7 +900,7 @@ export default function ITAdminDashboard() {
               ...user,
               ...(updatedUser || {}),
               role: updatedUser?.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : (updatedUser?.role || user.role),
-              photo_url: nextPhotoUrl || undefined,
+              photo_url: rawPhotoUrl || nextPhotoUrl || undefined,
             });
           }
           setUsers(currentUsers => currentUsers.map(u => String(u.id) === String(user?.id) ? { ...u, photo_url: nextPhotoUrl } : u));
@@ -4102,13 +4113,16 @@ $response = curl_exec($ch);`}
               <View style={styles.settingsDivider} />
 
               <View style={styles.profilePictureRow}>
-                <View style={styles.profileAvatarLarge}>
+                <View style={[styles.profileAvatarLarge, { overflow: 'hidden' }]}>
                   {profilePhotoUrl && !profilePhotoLoadFailed ? (
                     <Image
-                      source={{ uri: profilePhotoUrl }}
+                      source={{ uri: resolveImageUrl(profilePhotoUrl) || profilePhotoUrl }}
                       style={{ width: 72, height: 72, borderRadius: 36 }}
                       resizeMode="cover"
-                      onError={() => setProfilePhotoLoadFailed(true)}
+                      onError={() => {
+                        console.warn('Profile photo failed to load:', profilePhotoUrl);
+                        setProfilePhotoLoadFailed(true);
+                      }}
                     />
                   ) : (
                     <Text style={styles.profileAvatarTextLarge}>{user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'IT'}</Text>

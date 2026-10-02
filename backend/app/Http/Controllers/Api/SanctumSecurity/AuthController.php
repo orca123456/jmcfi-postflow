@@ -416,4 +416,41 @@ class AuthController extends Controller
             'user' => new UserResource($user->fresh()->load('roles')),
         ]);
     }
+
+    public function getPhoto(User $user)
+    {
+        $path = str_replace('\\', '/', (string) $user->photo_path);
+
+        if ($path === '' || str_contains($path, '..') || str_starts_with($path, '/')) {
+            abort(404);
+        }
+
+        $defaultDisk = config('filesystems.default');
+        $disk = $defaultDisk === 'local' ? 'public' : $defaultDisk;
+
+        try {
+            if (! Storage::disk($disk)->exists($path)) {
+                if ($disk !== 'public' && Storage::disk('public')->exists($path)) {
+                    $disk = 'public';
+                } else {
+                    abort(404);
+                }
+            }
+
+            $content = Storage::disk($disk)->get($path);
+            $mimeType = Storage::disk($disk)->mimeType($path) ?: 'image/jpeg';
+        } catch (\Throwable) {
+            abort(404);
+        }
+
+        return response($content, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => (string) strlen($content),
+            'Cache-Control' => 'public, max-age=300',
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers' => '*',
+        ]);
+    }
 }
+
