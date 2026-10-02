@@ -25,7 +25,7 @@ let html = fs.readFileSync(distIndex, 'utf-8');
 const SKELETON_CSS = `
   <style id="postflow-shell-css">
     :root {
-      --brand-navy: #1a2744;
+      --brand-navy: rgb(91, 15, 184);
       --brand-blue: #2563eb;
       --brand-gold: #f59e0b;
       --sidebar-w: 240px;
