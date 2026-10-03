@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../constants/theme';
 import { chatbotApi } from '../services/api';
+import { useAuthStore } from '../store/auth';
 
 interface Message {
   id: string;
@@ -22,24 +23,93 @@ interface Message {
   timestamp: Date;
 }
 
-const SUGGESTED_QUESTIONS = [
-  'How do I upload a document?',
-  'Show pending requirements',
-  'Summarize this file',
-  'Check post guidelines',
-  'Compliance policies',
-];
-
 export function ChatBot() {
+  const user = useAuthStore((state) => state.user);
+
+  const { roleCategory, isAdmin, isApprover, suggestedQuestions, welcomeMessage } = useMemo(() => {
+    const rawRole = (user?.role || '').toLowerCase();
+    const isAdminRole = rawRole === 'admin' || rawRole === 'it_publisher' || rawRole === 'it_admin';
+    const isApproverRole = !isAdminRole && (
+      rawRole === 'approver' ||
+      rawRole === 'office_head' ||
+      rawRole === 'vice_president' ||
+      rawRole === 'imc_qa_checker' ||
+      rawRole === 'president'
+    );
+
+    const category = isAdminRole ? 'admin' : isApproverRole ? 'approver' : 'requestor';
+    const firstName = user?.first_name || user?.name?.split(' ')[0] || (isAdminRole ? 'Admin' : 'there');
+
+    let questions: string[] = [];
+    let greeting = '';
+
+    if (isAdminRole) {
+      greeting = `Hello, ${firstName}! You are in Admin Mode with NO BOUNDARIES. You can ask anything — from system health, audit logs, and platform tokens, to technical architecture, coding scripts, or open-ended inquiries. How can I assist you?`;
+      questions = [
+        'System health & publishing status',
+        'How to manage user accounts & roles',
+        'Review recent audit logs',
+        'Platform token configuration',
+        'Explain PostFlow system architecture',
+        'Ask any technical or general question',
+      ];
+    } else if (isApproverRole) {
+      greeting = `Hello, ${firstName}! I am your Approver Workflow Assistant. I can help guide you through compliance reviews, branding QA standards, returning posts for revision, and approval stages. How can I help?`;
+      questions = [
+        'How to review pending posts',
+        'Compliance & branding guidelines',
+        'Returning a post for revision',
+        'Workflow approval stages',
+        'Quality assurance criteria',
+        'Show pending approvals',
+      ];
+    } else {
+      greeting = `Hello, ${firstName}! I am here to help you navigate content creation, submission guidelines, media requirements, and status tracking in PostFlow. How can I help?`;
+      questions = [
+        'How do I upload a document?',
+        'Show pending requirements',
+        'Check post guidelines',
+        'Summarize content rules',
+        'Compliance policies',
+        'Track my submission status',
+      ];
+    }
+
+    return {
+      roleCategory: category,
+      isAdmin: isAdminRole,
+      isApprover: isApproverRole,
+      suggestedQuestions: questions,
+      welcomeMessage: greeting,
+    };
+  }, [user]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
       role: 'bot',
-      text: 'Hello! How can I help you today?',
+      text: welcomeMessage,
       timestamp: new Date(),
     },
   ]);
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].id === '0') {
+        return [
+          {
+            id: '0',
+            role: 'bot',
+            text: welcomeMessage,
+            timestamp: new Date(),
+          },
+        ];
+      }
+      return prev;
+    });
+  }, [welcomeMessage]);
+
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -496,9 +566,25 @@ export function ChatBot() {
               <View style={styles.botAvatar}>
                 <Image source={require('../assets/images/chatbot-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               </View>
-              <View>
-                <Text style={styles.chatHeaderTitle}>AI Assistant ✋</Text>
-                <Text style={styles.chatHeaderSub}>Drag header to move window.</Text>
+              <View style={{ flexShrink: 1 }}>
+                <View style={styles.headerTitleRow}>
+                  <Text style={styles.chatHeaderTitle}>AI Assistant</Text>
+                  <View style={[
+                    styles.roleBadge,
+                    isAdmin ? styles.adminBadge : isApprover ? styles.approverBadge : styles.requestorBadge,
+                  ]}>
+                    <Text style={styles.roleBadgeText}>
+                      {isAdmin ? 'ADMIN • UNRESTRICTED' : isApprover ? 'APPROVER' : 'REQUESTOR'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.chatHeaderSub} numberOfLines={1}>
+                  {isAdmin
+                    ? 'Unrestricted system & general intelligence mode'
+                    : isApprover
+                    ? 'Review, QA & workflow approval guidance'
+                    : 'Content submission & guideline assistant'}
+                </Text>
               </View>
             </View>
             <View style={styles.headerActions}>
@@ -604,7 +690,7 @@ export function ChatBot() {
               style={styles.quickRepliesRow}
               contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 6 }}
             >
-              {SUGGESTED_QUESTIONS.map((qr) => (
+              {suggestedQuestions.map((qr) => (
                 <TouchableOpacity
                   key={qr}
                   style={styles.quickReplyChip}
@@ -752,14 +838,46 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#4ADE80',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   chatHeaderTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
   },
+  roleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  adminBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    borderWidth: 1,
+    borderColor: '#F87171',
+  },
+  approverBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.25)',
+    borderWidth: 1,
+    borderColor: '#60A5FA',
+  },
+  requestorBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    borderWidth: 1,
+    borderColor: '#34D399',
+  },
+  roleBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
+  },
   chatHeaderSub: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.65)',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
   },
   closeBtn: {
     padding: 4,
