@@ -92,13 +92,15 @@ export const authApi = {
 export const postsApi = {
   list: (params?: object) => api.get('/posts', { params }),
   create: (data: object) => api.post('/posts', data),
-  createWithFiles: (formData: FormData) => api.post('/posts', formData, {
+  createWithFiles: (formData: FormData, onUploadProgress?: (progressEvent: any) => void) => api.post('/posts', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress,
   }),
-  updateWithFiles: (id: number, formData: FormData) => {
+  updateWithFiles: (id: number, formData: FormData, onUploadProgress?: (progressEvent: any) => void) => {
     formData.append('_method', 'PUT');
     return api.post(`/posts/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
     });
   },
   get: (id: number) => api.get(`/posts/${id}`),

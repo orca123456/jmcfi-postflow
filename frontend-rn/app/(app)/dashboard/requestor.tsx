@@ -63,6 +63,8 @@ export default function RequestorDashboard() {
   const [editingPostHasImage, setEditingPostHasImage] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState(0);
+  const [submitStatusText, setSubmitStatusText] = useState('');
   const requestActionLockedRef = useRef(false);
   const [draftToDelete, setDraftToDelete] = useState<string | null>(null);
   const [postTitle, setPostTitle] = useState('');
@@ -739,6 +741,8 @@ export default function RequestorDashboard() {
 
     requestActionLockedRef.current = true;
     setIsSubmittingRequest(true);
+    setSubmitProgress(10);
+    setSubmitStatusText('Preparing content request...');
     try {
       const payload: any = {
         title: postTitle,
@@ -757,6 +761,18 @@ export default function RequestorDashboard() {
 
       let res;
       if (mediaFiles.length > 0 || supportingDocs.length > 0) {
+        setSubmitProgress(20);
+        setSubmitStatusText(
+          mediaFiles.length > 0
+            ? `Optimizing ${mediaFiles.length} photo${mediaFiles.length > 1 ? 's' : ''}...`
+            : 'Preparing documents...'
+        );
+
+        const [optimizedMediaBlobs, docBlobs] = await Promise.all([
+          Promise.all(mediaFiles.map((file) => getFileBlob(file, true))),
+          Promise.all(supportingDocs.map((doc) => getFileBlob(doc, false))),
+        ]);
+
         const formData = new FormData();
         formData.append('title', payload.title);
         formData.append('caption_narrative', payload.caption_narrative);
@@ -771,11 +787,6 @@ export default function RequestorDashboard() {
         }
         formData.append('featured_media_index', String(featuredMediaIndex));
 
-        const [optimizedMediaBlobs, docBlobs] = await Promise.all([
-          Promise.all(mediaFiles.map((file) => getFileBlob(file, true))),
-          Promise.all(supportingDocs.map((doc) => getFileBlob(doc, false))),
-        ]);
-
         for (const blobObj of optimizedMediaBlobs) {
           formData.append('media[]', blobObj);
         }
@@ -784,12 +795,26 @@ export default function RequestorDashboard() {
           formData.append('supporting_docs[]', docObj);
         }
 
+        setSubmitProgress(35);
+        setSubmitStatusText('Uploading files to server...');
+
+        const onProgress = (progressEvent: any) => {
+          if (progressEvent && progressEvent.total) {
+            const rawPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const scaled = Math.min(Math.round(35 + rawPercent * 0.5), 88);
+            setSubmitProgress(scaled);
+            setSubmitStatusText(`Uploading media & files (${rawPercent}%)...`);
+          }
+        };
+
         if (editingPostId) {
-          res = await postsApi.updateWithFiles(Number(editingPostId), formData);
+          res = await postsApi.updateWithFiles(Number(editingPostId), formData, onProgress);
         } else {
-          res = await postsApi.createWithFiles(formData);
+          res = await postsApi.createWithFiles(formData, onProgress);
         }
       } else {
+        setSubmitProgress(45);
+        setSubmitStatusText('Submitting content request...');
         if (editingPostId) {
           res = await postsApi.update(Number(editingPostId), payload);
         } else {
@@ -797,9 +822,15 @@ export default function RequestorDashboard() {
         }
       }
 
+      setSubmitProgress(90);
+      setSubmitStatusText('Finalizing submission & workflow...');
+
       if (editingPostId) {
         await postsApi.submit(Number(editingPostId));
       }
+
+      setSubmitProgress(100);
+      setSubmitStatusText('Request submitted successfully!');
 
       // Optimistically add to queue & mockRequests so it shows instantly in Recent Post Requests
       if (res?.data?.data) {
@@ -807,6 +838,8 @@ export default function RequestorDashboard() {
         setMockRequests((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
         setMockQueuePosts((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
       }
+
+      await new Promise((r) => setTimeout(r, 350));
 
       showToast('Content request submitted successfully!');
       setEditingPostId(null);
@@ -828,6 +861,8 @@ export default function RequestorDashboard() {
     } finally {
       requestActionLockedRef.current = false;
       setIsSubmittingRequest(false);
+      setSubmitProgress(0);
+      setSubmitStatusText('');
     }
   };
 
@@ -1206,11 +1241,54 @@ export default function RequestorDashboard() {
                 onPress={handleSubmitRequest}
                 disabled={isSubmittingRequest || isSavingDraft}
               >
-                <Ionicons name="paper-plane-outline" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={styles.submitButtonText}>{isSubmittingRequest ? 'Submitting...' : 'Submit Request'}</Text>
+                {isSubmittingRequest && (
+                  <View
+                    style={[
+                      styles.submitButtonProgressFill,
+                      { width: `${Math.min(Math.max(submitProgress, 4), 100)}%` },
+                    ]}
+                  />
+                )}
+                <Ionicons
+                  name={isSubmittingRequest ? 'cloud-upload-outline' : 'paper-plane-outline'}
+                  size={16}
+                  color={Colors.textPrimary}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.submitButtonText}>
+                  {isSubmittingRequest ? `Submitting... ${submitProgress}%` : 'Submit Request'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Submission Progress Bar Card */}
+          {isSubmittingRequest && (
+            <View style={styles.submissionProgressBanner}>
+              <View style={styles.submissionProgressHeader}>
+                <View style={styles.submissionProgressTitleGroup}>
+                  <View style={styles.submissionProgressIconCircle}>
+                    <Ionicons name="cloud-upload" size={18} color="#0B2545" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.submissionProgressTitleRow}>
+                      <Text style={styles.submissionProgressTitle}>Submitting Content Request</Text>
+                      <Text style={styles.submissionProgressBadgeText}>{submitProgress}%</Text>
+                    </View>
+                    <Text style={styles.submissionProgressSub}>{submitStatusText || 'Uploading request to server...'}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.submissionProgressBarTrack}>
+                <View
+                  style={[
+                    styles.submissionProgressBarFill,
+                    { width: `${Math.min(Math.max(submitProgress, 2), 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          )}
 
           {/* Form Layout Split */}
           <View style={{ gap: 16 }}>
@@ -3564,6 +3642,8 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
   submitButton: {
+    position: 'relative',
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 4,
@@ -3571,13 +3651,88 @@ const styles = StyleSheet.create({
     height: 38,
     backgroundColor: '#FFC72C', // Changed to Gold
   },
+  submitButtonProgressFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(11, 37, 69, 0.18)',
+    borderRightWidth: 2,
+    borderRightColor: '#0B2545',
+  },
   actionButtonDisabled: {
-    opacity: 0.55,
+    opacity: 0.85,
   },
   submitButtonText: {
     fontSize: FontSize.sm,
     color: Colors.textPrimary, // Changed to dark text for contrast on gold
     fontWeight: FontWeight.bold,
+    zIndex: 2,
+  },
+  submissionProgressBanner: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC72C', // JMCFI Gold
+    shadowColor: '#0B2545',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  submissionProgressHeader: {
+    marginBottom: 10,
+  },
+  submissionProgressTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  submissionProgressIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  submissionProgressTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  submissionProgressTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: '#0B2545',
+  },
+  submissionProgressBadgeText: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+    color: '#0B2545',
+  },
+  submissionProgressSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  submissionProgressBarTrack: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 999,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  submissionProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFC72C',
+    borderRadius: 999,
   },
   splitLayout: {
     gap: 16,
