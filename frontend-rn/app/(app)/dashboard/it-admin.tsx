@@ -2486,28 +2486,62 @@ export default function ITAdminDashboard() {
             <View style={styles.profileModalOverlay}>
               <View style={[styles.wideModalCard, { width: width > 900 ? 860 : width > 600 ? '92%' : '94%', maxHeight: width > 600 ? '88%' : '90%' }]}>
                 {/* ── Header ── */}
-                <View style={styles.wideModalHeader}>
-                  <View style={[styles.wideModalAvatar, { backgroundColor: selectedUser ? getRoleBadgeDetails(selectedUser.role).bgColor : Colors.background }]}>
-                    <Text style={[styles.wideModalAvatarText, { color: selectedUser ? getRoleBadgeDetails(selectedUser.role).color : Colors.textPrimary }]}>
-                      {selectedUser
-                        ? (selectedUser.first_name
-                          ? (selectedUser.first_name[0] + (selectedUser.last_name?.[0] || '')).toUpperCase()
-                          : selectedUser.email.substring(0, 2).toUpperCase())
-                        : '?'}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.wideModalTitle}>
-                      {selectedUser?.first_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser?.email}
-                    </Text>
-                    <Text style={styles.wideModalSubtitle}>
-                      {selectedUser ? getRoleBadgeDetails(selectedUser.role).label : ''} &nbsp;•&nbsp; ID: {selectedUser?.employee_id || 'N/A'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={handleCloseProfile} style={styles.wideModalCloseBtn}>
-                    <Ionicons name="close" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
+                {(() => {
+                  const isSelectedCurrentAuthUser = Boolean(
+                    selectedUser && user && (String(selectedUser.id) === String(user.id) || selectedUser.email === user.email)
+                  );
+                  const candidateModalPhoto = (isSelectedCurrentAuthUser && (user?.photo_url || profilePhotoUrl))
+                    ? (user?.photo_url || profilePhotoUrl)
+                    : selectedUser?.photo_url;
+                  const modalPhotoUrl = candidateModalPhoto && selectedUser && !brokenUserPhotoIds.has(String(selectedUser.id))
+                    ? resolveImageUrl(candidateModalPhoto)
+                    : null;
+                  const badgeDetails = selectedUser ? getRoleBadgeDetails(selectedUser.role) : null;
+                  const fallbackBg = badgeDetails?.bgColor || Colors.background;
+                  const fallbackColor = badgeDetails?.color || Colors.textPrimary;
+
+                  return (
+                    <View style={styles.wideModalHeader}>
+                      <View style={[styles.wideModalAvatar, { backgroundColor: fallbackBg }]}>
+                        {modalPhotoUrl ? (
+                          <Image
+                            source={{ uri: modalPhotoUrl }}
+                            style={{ width: 44, height: 44, borderRadius: 22 }}
+                            resizeMode="cover"
+                            onError={() => {
+                              if (selectedUser?.id) {
+                                setBrokenUserPhotoIds(prev => {
+                                  const next = new Set(prev);
+                                  next.add(String(selectedUser.id));
+                                  return next;
+                                });
+                              }
+                            }}
+                          />
+                        ) : (
+                          <Text style={[styles.wideModalAvatarText, { color: fallbackColor }]}>
+                            {selectedUser
+                              ? (selectedUser.first_name
+                                ? (selectedUser.first_name[0] + (selectedUser.last_name?.[0] || '')).toUpperCase()
+                                : selectedUser.email.substring(0, 2).toUpperCase())
+                              : '?'}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.wideModalTitle}>
+                          {selectedUser?.first_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser?.email}
+                        </Text>
+                        <Text style={styles.wideModalSubtitle}>
+                          {selectedUser ? getRoleBadgeDetails(selectedUser.role).label : ''} &nbsp;•&nbsp; ID: {selectedUser?.employee_id || 'N/A'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={handleCloseProfile} style={styles.wideModalCloseBtn}>
+                        <Ionicons name="close" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })()}
 
                 {/* ── Two-Column Body (Scrollable) ── */}
                 <ScrollView
@@ -5892,7 +5926,7 @@ const styles = StyleSheet.create({
   profileModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   wideModalCard: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 32, elevation: 16, display: 'flex', flexDirection: 'column' },
   wideModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#0F172A', paddingHorizontal: 24, paddingVertical: 18 },
-  wideModalAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  wideModalAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   wideModalAvatarText: { fontSize: 15, fontWeight: '800' },
   wideModalTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
   wideModalSubtitle: { fontSize: 11, fontWeight: '500', color: Colors.textMuted, marginTop: 1 },
