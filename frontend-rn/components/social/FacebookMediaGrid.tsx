@@ -2,6 +2,22 @@ import React from 'react';
 import { View, Image, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
+import { resolveImageUrl } from '../../services/api';
+
+export const isImageMedia = (file: any): boolean => {
+  if (!file) return false;
+  if (file.type === 'image' || file.mime_type?.startsWith('image/')) return true;
+  const name = (file.name || file.filename || file.original_filename || file.uri || file.url || file.file_path || '').toLowerCase();
+  return /\.(jpe?g|png|gif|webp)$/i.test(name.split('?')[0]);
+};
+
+export const getImageUrisFromMedia = (mediaList: any[]): string[] => {
+  if (!Array.isArray(mediaList)) return [];
+  return mediaList
+    .filter(isImageMedia)
+    .map((m: any) => resolveImageUrl(m?.url || m?.file_url || m?.file_path || m?.uri) || m?.uri || m?.url)
+    .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim().length > 0);
+};
 
 interface FacebookMediaGridProps {
   images: string[];
