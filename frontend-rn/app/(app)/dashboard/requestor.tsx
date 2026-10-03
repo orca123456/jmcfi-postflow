@@ -2520,26 +2520,6 @@ export default function RequestorDashboard() {
                             <Ionicons name="eye-outline" size={13} color="#374151" />
                             <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>Reason</Text>
                           </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              handleCreateNewFromRejected(post);
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 8,
-                              paddingVertical: 5,
-                              borderRadius: 6,
-                              backgroundColor: '#FFC72C',
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons name="create-outline" size={13} color="#1A1A2E" />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1A1A2E' }}>Revise</Text>
-                          </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
                     ))}
