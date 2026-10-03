@@ -31,6 +31,8 @@ import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 import { optimizeImageForUpload } from '../../../utils/imageOptimizer';
+import { FacebookMediaGrid } from '../../../components/social/FacebookMediaGrid';
+import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -563,6 +565,8 @@ export default function RequestorDashboard() {
       ],
       comments: [],
       rejectedBy,
+      media: p.media || [],
+      rawPost: p,
     };
   };
 
@@ -630,6 +634,14 @@ export default function RequestorDashboard() {
 
     const name = String(file?.name || file?.file?.name || file?.original_name || file?.original_filename || file?.uri || file?.url || '').toLowerCase();
     return /\.(jpe?g|png|gif|webp)$/.test(name);
+  };
+
+  const getImageUrisFromMedia = (mediaList: any[]): string[] => {
+    if (!Array.isArray(mediaList)) return [];
+    return mediaList
+      .filter(isImageFile)
+      .map((m: any) => m?.uri || m?.url || m?.file_url || m?.file_path)
+      .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim().length > 0);
   };
 
   const hasInstagramImage = () => mediaFiles.length > 0 ? mediaFiles.some(isImageFile) : editingPostHasImage;
@@ -1876,10 +1888,14 @@ export default function RequestorDashboard() {
                   </View>
 
                   {(() => {
+                    const formMediaImages = getImageUrisFromMedia(mediaFiles);
                     const activePreviewMedia = (mediaFiles && mediaFiles[featuredMediaIndex])
                       ? mediaFiles[featuredMediaIndex]
                       : (mediaFiles && mediaFiles[0] ? mediaFiles[0] : null);
                     const activePreviewUri = activePreviewMedia?.uri || activePreviewMedia?.url;
+                    const previewImages = formMediaImages.length > 0
+                      ? formMediaImages
+                      : (activePreviewUri ? [activePreviewUri] : []);
 
                     return (
                       <View style={[styles.previewMockupFrame, previewMode === 'mobile' ? { maxWidth: 360, alignSelf: 'center', width: '100%' } : { width: '100%' }]}>
@@ -1903,10 +1919,11 @@ export default function RequestorDashboard() {
                               </FormattedText>
                             </View>
 
-                            {activePreviewUri ? (
-                              <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
-                                <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                              </TouchableOpacity>
+                            {previewImages.length > 0 ? (
+                              <FacebookMediaGrid
+                                images={previewImages}
+                                onImagePress={(uri) => setFullScreenImage(uri)}
+                              />
                             ) : (
                               <View style={styles.mockPostMediaPlaceholder}>
                                 <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
@@ -1947,10 +1964,11 @@ export default function RequestorDashboard() {
                               <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
                             </View>
 
-                            {activePreviewUri ? (
-                              <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ width: '100%', aspectRatio: 1, backgroundColor: '#f3f4f6' }}>
-                                <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                              </TouchableOpacity>
+                            {previewImages.length > 0 ? (
+                              <InstagramMediaCarousel
+                                images={previewImages}
+                                onImagePress={(uri) => setFullScreenImage(uri)}
+                              />
                             ) : (
                               <View style={[styles.mockPostMediaPlaceholder, { aspectRatio: 1 }]}>
                                 <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
@@ -2629,78 +2647,93 @@ export default function RequestorDashboard() {
                     </View>
 
                     {/* Interactive Mockup Container */}
-                    {modalPlatformTab === 'facebook' && (
-                      <View style={styles.socialMockupCard}>
-                        <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
-                          <View>
-                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
-                            <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
-                          </View>
-                        </View>
+                    {(() => {
+                      const rawList = selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [];
+                      const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
+                      const queuePostMediaImages = validList.length > 0
+                        ? validList
+                        : (selectedQueuePost?.thumbnailUrl ? [selectedQueuePost.thumbnailUrl] : []);
 
-                        <FormattedText style={styles.socialCaptionText}>{selectedQueuePost.caption}</FormattedText>
+                      return (
+                        <>
+                          {modalPlatformTab === 'facebook' && (
+                            <View style={styles.socialMockupCard}>
+                              <View style={styles.socialHeader}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
+                                <View>
+                                  <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
+                                  <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
+                                </View>
+                              </View>
 
-                        {selectedQueuePost.thumbnailUrl ? (
-                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedQueuePost.thumbnailUrl)}>
-                            <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={styles.socialMediaBanner}>
-                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                            <Text style={styles.socialMediaBannerText}>{selectedQueuePost.previewBanner}</Text>
-                          </View>
-                        )}
+                              <FormattedText style={styles.socialCaptionText}>{selectedQueuePost.caption}</FormattedText>
 
-                        <View style={styles.socialFooterActions}>
-                          <View style={styles.socialActionBtn}>
-                            <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
-                            <Text style={styles.socialActionText}>Like</Text>
-                          </View>
-                          <View style={styles.socialActionBtn}>
-                            <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
-                            <Text style={styles.socialActionText}>Comment</Text>
-                          </View>
-                          <View style={styles.socialActionBtn}>
-                            <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
-                            <Text style={styles.socialActionText}>Share</Text>
-                          </View>
-                        </View>
-                      </View>
-                    )}
+                              {queuePostMediaImages.length > 0 ? (
+                                <FacebookMediaGrid
+                                  images={queuePostMediaImages}
+                                  onImagePress={(uri) => setFullScreenImage(uri)}
+                                  containerStyle={{ marginHorizontal: 0, marginBottom: 8 }}
+                                />
+                              ) : selectedQueuePost.previewBanner ? (
+                                <View style={styles.socialMediaBanner}>
+                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                  <Text style={styles.socialMediaBannerText}>{selectedQueuePost.previewBanner}</Text>
+                                </View>
+                              ) : null}
 
-                    {modalPlatformTab === 'instagram' && (
-                      <View style={styles.socialMockupCard}>
-                        <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
-                          </View>
-                          <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
-                        </View>
+                              <View style={styles.socialFooterActions}>
+                                <View style={styles.socialActionBtn}>
+                                  <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.socialActionText}>Like</Text>
+                                </View>
+                                <View style={styles.socialActionBtn}>
+                                  <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.socialActionText}>Comment</Text>
+                                </View>
+                                <View style={styles.socialActionBtn}>
+                                  <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.socialActionText}>Share</Text>
+                                </View>
+                              </View>
+                            </View>
+                          )}
 
-                        {selectedQueuePost.thumbnailUrl ? (
-                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedQueuePost.thumbnailUrl)}>
-                            <Image source={{ uri: selectedQueuePost.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
-                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                            <Text style={styles.socialMediaBannerText}>{selectedQueuePost.previewBanner}</Text>
-                          </View>
-                        )}
+                          {modalPlatformTab === 'instagram' && (
+                            <View style={styles.socialMockupCard}>
+                              <View style={styles.socialHeader}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
+                                </View>
+                                <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                              </View>
 
-                        <View style={{ padding: 12 }}>
-                          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                            <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
-                            <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
-                            <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
-                          </View>
-                          <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                          <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_cite </b>' + (selectedQueuePost.caption || '')}</FormattedText>
-                        </View>
-                      </View>
-                    )}
+                              {queuePostMediaImages.length > 0 ? (
+                                <InstagramMediaCarousel
+                                  images={queuePostMediaImages}
+                                  onImagePress={(uri) => setFullScreenImage(uri)}
+                                />
+                              ) : selectedQueuePost.previewBanner ? (
+                                <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
+                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                  <Text style={styles.socialMediaBannerText}>{selectedQueuePost.previewBanner}</Text>
+                                </View>
+                              ) : null}
+
+                              <View style={{ padding: 12 }}>
+                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+                                  <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
+                                  <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
+                                  <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
+                                </View>
+                                <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
+                                <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_cite </b>' + (selectedQueuePost.caption || '')}</FormattedText>
+                              </View>
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {modalPlatformTab === 'website' && (
                       <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
@@ -3078,10 +3111,14 @@ export default function RequestorDashboard() {
               </View>
 
               {(() => {
+                const formMediaImages = getImageUrisFromMedia(mediaFiles);
                 const activePreviewMedia = (mediaFiles && mediaFiles[featuredMediaIndex])
                   ? mediaFiles[featuredMediaIndex]
                   : (mediaFiles && mediaFiles[0] ? mediaFiles[0] : null);
                 const activePreviewUri = activePreviewMedia?.uri || activePreviewMedia?.url;
+                const previewImages = formMediaImages.length > 0
+                  ? formMediaImages
+                  : (activePreviewUri ? [activePreviewUri] : []);
 
                 return (
                   <View style={[styles.previewMockupFrame, { alignSelf: 'center', width: '100%', backgroundColor: Colors.surface, maxHeight: '80%' }]}>
@@ -3105,10 +3142,11 @@ export default function RequestorDashboard() {
                             </FormattedText>
                           </View>
 
-                          {activePreviewUri ? (
-                            <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginHorizontal: 12, marginBottom: 12, aspectRatio: 4 / 3, backgroundColor: '#f3f4f6', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
-                              <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                            </TouchableOpacity>
+                          {previewImages.length > 0 ? (
+                            <FacebookMediaGrid
+                              images={previewImages}
+                              onImagePress={(uri) => setFullScreenImage(uri)}
+                            />
                           ) : (
                             <View style={styles.mockPostMediaPlaceholder}>
                               <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
@@ -3149,10 +3187,11 @@ export default function RequestorDashboard() {
                             <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
                           </View>
 
-                          {activePreviewUri ? (
-                            <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ width: '100%', aspectRatio: 1, backgroundColor: '#f3f4f6' }}>
-                              <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                            </TouchableOpacity>
+                          {previewImages.length > 0 ? (
+                            <InstagramMediaCarousel
+                              images={previewImages}
+                              onImagePress={(uri) => setFullScreenImage(uri)}
+                            />
                           ) : (
                             <View style={[styles.mockPostMediaPlaceholder, { aspectRatio: 1 }]}>
                               <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
