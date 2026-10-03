@@ -9,23 +9,14 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\RoleController;
-// use App\Http\Controllers\Api\PublishingController;
-// use App\Http\Controllers\Api\ViolationController;
-// use App\Http\Controllers\Api\AIComplianceController;
 use App\Http\Controllers\Api\ChatbotController;
-
 use App\Http\Controllers\Api\PolicySettingController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\TokenSettingController;
 use App\Http\Controllers\Api\ApiTokenController;
 use App\Http\Controllers\Api\ExternalIntegrationController;
 use App\Http\Controllers\Api\NotificationController;
-
-// NOTE: the former unauthenticated GET /api/magic-seed route ran
-// `migrate:fresh` + `db:seed`, i.e. any request to that URL dropped every
-// table. Schema changes now run through Railway's pre-deploy command
-// (`php artisan migrate --force`) instead. Do not reintroduce a route that
-// mutates the schema.
+use App\Http\Controllers\Api\HealthCheckController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -49,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    
     // Dashboard stats MUST come before apiResource to avoid route collision with {post}
     Route::get('posts/dashboard/stats', [PostRequestController::class, 'getDashboardStats']);
 
@@ -83,15 +75,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('role:it_publisher,it_admin');
 
     // Publishing
-    // Route::apiResource('publishing', PublishingController::class)->only(['index', 'show']);
     Route::post('publishing/{post}/schedule', [App\Http\Controllers\Api\PublishingController::class, 'schedule']);
     Route::post('publishing/{post}/publish', [App\Http\Controllers\Api\PublishingController::class, 'publish']);
-    // Route::post('publishing/{post}/cancel', [App\Http\Controllers\Api\PublishingController::class, 'cancel']);
-
-    // Policy Violations
-    // Route::apiResource('violations', ViolationController::class)->only(['index', 'show', 'update']);
-    // Route::post('violations/{violation}/resolve', [ViolationController::class, 'resolve']);
-    // Route::get('violations/dashboard/stats', [ViolationController::class, 'getDashboardStats']);
 
     // Policy Settings (update admin only)
     Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);
@@ -118,13 +103,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('roles/list', [RoleController::class, 'store'])->middleware('role:it_publisher,it_admin');
     Route::delete('roles/list/{role}', [RoleController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
 
-
+    // Chatbot
     Route::post('chatbot/message', [ChatbotController::class, 'handleMessage'])->middleware('auth:sanctum');
-
-// AI Compliance
-    // Route::post('ai/check/{post}', [AIComplianceController::class, 'checkCompliance']);
-    // Route::post('ai/generate-rejection-reason/{post}', [AIComplianceController::class, 'generateRejectionReason']);
-    // Route::post('ai/improve-caption/{post}', [AIComplianceController::class, 'improveCaption']);
 
     // Email Settings (Admin only)
     Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings'])->middleware('role:it_publisher,it_admin');
@@ -139,3 +119,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // External Integration Endpoint
     Route::post('external/submit-request', [ExternalIntegrationController::class, 'submitRequest']);
 });
+
+// System Health Check (open for monitoring services & uptime checkers)
+Route::get('health', [HealthCheckController::class, 'check']);

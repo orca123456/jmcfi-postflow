@@ -46,7 +46,8 @@
     "web": "expo start --web --port 3000",
     "dev": "expo start --web --port 3000",
     "export:web": "expo export --platform web && node inject-shell.js",
-    "postbuild": "node inject-shell.js"
+    "postbuild": "node inject-shell.js",
+    "test:e2e": "node tests/full-approval-lifecycle.browser.cjs"
   },
   "private": true
 }
