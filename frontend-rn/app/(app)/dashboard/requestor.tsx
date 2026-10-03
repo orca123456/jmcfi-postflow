@@ -1317,31 +1317,51 @@ export default function RequestorDashboard() {
                   <View style={[styles.inlineFieldsRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
                     <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isCategoryDropdownOpen ? 60 : 1 }]}>
                       <Text style={styles.inputLabel}>CATEGORY</Text>
-                      <View style={[styles.dropdownSelector, { paddingRight: 8, flexDirection: 'row', alignItems: 'center' }]}>
-                        {category === 'Others' ? (
+                      {category === 'Others' ? (
+                        <View style={[styles.dropdownSelector, { paddingRight: 8, flexDirection: 'row', alignItems: 'center' }]}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                            <Text style={styles.dropdownSelectorText}>Others: </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                                setIsDeptDropdownOpen(false);
+                              }}
+                              style={{ paddingVertical: 4 }}
+                            >
+                              <Text style={styles.dropdownSelectorText}>Others: </Text>
+                            </TouchableOpacity>
                             <TextInput
-                              style={[{ flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0, height: 20 }, { outlineStyle: 'none' } as any]}
+                              style={[{ flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0, height: 24 }, { outlineStyle: 'none' } as any]}
                               placeholder="Type category here..."
                               value={otherCategoryName}
                               onChangeText={setOtherCategoryName}
                               autoFocus
                             />
                           </View>
-                        ) : (
-                          <Text style={[styles.dropdownSelectorText, { flex: 1 }]}>{category}</Text>
-                        )}
+                          <TouchableOpacity
+                            onPress={() => {
+                              setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                              setIsDeptDropdownOpen(false);
+                            }}
+                            style={{ padding: 6 }}
+                          >
+                            <Ionicons name={isCategoryDropdownOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color={Colors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
                         <TouchableOpacity
+                          style={[styles.dropdownSelector, { paddingRight: 12, flexDirection: 'row', alignItems: 'center', cursor: 'pointer' as any }]}
                           onPress={() => {
                             setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
                             setIsDeptDropdownOpen(false);
                           }}
-                          style={{ padding: 4 }}
+                          activeOpacity={0.7}
                         >
-                          <Ionicons name="chevron-down-outline" size={16} color={Colors.textSecondary} />
+                          <Text style={[styles.dropdownSelectorText, { flex: 1 }]}>
+                            {category || 'Select Category...'}
+                          </Text>
+                          <Ionicons name={isCategoryDropdownOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color={Colors.textSecondary} />
                         </TouchableOpacity>
-                      </View>
+                      )}
 
                       {isCategoryDropdownOpen && (
                         <View style={styles.dropdownMenu}>
