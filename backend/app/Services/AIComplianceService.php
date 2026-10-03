@@ -6,6 +6,7 @@ use App\Models\AIComplianceCheck;
 use App\Models\PostRequest;
 use App\Models\PolicyViolation;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class AIComplianceService
 {
@@ -106,7 +107,24 @@ class AIComplianceService
     public function checkDraftCompliance(string $title, string $caption): array
     {
         $startTime = microtime(true);
-        
+
+        // 1. Strip raw HTML from caption while preserving line breaks to reduce prompt token footprint
+        $cleanCaption = trim(strip_tags(str_replace(
+            ['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'],
+            ["\n", "\n", "\n", "\n\n", "\n", "\n"],
+            $caption
+        )));
+        if ($cleanCaption === '') {
+            $cleanCaption = trim($caption);
+        }
+
+        // 2. Cache hit optimization: return cached analysis if identical draft content was checked recently (15 mins)
+        $cacheKey = 'ai_draft_compliance_' . md5(trim($title) . '|' . $cleanCaption);
+        $cachedResult = Cache::get($cacheKey);
+        if (is_array($cachedResult) && ($cachedResult['overall_status'] ?? '') !== 'error') {
+            return $cachedResult;
+        }
+
         try {
             $prompt = <<<PROMPT
 Analyze this JMCFI post draft for compliance:
@@ -119,9 +137,10 @@ POST DETAILS:
 - Media Attachments: None
 
 CAPTION/NARRATIVE:
-{$caption}
+{$cleanCaption}
 
 Provide compliance analysis as JSON with the exact structure specified in system prompt.
+Keep each issue and suggestion concise (max 1 sentence each). Keep analysis_logic under 2-3 sentences.
 PROMPT;
             
             $response = $this->client->complete([
@@ -133,7 +152,7 @@ PROMPT;
                         'role' => 'user',
                         'content' => $prompt,
                     ],
-            ], json: true);
+            ], json: true, maxTokens: 1200, timeout: 25);
 
             $content = $response['content'];
             $tokensUsed = $response['tokens_used'];
@@ -141,7 +160,7 @@ PROMPT;
 
             $result = $this->parseComplianceResponse($content);
             
-            return [
+            $output = [
                 'compliance_score' => $result['overall_compliance_score'] ?? ($result['compliance_score'] ?? 0),
                 'overall_status' => $result['overall_status'] ?? 'needs_review',
                 'checks' => $result['checks'] ?? [],
@@ -151,6 +170,11 @@ PROMPT;
                 'tokens_used' => $tokensUsed,
                 'processing_time_ms' => round($processingTime),
             ];
+
+            // Cache successful result for 15 minutes to eliminate redundant API latency
+            Cache::put($cacheKey, $output, now()->addMinutes(15));
+
+            return $output;
 
         } catch (\Exception $e) {
             return [
@@ -167,6 +191,13 @@ PROMPT;
     }
 
     private function getSystemPrompt(): string
+    {
+        return Cache::remember('ai_compliance_system_prompt_cached', 1800, function () {
+            return $this->buildSystemPromptText();
+        });
+    }
+
+    private function buildSystemPromptText(): string
     {
         $policyRulesText = "";
         try {
@@ -252,8 +283,8 @@ against the following criteria:
 For each criterion, provide:
 - passed: true/false
 - score: 0-100
-- issues: array of specific issues found
-- suggestions: array of improvement suggestions
+- issues: array of specific issues found (max 1 concise sentence each)
+- suggestions: array of improvement suggestions (max 1 concise sentence each)
 
 Put these five criteria in a "checks" object with exactly these keys:
 "accuracy", "completeness", "branding", "privacy", "compliance".
@@ -266,7 +297,7 @@ Also provide:
 - suggested_improved_caption: improved version if issues found
 - rejection_reason_suggestion: suggested rejection reason if non-compliant
 - revision_guidance: specific guidance for revision
-- analysis_logic: a brief explanation of findings and relevant policy references
+- analysis_logic: a brief explanation of findings (max 2-3 sentences)
 - policy_alignment: "aligned" | "partially_aligned" | "not_aligned"
 
 Return ONLY valid JSON.

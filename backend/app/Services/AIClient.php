@@ -10,7 +10,7 @@ class AIClient
 {
     public function __construct(private AIProviderSettings $settings) {}
 
-    public function complete(array $messages, ?array $settings = null, bool $json = false): array
+    public function complete(array $messages, ?array $settings = null, bool $json = false, int $maxTokens = 4096, int $timeout = 30): array
     {
         // Resolve on every call so long-running workers also pick up replacements.
         $settings ??= $this->settings->current();
@@ -22,14 +22,14 @@ class AIClient
             throw new RuntimeException('The selected AI provider is unsupported.');
         }
         $payload = ['model' => $settings['model'], 'messages' => $messages];
-        $payload[$settings['provider'] === 'openai' ? 'max_completion_tokens' : 'max_tokens'] = 4096;
+        $payload[$settings['provider'] === 'openai' ? 'max_completion_tokens' : 'max_tokens'] = $maxTokens;
         if ($json) {
             $payload['response_format'] = ['type' => 'json_object'];
         }
 
         try {
             $response = Http::withToken($settings['api_key'])->acceptJson()
-                ->connectTimeout(10)->timeout(45)->withoutRedirecting()
+                ->connectTimeout(5)->timeout($timeout)->withoutRedirecting()
                 ->post($provider['url'] . '/chat/completions', $payload);
         } catch (ConnectionException $e) {
             throw new RuntimeException('Cannot reach the AI provider. Please try again.');

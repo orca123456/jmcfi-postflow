@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -912,29 +913,37 @@ export default function RequestorDashboard() {
   const [complianceScore, setComplianceScore] = useState(0);
   const [complianceStatus, setComplianceStatus] = useState('');
   const [complianceAnalysis, setComplianceAnalysis] = useState('');
+  const [complianceChecks, setComplianceChecks] = useState<any>({});
+  const [complianceSuggestedCaption, setComplianceSuggestedCaption] = useState<string | null>(null);
 
   const [isCheckingPolicy, setIsCheckingPolicy] = useState(false);
 
   const handleCheckPolicy = async () => {
-    if (!caption) {
-      alert('Please write a caption first.');
+    const plainText = caption.replace(/<[^>]*>/g, '').trim();
+    if (!plainText) {
+      showToast('Please write a caption first before checking policy alignment.', 'error');
       return;
     }
 
     setIsCheckingPolicy(true);
     try {
-      const response = await postsApi.aiCheckDraft({ title: postTitle, caption_narrative: caption });
-      const data = response.data.data;
+      const response = await postsApi.aiCheckDraft({ title: postTitle || 'Draft Post', caption_narrative: caption });
+      const data = response?.data?.data;
+      if (!data) {
+        throw new Error('No response received from AI service.');
+      }
       if (data.overall_status === 'error') {
-        alert('AI Analysis failed: ' + data.analysis_logic);
+        showToast(data.analysis_logic || 'AI analysis could not be completed.', 'error');
       } else {
-        setComplianceScore(data.compliance_score);
-        setComplianceStatus(data.overall_status);
-        setComplianceAnalysis(data.analysis_logic);
+        setComplianceScore(data.compliance_score || 0);
+        setComplianceStatus(data.overall_status || 'compliant');
+        setComplianceAnalysis(data.analysis_logic || '');
+        setComplianceChecks(data.checks || {});
+        setComplianceSuggestedCaption(data.suggested_caption || null);
         setIsComplianceModalVisible(true);
       }
     } catch (e: any) {
-      alert('Failed to check policy alignment: ' + (e.response?.data?.message || e.message));
+      showToast('Policy Check: ' + (e.response?.data?.message || e.message || 'Service unavailable'), 'error');
     } finally {
       setIsCheckingPolicy(false);
     }
@@ -1530,9 +1539,24 @@ export default function RequestorDashboard() {
                       <Text style={styles.characterCounter}>
                         {caption.length} / 2200 characters
                       </Text>
-                      <TouchableOpacity style={[styles.checkPolicyBtn, isCheckingPolicy && { opacity: 0.7 }]} onPress={handleCheckPolicy} disabled={isCheckingPolicy}>
-                        <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textPrimary} style={{ marginRight: 4 }} />
-                        <Text style={styles.checkPolicyBtnText}>{isCheckingPolicy ? 'Checking...' : 'Check Policy Alignment'}</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.checkPolicyBtn,
+                          isCheckingPolicy && { opacity: 0.75 },
+                          { cursor: isCheckingPolicy ? 'wait' : 'pointer', flexDirection: 'row', alignItems: 'center' } as any,
+                        ]}
+                        onPress={handleCheckPolicy}
+                        disabled={isCheckingPolicy}
+                        activeOpacity={0.7}
+                      >
+                        {isCheckingPolicy ? (
+                          <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 6 }} />
+                        ) : (
+                          <Ionicons name="shield-checkmark-outline" size={15} color={Colors.primary} style={{ marginRight: 6 }} />
+                        )}
+                        <Text style={[styles.checkPolicyBtnText, { color: Colors.primary, fontWeight: '700' }]}>
+                          {isCheckingPolicy ? 'Analyzing Policy...' : 'Check Policy Alignment'}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -3342,6 +3366,13 @@ export default function RequestorDashboard() {
         score={complianceScore}
         status={complianceStatus}
         analysisLogic={complianceAnalysis}
+        checks={complianceChecks}
+        suggestedCaption={complianceSuggestedCaption}
+        onApplySuggestedCaption={(text) => {
+          setCaption(text);
+          setIsComplianceModalVisible(false);
+          showToast('AI refined caption applied to post!', 'success');
+        }}
       />
 
     </DashboardShell>
