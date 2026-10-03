@@ -38,6 +38,8 @@ import { triggerCsvDownload } from '../../../utils/export';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
+import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
+import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 
 interface StatCardProps {
   label: string;
@@ -5196,116 +5198,114 @@ $response = curl_exec($ch);`}
               {/* Top Area */}
               <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
                 <View style={{ flex: 1.5 }}>
-                  {/* FACEBOOK PREVIEW MOCKUP */}
-                  {previewPlatformTab === 'facebook' && (
-                    <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
-                      {/* FB Header */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' }}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#050505' }}>
-                            Jose Maria College Foundation, Inc.
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={{ fontSize: 11, color: '#65676B' }}>{previewPost?.department || 'Official'}</Text>
-                            <Text style={{ fontSize: 11, color: '#65676B' }}>• Just now •</Text>
-                            <Ionicons name="earth" size={12} color="#65676B" />
-                          </View>
-                        </View>
-                      </View>
-                      {/* FB Text */}
-                      {previewPost?.rawPost?.caption_narrative ? (
-                        <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                          <FormattedText style={{ fontSize: 13, color: '#050505', lineHeight: 18 }}>
-                            {previewPost.rawPost.caption_narrative}
-                          </FormattedText>
-                        </View>
-                      ) : null}
-                      {/* FB Image */}
-                      {previewPost?.image && (
-                        <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9}>
-                          <Image
-                            source={{ uri: previewPost.image }}
-                            resizeMode="cover"
-                            style={{
-                              width: '100%',
-                              height: 260,
-                              backgroundColor: '#F3F4F6',
-                            }}
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {/* FB Footer actions */}
-                      <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 6 }}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
-                          <Ionicons name="thumbs-up-outline" size={16} color="#65676B" />
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Like</Text>
-                        </View>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
-                          <Ionicons name="chatbubble-outline" size={16} color="#65676B" />
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Comment</Text>
-                        </View>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
-                          <Ionicons name="share-social-outline" size={16} color="#65676B" />
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Share</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
+                  {(() => {
+                    const rawList = previewPost?.rawPost?.media || previewPost?.media || [];
+                    const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
+                    const previewPostImages = validList.length > 0
+                      ? validList
+                      : (previewPost?.image ? [resolveImageUrl(previewPost.image) || previewPost.image] : []);
 
-                  {/* INSTAGRAM PREVIEW MOCKUP */}
-                  {previewPlatformTab === 'instagram' && (
-                    <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
-                      {/* IG Header */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 18, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>
-                            jmc_official
-                          </Text>
-                          <Text style={{ fontSize: 10, color: '#8E8E8E' }}>
-                            {previewPost?.department || 'Davao City, Philippines'}
-                          </Text>
-                        </View>
-                        <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
-                      </View>
-                      {/* IG Image */}
-                      {previewPost?.image && (
-                        <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9}>
-                          <Image
-                            source={{ uri: previewPost.image }}
-                            resizeMode="cover"
-                            style={{
-                              width: '100%',
-                              height: 280,
-                              backgroundColor: '#F3F4F6',
-                            }}
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {/* IG Action bar */}
-                      <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                          <View style={{ flexDirection: 'row', gap: 14 }}>
-                            <Ionicons name="heart" size={22} color="#E1306C" />
-                            <Ionicons name="chatbubble-outline" size={20} color="#262626" />
-                            <Ionicons name="paper-plane-outline" size={20} color="#262626" />
+                    return (
+                      <>
+                        {/* FACEBOOK PREVIEW MOCKUP */}
+                        {previewPlatformTab === 'facebook' && (
+                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                            {/* FB Header */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                              <View style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#050505' }}>
+                                  Jose Maria College Foundation, Inc.
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  <Text style={{ fontSize: 11, color: '#65676B' }}>{previewPost?.department || 'Official'}</Text>
+                                  <Text style={{ fontSize: 11, color: '#65676B' }}>• Just now •</Text>
+                                  <Ionicons name="earth" size={12} color="#65676B" />
+                                </View>
+                              </View>
+                            </View>
+                            {/* FB Text */}
+                            {previewPost?.rawPost?.caption_narrative ? (
+                              <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+                                <FormattedText style={{ fontSize: 13, color: '#050505', lineHeight: 18 }}>
+                                  {previewPost.rawPost.caption_narrative}
+                                </FormattedText>
+                              </View>
+                            ) : null}
+                            {/* FB Media / Collage Grid */}
+                            {previewPostImages.length > 0 && (
+                              <FacebookMediaGrid
+                                images={previewPostImages}
+                                onImagePress={(uri) => setFullScreenImage(uri)}
+                              />
+                            )}
+                            {/* FB Footer actions */}
+                            <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 6 }}>
+                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                                <Ionicons name="thumbs-up-outline" size={16} color="#65676B" />
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Like</Text>
+                              </View>
+                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                                <Ionicons name="chatbubble-outline" size={16} color="#65676B" />
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Comment</Text>
+                              </View>
+                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
+                                <Ionicons name="share-social-outline" size={16} color="#65676B" />
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Share</Text>
+                              </View>
+                            </View>
                           </View>
-                          <Ionicons name="bookmark-outline" size={20} color="#262626" />
-                        </View>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626', marginBottom: 4 }}>
-                          Liked by jmcfi_official and others
-                        </Text>
-                        <FormattedText style={{ fontSize: 12, color: '#262626', lineHeight: 16 }}>
-                          {'<b>jmc_official </b>' + (previewPost?.rawPost?.caption_narrative || previewPost?.title || '')}
-                        </FormattedText>
-                      </View>
-                    </View>
-                  )}
+                        )}
+
+                        {/* INSTAGRAM PREVIEW MOCKUP */}
+                        {previewPlatformTab === 'instagram' && (
+                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                            {/* IG Header */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                              <View style={{ width: 36, height: 36, borderRadius: 18, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>
+                                  jmc_official
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#8E8E8E' }}>
+                                  {previewPost?.department || 'Davao City, Philippines'}
+                                </Text>
+                              </View>
+                              <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
+                            </View>
+                            {/* IG Image / Carousel */}
+                            {previewPostImages.length > 0 && (
+                              <InstagramMediaCarousel
+                                images={previewPostImages}
+                                onImagePress={(uri) => setFullScreenImage(uri)}
+                              />
+                            )}
+                            {/* IG Action bar */}
+                            <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <View style={{ flexDirection: 'row', gap: 14 }}>
+                                  <Ionicons name="heart" size={22} color="#E1306C" />
+                                  <Ionicons name="chatbubble-outline" size={20} color="#262626" />
+                                  <Ionicons name="paper-plane-outline" size={20} color="#262626" />
+                                </View>
+                                <Ionicons name="bookmark-outline" size={20} color="#262626" />
+                              </View>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626', marginBottom: 4 }}>
+                                Liked by jmcfi_official and others
+                              </Text>
+                              <FormattedText style={{ fontSize: 12, color: '#262626', lineHeight: 16 }}>
+                                {'<b>jmc_official </b>' + (previewPost?.rawPost?.caption_narrative || previewPost?.title || '')}
+                              </FormattedText>
+                            </View>
+                          </View>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* WORDPRESS PREVIEW MOCKUP */}
                   {previewPlatformTab === 'wordpress' && (

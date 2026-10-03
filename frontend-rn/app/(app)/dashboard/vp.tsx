@@ -26,6 +26,8 @@ import { FormattedText } from '../../../components/ui/FormattedText';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
 import { postsApi, dashboardApi, authApi, resolveImageUrl } from '../../../services/api';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
+import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
+import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 
 export default function VPDashboard() {
   const router = useRouter();
@@ -1057,99 +1059,113 @@ export default function VPDashboard() {
                     </View>
 
                     {/* Interactive Mockup Container */}
-                    {modalPlatformTab === 'facebook' && (
-                      <View style={styles.socialMockupCard}>
-                        <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
-                          <View>
-                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
-                            <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
-                          </View>
-                        </View>
+                    {(() => {
+                      const rawList = selectedRequest?.media || selectedRequest?.rawPost?.media || [];
+                      const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
+                      const requestMediaImages = validList.length > 0
+                        ? validList
+                        : (selectedRequest?.thumbnailUrl ? [resolveImageUrl(selectedRequest.thumbnailUrl) || selectedRequest.thumbnailUrl] : []);
 
-                        <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
+                      return (
+                        <>
+                          {modalPlatformTab === 'facebook' && (
+                            <View style={styles.socialMockupCard}>
+                              <View style={styles.socialHeader}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
+                                <View>
+                                  <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
+                                  <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
+                                </View>
+                              </View>
 
-                        {selectedRequest.thumbnailUrl ? (
-                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
-                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 260, maxHeight: 400, borderRadius: 8, backgroundColor: '#F9FAFB' }} resizeMode="contain" />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={styles.socialMediaBanner}>
-                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                            <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                          </View>
-                        )}
+                              <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
 
-                        <View style={styles.socialFooterActions}>
-                          <View style={styles.socialActionBtn}>
-                            <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
-                            <Text style={styles.socialActionText}>Like</Text>
-                          </View>
-                          <View style={styles.socialActionBtn}>
-                            <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
-                            <Text style={styles.socialActionText}>Comment</Text>
-                          </View>
-                          <View style={styles.socialActionBtn}>
-                            <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
-                            <Text style={styles.socialActionText}>Share</Text>
-                          </View>
-                        </View>
-                      </View>
-                    )}
+                              {requestMediaImages.length > 0 ? (
+                                <FacebookMediaGrid
+                                  images={requestMediaImages}
+                                  onImagePress={(uri) => setFullScreenImage(uri)}
+                                />
+                              ) : (
+                                <View style={styles.socialMediaBanner}>
+                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                  <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                                </View>
+                              )}
 
-                    {modalPlatformTab === 'instagram' && (
-                      <View style={styles.socialMockupCard}>
-                        <View style={styles.socialHeader}>
-                          <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
-                          </View>
-                          <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
-                        </View>
+                              <View style={styles.socialFooterActions}>
+                                <View style={styles.socialActionBtn}>
+                                  <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.socialActionText}>Like</Text>
+                                </View>
+                                <View style={styles.socialActionBtn}>
+                                  <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.socialActionText}>Comment</Text>
+                                </View>
+                                <View style={styles.socialActionBtn}>
+                                  <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.socialActionText}>Share</Text>
+                                </View>
+                              </View>
+                            </View>
+                          )}
 
-                        {selectedRequest.thumbnailUrl ? (
-                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
-                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 320, backgroundColor: '#F9FAFB' }} resizeMode="cover" />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
-                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                            <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                          </View>
-                        )}
+                          {modalPlatformTab === 'instagram' && (
+                            <View style={styles.socialMockupCard}>
+                              <View style={styles.socialHeader}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
+                                </View>
+                                <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                              </View>
 
-                        <View style={{ padding: 12 }}>
-                          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                            <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
-                            <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
-                            <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
-                          </View>
-                          <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                          <FormattedText style={styles.socialCaptionText}>{'<b>Jose Maria College Foundation Inc. </b>' + (selectedRequest.caption || '')}</FormattedText>
-                        </View>
-                      </View>
-                    )}
+                              {requestMediaImages.length > 0 ? (
+                                <InstagramMediaCarousel
+                                  images={requestMediaImages}
+                                  onImagePress={(uri) => setFullScreenImage(uri)}
+                                />
+                              ) : (
+                                <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
+                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                  <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                                </View>
+                              )}
 
-                    {modalPlatformTab === 'website' && (
-                      <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
-                        {selectedRequest.thumbnailUrl ? (
-                          <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(selectedRequest.thumbnailUrl)}>
-                            <Image source={{ uri: selectedRequest.thumbnailUrl }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
-                            <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                            <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                          </View>
-                        )}
-                        <View style={{ padding: 16 }}>
-                          <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
-                          <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedRequest.title}</Text>
-                          <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedRequest.date}</Text>
-                          <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedRequest.caption}</FormattedText>
-                        </View>
-                      </View>
-                    )}
+                              <View style={{ padding: 12 }}>
+                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+                                  <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
+                                  <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
+                                  <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
+                                </View>
+                                <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
+                                <FormattedText style={styles.socialCaptionText}>{'<b>Jose Maria College Foundation Inc. </b>' + (selectedRequest.caption || '')}</FormattedText>
+                              </View>
+                            </View>
+                          )}
+
+                          {modalPlatformTab === 'website' && (
+                            <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
+                              {requestMediaImages.length > 0 ? (
+                                <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(requestMediaImages[0])}>
+                                  <Image source={{ uri: requestMediaImages[0] }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
+                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                  <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                                </View>
+                              )}
+                              <View style={{ padding: 16 }}>
+                                <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
+                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedRequest.title}</Text>
+                                <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedRequest.date}</Text>
+                                <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedRequest.caption}</FormattedText>
+                              </View>
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
                   </View>
 
                   {/* Right Side: Request Details Metadata */}
