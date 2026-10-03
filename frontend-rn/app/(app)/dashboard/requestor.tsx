@@ -118,6 +118,36 @@ export default function RequestorDashboard() {
   const [customRejectedStartDate, setCustomRejectedStartDate] = useState('');
   const [customRejectedEndDate, setCustomRejectedEndDate] = useState('');
 
+  const filterDropdownsRef = useRef<View>(null);
+  const rejectedDropdownRef = useRef<View>(null);
+
+  // Close filter dropdowns when clicking outside on web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!isStatusDropdownOpen && !isDateDropdownOpen && !isRejectedDateDropdownOpen) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      const node = filterDropdownsRef.current as any;
+      if (node && !node.contains(e.target as Node)) {
+        setIsStatusDropdownOpen(false);
+        setIsDateDropdownOpen(false);
+      }
+      const rejNode = rejectedDropdownRef.current as any;
+      if (rejNode && !rejNode.contains(e.target as Node)) {
+        setIsRejectedDateDropdownOpen(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleOutsideClick);
+    }, 10);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleOutsideClick);
+    };
+  }, [isStatusDropdownOpen, isDateDropdownOpen, isRejectedDateDropdownOpen]);
+
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState('facebook');
@@ -1048,21 +1078,30 @@ export default function RequestorDashboard() {
                   />
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View ref={filterDropdownsRef} style={{ flexDirection: 'row', gap: 8 }}>
                 {activeTab === 'dashboard' ? (
-                  <View style={{ position: 'relative', zIndex: 40, flex: isTablet ? undefined : 1 }}>
+                  <View style={{ position: 'relative', zIndex: isStatusDropdownOpen ? 70 : 40, flex: isTablet ? undefined : 1 }}>
                     <TouchableOpacity
-                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
-                      onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, cursor: 'pointer' as any }]}
+                      onPress={() => {
+                        setIsStatusDropdownOpen((prev) => !prev);
+                        setIsDateDropdownOpen(false);
+                      }}
+                      activeOpacity={0.7}
                     >
                       <Text style={styles.departmentDropdownText}>
                         {statusFilter === 'All' ? 'All Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).toLowerCase()}
                       </Text>
-                      <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                      <Ionicons
+                        name={isStatusDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
+                        size={14}
+                        color={Colors.textSecondary}
+                        style={{ marginLeft: 4 }}
+                      />
                     </TouchableOpacity>
 
                     {isStatusDropdownOpen && (
-                      <View style={[styles.dropdownMenu, { minWidth: 140, right: 0, top: 40 }]}>
+                      <View style={[styles.dropdownMenu, { minWidth: 140, left: 0, right: 'auto', top: 40 }]}>
                         {[{ label: 'All Status', value: 'All' }, { label: 'Pending', value: 'PENDING' }, { label: 'Approved', value: 'APPROVED' }].map((opt: any) => (
                           <TouchableOpacity
                             key={opt.value}
@@ -1080,18 +1119,27 @@ export default function RequestorDashboard() {
                   </View>
                 ) : null}
 
-                <View style={{ position: 'relative', zIndex: 40, flex: isTablet ? undefined : 1 }}>
+                <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 70 : 40, flex: isTablet ? undefined : 1 }}>
                   <TouchableOpacity
-                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
-                    onPress={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, cursor: 'pointer' as any }]}
+                    onPress={() => {
+                      setIsDateDropdownOpen((prev) => !prev);
+                      setIsStatusDropdownOpen(false);
+                    }}
+                    activeOpacity={0.7}
                   >
                     <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
                     <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    <Ionicons
+                      name={isDateDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
+                      size={14}
+                      color={Colors.textSecondary}
+                      style={{ marginLeft: 4 }}
+                    />
                   </TouchableOpacity>
 
                   {isDateDropdownOpen && (
-                    <View style={[styles.dropdownMenu, { minWidth: 200, right: 0, top: 40 }]}>
+                    <View style={[styles.dropdownMenu, { minWidth: 200, right: 0, left: 'auto', top: 40 }]}>
                       {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
                         <TouchableOpacity
                           key={opt}
@@ -2264,14 +2312,20 @@ export default function RequestorDashboard() {
                   />
                 </View>
 
-                <View style={{ position: 'relative', zIndex: 40 }}>
+                <View ref={rejectedDropdownRef} style={{ position: 'relative', zIndex: isRejectedDateDropdownOpen ? 70 : 40 }}>
                   <TouchableOpacity
-                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0 }]}
+                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, cursor: 'pointer' as any }]}
                     onPress={() => setIsRejectedDateDropdownOpen(!isRejectedDateDropdownOpen)}
+                    activeOpacity={0.7}
                   >
                     <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
                     <Text style={styles.departmentDropdownText}>{rejectedDateFilter}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                    <Ionicons
+                      name={isRejectedDateDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
+                      size={14}
+                      color={Colors.textSecondary}
+                      style={{ marginLeft: 4 }}
+                    />
                   </TouchableOpacity>
 
                   {isRejectedDateDropdownOpen && (
