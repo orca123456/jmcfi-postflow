@@ -25,6 +25,8 @@ use Illuminate\Support\Str;
 
 class PostRequestController extends Controller
 {
+    private static ?bool $hasMediaFilesTable = null;
+
     public function __construct(
         private AIComplianceService $aiService,
         private ApprovalWorkflowService $workflowService
@@ -962,7 +964,11 @@ class PostRequestController extends Controller
             'is_featured' => $isFeatured,
         ]);
 
-        if (Schema::hasTable('post_media_files')) {
+        if (self::$hasMediaFilesTable === null) {
+            self::$hasMediaFilesTable = Schema::hasTable('post_media_files');
+        }
+
+        if (self::$hasMediaFilesTable && $type === 'image') {
             try {
                 $realPath = $file->getRealPath();
                 if ($realPath && file_exists($realPath)) {

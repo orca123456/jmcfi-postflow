@@ -30,6 +30,7 @@ import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
+import { optimizeImageForUpload } from '../../../utils/imageOptimizer';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -601,25 +602,31 @@ export default function RequestorDashboard() {
 
   const hasInstagramImage = () => mediaFiles.length > 0 ? mediaFiles.some(isImageFile) : editingPostHasImage;
 
-  const getFileBlob = async (item: any): Promise<any> => {
+  const getFileBlob = async (item: any, isMedia = false): Promise<any> => {
+    // If it's media (images/photos), run client-side optimization first
+    const targetItem = isMedia ? await optimizeImageForUpload(item) : item;
+
     if (Platform.OS === 'web') {
-      if (item.file instanceof File || item.file instanceof Blob) {
-        return item.file;
+      if (targetItem instanceof File || targetItem instanceof Blob) {
+        return targetItem;
       }
-      if (typeof item.uri === 'string' && (item.uri.startsWith('blob:') || item.uri.startsWith('data:'))) {
+      if (targetItem?.file instanceof File || targetItem?.file instanceof Blob) {
+        return targetItem.file;
+      }
+      if (typeof targetItem?.uri === 'string' && (targetItem.uri.startsWith('blob:') || targetItem.uri.startsWith('data:'))) {
         try {
-          const res = await fetch(item.uri);
+          const res = await fetch(targetItem.uri);
           const blob = await res.blob();
-          return new File([blob], item.name || 'upload.png', { type: item.mimeType || item.type || blob.type || 'image/png' });
+          return new File([blob], targetItem.name || 'upload.png', { type: targetItem.mimeType || targetItem.type || blob.type || 'image/png' });
         } catch (e) {
           console.warn('Failed to convert URI to File:', e);
         }
       }
     }
     return {
-      uri: item.uri,
-      name: item.name || 'upload.png',
-      type: item.mimeType || item.type || 'image/jpeg',
+      uri: targetItem?.uri || item?.uri,
+      name: targetItem?.name || item?.name || 'upload.png',
+      type: targetItem?.mimeType || targetItem?.type || item?.mimeType || item?.type || 'image/jpeg',
     };
   };
 
@@ -667,13 +674,16 @@ export default function RequestorDashboard() {
         }
         formData.append('featured_media_index', String(featuredMediaIndex));
 
-        for (const file of mediaFiles) {
-          const blobObj = await getFileBlob(file);
+        const [optimizedMediaBlobs, docBlobs] = await Promise.all([
+          Promise.all(mediaFiles.map((file) => getFileBlob(file, true))),
+          Promise.all(supportingDocs.map((doc) => getFileBlob(doc, false))),
+        ]);
+
+        for (const blobObj of optimizedMediaBlobs) {
           formData.append('media[]', blobObj);
         }
 
-        for (const doc of supportingDocs) {
-          const docObj = await getFileBlob(doc);
+        for (const docObj of docBlobs) {
           formData.append('supporting_docs[]', docObj);
         }
 
@@ -761,13 +771,16 @@ export default function RequestorDashboard() {
         }
         formData.append('featured_media_index', String(featuredMediaIndex));
 
-        for (const file of mediaFiles) {
-          const blobObj = await getFileBlob(file);
+        const [optimizedMediaBlobs, docBlobs] = await Promise.all([
+          Promise.all(mediaFiles.map((file) => getFileBlob(file, true))),
+          Promise.all(supportingDocs.map((doc) => getFileBlob(doc, false))),
+        ]);
+
+        for (const blobObj of optimizedMediaBlobs) {
           formData.append('media[]', blobObj);
         }
 
-        for (const doc of supportingDocs) {
-          const docObj = await getFileBlob(doc);
+        for (const docObj of docBlobs) {
           formData.append('supporting_docs[]', docObj);
         }
 
