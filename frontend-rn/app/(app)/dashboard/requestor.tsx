@@ -497,6 +497,17 @@ export default function RequestorDashboard() {
       });
   }, [rejectedPosts, rejectedSearchQuery, rejectedDateFilter, customRejectedStartDate, customRejectedEndDate]);
 
+  const [rejectedPage, setRejectedPage] = useState(1);
+  const rejectedPerPage = 10;
+
+  useEffect(() => {
+    setRejectedPage(1);
+  }, [rejectedSearchQuery, rejectedDateFilter, customRejectedStartDate, customRejectedEndDate]);
+
+  const paginatedRejectedPosts = useMemo(() => {
+    return filteredRejectedPosts.slice((rejectedPage - 1) * rejectedPerPage, rejectedPage * rejectedPerPage);
+  }, [filteredRejectedPosts, rejectedPage, rejectedPerPage]);
+
   const [mockQueuePosts, setMockQueuePosts] = useState<any[]>([]);
 
   const { data: postsDataRes, isLoading: isInitLoading, refetch: refetchPosts } = useQuery({
@@ -2415,16 +2426,16 @@ export default function RequestorDashboard() {
               </Card>
             ) : (
               <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ minWidth: isTablet ? '100%' : 800 }}>
-                  <View style={styles.table}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ width: '100%', minWidth: isTablet ? '100%' : 920 }}>
+                  <View style={[styles.table, { width: '100%', minWidth: isTablet ? '100%' : 920 }]}>
                     <View style={styles.tableHeaderRow}>
                       <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
-                      <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
+                      <Text style={[styles.tableHeaderCell, styles.flexDept]}>REJECTED BY & REASON</Text>
                       <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
                       <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
                       <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
                     </View>
-                    {filteredRejectedPosts.map((post) => (
+                    {paginatedRejectedPosts.map((post) => (
                       <TouchableOpacity
                         key={post.id}
                         style={styles.tableRow}
@@ -2448,10 +2459,17 @@ export default function RequestorDashboard() {
                           </View>
                         </View>
 
-                        {/* REQUESTED BY */}
-                        <View style={[styles.cellContainer, styles.flexUser]}>
-                          <Text style={styles.rowUserName}>{user?.full_name}</Text>
-                          <Text style={styles.rowUserRole}>Requestor</Text>
+                        {/* REJECTED BY & REASON */}
+                        <View style={[styles.cellContainer, styles.flexDept]}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="close-circle" size={14} color="#DC2626" />
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
+                              {post.rejectedBy || 'Approver Rejected'}
+                            </Text>
+                          </View>
+                          <Text numberOfLines={2} style={{ fontSize: 11, color: Colors.textSecondary, marginTop: 2 }}>
+                            {post.rejectionReason || 'No specific reason provided.'}
+                          </Text>
                         </View>
 
                         {/* REQUESTED ON */}
@@ -2480,10 +2498,48 @@ export default function RequestorDashboard() {
                         </View>
 
                         {/* ACTIONS */}
-                        <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup, { justifyContent: 'flex-end' }]}>
-                          <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#B91C1C' }}>REJECTED</Text>
-                          </View>
+                        <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup, { justifyContent: 'flex-end', gap: 6 }]}>
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setSelectedQueuePost(post);
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 8,
+                              paddingVertical: 5,
+                              borderRadius: 6,
+                              backgroundColor: '#F3F4F6',
+                              borderWidth: 1,
+                              borderColor: '#E5E7EB',
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="eye-outline" size={13} color="#374151" />
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>Reason</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleCreateNewFromRejected(post);
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 8,
+                              paddingVertical: 5,
+                              borderRadius: 6,
+                              backgroundColor: '#FFC72C',
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="create-outline" size={13} color="#1A1A2E" />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1A1A2E' }}>Revise</Text>
+                          </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -2491,10 +2547,10 @@ export default function RequestorDashboard() {
                 </ScrollView>
 
                 <PaginationControl
-                  currentPage={1}
-                  totalItems={rejectedPosts.length}
-                  itemsPerPage={10}
-                  onPageChange={() => { }}
+                  currentPage={rejectedPage}
+                  totalItems={filteredRejectedPosts.length}
+                  itemsPerPage={rejectedPerPage}
+                  onPageChange={setRejectedPage}
                 />
               </>
             )}
@@ -3523,6 +3579,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   table: {
+    width: '100%',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
@@ -3530,7 +3587,8 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
+    width: '100%',
+    backgroundColor: '#F9FAFB',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -3544,6 +3602,7 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
+    width: '100%',
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
