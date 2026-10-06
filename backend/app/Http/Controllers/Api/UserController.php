@@ -37,7 +37,7 @@ class UserController extends Controller
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => ['required', 'email', 'max:255', 'unique:users,email', 'regex:/@jmc\.edu\.ph$/i'],
-            'password' => 'required|string|min:8',
+            'password' => 'required|string',
             'department' => 'nullable|string|max:255',
             'position' => 'nullable|string|max:255',
             'role' => 'required|string|exists:roles,name',
@@ -47,7 +47,6 @@ class UserController extends Controller
             'email.required' => 'Please fill the Email Username.',
             'email.regex' => 'Only @jmc.edu.ph email addresses are allowed.',
             'password.required' => 'Please fill the Password.',
-            'password.min' => 'Password must be at least 8 characters.',
             'role.required' => 'Please select the Role.',
         ]);
 
@@ -123,7 +122,7 @@ class UserController extends Controller
             'department' => 'nullable|string|max:255',
             'role' => 'sometimes|string|exists:roles,name',
             'status' => 'sometimes|string|in:active,inactive',
-            'password' => 'sometimes|string|min:8|confirmed',
+            'password' => 'sometimes|string|confirmed',
         ], [
             'email.regex' => 'Only @jmc.edu.ph email addresses are allowed.',
         ]);
