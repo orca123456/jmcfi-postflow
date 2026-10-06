@@ -28,6 +28,7 @@ import { DashboardShell } from '../../../components/DashboardShell';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
+import { useThemeStore } from '../../../store/theme';
 import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi, resolveImageUrl } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
@@ -232,6 +233,7 @@ export default function ITAdminDashboard() {
   const { width } = useWindowDimensions();
   const { user, setUser } = useAuthStore();
   const queryClient = useQueryClient();
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   // Tab state: 'overview' | 'user-management' | 'all-posts' | 'approval-queue' | 'policy-rules' | 'account-settings'
   const params = useLocalSearchParams();
@@ -3969,48 +3971,48 @@ $response = curl_exec($ch);`}
               const secNumber = numMatch ? numMatch[1] : `${sIdx + 1}`;
               const secCleanTitle = numMatch ? numMatch[2] : section.title;
 
-              let badgeBg = '#0B2545';
+              let badgeBg = isDarkMode ? '#2563EB' : '#0B2545';
               let cardIconName: any = 'checkmark';
-              let cardIconBg = '#F3E8FF';
-              let cardIconColor = '#7C3AED';
-              let cardAccentColor = '#7C3AED';
+              let cardIconBg = isDarkMode ? '#1E293B' : '#F3E8FF';
+              let cardIconColor = isDarkMode ? '#A78BFA' : '#7C3AED';
+              let cardAccentColor = isDarkMode ? '#A78BFA' : '#7C3AED';
 
               if (secNumber === '2') {
                 badgeBg = '#7C3AED';
                 cardIconName = 'checkmark';
-                cardIconBg = '#F3E8FF';
-                cardIconColor = '#7C3AED';
-                cardAccentColor = '#7C3AED';
+                cardIconBg = isDarkMode ? '#2E1065' : '#F3E8FF';
+                cardIconColor = isDarkMode ? '#C084FC' : '#7C3AED';
+                cardAccentColor = isDarkMode ? '#C084FC' : '#7C3AED';
               } else if (secNumber === '3') {
                 badgeBg = '#16A34A';
                 cardIconName = 'checkmark';
-                cardIconBg = '#DCFCE7';
-                cardIconColor = '#16A34A';
-                cardAccentColor = '#16A34A';
+                cardIconBg = isDarkMode ? '#064E3B' : '#DCFCE7';
+                cardIconColor = isDarkMode ? '#4ADE80' : '#16A34A';
+                cardAccentColor = isDarkMode ? '#4ADE80' : '#16A34A';
               } else if (secNumber === '4') {
                 badgeBg = '#DC2626';
                 cardIconName = 'close';
-                cardIconBg = '#FEE2E2';
-                cardIconColor = '#DC2626';
-                cardAccentColor = '#DC2626';
+                cardIconBg = isDarkMode ? '#7F1D1D' : '#FEE2E2';
+                cardIconColor = isDarkMode ? '#F87171' : '#DC2626';
+                cardAccentColor = isDarkMode ? '#F87171' : '#DC2626';
               } else if (secNumber === '5') {
                 badgeBg = '#D97706';
                 cardIconName = 'copy-outline';
-                cardIconBg = '#FEF3C7';
-                cardIconColor = '#D97706';
-                cardAccentColor = '#D97706';
+                cardIconBg = isDarkMode ? '#78350F' : '#FEF3C7';
+                cardIconColor = isDarkMode ? '#FBBF24' : '#D97706';
+                cardAccentColor = isDarkMode ? '#FBBF24' : '#D97706';
               } else if (secNumber === '6') {
                 badgeBg = '#2563EB';
                 cardIconName = 'git-network-outline';
-                cardIconBg = '#EFF6FF';
-                cardIconColor = '#2563EB';
-                cardAccentColor = '#2563EB';
+                cardIconBg = isDarkMode ? '#1E3A8A' : '#EFF6FF';
+                cardIconColor = isDarkMode ? '#60A5FA' : '#2563EB';
+                cardAccentColor = isDarkMode ? '#60A5FA' : '#2563EB';
               } else if (secNumber === '7') {
-                badgeBg = '#4B5563';
+                badgeBg = isDarkMode ? '#64748B' : '#4B5563';
                 cardIconName = 'warning-outline';
-                cardIconBg = '#F3F4F6';
-                cardIconColor = '#374151';
-                cardAccentColor = '#4B5563';
+                cardIconBg = isDarkMode ? '#1E293B' : '#F3F4F6';
+                cardIconColor = isDarkMode ? '#94A3B8' : '#374151';
+                cardAccentColor = isDarkMode ? '#94A3B8' : '#4B5563';
               }
 
               return (
@@ -6093,16 +6095,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   policyNumberBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   policyNumberBadgeText: {
-    color: Colors.surface,
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   policySectionTitleText: {
     fontSize: 17,
@@ -6127,7 +6131,7 @@ const styles = StyleSheet.create({
   },
   policyStatementBody: {
     fontSize: 13,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
   policyGridRow: {
@@ -6165,7 +6169,7 @@ const styles = StyleSheet.create({
   },
   policyCardDesc: {
     fontSize: 12,
-    color: '#4B5563',
+    color: Colors.textSecondary,
     lineHeight: 18,
   },
   policySimpleContentBox: {
@@ -6173,7 +6177,7 @@ const styles = StyleSheet.create({
   },
   policySimpleContentText: {
     fontSize: 13,
-    color: '#4B5563',
+    color: Colors.textSecondary,
   },
 
   // Editing Mode Styles
