@@ -331,6 +331,12 @@ export function DashboardShell({
         background-color: rgba(217, 119, 6, 0.2) !important;
       }
 
+      /* Media upload dashed zones */
+      .dark-theme [style*="dashed"] {
+        background-color: #1E293B !important;
+        border-color: #334155 !important;
+      }
+
       /* React Native Web Atomic Text Classes */
       .dark-theme .r-color-15ijx5m,
       .dark-theme .r-color-18zdu8c,
