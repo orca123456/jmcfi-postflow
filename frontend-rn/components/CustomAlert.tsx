@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { Colors, BorderRadius } from '../constants/theme';
+import { useThemeStore } from '../store/theme';
 
 export function CustomAlertProvider({ children }: { children: React.ReactNode }) {
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
   const [alertConfig, setAlertConfig] = useState<{ message: string; visible: boolean }>({
     message: '',
     visible: false,
@@ -53,11 +55,28 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
           onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}
         >
           <View style={styles.overlay}>
-            <View style={styles.alertBox}>
-              <Text style={styles.alertTitle}>JMCFI PostFlow</Text>
-              <Text style={styles.alertMessage}>{alertConfig.message}</Text>
+            <View
+              style={[
+                styles.alertBox,
+                {
+                  backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                  borderWidth: 1,
+                },
+              ]}
+              {...({ 'data-modal': 'alert-box' } as any)}
+            >
+              <Text style={[styles.alertTitle, { color: isDarkMode ? '#F8FAFC' : '#0B2545' }]}>
+                JMCFI PostFlow
+              </Text>
+              <Text style={[styles.alertMessage, { color: isDarkMode ? '#F8FAFC' : '#1A1A2E' }]}>
+                {alertConfig.message}
+              </Text>
               <TouchableOpacity
-                style={styles.okButton}
+                style={[
+                  styles.okButton,
+                  { backgroundColor: isDarkMode ? '#2563EB' : '#0B2545' },
+                ]}
                 onPress={() => setAlertConfig({ ...alertConfig, visible: false })}
               >
                 <Text style={styles.okButtonText}>OK</Text>

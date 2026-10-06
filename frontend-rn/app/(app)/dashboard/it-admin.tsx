@@ -990,7 +990,6 @@ export default function ITAdminDashboard() {
     if (!acctCurrentPw?.trim()) { showToast('Please fill the Current Password.', 'warning'); return; }
     if (!acctNewPw?.trim()) { showToast('Please fill the New Password.', 'warning'); return; }
     if (!acctConfirmPw?.trim()) { showToast('Please fill the Confirm Password.', 'warning'); return; }
-    if (acctNewPw.length < 8) { showToast('Password must be at least 8 characters.', 'warning'); return; }
     if (acctNewPw !== acctConfirmPw) { showToast('Passwords do not match.', 'warning'); return; }
     setSavingAcctPw(true);
     try {
@@ -1534,10 +1533,6 @@ export default function ITAdminDashboard() {
       showToast('Please fill the Password.', 'warning');
       return;
     }
-    if (newUserPassword.length < 8) {
-      showToast('Password must be at least 8 characters.', 'warning');
-      return;
-    }
     if (!newUserRole) {
       showToast('Please select the Role.', 'warning');
       return;
@@ -1697,11 +1692,6 @@ export default function ITAdminDashboard() {
       payload.position = autoPositionFor(profileRole, profileDepartment);
 
       if (profilePassword) {
-        if (profilePassword.length < 8) {
-          showToast('Password must be at least 8 characters.', 'warning');
-          setSavingProfile(false);
-          return;
-        }
         if (profilePassword !== profilePasswordConfirmation) {
           showToast('Password confirmation does not match.', 'warning');
           setSavingProfile(false);
@@ -2706,7 +2696,7 @@ export default function ITAdminDashboard() {
                                 secureTextEntry={!showProfilePassword}
                                 value={profilePassword}
                                 onChangeText={setProfilePassword}
-                                placeholder="Min. 8 characters"
+                                placeholder="Enter new password (optional)"
                                 autoCapitalize="none"
                               />
                               <TouchableOpacity style={styles.widePasswordToggle} onPress={() => setShowProfilePassword(!showProfilePassword)}>
