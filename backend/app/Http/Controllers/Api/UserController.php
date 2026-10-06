@@ -42,7 +42,13 @@ class UserController extends Controller
             'position' => 'nullable|string|max:255',
             'role' => 'required|string|exists:roles,name',
         ], [
+            'first_name.required' => 'Please fill the Firstname.',
+            'last_name.required' => 'Please fill the Lastname.',
+            'email.required' => 'Please fill the Email Username.',
             'email.regex' => 'Only @jmc.edu.ph email addresses are allowed.',
+            'password.required' => 'Please fill the Password.',
+            'password.min' => 'Password must be at least 8 characters.',
+            'role.required' => 'Please select the Role.',
         ]);
 
         // Auto-set position based on role category (mirrors User::roleCategory)

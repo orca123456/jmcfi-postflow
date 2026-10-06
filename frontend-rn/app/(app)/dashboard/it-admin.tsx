@@ -960,6 +960,10 @@ export default function ITAdminDashboard() {
   }, [user, activeTab]);
 
   const handleSaveAcctDetails = async () => {
+    if (!acctFullName.trim()) {
+      showToast('Please fill the Full Name.', 'warning');
+      return;
+    }
     const parts = acctFullName.trim().split(' ');
     const first_name = parts[0] || '';
     const last_name = parts.slice(1).join(' ') || '';
@@ -983,7 +987,9 @@ export default function ITAdminDashboard() {
   };
 
   const handleChangeAcctPassword = async () => {
-    if (!acctCurrentPw || !acctNewPw) { showToast('Fill all password fields.', 'warning'); return; }
+    if (!acctCurrentPw?.trim()) { showToast('Please fill the Current Password.', 'warning'); return; }
+    if (!acctNewPw?.trim()) { showToast('Please fill the New Password.', 'warning'); return; }
+    if (!acctConfirmPw?.trim()) { showToast('Please fill the Confirm Password.', 'warning'); return; }
     if (acctNewPw.length < 8) { showToast('Password must be at least 8 characters.', 'warning'); return; }
     if (acctNewPw !== acctConfirmPw) { showToast('Passwords do not match.', 'warning'); return; }
     setSavingAcctPw(true);
@@ -1512,8 +1518,34 @@ export default function ITAdminDashboard() {
 
 
   const handleCreateAccount = async () => {
-    if (!newUserEmail || !newUserPassword || !newUserFirstName || !newUserLastName) { showToast('Please fill in all required fields.', 'warning'); return; }
-    if (!newUserDepartment) { showToast('Please select or add a valid department first.', 'warning'); return; }
+    if (!newUserFirstName?.trim()) {
+      showToast('Please fill the Firstname.', 'warning');
+      return;
+    }
+    if (!newUserLastName?.trim()) {
+      showToast('Please fill the Lastname.', 'warning');
+      return;
+    }
+    if (!newUserEmail?.trim()) {
+      showToast('Please fill the Email Username.', 'warning');
+      return;
+    }
+    if (!newUserPassword?.trim()) {
+      showToast('Please fill the Password.', 'warning');
+      return;
+    }
+    if (newUserPassword.length < 8) {
+      showToast('Password must be at least 8 characters.', 'warning');
+      return;
+    }
+    if (!newUserRole) {
+      showToast('Please select the Role.', 'warning');
+      return;
+    }
+    if (!newUserDepartment?.trim()) {
+      showToast('Please select or add a valid department first.', 'warning');
+      return;
+    }
     // Auto-append @jmc.edu.ph if not already a full email
     const finalEmail = newUserEmail.includes('@') ? newUserEmail.trim() : newUserEmail.trim() + '@jmc.edu.ph';
     if (!finalEmail.toLowerCase().endsWith('@jmc.edu.ph')) {
@@ -1631,6 +1663,22 @@ export default function ITAdminDashboard() {
 
   const handleSaveProfile = async () => {
     if (!selectedUser) return;
+    if (!profileFirstName?.trim()) {
+      showToast('Please fill the Firstname.', 'warning');
+      return;
+    }
+    if (!profileLastName?.trim()) {
+      showToast('Please fill the Lastname.', 'warning');
+      return;
+    }
+    if (!profileEmail?.trim()) {
+      showToast('Please fill the Email.', 'warning');
+      return;
+    }
+    if (!profileDepartment?.trim()) {
+      showToast('Please select the Department.', 'warning');
+      return;
+    }
     setSavingProfile(true);
     try {
       const roleToSend = roleCategoryOf(profileOriginalRole) === profileRole
