@@ -34,11 +34,13 @@ import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictur
 import { optimizeImageForUpload } from '../../../utils/imageOptimizer';
 import { FacebookMediaGrid } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
+import { useThemeStore } from '../../../store/theme';
 
 export default function RequestorDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
 
@@ -1680,7 +1682,15 @@ export default function RequestorDashboard() {
                   </View>
 
                   <View style={[styles.uploadGridRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
-                    <TouchableOpacity style={styles.uploadZone} onPress={async () => {
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadZone,
+                        {
+                          backgroundColor: isDarkMode ? '#1E293B' : '#FAFAFA',
+                          borderColor: isDarkMode ? '#334155' : Colors.border,
+                        }
+                      ]}
+                      onPress={async () => {
                       try {
                         const result = await DocumentPicker.getDocumentAsync({
                           type: ['image/*', 'video/*'],
@@ -1710,8 +1720,15 @@ export default function RequestorDashboard() {
                         }
                       }
                     }}>
-                      <View style={styles.uploadZoneCircle}>
-                        <Ionicons name="cloud-upload-outline" size={24} color={Colors.textSecondary} />
+                      <View style={[
+                        styles.uploadZoneCircle,
+                        {
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                          borderWidth: 1,
+                        }
+                      ]}>
+                        <Ionicons name="cloud-upload-outline" size={24} color={isDarkMode ? '#F8FAFC' : '#0B2545'} />
                       </View>
                       <Text style={styles.uploadZoneTitle}>Upload Main Media</Text>
                       <Text style={styles.uploadZoneSubtitle}>
@@ -1721,7 +1738,15 @@ export default function RequestorDashboard() {
                       </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.uploadZone} onPress={async () => {
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadZone,
+                        {
+                          backgroundColor: isDarkMode ? '#1E293B' : '#FAFAFA',
+                          borderColor: isDarkMode ? '#334155' : Colors.border,
+                        }
+                      ]}
+                      onPress={async () => {
                       try {
                         const result = await DocumentPicker.getDocumentAsync({
                           type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
@@ -1751,8 +1776,15 @@ export default function RequestorDashboard() {
                         }
                       }
                     }}>
-                      <View style={styles.uploadZoneCircle}>
-                        <Ionicons name="attach-outline" size={22} color={Colors.textSecondary} />
+                      <View style={[
+                        styles.uploadZoneCircle,
+                        {
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                          borderWidth: 1,
+                        }
+                      ]}>
+                        <Ionicons name="attach-outline" size={22} color={isDarkMode ? '#F8FAFC' : '#0B2545'} />
                       </View>
                       <Text style={styles.uploadZoneTitle}>Supporting Docs</Text>
                       <Text style={styles.uploadZoneSubtitle}>
@@ -1833,7 +1865,15 @@ export default function RequestorDashboard() {
                   </View>
 
                   {/* Platform Choice Selector (3 Choices: Facebook, Instagram, WordPress) */}
-                  <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 3, marginBottom: 12 }}>
+                  <View style={{
+                    flexDirection: 'row',
+                    backgroundColor: isDarkMode ? '#0F172A' : '#F3F4F6',
+                    borderRadius: 8,
+                    padding: 3,
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                  }}>
                     <TouchableOpacity
                       onPress={() => setPreviewPlatformTab('facebook')}
                       activeOpacity={0.8}
@@ -1845,13 +1885,25 @@ export default function RequestorDashboard() {
                         gap: 5,
                         paddingVertical: 6,
                         borderRadius: 6,
-                        backgroundColor: previewPlatformTab === 'facebook' ? '#FFFFFF' : 'transparent',
+                        backgroundColor: previewPlatformTab === 'facebook'
+                          ? (isDarkMode ? '#1E293B' : '#FFFFFF')
+                          : 'transparent',
                         borderWidth: previewPlatformTab === 'facebook' ? 1 : 0,
-                        borderColor: previewPlatformTab === 'facebook' ? '#E5E7EB' : 'transparent',
+                        borderColor: previewPlatformTab === 'facebook'
+                          ? (isDarkMode ? '#334155' : '#E5E7EB')
+                          : 'transparent',
                       }}
                     >
-                      <Ionicons name="logo-facebook" size={15} color={previewPlatformTab === 'facebook' ? '#1877F2' : '#6B7280'} />
-                      <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'facebook' ? '700' : '500', color: previewPlatformTab === 'facebook' ? '#1877F2' : '#4B5563' }}>
+                      <Ionicons
+                        name="logo-facebook"
+                        size={15}
+                        color={previewPlatformTab === 'facebook' ? '#1877F2' : (isDarkMode ? '#94A3B8' : '#6B7280')}
+                      />
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: previewPlatformTab === 'facebook' ? '700' : '500',
+                        color: previewPlatformTab === 'facebook' ? '#1877F2' : (isDarkMode ? '#94A3B8' : '#4B5563')
+                      }}>
                         Facebook
                       </Text>
                     </TouchableOpacity>
@@ -1867,13 +1919,25 @@ export default function RequestorDashboard() {
                         gap: 5,
                         paddingVertical: 6,
                         borderRadius: 6,
-                        backgroundColor: previewPlatformTab === 'instagram' ? '#FFFFFF' : 'transparent',
+                        backgroundColor: previewPlatformTab === 'instagram'
+                          ? (isDarkMode ? '#1E293B' : '#FFFFFF')
+                          : 'transparent',
                         borderWidth: previewPlatformTab === 'instagram' ? 1 : 0,
-                        borderColor: previewPlatformTab === 'instagram' ? '#E5E7EB' : 'transparent',
+                        borderColor: previewPlatformTab === 'instagram'
+                          ? (isDarkMode ? '#334155' : '#E5E7EB')
+                          : 'transparent',
                       }}
                     >
-                      <Ionicons name="logo-instagram" size={15} color={previewPlatformTab === 'instagram' ? '#E1306C' : '#6B7280'} />
-                      <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'instagram' ? '700' : '500', color: previewPlatformTab === 'instagram' ? '#E1306C' : '#4B5563' }}>
+                      <Ionicons
+                        name="logo-instagram"
+                        size={15}
+                        color={previewPlatformTab === 'instagram' ? '#E1306C' : (isDarkMode ? '#94A3B8' : '#6B7280')}
+                      />
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: previewPlatformTab === 'instagram' ? '700' : '500',
+                        color: previewPlatformTab === 'instagram' ? '#E1306C' : (isDarkMode ? '#94A3B8' : '#4B5563')
+                      }}>
                         Instagram
                       </Text>
                     </TouchableOpacity>
@@ -1889,32 +1953,66 @@ export default function RequestorDashboard() {
                         gap: 5,
                         paddingVertical: 6,
                         borderRadius: 6,
-                        backgroundColor: previewPlatformTab === 'wordpress' ? '#FFFFFF' : 'transparent',
+                        backgroundColor: previewPlatformTab === 'wordpress'
+                          ? (isDarkMode ? '#1E293B' : '#FFFFFF')
+                          : 'transparent',
                         borderWidth: previewPlatformTab === 'wordpress' ? 1 : 0,
-                        borderColor: previewPlatformTab === 'wordpress' ? '#E5E7EB' : 'transparent',
+                        borderColor: previewPlatformTab === 'wordpress'
+                          ? (isDarkMode ? '#334155' : '#E5E7EB')
+                          : 'transparent',
                       }}
                     >
-                      <Ionicons name="globe-outline" size={15} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#6B7280'} />
-                      <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#4B5563' }}>
+                      <Ionicons
+                        name="globe-outline"
+                        size={15}
+                        color={previewPlatformTab === 'wordpress' ? '#21759B' : (isDarkMode ? '#94A3B8' : '#6B7280')}
+                      />
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500',
+                        color: previewPlatformTab === 'wordpress' ? '#21759B' : (isDarkMode ? '#94A3B8' : '#4B5563')
+                      }}>
                         WordPress
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.previewModeRow}>
+                  <View style={[
+                    styles.previewModeRow,
+                    {
+                      backgroundColor: isDarkMode ? '#0F172A' : '#F3F4F6',
+                      borderColor: isDarkMode ? '#334155' : Colors.border,
+                    }
+                  ]}>
                     <TouchableOpacity
-                      style={[styles.previewToggleBtn, previewMode === 'mobile' && styles.previewToggleBtnActive]}
+                      style={[
+                        styles.previewToggleBtn,
+                        previewMode === 'mobile' && (isDarkMode ? styles.previewToggleBtnActiveDark : styles.previewToggleBtnActive),
+                      ]}
                       onPress={() => setPreviewMode('mobile')}
                     >
-                      <Text style={[styles.previewToggleText, previewMode === 'mobile' && styles.previewToggleTextActive]}>
+                      <Text style={[
+                        styles.previewToggleText,
+                        previewMode === 'mobile'
+                          ? styles.previewToggleTextActive
+                          : { color: isDarkMode ? '#94A3B8' : Colors.textPrimary },
+                      ]}>
                         Mobile
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.previewToggleBtn, previewMode === 'desktop' && styles.previewToggleBtnActive]}
+                      style={[
+                        styles.previewToggleBtn,
+                        previewMode === 'desktop' && (isDarkMode ? styles.previewToggleBtnActiveDark : styles.previewToggleBtnActive),
+                      ]}
                       onPress={() => setPreviewMode('desktop')}
                     >
-                      <Text style={[styles.previewToggleText, previewMode === 'desktop' && styles.previewToggleTextActive]}>
+                      <Text style={[
+                        styles.previewToggleText,
+                        previewMode === 'desktop'
+                          ? styles.previewToggleTextActive
+                          : { color: isDarkMode ? '#94A3B8' : Colors.textPrimary },
+                      ]}>
                         Desktop
                       </Text>
                     </TouchableOpacity>
@@ -1934,7 +2032,13 @@ export default function RequestorDashboard() {
                       <View style={[styles.previewMockupFrame, previewMode === 'mobile' ? { maxWidth: 360, alignSelf: 'center', width: '100%' } : { width: '100%' }]}>
                         {/* FACEBOOK PREVIEW */}
                         {previewPlatformTab === 'facebook' && (
-                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                          <View style={{
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                            borderRadius: 10,
+                            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                            overflow: 'hidden',
+                          }}>
                             <View style={styles.mockPostHeader}>
                               <View style={[styles.mockPostAvatarCircle, { backgroundColor: Colors.surface, overflow: 'hidden' }]}>
                                 <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -1985,16 +2089,29 @@ export default function RequestorDashboard() {
 
                         {/* INSTAGRAM PREVIEW */}
                         {previewPlatformTab === 'instagram' && (
-                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                          <View style={{
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                            borderRadius: 10,
+                            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                            overflow: 'hidden',
+                          }}>
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              padding: 10,
+                              gap: 10,
+                              borderBottomWidth: 1,
+                              borderBottomColor: isDarkMode ? '#334155' : '#F3F4F6',
+                            }}>
                               <View style={{ width: 34, height: 34, borderRadius: 17, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
                                 <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
                               </View>
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>jmc_official</Text>
-                                <Text style={{ fontSize: 10, color: '#8E8E8E' }}>Davao City, Philippines</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#262626' }}>jmc_official</Text>
+                                <Text style={{ fontSize: 10, color: isDarkMode ? '#94A3B8' : '#8E8E8E' }}>Davao City, Philippines</Text>
                               </View>
-                              <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
+                              <Ionicons name="ellipsis-horizontal" size={18} color={isDarkMode ? '#F8FAFC' : '#262626'} />
                             </View>
 
                             {previewImages.length > 0 ? (
@@ -2015,15 +2132,15 @@ export default function RequestorDashboard() {
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                                 <View style={{ flexDirection: 'row', gap: 12 }}>
                                   <Ionicons name="heart" size={20} color="#E1306C" />
-                                  <Ionicons name="chatbubble-outline" size={19} color="#262626" />
-                                  <Ionicons name="paper-plane-outline" size={19} color="#262626" />
+                                  <Ionicons name="chatbubble-outline" size={19} color={isDarkMode ? '#F8FAFC' : '#262626'} />
+                                  <Ionicons name="paper-plane-outline" size={19} color={isDarkMode ? '#F8FAFC' : '#262626'} />
                                 </View>
-                                <Ionicons name="bookmark-outline" size={19} color="#262626" />
+                                <Ionicons name="bookmark-outline" size={19} color={isDarkMode ? '#F8FAFC' : '#262626'} />
                               </View>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#262626', marginBottom: 3 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#262626', marginBottom: 3 }}>
                                 Liked by jmcfi_official and others
                               </Text>
-                              <FormattedText style={{ fontSize: 11, color: '#262626', lineHeight: 15 }}>
+                              <FormattedText style={{ fontSize: 11, color: isDarkMode ? '#E2E8F0' : '#262626', lineHeight: 15 }}>
                                 {'<b>jmc_official </b>' + (caption ? caption : 'Upload media to see your content preview here...')}
                               </FormattedText>
                             </View>
@@ -2032,17 +2149,34 @@ export default function RequestorDashboard() {
 
                         {/* WORDPRESS PREVIEW */}
                         {previewPlatformTab === 'wordpress' && (
-                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 14 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+                          <View style={{
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#334155' : '#E5E7EB',
+                            borderRadius: 10,
+                            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                            overflow: 'hidden',
+                            padding: 14,
+                          }}>
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              marginBottom: 8,
+                              backgroundColor: isDarkMode ? 'rgba(33, 117, 155, 0.25)' : '#F0F9FF',
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 6,
+                              alignSelf: 'flex-start',
+                            }}>
                               <Ionicons name="globe-outline" size={13} color="#21759B" />
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#38BDF8' : '#21759B' }}>WordPress Article Preview</Text>
                             </View>
 
-                            <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 4, lineHeight: 20 }}>
+                            <Text style={{ fontSize: 16, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 4, lineHeight: 20 }}>
                               {postTitle ? postTitle : (caption ? (caption.length > 50 ? caption.slice(0, 50) + '...' : caption) : 'Content Request Title')}
                             </Text>
 
-                            <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 10 }}>
+                            <Text style={{ fontSize: 10, color: isDarkMode ? '#94A3B8' : '#64748B', marginBottom: 10 }}>
                               By JMCFI Requestor • News & Announcements • Just now
                             </Text>
 
@@ -2062,7 +2196,7 @@ export default function RequestorDashboard() {
                               </View>
                             )}
 
-                            <FormattedText style={{ fontSize: 12, color: '#334155', lineHeight: 17 }}>
+                            <FormattedText style={{ fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#334155', lineHeight: 17 }}>
                               {caption ? caption : 'Upload media to see your content preview here...'}
                             </FormattedText>
                           </View>
@@ -4069,7 +4203,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAFAFA',
+    backgroundColor: Colors.surfaceSecondary,
     gap: 8,
     minHeight: 120,
   },
@@ -4077,7 +4211,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -4180,27 +4316,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: 'hidden',
     marginBottom: Spacing.sm,
+    backgroundColor: Colors.surfaceSecondary,
   },
   previewToggleBtn: {
     flex: 1,
-    height: 28,
+    height: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'transparent',
   },
   previewToggleBtnActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#0B2545',
+  },
+  previewToggleBtnActiveDark: {
+    backgroundColor: '#2563EB',
   },
   previewToggleText: {
     fontSize: FontSize.xs,
-    color: Colors.textPrimary,
+    color: Colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   previewToggleTextActive: {
-    color: Colors.surface,
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   previewMockupFrame: {
