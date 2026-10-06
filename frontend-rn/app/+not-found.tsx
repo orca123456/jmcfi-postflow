@@ -12,6 +12,17 @@ export default function NotFoundScreen() {
   // Hover state for the button
   const [isHovered, setIsHovered] = useState(false);
 
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      const match = pathname.match(/\/(approver|requestor|admin)\/posts\/(\d+)/i);
+      if (match) {
+        const [, roleType, postId] = match;
+        router.replace(`/${roleType.toLowerCase()}/posts/${postId}` as any);
+      }
+    }
+  }, [router]);
+
   return (
     <>
       <Stack.Screen options={{ title: 'Page Not Found', headerShown: false }} />

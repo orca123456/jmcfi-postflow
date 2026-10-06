@@ -289,6 +289,51 @@ export default function ImcQaDashboard() {
     }
   }, [initDataRes, user?.department, optimisticallyRemovedIds]);
 
+  useEffect(() => {
+    if (params.postId && !selectedRequest) {
+      const postIdStr = String(params.postId);
+      const allPosts = [...requestsList, ...approvedRequests, ...rejectedRequests];
+      const match = allPosts.find((r: any) => String(r.id) === postIdStr);
+      if (match) {
+        setSelectedRequest(match);
+      } else {
+        postsApi.get(Number(postIdStr)).then((res: any) => {
+          const raw = res?.data?.data || res?.data;
+          if (raw) {
+            let rejectedBy = '';
+            if ((raw.status === 'rejected' || raw.status === 'returned_for_revision') && raw.approval_workflows && Array.isArray(raw.approval_workflows)) {
+              const rejectionLog = raw.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
+              if (rejectionLog && rejectionLog.approver) {
+                rejectedBy = `${rejectionLog.approver.full_name}`;
+              }
+            }
+            setSelectedRequest({
+              ...raw,
+              id: raw.id.toString(),
+              title: raw.title || 'Untitled',
+              category: raw.category?.name || 'Category',
+              dept: raw.requestor?.department || 'Department',
+              requestedBy: raw.requestor?.full_name || 'Unknown',
+              requestedByRole: 'Requestor',
+              date: new Date(raw.created_at).toLocaleDateString(),
+              time: new Date(raw.created_at).toLocaleTimeString(),
+              rawDate: new Date(raw.created_at),
+              platforms: raw.target_platforms || [],
+              caption: raw.caption_narrative || '',
+              previewBanner: (raw.title || '').toUpperCase(),
+              attachment: raw.media && raw.media.length > 0 ? raw.media[0].original_filename : 'No Attachment',
+              attachmentSize: raw.media && raw.media.length > 0 ? raw.media[0].size + 'B' : '',
+              thumbnailUrl: Array.isArray(raw.media) && raw.media.length > 0 ? (raw.media[0].url || raw.media[0].file_url || raw.media[0].file_path || null) : null,
+              status: raw.status ? raw.status.toUpperCase() : 'UNKNOWN',
+              rejectionReason: raw.rejection_reason || '',
+              rejectedBy,
+            });
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [params.postId, requestsList.length]);
+
   const loadData = (showLoading = true) => {
     refetchInitData();
   };
