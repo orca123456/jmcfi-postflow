@@ -446,17 +446,19 @@ export function DashboardShell({
             </View>
           )}
 
-          {/* DARK MODE TOGGLE */}
-          <TouchableOpacity 
-            onPress={toggleDarkMode}
-            style={styles.headerIconButton}
-          >
-            <Ionicons 
-              name={isDarkMode ? "sunny-outline" : "moon-outline"} 
-              size={18} 
-              color="#FFFFFF" 
-            />
-          </TouchableOpacity>
+          {/* DARK MODE TOGGLE (Desktop only - moved to profile dropdown on mobile/iOS to prevent overlapping) */}
+          {isDesktop && (
+            <TouchableOpacity 
+              onPress={toggleDarkMode}
+              style={styles.headerIconButton}
+            >
+              <Ionicons 
+                name={isDarkMode ? "sunny-outline" : "moon-outline"} 
+                size={18} 
+                color="#FFFFFF" 
+              />
+            </TouchableOpacity>
+          )}
 
           {/* NOTIFICATION TRIGGER */}
           <TouchableOpacity 
@@ -639,6 +641,31 @@ export function DashboardShell({
                 </TouchableOpacity>
               )}
               
+              {/* DARK MODE TOGGLE (Available in profile dropdown, especially for mobile/iOS) */}
+              <TouchableOpacity 
+                style={styles.dropdownItem} 
+                onPress={toggleDarkMode}
+              >
+                <Ionicons 
+                  name={isDarkMode ? "sunny-outline" : "moon-outline"} 
+                  size={18} 
+                  color={isDarkMode ? "#EAB308" : "#4B5563"} 
+                />
+                <View style={styles.itemTextContainer}>
+                  <Text style={styles.itemTitle}>{isDarkMode ? 'Light appearance' : 'Dark appearance'}</Text>
+                  <Text style={styles.itemSubtitle}>{isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}</Text>
+                </View>
+                <View style={[
+                  styles.themeTogglePill,
+                  isDarkMode && styles.themeTogglePillActive
+                ]}>
+                  <View style={[
+                    styles.themeToggleThumb,
+                    isDarkMode && styles.themeToggleThumbActive
+                  ]} />
+                </View>
+              </TouchableOpacity>
+
               <TouchableOpacity 
                 style={styles.dropdownItem} 
                 onPress={() => { 
@@ -921,6 +948,15 @@ export function DashboardShell({
             <View style={styles.mobileDrawerFooter}>
               <TouchableOpacity
                 style={styles.mobileDrawerNavItem}
+                onPress={toggleDarkMode}
+              >
+                <Ionicons name={isDarkMode ? "sunny-outline" : "moon-outline"} size={22} color="#FFFFFF" />
+                <Text style={styles.mobileDrawerNavLabel}>
+                  {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.mobileDrawerNavItem}
                 onPress={() => {
                   closeMobileDrawer();
                   if (onTabChange) onTabChange('account-settings');
@@ -961,7 +997,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#4C007C', // Deep purple matching screenshot
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#3B0061',
@@ -1023,6 +1059,26 @@ const styles = StyleSheet.create({
   },
   roleBadgeTextSmall: {
     fontSize: 11,
+  },
+  themeTogglePill: {
+    width: 38,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E5E7EB',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  themeTogglePillActive: {
+    backgroundColor: '#7C3AED',
+  },
+  themeToggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+  },
+  themeToggleThumbActive: {
+    transform: [{ translateX: 16 }],
   },
   headerIconButton: {
     width: 34,
