@@ -1837,56 +1837,56 @@ export default function ITAdminDashboard() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 24, justifyContent: 'space-between', width: '100%' }}>
             {/* Stat Card 1: TOTAL CONTENT */}
             <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.8}>
-              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'All Status' ? 2 : 1.5, borderColor: requestsStatus === 'All Status' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'All Status' ? 2 : 1.5, borderColor: requestsStatus === 'All Status' ? Colors.textPrimary : Colors.border, backgroundColor: Colors.surface, width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Ionicons name="document-text" size={17} color="#7C3AED" />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">TOTAL CONTENT</Text>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.total}</Text>
-                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">All content requests</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">TOTAL CONTENT</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: Colors.textPrimary, lineHeight: 26 }}>{computedStats.total}</Text>
+                  <Text style={{ fontSize: 9, color: Colors.textSecondary, marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">All content requests</Text>
                 </View>
               </Card>
             </TouchableOpacity>
 
             {/* Stat Card 2: PENDING */}
             <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('Pending')} activeOpacity={0.8}>
-              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Pending' ? 2 : 1.5, borderColor: requestsStatus === 'Pending' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Pending' ? 2 : 1.5, borderColor: requestsStatus === 'Pending' ? Colors.textPrimary : Colors.border, backgroundColor: Colors.surface, width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFE4E6', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Ionicons name="time" size={17} color="#E11D48" />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">PENDING</Text>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.pending}</Text>
-                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Awaiting approval</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">PENDING</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: Colors.textPrimary, lineHeight: 26 }}>{computedStats.pending}</Text>
+                  <Text style={{ fontSize: 9, color: Colors.textSecondary, marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Awaiting approval</Text>
                 </View>
               </Card>
             </TouchableOpacity>
 
             {/* Stat Card 3: APPROVED & PUBLISHED */}
             <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('Published')} activeOpacity={0.8}>
-              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Published' ? 2 : 1.5, borderColor: requestsStatus === 'Published' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Published' ? 2 : 1.5, borderColor: requestsStatus === 'Published' ? Colors.textPrimary : Colors.border, backgroundColor: Colors.surface, width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Ionicons name="checkmark-circle" size={17} color="#0284C7" />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">APPROVED & PUBLISHED</Text>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.published}</Text>
-                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Ready or live</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">APPROVED & PUBLISHED</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: Colors.textPrimary, lineHeight: 26 }}>{computedStats.published}</Text>
+                  <Text style={{ fontSize: 9, color: Colors.textSecondary, marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Ready or live</Text>
                 </View>
               </Card>
             </TouchableOpacity>
 
             {/* Stat Card 4: DRAFTS */}
             <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('Drafts')} activeOpacity={0.8}>
-              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Drafts' ? 2 : 1.5, borderColor: requestsStatus === 'Drafts' ? '#0F172A' : '#E2E8F0', backgroundColor: '#FFFFFF', width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
+              <Card style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 88, borderRadius: 16, borderWidth: requestsStatus === 'Drafts' ? 2 : 1.5, borderColor: requestsStatus === 'Drafts' ? Colors.textPrimary : Colors.border, backgroundColor: Colors.surface, width: '100%', maxWidth: '100%', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Ionicons name="document-text" size={17} color="#16A34A" />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">DRAFTS</Text>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', lineHeight: 26 }}>{computedStats.draft}</Text>
-                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Work in progress</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.textSecondary, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1} ellipsizeMode="tail">DRAFTS</Text>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: Colors.textPrimary, lineHeight: 26 }}>{computedStats.draft}</Text>
+                  <Text style={{ fontSize: 9, color: Colors.textSecondary, marginTop: 1, fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">Work in progress</Text>
                 </View>
               </Card>
             </TouchableOpacity>
@@ -4378,11 +4378,11 @@ $response = curl_exec($ch);`}
                     activeOpacity={0.8}
                     onPress={() => setIsAnalyticsPeriodOpen(!isAnalyticsPeriodOpen)}
                   >
-                    <Ionicons name="calendar-outline" size={15} color="#334155" />
+                    <Ionicons name="calendar-outline" size={15} color={Colors.textSecondary} />
                     <Text style={styles.analyticsActionText}>
                       {ANALYTICS_PERIOD_OPTIONS.find((opt) => opt.value === analyticsPeriod)?.label || 'This Month'}
                     </Text>
-                    <Ionicons name={isAnalyticsPeriodOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#334155" />
+                    <Ionicons name={isAnalyticsPeriodOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isAnalyticsPeriodOpen && (
@@ -4414,7 +4414,7 @@ $response = curl_exec($ch);`}
                 </View>
 
                 <TouchableOpacity style={styles.analyticsActionButton} activeOpacity={0.8} onPress={handleExportAnalyticsOverview}>
-                  <Ionicons name="download-outline" size={15} color="#334155" />
+                  <Ionicons name="download-outline" size={15} color={Colors.textSecondary} />
                   <Text style={styles.analyticsActionText}>Export Report</Text>
                 </TouchableOpacity>
               </View>
@@ -4511,7 +4511,7 @@ $response = curl_exec($ch);`}
                 </View>
                 <TouchableOpacity style={styles.analyticsDeptFooter} activeOpacity={0.8}>
                   <Text style={styles.analyticsDeptFooterText}>View All Departments</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#111827" />
+                  <Ionicons name="arrow-forward" size={16} color={Colors.textPrimary} />
                 </TouchableOpacity>
               </Card>
             </View>
@@ -5577,17 +5577,17 @@ const styles = StyleSheet.create({
   analyticsPage: { gap: 24 },
   analyticsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, position: 'relative', zIndex: 500 },
   analyticsHeaderStacked: { flexDirection: 'column' },
-  analyticsTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
-  analyticsSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
+  analyticsTitle: { fontSize: 26, fontWeight: '900', color: Colors.textPrimary },
+  analyticsSubtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 5 },
   analyticsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', zIndex: 600 },
   analyticsPeriodDropdownContainer: { position: 'relative', zIndex: 1000 },
   analyticsPeriodDropdown: {
     position: 'absolute',
     top: 46,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.border,
     borderRadius: 8,
     paddingVertical: 4,
     minWidth: 160,
@@ -5606,34 +5606,34 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   analyticsPeriodItemActive: { backgroundColor: '#F3E8FF' },
-  analyticsPeriodItemText: { fontSize: 13, fontWeight: '600', color: '#334155' },
+  analyticsPeriodItemText: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
   analyticsPeriodItemTextActive: { fontWeight: '700', color: '#7C3AED' },
-  analyticsActionButton: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8 },
-  analyticsActionText: { fontSize: 13, fontWeight: '700', color: '#334155' },
+  analyticsActionButton: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, paddingHorizontal: 14, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 8 },
+  analyticsActionText: { fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
   analyticsStatsGrid: { flexDirection: 'row', gap: 18 },
   analyticsStack: { flexDirection: 'column' },
-  analyticsStatCard: { flex: 1, minWidth: 0, width: '100%', padding: 16, flexDirection: 'row', gap: 16, alignItems: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatCard: { flex: 1, minWidth: 0, width: '100%', padding: 16, flexDirection: 'row', gap: 16, alignItems: 'flex-start', backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsStatIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   analyticsStatContent: { flex: 1, minWidth: 0, gap: 6 },
   analyticsStatTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  analyticsStatLabel: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  analyticsStatLabel: { fontSize: 12, fontWeight: '700', color: Colors.textSecondary },
   analyticsTrend: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   analyticsTrendText: { fontSize: 12, fontWeight: '800' },
-  analyticsStatValue: { fontSize: 25, lineHeight: 30, fontWeight: '900', color: '#111827' },
+  analyticsStatValue: { fontSize: 25, lineHeight: 30, fontWeight: '900', color: Colors.textPrimary },
   analyticsStatFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
-  analyticsStatSubtext: { fontSize: 11, color: '#64748B' },
+  analyticsStatSubtext: { fontSize: 11, color: Colors.textSecondary },
   analyticsCompareText: { fontSize: 10, color: '#94A3B8' },
   analyticsMainGrid: { flexDirection: 'row', gap: 24 },
-  analyticsChartCard: { minWidth: 0, padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
-  analyticsDepartmentCard: { minWidth: 0, width: '100%', padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsChartCard: { minWidth: 0, padding: 22, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsDepartmentCard: { minWidth: 0, width: '100%', padding: 0, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsDepartmentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, paddingTop: 24, paddingHorizontal: 22, marginBottom: 20 },
   analyticsCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  analyticsCardTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  analyticsCardSubtitle: { fontSize: 12, color: '#64748B', marginTop: 4 },
+  analyticsCardTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  analyticsCardSubtitle: { fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
   analyticsPill: { backgroundColor: '#F3E8FF', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
   analyticsPillText: { fontSize: 12, fontWeight: '800', color: '#7C3AED' },
   analyticsChartArea: { height: 250, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingLeft: 36, paddingRight: 8, paddingTop: 8, paddingBottom: 28, position: 'relative' },
-  analyticsGridLine: { position: 'absolute', left: 36, right: 8, borderTopWidth: 1, borderTopColor: '#E5E7EB', borderStyle: 'dashed' },
+  analyticsGridLine: { position: 'absolute', left: 36, right: 8, borderTopWidth: 1, borderTopColor: Colors.border, borderStyle: 'dashed' },
   analyticsYAxisLabel: { position: 'absolute', left: -30, top: -8, fontSize: 11, color: '#94A3B8' },
   analyticsMonthColumn: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end', minWidth: 30 },
   analyticsPlotColumn: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' },
@@ -5641,69 +5641,69 @@ const styles = StyleSheet.create({
   analyticsPoint: { width: 12, height: 12, borderRadius: 6, borderWidth: 3, borderColor: '#7C3AED', backgroundColor: '#FFFFFF', marginTop: -6 },
   analyticsPointPeak: { width: 15, height: 15, borderRadius: 8, borderWidth: 3 },
   analyticsPointLabel: { position: 'absolute', bottom: '84%', fontSize: 18, fontWeight: '900', color: '#7C3AED' },
-  analyticsMonthLabel: { fontSize: 11, color: '#64748B', marginTop: 12 },
+  analyticsMonthLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 12 },
   analyticsChartLegend: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24, marginTop: 6 },
   analyticsLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   analyticsLegendDot: { width: 18, height: 4, borderRadius: 2 },
-  analyticsLegendText: { fontSize: 11, color: '#64748B' },
+  analyticsLegendText: { fontSize: 11, color: Colors.textSecondary },
   analyticsDeptList: { flex: 1, paddingHorizontal: 22, paddingBottom: 16, gap: 16 },
   analyticsDeptItem: { gap: 7 },
   analyticsDeptHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  analyticsDeptName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#111827' },
-  analyticsDeptPercent: { fontSize: 12, fontWeight: '900', color: '#111827' },
-  analyticsDeptTrack: { height: 7, borderRadius: 8, backgroundColor: '#F1F5F9', overflow: 'hidden' },
+  analyticsDeptName: { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
+  analyticsDeptPercent: { fontSize: 12, fontWeight: '900', color: Colors.textPrimary },
+  analyticsDeptTrack: { height: 7, borderRadius: 8, backgroundColor: Colors.surfaceSecondary, overflow: 'hidden' },
   analyticsDeptFill: { height: '100%', borderRadius: 8 },
   analyticsDeptSubtext: { fontSize: 11, color: '#94A3B8' },
-  analyticsDeptFooter: { marginTop: 16, minHeight: 48, borderTopWidth: 1, borderTopColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10, paddingVertical: 12 },
-  analyticsDeptFooterText: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  analyticsDeptFooter: { marginTop: 16, minHeight: 48, borderTopWidth: 1, borderTopColor: Colors.border, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10, paddingVertical: 12 },
+  analyticsDeptFooterText: { fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
   analyticsBottomGrid: { flexDirection: 'row', gap: 24 },
-  analyticsPlatformCard: { minWidth: 0, width: '100%', padding: 22, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsPlatformCard: { minWidth: 0, width: '100%', padding: 22, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsPlatformGrid: { flexDirection: 'row', gap: 16, marginTop: 16 },
-  analyticsPlatformItem: { minWidth: 0, width: '100%', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, position: 'relative', overflow: 'hidden' },
+  analyticsPlatformItem: { minWidth: 0, width: '100%', borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, borderRadius: 8, padding: 16, position: 'relative', overflow: 'hidden' },
   analyticsPlatformTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 20 },
   analyticsPlatformIdentity: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
   analyticsPlatformIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  analyticsPlatformName: { fontSize: 13, fontWeight: '800', color: '#111827' },
-  analyticsPlatformPercent: { fontSize: 19, fontWeight: '900', color: '#111827' },
+  analyticsPlatformName: { fontSize: 13, fontWeight: '800', color: Colors.textPrimary },
+  analyticsPlatformPercent: { fontSize: 19, fontWeight: '900', color: Colors.textPrimary },
   analyticsPlatformBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 },
   analyticsPlatformPosts: { fontSize: 24, lineHeight: 28, fontWeight: '900' },
   analyticsPlatformPostsLabel: { fontSize: 11, fontWeight: '800', marginTop: -1 },
-  analyticsPlatformTarget: { fontSize: 11, color: '#64748B', marginTop: 8 },
+  analyticsPlatformTarget: { fontSize: 11, color: Colors.textSecondary, marginTop: 8 },
   analyticsProgressRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   analyticsProgressRingFill: { position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 7, borderLeftColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '35deg' }] },
-  analyticsStatusCard: { minWidth: 0, width: '100%', padding: 16, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  analyticsStatusCard: { minWidth: 0, width: '100%', padding: 16, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   analyticsStatusBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 14, paddingBottom: 2 },
   analyticsDonutWrap: { width: 96, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   analyticsDonutOuter: { width: 92, height: 92, borderRadius: 46, borderWidth: 15, borderColor: '#F97316', borderLeftColor: '#10B981', borderTopColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
-  analyticsDonutMiddle: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  analyticsDonutValue: { fontSize: 20, fontWeight: '900', color: '#0F172A' },
-  analyticsDonutLabel: { fontSize: 10, color: '#64748B', marginTop: 1 },
+  analyticsDonutMiddle: { width: 62, height: 62, borderRadius: 31, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  analyticsDonutValue: { fontSize: 20, fontWeight: '900', color: Colors.textPrimary },
+  analyticsDonutLabel: { fontSize: 10, color: Colors.textSecondary, marginTop: 1 },
   analyticsStatusLegendList: { flex: 1, gap: 8, minWidth: 0, paddingRight: 4 },
   analyticsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
   analyticsStatusLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
   analyticsStatusDot: { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
-  analyticsStatusLabel: { fontSize: 11, color: '#64748B', flexShrink: 1 },
-  analyticsStatusValue: { fontSize: 11, fontWeight: '800', color: '#0F172A', flexShrink: 0 },
+  analyticsStatusLabel: { fontSize: 11, color: Colors.textSecondary, flexShrink: 1 },
+  analyticsStatusValue: { fontSize: 11, fontWeight: '800', color: Colors.textPrimary, flexShrink: 0 },
   analyticsEmptyText: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 20, alignSelf: 'center' },
 
   // Platform integrations
   tokensPage: { gap: 18 },
   tokensHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
   tokensHeaderMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 10 },
-  tokensTitle: { fontSize: 26, fontWeight: '900', color: '#111827' },
+  tokensTitle: { fontSize: 26, fontWeight: '900', color: Colors.textPrimary },
   tokensTitleMobile: { fontSize: 21 },
-  tokensSubtitle: { fontSize: 13, color: '#64748B', marginTop: 5, lineHeight: 18 },
+  tokensSubtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 5, lineHeight: 18 },
   tokensUpdatedBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#F3E8FF', borderWidth: 1, borderColor: '#E9D5FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   tokensUpdatedText: { fontSize: 11, fontWeight: '700', color: '#5B21B6' },
   tokensSecurityBanner: { minHeight: 48, borderRadius: 8, backgroundColor: 'rgba(245, 240, 255, 0.92)', borderWidth: 1, borderColor: '#E9D5FF', paddingHorizontal: 16, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 12 },
   tokensSecurityText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#5B21B6' },
-  tokensMetaCard: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 18, flexWrap: 'wrap', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
+  tokensMetaCard: { padding: 16, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 18, flexWrap: 'wrap', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
   tokensMetaCardMobile: { flexDirection: 'column', alignItems: 'stretch', gap: 14, padding: 14 },
   tokensMetaContent: { flex: 1, minWidth: 260, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   tokensMetaContentMobile: { flex: 0, minWidth: 0, width: '100%' },
   tokensMetaIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  tokensMetaTitle: { fontSize: 13, fontWeight: '900', color: '#111827' },
-  tokensMetaText: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 4 },
+  tokensMetaTitle: { fontSize: 13, fontWeight: '900', color: Colors.textPrimary },
+  tokensMetaText: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18, marginTop: 4 },
   tokensMetaActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   tokensMetaActionsMobile: { flexDirection: 'column', width: '100%', alignItems: 'stretch', gap: 10 },
   tokensFullWidthButton: { width: '100%', minHeight: 42, justifyContent: 'center' },
@@ -5712,13 +5712,13 @@ const styles = StyleSheet.create({
   tokensSecondaryButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 14, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#DDD6FE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   tokensSecondaryButtonText: { fontSize: 12, fontWeight: '900', color: '#5B21B6', flexShrink: 1 },
   tokensButtonDisabled: { opacity: 0.6 },
-  tokensIntegrationCard: { padding: 0, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  tokensIntegrationCard: { padding: 0, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   tokensIntegrationCardMobile: { flexDirection: 'column' },
-  tokensPlatformIntro: { width: 360, padding: 24, borderRightWidth: 1, borderRightColor: '#E5E7EB', flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  tokensPlatformIntroMobile: { width: '100%', borderRightWidth: 0, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 16 },
+  tokensPlatformIntro: { width: 360, padding: 24, borderRightWidth: 1, borderRightColor: Colors.border, flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  tokensPlatformIntroMobile: { width: '100%', borderRightWidth: 0, borderBottomWidth: 1, borderBottomColor: Colors.border, padding: 16 },
   tokensPlatformIcon: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  tokensPlatformName: { fontSize: 17, fontWeight: '900', color: '#111827', marginTop: 3 },
-  tokensPlatformDescription: { fontSize: 12, color: '#64748B', lineHeight: 18, marginTop: 10 },
+  tokensPlatformName: { fontSize: 17, fontWeight: '900', color: Colors.textPrimary, marginTop: 3 },
+  tokensPlatformDescription: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18, marginTop: 10 },
   tokensConnectionBadge: { alignSelf: 'flex-start', marginTop: 14, borderRadius: 999, backgroundColor: '#FEF3C7', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6 },
   tokensConnectionBadgeConnected: { backgroundColor: '#DCFCE7' },
   tokensConnectionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#F59E0B' },
@@ -5730,44 +5730,44 @@ const styles = StyleSheet.create({
   tokensFieldGridMobile: { flexDirection: 'column' },
   tokensField: { flex: 1, minWidth: 280, gap: 7 },
   tokensLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  tokensFieldLabel: { fontSize: 12, fontWeight: '800', color: '#111827' },
-  tokensInputWrap: { minHeight: 40, borderWidth: 1, borderColor: '#DDE3EA', borderRadius: 7, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
-  tokensInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: '#111827', outlineStyle: 'none' } as any,
+  tokensFieldLabel: { fontSize: 12, fontWeight: '800', color: Colors.textPrimary },
+  tokensInputWrap: { minHeight: 40, borderWidth: 1, borderColor: Colors.border, borderRadius: 7, backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  tokensInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: Colors.textPrimary, outlineStyle: 'none' } as any,
   tokensEyeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   tokensFieldHint: { fontSize: 11, color: '#94A3B8' },
   tokensCardActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   tokensCardActionsMobile: { flexDirection: 'column', width: '100%', alignItems: 'stretch', gap: 10 },
   tokensSaveButton: { minHeight: 40, borderRadius: 7, paddingHorizontal: 16, backgroundColor: '#5B0FB8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   tokensSaveButtonText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
-  tokensClearButton: { minHeight: 40, minWidth: 82, borderRadius: 7, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
-  tokensClearButtonText: { fontSize: 12, fontWeight: '800', color: '#64748B' },
+  tokensClearButton: { minHeight: 40, minWidth: 82, borderRadius: 7, paddingHorizontal: 14, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  tokensClearButtonText: { fontSize: 12, fontWeight: '800', color: Colors.textSecondary },
 
   // Email settings
   emailPage: { gap: 26 },
-  emailHeroCard: { padding: 24, minHeight: 92, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', gap: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  emailHeroCard: { padding: 24, minHeight: 92, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   emailHeroIcon: { width: 50, height: 50, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  emailHeroTitle: { fontSize: 19, fontWeight: '900', color: '#111827' },
-  emailHeroSubtitle: { fontSize: 14, color: '#64748B', marginTop: 6 },
+  emailHeroTitle: { fontSize: 19, fontWeight: '900', color: Colors.textPrimary },
+  emailHeroSubtitle: { fontSize: 14, color: Colors.textSecondary, marginTop: 6 },
   emailLayout: { flexDirection: 'row', gap: 26, alignItems: 'flex-start' },
   emailLayoutStacked: { flexDirection: 'column' },
-  emailSmtpCard: { flex: 1.45, minWidth: 520, padding: 26, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  emailSmtpCard: { flex: 1.45, minWidth: 520, padding: 26, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
   emailSmtpCardMobile: { minWidth: 0, width: '100%' },
   emailSideColumn: { flex: 1, minWidth: 360, gap: 26, alignSelf: 'stretch' },
   emailSideColumnMobile: { minWidth: 0, width: '100%' },
-  emailSenderCard: { padding: 26, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', gap: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
-  emailCardTitle: { fontSize: 19, fontWeight: '900', color: '#111827' },
-  emailCardSubtitle: { fontSize: 13, color: '#64748B', lineHeight: 20, marginTop: 10, marginBottom: 24 },
+  emailSenderCard: { padding: 26, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, gap: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 3 },
+  emailCardTitle: { fontSize: 19, fontWeight: '900', color: Colors.textPrimary },
+  emailCardSubtitle: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20, marginTop: 10, marginBottom: 24 },
   emailLinkText: { color: '#4F46E5', fontWeight: '800' },
   emailTwoColumnRow: { flexDirection: 'row', gap: 18, marginBottom: 24 },
   emailColumnRow: { flexDirection: 'column' },
   emailField: { flex: 1, minWidth: 0 },
-  emailFieldLabel: { fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 9 },
-  emailInputWrap: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#DDE3EA', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
-  emailInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: '#111827', outlineStyle: 'none' } as any,
+  emailFieldLabel: { fontSize: 13, fontWeight: '800', color: Colors.textPrimary, marginBottom: 9 },
+  emailInputWrap: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
+  emailInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: Colors.textPrimary, outlineStyle: 'none' } as any,
   emailEyeButton: { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   emailEncryptionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 20 },
-  emailEncryptionOption: { minHeight: 42, minWidth: 88, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 },
-  emailEncryptionOptionActive: { borderColor: '#4F46E5', backgroundColor: '#FFFFFF' },
+  emailEncryptionOption: { minHeight: 42, minWidth: 88, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 },
+  emailEncryptionOptionActive: { borderColor: '#4F46E5', backgroundColor: Colors.surface },
   emailRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
   emailRadioActive: { borderColor: '#4F46E5' },
   emailRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4F46E5' },
