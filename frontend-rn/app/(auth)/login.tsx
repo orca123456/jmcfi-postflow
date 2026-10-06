@@ -164,7 +164,25 @@ export default function LoginScreen() {
     if (success) {
       const user = useAuthStore.getState().user;
       if (user) {
-        router.replace(getRoleDashboardPath(user.role) as any);
+        let intended: string | null = null;
+        let targetPostId: string | null = null;
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            intended = sessionStorage.getItem('postflow_intended_url') || localStorage.getItem('postflow_intended_url');
+            targetPostId = sessionStorage.getItem('postflow_target_post_id') || localStorage.getItem('postflow_target_post_id');
+            sessionStorage.removeItem('postflow_intended_url');
+            sessionStorage.removeItem('postflow_target_post_id');
+            localStorage.removeItem('postflow_intended_url');
+            localStorage.removeItem('postflow_target_post_id');
+          } catch (e) {}
+        }
+        if (intended) {
+          router.replace(intended as any);
+        } else if (targetPostId) {
+          router.replace(`${getRoleDashboardPath(user.role)}?postId=${targetPostId}` as any);
+        } else {
+          router.replace(getRoleDashboardPath(user.role) as any);
+        }
       }
     } else {
       setPassword('');
