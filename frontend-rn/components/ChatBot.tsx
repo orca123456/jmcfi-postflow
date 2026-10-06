@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../constants/theme';
 import { chatbotApi } from '../services/api';
 import { useAuthStore } from '../store/auth';
+import { useThemeStore } from '../store/theme';
 
 interface Message {
   id: string;
@@ -25,6 +26,7 @@ interface Message {
 
 export function ChatBot() {
   const user = useAuthStore((state) => state.user);
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
 
   const { roleCategory, isAdmin, isApprover, suggestedQuestions, welcomeMessage } = useMemo(() => {
     const rawRole = (user?.role || '').toLowerCase();
@@ -553,7 +555,7 @@ export function ChatBot() {
       {isOpen && (
         <Animated.View
           style={[
-            styles.chatPanel,
+            styles.chatPanel, isDarkMode && { backgroundColor: '#1C2541', borderColor: '#334155' },
             { opacity: chatOpacity, transform: [{ translateY: chatTranslateY }] },
           ]}
         >
@@ -600,7 +602,7 @@ export function ChatBot() {
           {/* Messages */}
           <ScrollView
             ref={scrollRef}
-            style={styles.messagesArea}
+            style={[styles.messagesArea, isDarkMode && { backgroundColor: '#0B1329' }]}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
             {...({ role: 'log' } as any)}
@@ -622,7 +624,7 @@ export function ChatBot() {
                   {msg.role === 'bot' && <Text style={styles.chatSenderName}>PostFlow AI</Text>}
                   <View style={[
                     styles.bubbleContent,
-                    msg.role === 'user' ? styles.userBubbleContent : styles.botBubbleContent,
+                    msg.role === 'user' ? styles.userBubbleContent : [styles.botBubbleContent, isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' }],
                   ]}>
                     {renderFormattedMessage(msg.text, msg.role === 'user')}
                   </View>
@@ -659,7 +661,7 @@ export function ChatBot() {
           </ScrollView>
 
           {/* Suggested Questions */}
-          <View style={styles.suggestedContainer}>
+          <View style={[styles.suggestedContainer, isDarkMode && { backgroundColor: '#1C2541', borderTopColor: '#334155' }]}>
             <View style={styles.suggestedHeaderRow}>
               <Text style={styles.suggestedTitle}>Suggested Questions</Text>
               <View style={styles.suggestedArrows}>
@@ -687,7 +689,7 @@ export function ChatBot() {
               showsHorizontalScrollIndicator={false}
               onScroll={checkSuggestedScroll}
               scrollEventThrottle={16}
-              style={styles.quickRepliesRow}
+              style={[styles.quickRepliesRow, isDarkMode && { backgroundColor: '#1C2541' }]}
               contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 6 }}
             >
               {suggestedQuestions.map((qr) => (
@@ -705,9 +707,9 @@ export function ChatBot() {
           </View>
 
           {/* Input */}
-          <View style={styles.inputRow}>
+          <View style={[styles.inputRow, isDarkMode && { backgroundColor: '#1C2541', borderTopColor: '#334155' }]}>
             <TextInput
-              style={styles.chatInput}
+              style={[styles.chatInput, isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
               placeholder="Type your question…"
               placeholderTextColor="#94A3B8"
               value={inputText}

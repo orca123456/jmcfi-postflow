@@ -19,8 +19,11 @@ export default function RootLayout() {
   useEffect(() => {
     loadFromStorage();
     
-    // Hide default password reveal icon on Edge/IE to prevent overlapping with our custom icon
     if (Platform.OS === 'web') {
+      if (localStorage.getItem('dark_mode') === 'true') {
+        document.documentElement.classList.add('dark-theme');
+        document.body.classList.add('dark-theme');
+      }
       const style = document.createElement('style');
       style.type = 'text/css';
       style.innerHTML = `
