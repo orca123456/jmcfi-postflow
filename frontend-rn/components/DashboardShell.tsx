@@ -808,7 +808,7 @@ export function DashboardShell({
                   if (onTabChange) onTabChange('account-settings');
                 }}
               >
-                <Ionicons name="settings-outline" size={18} color="#4B5563" />
+                <Ionicons name="settings-outline" size={18} color={isDarkMode ? '#94A3B8' : '#4B5563'} />
                 <View style={styles.itemTextContainer}>
                   <Text style={styles.itemTitle}>Account settings</Text>
                   <Text style={styles.itemSubtitle}>Manage defaults, privacy & more</Text>
@@ -819,7 +819,7 @@ export function DashboardShell({
                 style={styles.dropdownItem} 
                 onPress={() => { setIsProfileDropdownOpen(false); handleLogout(); }}
               >
-                <Ionicons name="log-out-outline" size={18} color="#4B5563" />
+                <Ionicons name="log-out-outline" size={18} color={isDarkMode ? '#94A3B8' : '#4B5563'} />
                 <View style={styles.itemTextContainer}>
                   <Text style={styles.itemTitle}>Sign out</Text>
                 </View>
@@ -919,42 +919,6 @@ export function DashboardShell({
                 <View style={styles.sidebarDivider} />
 
                 <View style={{ gap: 4, paddingBottom: 16 }}>
-                  <AnimatedTouchable
-                    style={[
-                      styles.sidebarNavItem,
-                      activeTab === 'account-settings' && styles.sidebarNavItemActivePurple,
-                      {
-                        width: sidebarWidthAnim.interpolate({
-                          inputRange: [MIN_WIDTH, MAX_WIDTH],
-                          outputRange: [48, MAX_WIDTH - 16]
-                        })
-                      }
-                    ]}
-                    onPress={() => {
-                      if (onTabChange) onTabChange('account-settings');
-                      if (sidebarOpenedByHover) closeSidebar();
-                    }}
-                  >
-                    <View style={styles.sidebarNavIconWrapper}>
-                      <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
-                    </View>
-                    <Animated.View style={{ 
-                      opacity: sidebarWidthAnim.interpolate({
-                        inputRange: [MIN_WIDTH, MAX_WIDTH],
-                        outputRange: [0, 1]
-                      }) 
-                    }}>
-                      <Text
-                        style={[
-                          styles.sidebarNavLabel,
-                          activeTab === 'account-settings' && styles.sidebarNavLabelActivePurple,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        Account Settings
-                      </Text>
-                    </Animated.View>
-                  </AnimatedTouchable>
                   <AnimatedTouchable
                     style={[
                       styles.sidebarNavItem,
@@ -1089,16 +1053,6 @@ export function DashboardShell({
                 <Text style={styles.mobileDrawerNavLabel}>
                   {isDarkMode ? 'Light Mode' : 'Dark Mode'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.mobileDrawerNavItem}
-                onPress={() => {
-                  closeMobileDrawer();
-                  if (onTabChange) onTabChange('account-settings');
-                }}
-              >
-                <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.mobileDrawerNavLabel}>Account Settings</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.mobileDrawerNavItem}
