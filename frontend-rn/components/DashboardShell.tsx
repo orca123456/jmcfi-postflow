@@ -581,20 +581,6 @@ export function DashboardShell({
             </View>
           )}
 
-          {/* DARK MODE TOGGLE (Desktop only - moved to profile dropdown on mobile/iOS to prevent overlapping) */}
-          {isDesktop && (
-            <TouchableOpacity 
-              onPress={toggleDarkMode}
-              style={styles.headerIconButton}
-            >
-              <Ionicons 
-                name={isDarkMode ? "sunny-outline" : "moon-outline"} 
-                size={18} 
-                color="#FFFFFF" 
-              />
-            </TouchableOpacity>
-          )}
-
           {/* NOTIFICATION TRIGGER */}
           <TouchableOpacity 
             onPress={() => {
@@ -1045,15 +1031,6 @@ export function DashboardShell({
 
             {/* Footer Actions */}
             <View style={styles.mobileDrawerFooter}>
-              <TouchableOpacity
-                style={styles.mobileDrawerNavItem}
-                onPress={toggleDarkMode}
-              >
-                <Ionicons name={isDarkMode ? "sunny-outline" : "moon-outline"} size={22} color="#FFFFFF" />
-                <Text style={styles.mobileDrawerNavLabel}>
-                  {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.mobileDrawerNavItem}
                 onPress={() => {
