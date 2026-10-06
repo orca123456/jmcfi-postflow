@@ -243,63 +243,198 @@ export function DashboardShell({
     if (!styleTag) {
       styleTag = document.createElement('style');
       styleTag.id = styleId;
-      styleTag.innerHTML = `
-        :root {
-          --color-primary: #0B2545;
-          --color-primary-light: #134074;
-          --color-primary-dark: #081F37;
-          --color-accent: #FFC72C;
-          --color-wisteria: #EEF4F8;
-          --color-background: #F4F6F9;
-          --color-surface: #FFFFFF;
-          --color-surface-secondary: #EEF4F8;
-          --color-text-primary: #1A1A2E;
-          --color-text-secondary: #6B7280;
-          --color-text-muted: #9CA3AF;
-          --color-text-on-primary: #FFFFFF;
-          --color-success: #16A34A;
-          --color-warning: #D97706;
-          --color-error: #DC2626;
-          --color-info: #2563EB;
-          --color-border: #E5E7EB;
-          --color-border-focus: #0B2545;
-          --color-admin: #7C3AED;
-          --color-requestor: #2563EB;
-          --color-office-head: #D97706;
-          --color-vp: #DC2626;
-          --color-imc-qa: #7C3AED;
-          --color-publisher: #374151;
-        }
-        
-        .dark-theme {
-          --color-primary: #1E293B;
-          --color-primary-light: #334155;
-          --color-primary-dark: #0F172A;
-          --color-accent: #FFD15C;
-          --color-wisteria: #1E293B;
-          --color-background: #0B1329;
-          --color-surface: #1C2541;
-          --color-surface-secondary: #1E293B;
-          --color-text-primary: #F8FAFC;
-          --color-text-secondary: #94A3B8;
-          --color-text-muted: #64748B;
-          --color-text-on-primary: #FFFFFF;
-          --color-success: #22C55E;
-          --color-warning: #F59E0B;
-          --color-error: #EF4444;
-          --color-info: #3B82F6;
-          --color-border: #334155;
-          --color-border-focus: #FFC72C;
-          --color-admin: #A78BFA;
-          --color-requestor: #60A5FA;
-          --color-office-head: #F59E0B;
-          --color-vp: #F87171;
-          --color-imc-qa: #C084FC;
-          --color-publisher: #9CA3AF;
-        }
-      `;
       document.head.appendChild(styleTag);
     }
+    styleTag.innerHTML = `
+      :root {
+        --color-primary: #0B2545;
+        --color-primary-light: #134074;
+        --color-primary-dark: #081F37;
+        --color-accent: #FFC72C;
+        --color-wisteria: #EEF4F8;
+        --color-background: #F4F6F9;
+        --color-surface: #FFFFFF;
+        --color-surface-secondary: #EEF4F8;
+        --color-text-primary: #1A1A2E;
+        --color-text-secondary: #6B7280;
+        --color-text-muted: #9CA3AF;
+        --color-text-on-primary: #FFFFFF;
+        --color-success: #16A34A;
+        --color-warning: #D97706;
+        --color-error: #DC2626;
+        --color-info: #2563EB;
+        --color-border: #E5E7EB;
+        --color-border-focus: #0B2545;
+        --color-admin: #7C3AED;
+        --color-requestor: #2563EB;
+        --color-office-head: #D97706;
+        --color-vp: #DC2626;
+        --color-imc-qa: #7C3AED;
+        --color-publisher: #374151;
+      }
+      
+      .dark-theme {
+        --color-primary: #1E293B;
+        --color-primary-light: #334155;
+        --color-primary-dark: #0F172A;
+        --color-accent: #FFD15C;
+        --color-wisteria: #1E293B;
+        --color-background: #0B1329;
+        --color-surface: #1C2541;
+        --color-surface-secondary: #1E293B;
+        --color-text-primary: #F8FAFC;
+        --color-text-secondary: #94A3B8;
+        --color-text-muted: #64748B;
+        --color-text-on-primary: #FFFFFF;
+        --color-success: #22C55E;
+        --color-warning: #F59E0B;
+        --color-error: #EF4444;
+        --color-info: #3B82F6;
+        --color-border: #334155;
+        --color-border-focus: #FFC72C;
+        --color-admin: #A78BFA;
+        --color-requestor: #60A5FA;
+        --color-office-head: #F59E0B;
+        --color-vp: #F87171;
+        --color-imc-qa: #C084FC;
+        --color-publisher: #9CA3AF;
+        color-scheme: dark !important;
+      }
+
+      /* Base layout in dark mode */
+      .dark-theme,
+      .dark-theme body,
+      .dark-theme #root,
+      .dark-theme [data-testid="root"] {
+        background-color: #0B1329 !important;
+        color: #F8FAFC !important;
+      }
+
+      /* React Native Web Atomic Background Classes */
+      .dark-theme .r-backgroundColor-14lw9ot,
+      .dark-theme .r-backgroundColor-1hus931,
+      .dark-theme .r-backgroundColor-6026j,
+      .dark-theme .r-backgroundColor-6st0mw,
+      .dark-theme .r-backgroundColor-z6hqnn,
+      .dark-theme .r-backgroundColor-1ins33t,
+      .dark-theme .r-backgroundColor-pgx3k3,
+      .dark-theme .r-backgroundColor-1uavh4e,
+      .dark-theme .r-backgroundColor-1oainxc,
+      .dark-theme .r-backgroundColor-bmsz1l {
+        background-color: #1C2541 !important;
+      }
+
+      .dark-theme .r-backgroundColor-o5e8d5 {
+        background-color: rgba(37, 99, 235, 0.18) !important;
+      }
+      .dark-theme .r-backgroundColor-xfb1t7 {
+        background-color: rgba(217, 119, 6, 0.2) !important;
+      }
+
+      /* React Native Web Atomic Text Classes */
+      .dark-theme .r-color-15ijx5m,
+      .dark-theme .r-color-18zdu8c,
+      .dark-theme .r-color-1qar9k,
+      .dark-theme .r-color-1w5meix,
+      .dark-theme .r-color-cqee49 {
+        color: #F8FAFC !important;
+      }
+
+      .dark-theme .r-color-dz6k1,
+      .dark-theme .r-color-1ois7e2,
+      .dark-theme .r-color-edjfg1 {
+        color: #CBD5E1 !important;
+      }
+
+      .dark-theme .r-color-1s7ct43,
+      .dark-theme .r-color-1cucpzw {
+        color: #94A3B8 !important;
+      }
+
+      /* React Native Web Atomic Border Classes */
+      .dark-theme .r-borderColor-1w15a45,
+      .dark-theme .r-borderColor-1wr2p1e,
+      .dark-theme .r-borderColor-1h911o7 {
+        border-top-color: #334155 !important;
+        border-right-color: #334155 !important;
+        border-bottom-color: #334155 !important;
+        border-left-color: #334155 !important;
+      }
+
+      /* Generic Catch-All for Hardcoded Inline Styles */
+      .dark-theme [style*="background-color: rgb(255, 255, 255)"],
+      .dark-theme [style*="background-color: rgb(255,255,255)"],
+      .dark-theme [style*="background-color: #FFFFFF"],
+      .dark-theme [style*="background-color:#FFFFFF"],
+      .dark-theme [style*="background-color: #ffffff"],
+      .dark-theme [style*="background-color:#ffffff"],
+      .dark-theme [style*="background-color: rgb(250, 250, 250)"],
+      .dark-theme [style*="background-color: rgb(248, 250, 252)"],
+      .dark-theme [style*="background-color: rgb(244, 246, 249)"],
+      .dark-theme [style*="background-color: rgb(241, 245, 249)"],
+      .dark-theme [style*="background-color: rgb(243, 244, 246)"],
+      .dark-theme [style*="background-color: rgb(249, 250, 251)"],
+      .dark-theme [style*="background-color: rgba(255, 255, 255"],
+      .dark-theme [style*="background-color: rgba(255,255,255"] {
+        background-color: #1C2541 !important;
+      }
+
+      .dark-theme [style*="color: rgb(15, 23, 42)"],
+      .dark-theme [style*="color: rgb(17, 24, 39)"],
+      .dark-theme [style*="color: rgb(26, 26, 46)"],
+      .dark-theme [style*="color: rgb(31, 41, 55)"],
+      .dark-theme [style*="color: #0F172A"],
+      .dark-theme [style*="color: #0f172a"],
+      .dark-theme [style*="color: #111827"],
+      .dark-theme [style*="color: #1F2937"],
+      .dark-theme [style*="color: #1f2937"],
+      .dark-theme [style*="color: #1A1A2E"],
+      .dark-theme [style*="color: #1a1a2e"],
+      .dark-theme [style*="color: #000000"],
+      .dark-theme [style*="color: #000"] {
+        color: #F8FAFC !important;
+      }
+
+      .dark-theme [style*="color: rgb(51, 65, 85)"],
+      .dark-theme [style*="color: rgb(55, 65, 81)"],
+      .dark-theme [style*="color: rgb(75, 85, 99)"],
+      .dark-theme [style*="color: #334155"],
+      .dark-theme [style*="color: #374151"],
+      .dark-theme [style*="color: #4B5563"] {
+        color: #CBD5E1 !important;
+      }
+
+      .dark-theme [style*="color: rgb(100, 116, 139)"],
+      .dark-theme [style*="color: rgb(107, 114, 128)"],
+      .dark-theme [style*="color: #64748B"],
+      .dark-theme [style*="color: #6B7280"] {
+        color: #94A3B8 !important;
+      }
+
+      .dark-theme [style*="border-color: rgb(229, 231, 235)"],
+      .dark-theme [style*="border-color: rgb(226, 232, 240)"],
+      .dark-theme [style*="border-color: rgb(243, 244, 246)"],
+      .dark-theme [style*="border-color: #E5E7EB"],
+      .dark-theme [style*="border-color: #e5e7eb"],
+      .dark-theme [style*="border-color: #E2E8F0"],
+      .dark-theme [style*="border-color: #e2e8f0"],
+      .dark-theme [style*="border-color: #F3F4F6"],
+      .dark-theme [style*="border-color: #f3f4f6"] {
+        border-color: #334155 !important;
+      }
+
+      .dark-theme input,
+      .dark-theme textarea,
+      .dark-theme select {
+        background-color: #1E293B !important;
+        color: #F8FAFC !important;
+        border-color: #334155 !important;
+      }
+      .dark-theme input::placeholder,
+      .dark-theme textarea::placeholder {
+        color: #64748B !important;
+      }
+`;
 
     if (isDarkMode) {
       document.documentElement.classList.add('dark-theme');
@@ -518,10 +653,10 @@ export function DashboardShell({
 
         {/* NOTIFICATIONS DROPDOWN OVERLAY (HEADER LEVEL) */}
         {isNotificationDropdownOpen && (
-          <View style={styles.notificationsDropdownContainer}>
-            <View style={styles.notifHeader}>
+          <View style={[styles.notificationsDropdownContainer, isDarkMode && { backgroundColor: '#1C2541', borderColor: '#334155' }]}>
+            <View style={[styles.notifHeader, isDarkMode && { backgroundColor: '#1E293B' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.notifHeaderTitle}>Notifications</Text>
+                <Text style={[styles.notifHeaderTitle, isDarkMode && { color: '#F8FAFC' }]}>Notifications</Text>
                 {unreadCount > 0 && (
                   <View style={{ backgroundColor: '#EF4444', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
                     <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>{unreadCount} new</Text>
@@ -535,7 +670,7 @@ export function DashboardShell({
               )}
             </View>
 
-            <View style={{ height: 1, backgroundColor: '#E5E7EB' }} />
+            <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#E5E7EB' }} />
 
             <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={true}>
               {notifications.length === 0 ? (
@@ -606,7 +741,7 @@ export function DashboardShell({
 
         {/* PROFILE DROPDOWN OVERLAY (HEADER LEVEL) */}
         {isProfileDropdownOpen && (
-          <View style={styles.dropdownContainer}>
+          <View style={[styles.dropdownContainer, isDarkMode && { backgroundColor: '#1C2541', borderColor: '#334155' }]}>
             {/* Header Info */}
             <View style={styles.dropdownHeader}>
               <View style={[styles.avatarCircleLarge, !shouldShowPhoto && { backgroundColor: avatarColors.bg }]}>
@@ -624,7 +759,7 @@ export function DashboardShell({
               </View>
             </View>
             
-            <View style={styles.dropdownDivider} />
+            <View style={[styles.dropdownDivider, isDarkMode && { backgroundColor: '#334155' }]} />
             
             {/* Menu items */}
             <ScrollView style={styles.dropdownItemsList}>
@@ -858,12 +993,12 @@ export function DashboardShell({
         )}
 
         {/* Content Wrapper — full width always since sidebar overlays */}
-        <View style={styles.contentWrapper}>
+        <View style={[styles.contentWrapper, isDarkMode && { backgroundColor: '#0B1329' }]}>
           {backgroundImage ? (
             <ImageBackground 
               source={backgroundImage} 
-              style={{ flex: 1, width: '100%', height: '100%', backgroundColor: 'rgba(255, 255, 255, 0.85)' }} 
-              imageStyle={{ opacity: 0.15 }}
+              style={{ flex: 1, width: '100%', height: '100%', backgroundColor: isDarkMode ? 'rgba(11, 19, 41, 0.94)' : 'rgba(255, 255, 255, 0.85)' }}
+              imageStyle={{ opacity: isDarkMode ? 0.05 : 0.15 }}
               resizeMode="cover"
             >
               <ScrollView

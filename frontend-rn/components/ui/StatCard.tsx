@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { useThemeStore } from '../../store/theme';
 
 interface StatCardProps {
   label: string;
@@ -24,21 +25,23 @@ export const StatCard: React.FC<StatCardProps> = ({
   isSelected = false,
   onPress,
 }) => {
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
   const bgCircle = iconBgColor || `${color}18`;
 
   const cardContent = (
     <View style={[
       styles.card,
-      isSelected && styles.cardSelected,
-      Platform.OS === 'web' && ({ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' } as any)
+      isDarkMode && styles.cardDark,
+      isSelected && (isDarkMode ? styles.cardSelectedDark : styles.cardSelected),
+      Platform.OS === 'web' && ({ boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.06)' } as any)
     ]}>
       <View style={[styles.iconContainer, { backgroundColor: bgCircle }]}>
         <Ionicons name={icon} size={22} color={color} />
       </View>
       <View style={styles.contentContainer}>
-        <Text style={styles.label}>{label.toUpperCase()}</Text>
-        <Text style={styles.value}>{value}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        <Text style={[styles.label, isDarkMode && styles.labelDark]}>{label.toUpperCase()}</Text>
+        <Text style={[styles.value, isDarkMode && styles.valueDark]}>{value}</Text>
+        {subtitle && <Text style={[styles.subtitle, isDarkMode && styles.subtitleDark]}>{subtitle}</Text>}
       </View>
     </View>
   );
@@ -80,10 +83,20 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  cardDark: {
+    backgroundColor: '#1C2541',
+    borderColor: '#334155',
+  },
   cardSelected: {
     borderColor: '#0F172A',
     borderWidth: 2,
     shadowOpacity: 0.12,
+  },
+  cardSelectedDark: {
+    borderColor: '#FFC72C',
+    borderWidth: 2,
+    backgroundColor: '#1E293B',
+    shadowOpacity: 0.25,
   },
   iconContainer: {
     width: 48,
@@ -104,16 +117,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 2,
   },
+  labelDark: {
+    color: '#94A3B8',
+  },
   value: {
     fontSize: 28,
     fontWeight: '900' as const,
     color: '#0F172A',
     lineHeight: 32,
   },
+  valueDark: {
+    color: '#F8FAFC',
+  },
   subtitle: {
     fontSize: 11,
     color: '#94A3B8',
     marginTop: 2,
     fontWeight: '500' as const,
+  },
+  subtitleDark: {
+    color: '#64748B',
   },
 });

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { tokenSettingsApi } from '../services/api';
+import { useThemeStore } from '../store/theme';
 
 type Settings = {
   provider: string;
@@ -71,6 +72,7 @@ const getInitialSettings = (): Settings | null => {
 export function AISettingsPanel({ isVisible = true }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 1024;
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   const [saved, setSaved] = useState<Settings | null>(getInitialSettings);
   const [provider, setProvider] = useState(() => getInitialSettings()?.provider || 'deepseek');
@@ -212,12 +214,12 @@ export function AISettingsPanel({ isVisible = true }: Props) {
     : 'Not Connected';
 
   return (
-    <View testID="ai-settings-panel" style={[styles.card, !isWide && styles.cardMobile]}>
+    <View testID="ai-settings-panel" style={[styles.card, isDarkMode && styles.cardDark, !isWide && styles.cardMobile]}>
       {/* ── Left Intro Panel ────────────────────────────────────────────── */}
-      <View testID="ai-settings-intro" style={[styles.introPanel, !isWide && styles.introPanelMobile]}>
+      <View testID="ai-settings-intro" style={[styles.introPanel, isDarkMode && styles.introPanelDark, !isWide && styles.introPanelMobile]}>
         <View style={styles.introTop}>
           <View style={styles.titleRow}>
-            <View style={styles.iconBox}>
+            <View style={[styles.iconBox, isDarkMode && styles.iconBoxDark]}>
               {meta.logo ? (
                 <Image source={meta.logo} style={styles.logoImage} resizeMode="contain" />
               ) : (
@@ -225,13 +227,13 @@ export function AISettingsPanel({ isVisible = true }: Props) {
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>AI Provider</Text>
+              <Text style={[styles.cardTitle, isDarkMode && styles.textWhite]}>AI Provider</Text>
               {!!saved?.model && (
-                <Text style={styles.cardSub} numberOfLines={1}>{saved.model}</Text>
+                <Text style={[styles.cardSub, isDarkMode && styles.textMuted]} numberOfLines={1}>{saved.model}</Text>
               )}
             </View>
           </View>
-          <Text style={styles.cardDesc}>
+          <Text style={[styles.cardDesc, isDarkMode && styles.textMuted]}>
             Configure your AI model for automatic policy checks and assistant responses.
           </Text>
         </View>
@@ -249,17 +251,17 @@ export function AISettingsPanel({ isVisible = true }: Props) {
       </View>
 
       {/* ── Vertical / Horizontal Divider Line ──────────────────────────── */}
-      <View style={isWide ? styles.verticalDivider : styles.horizontalDivider} />
+      <View style={[isWide ? styles.verticalDivider : styles.horizontalDivider, isDarkMode && styles.dividerDark]} />
 
       {/* ── Right Form Panel ────────────────────────────────────────────── */}
-      <View style={styles.formPanel}>
+      <View style={[styles.formPanel, isDarkMode && styles.formPanelDark]}>
         <>
             {/* Fields Row */}
             <View style={[styles.fieldsRow, !isWide && styles.fieldsRowMobile]}>
               {/* Field 1: Provider */}
               <View style={styles.fieldCol}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.fieldLabel}>Provider</Text>
+                  <Text style={[styles.fieldLabel, isDarkMode && styles.textWhite]}>Provider</Text>
                   <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
                 </View>
                 <TouchableOpacity
@@ -268,9 +270,9 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                   accessibilityState={{ expanded: menu, disabled: busy || loading }}
                   disabled={busy || loading}
                   onPress={() => setMenu(true)}
-                  style={[styles.inputBox, styles.selectBox, (busy || loading) && styles.inputDisabled]}
+                  style={[styles.inputBox, isDarkMode && styles.inputBoxDark, styles.selectBox, (busy || loading) && styles.inputDisabled]}
                 >
-                  <Text style={styles.inputText} numberOfLines={1}>{providerName}</Text>
+                  <Text style={[styles.inputText, isDarkMode && styles.textWhite]} numberOfLines={1}>{providerName}</Text>
                   <Ionicons name="chevron-down" size={15} color="#94A3B8" />
                 </TouchableOpacity>
                 <Text style={styles.fieldHint}>Select AI model provider</Text>
@@ -279,13 +281,13 @@ export function AISettingsPanel({ isVisible = true }: Props) {
               {/* Field 2: Model ID */}
               <View style={styles.fieldCol}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.fieldLabel}>Model ID</Text>
+                  <Text style={[styles.fieldLabel, isDarkMode && styles.textWhite]}>Model ID</Text>
                   <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
                 </View>
-                <View style={[styles.inputBox, focused === 'model' && styles.inputFocused, (busy || loading) && styles.inputDisabled]}>
+                <View style={[styles.inputBox, isDarkMode && styles.inputBoxDark, focused === 'model' && styles.inputFocused, (busy || loading) && styles.inputDisabled]}>
                   <TextInput
                     accessibilityLabel="AI model ID"
-                    style={styles.textInput}
+                    style={[styles.textInput, isDarkMode && styles.textWhite]}
                     value={model}
                     onChangeText={v => { setModel(v); edited(); }}
                     onFocus={() => setFocused('model')}
@@ -304,10 +306,10 @@ export function AISettingsPanel({ isVisible = true }: Props) {
               {/* Field 3: API Key */}
               <View style={styles.fieldCol}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.fieldLabel}>API Key</Text>
+                  <Text style={[styles.fieldLabel, isDarkMode && styles.textWhite]}>API Key</Text>
                   <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
                 </View>
-                <View style={[styles.inputBox, focused === 'key' && styles.inputFocused, (busy || loading) && styles.inputDisabled]}>
+                <View style={[styles.inputBox, isDarkMode && styles.inputBoxDark, focused === 'key' && styles.inputFocused, (busy || loading) && styles.inputDisabled]}>
                   <TextInput
                     accessibilityLabel="AI API key"
                     style={[styles.textInput, { flex: 1 }]}
@@ -371,7 +373,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                   onPress={() => setConfirmClear(true)}
                   style={[styles.btnClear, (busy || loading || !saved?.configured) && styles.btnDisabled]}
                 >
-                  <Text style={styles.btnClearText}>Clear</Text>
+                  <Text style={[styles.btnClearText, isDarkMode && styles.btnClearTextDark]}>Clear</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -402,7 +404,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Close provider menu"
-                style={styles.sheetClose}
+                style={[styles.sheetClose, isDarkMode && styles.sheetCloseDark]}
                 onPress={() => setMenu(false)}
               >
                 <Ionicons name="close" size={19} color="#64748B" />
@@ -432,7 +434,7 @@ export function AISettingsPanel({ isVisible = true }: Props) {
                       setMenu(false);
                     }}
                   >
-                    <View style={styles.optionIcon}>
+                    <View style={[styles.optionIcon, isDarkMode && styles.optionIconDark]}>
                       {m.logo ? (
                         <Image source={m.logo} style={styles.optionLogoImage} resizeMode="contain" />
                       ) : (
@@ -504,6 +506,59 @@ export function AISettingsPanel({ isVisible = true }: Props) {
 }
 
 const styles = StyleSheet.create({
+  cardDark: {
+    backgroundColor: '#1C2541',
+    borderColor: '#334155',
+  },
+  introPanelDark: {
+    backgroundColor: '#1C2541',
+  },
+  formPanelDark: {
+    backgroundColor: '#1C2541',
+  },
+  iconBoxDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  dividerDark: {
+    backgroundColor: '#334155',
+  },
+  inputBoxDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  textWhite: {
+    color: '#F8FAFC',
+  },
+  textMuted: {
+    color: '#94A3B8',
+  },
+  btnClearDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  btnClearTextDark: {
+    color: '#CBD5E1',
+  },
+  sheetDark: {
+    backgroundColor: '#1C2541',
+    borderColor: '#334155',
+  },
+  sheetCloseDark: {
+    backgroundColor: '#1E293B',
+  },
+  optionIconDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  optionRowDark: {
+    borderColor: '#334155',
+  },
+  optionRowActiveDark: {
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    borderColor: '#7C3AED',
+  },
+
   /* Outer Card Container */
   card: {
     backgroundColor: '#FFFFFF',
