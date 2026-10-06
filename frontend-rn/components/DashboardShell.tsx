@@ -320,6 +320,38 @@ export function DashboardShell({
   const userRole = user?.role ?? 'requestor';
   const avatarColors = getAvatarColors(user?.name ?? 'Esther Howard');
 
+  // Dynamic user role label for navbar badge
+  const roleBadgeLabel = React.useMemo(() => {
+    if (!user) return '';
+    const roles = Array.isArray(user.roles) ? user.roles : (user.roles ? [user.roles] : []);
+    const primaryRole = roles[0] || user.role || '';
+    const dept = (user.department || '').toLowerCase();
+
+    if (primaryRole === 'it_admin' || primaryRole === 'admin' || roles.includes('admin') || roles.includes('it_admin')) {
+      return 'Admin';
+    }
+    if (primaryRole === 'it_publisher' || roles.includes('it_publisher')) {
+      return 'Publisher';
+    }
+    if (primaryRole === 'vice_president' || roles.includes('vice_president') || dept.includes('vice president')) {
+      return 'Vice President';
+    }
+    if (primaryRole === 'imc_qa_checker' || roles.includes('imc_qa_checker') || dept.includes('institutional marketing') || dept.includes('imc')) {
+      return 'IMC QA';
+    }
+    if (primaryRole === 'office_head' || roles.includes('office_head')) {
+      return 'Office Head';
+    }
+    if (primaryRole === 'approver' || roles.includes('approver')) {
+      return 'Approver';
+    }
+    if (primaryRole === 'content_requestor' || primaryRole === 'requestor' || roles.includes('content_requestor') || roles.includes('requestor')) {
+      return 'Requestor';
+    }
+
+    return getRoleLabel(primaryRole) || 'User';
+  }, [user]);
+
   const getSidebarNavItems = () => {
     if (userRole === 'requestor') {
       const active = activeTab ?? 'dashboard';
@@ -405,6 +437,15 @@ export function DashboardShell({
           </TouchableOpacity>
         </View>
         <View style={styles.headerRight}>
+          {/* USER ROLE BADGE */}
+          {Boolean(roleBadgeLabel) && (
+            <View style={[styles.roleBadge, width < 420 && styles.roleBadgeSmall]}>
+              <Text style={[styles.roleBadgeText, width < 420 && styles.roleBadgeTextSmall]}>
+                {roleBadgeLabel}
+              </Text>
+            </View>
+          )}
+
           {/* DARK MODE TOGGLE */}
           <TouchableOpacity 
             onPress={toggleDarkMode}
@@ -953,6 +994,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flexShrink: 0,
+  },
+  roleBadge: {
+    paddingHorizontal: 13,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  roleBadgeSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  roleBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  roleBadgeTextSmall: {
+    fontSize: 11,
   },
   headerIconButton: {
     width: 34,
