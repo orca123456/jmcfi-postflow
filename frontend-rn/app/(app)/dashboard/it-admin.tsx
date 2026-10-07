@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
@@ -643,6 +644,183 @@ export default function ITAdminDashboard() {
   // Confirm delete modal state
   const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<any>(null);
   const [confirmDeleteUserEmail, setConfirmDeleteUserEmail] = useState('');
+
+  // CSV Import state
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [csvFileName, setCsvFileName] = useState('');
+  const [csvParsedRows, setCsvParsedRows] = useState<any[]>([]);
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+
+  const handleDownloadCsvTemplate = () => {
+    const csvContent = [
+      'first_name,last_name,email,password,role,department,position',
+      'Juan,Dela Cruz,juan.delacruz@jmc.edu.ph,Jmcfi@2026,requestor,College of Computer Studies,Staff / Faculty',
+      'Maria,Santos,maria.santos@jmc.edu.ph,Jmcfi@2026,office_head,College of Education,Department Head',
+      'Antonio,Luna,antonio.luna@jmc.edu.ph,Jmcfi@2026,requestor,Basic Education Department,Faculty',
+    ].join('\n');
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'jmcfi_user_accounts_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('CSV template downloaded successfully!', 'success');
+    }
+  };
+
+  const parseCsvText = (text: string) => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length < 2) {
+      showToast('CSV file is empty or missing a header row.', 'warning');
+      return;
+    }
+
+    const parseRow = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
+    const rows: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseRow(lines[i]);
+      if (values.every(v => v === '')) continue;
+
+      const rowObj: any = {};
+      headers.forEach((h, idx) => {
+        const val = values[idx] || '';
+        if (h.includes('first')) rowObj.first_name = val;
+        else if (h.includes('last')) rowObj.last_name = val;
+        else if (h.includes('email') || h.includes('user')) rowObj.email = val;
+        else if (h.includes('pass')) rowObj.password = val;
+        else if (h.includes('role')) rowObj.role = val;
+        else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
+        else if (h.includes('pos')) rowObj.position = val;
+      });
+
+      let email = String(rowObj.email || '').trim();
+      if (email && !email.includes('@')) {
+        email += '@jmc.edu.ph';
+      }
+      rowObj.email = email;
+
+      const errors: string[] = [];
+      if (!rowObj.first_name?.trim()) errors.push('Missing Firstname');
+      if (!rowObj.last_name?.trim()) errors.push('Missing Lastname');
+      if (!rowObj.email?.trim()) errors.push('Missing Email');
+      else if (!rowObj.email.toLowerCase().endsWith('@jmc.edu.ph')) errors.push('Must end with @jmc.edu.ph');
+
+      rowObj.isValid = errors.length === 0;
+      rowObj.errorMsg = errors.join(', ');
+      rowObj.role = rowObj.role || 'requestor';
+      rowObj.department = rowObj.department || (filteredDepts[0]?.display_name || 'General Department');
+      rowObj.password = rowObj.password || 'Jmcfi@2026';
+      rows.push(rowObj);
+    }
+
+    if (rows.length === 0) {
+      showToast('No user records found in CSV file.', 'warning');
+      return;
+    }
+
+    setCsvParsedRows(rows);
+  };
+
+  const handleSelectCsvFile = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv,text/csv';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setCsvFileName(file.name);
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            const content = event.target?.result as string;
+            if (content) {
+              parseCsvText(content);
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      } else {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: ['text/csv', 'text/comma-separated-values'],
+          copyToCacheDirectory: true,
+        });
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const file = result.assets[0];
+          setCsvFileName(file.name);
+          const response = await fetch(file.uri);
+          const text = await response.text();
+          parseCsvText(text);
+        }
+      }
+    } catch (err: any) {
+      showToast('Failed to read CSV file: ' + err.message, 'error');
+    }
+  };
+
+  const handleConfirmCsvImport = async () => {
+    const validRows = csvParsedRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      showToast('There are no valid accounts to import.', 'warning');
+      return;
+    }
+
+    setIsImportingCsv(true);
+    try {
+      const res = await usersApi.bulkCreate({ users: validRows });
+      const newCreated = res.data?.data || [];
+      const updatedList = [
+        ...newCreated.map((u: any) => ({
+          ...u,
+          role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
+          created_at: new Date(u.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+        })),
+        ...users,
+      ];
+      setUsers(updatedList);
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.setItem('postflow_users_cache', JSON.stringify(updatedList));
+        } catch (_) {}
+      }
+
+      const msg = res.data?.message || `Successfully imported ${validRows.length} accounts!`;
+      showToast(msg, 'success');
+      setIsCsvModalOpen(false);
+      setCsvParsedRows([]);
+      setCsvFileName('');
+    } catch (e: any) {
+      showToast('Import failed: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
+      setIsImportingCsv(false);
+    }
+  };
 
   const handleAddRole = () => {
     setAddingRole(true);
@@ -2265,7 +2443,50 @@ export default function ITAdminDashboard() {
       {activeTab === 'user-management' && (
         <View style={styles.userTabContainer}>
           <Card style={styles.userCard}>
-            <Text style={styles.sectionHeader}>Create New Institutional Account</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+              <Text style={[styles.sectionHeader, { marginBottom: 0 }]}>Create New Institutional Account</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={handleDownloadCsvTemplate}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 6,
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                  }}
+                >
+                  <Ionicons name="download-outline" size={15} color={isDarkMode ? '#94A3B8' : '#475569'} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
+                    Download Template
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setIsCsvModalOpen(true)}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 6,
+                    backgroundColor: '#1E3A8A',
+                  }}
+                >
+                  <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
+                    Import CSV File
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             {/* Row 1: First Name + Last Name */}
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
@@ -2512,6 +2733,319 @@ export default function ITAdminDashboard() {
                     style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#DC2626', alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Yes, Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ── Bulk CSV Import Modal ── */}
+          <Modal
+            visible={isCsvModalOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setIsCsvModalOpen(false)}
+          >
+            <View style={styles.profileModalOverlay}>
+              <View
+                style={{
+                  backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderRadius: 16,
+                  width: width > 900 ? 820 : width > 600 ? '92%' : '95%',
+                  maxHeight: '90%',
+                  shadowColor: '#000',
+                  shadowOpacity: 0.25,
+                  shadowRadius: 24,
+                  elevation: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Header */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 20,
+                    paddingVertical: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Ionicons name="people-outline" size={20} color="#2563EB" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                        Bulk Institutional Account Import
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                        Upload a .csv file to register multiple institutional users at once
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setIsCsvModalOpen(false)}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isDarkMode ? '#334155' : '#F1F5F9',
+                    }}
+                  >
+                    <Ionicons name="close" size={18} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Content */}
+                <ScrollView
+                  style={{ paddingHorizontal: 20, paddingVertical: 16 }}
+                  contentContainerStyle={{ gap: 16 }}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {/* File Upload / Dropzone */}
+                  <TouchableOpacity
+                    onPress={handleSelectCsvFile}
+                    activeOpacity={0.8}
+                    style={{
+                      borderWidth: 2,
+                      borderStyle: 'dashed',
+                      borderColor: csvFileName ? '#2563EB' : isDarkMode ? '#475569' : '#CBD5E1',
+                      borderRadius: 12,
+                      padding: 24,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: csvFileName
+                        ? isDarkMode ? 'rgba(37, 99, 235, 0.1)' : '#EFF6FF'
+                        : isDarkMode ? '#0F172A' : '#F8FAFC',
+                    }}
+                  >
+                    <Ionicons
+                      name={csvFileName ? "document-text" : "cloud-upload-outline"}
+                      size={40}
+                      color={csvFileName ? '#2563EB' : isDarkMode ? '#64748B' : '#94A3B8'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: isDarkMode ? '#F1F5F9' : '#1E293B',
+                        marginTop: 10,
+                      }}
+                    >
+                      {csvFileName ? csvFileName : 'Click to select or drop .csv file'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 4 }}>
+                      {csvFileName
+                        ? `${csvParsedRows.length} total rows parsed. Click to select another file.`
+                        : 'Supported columns: first_name, last_name, email, password, role, department, position'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Template download helper */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      borderRadius: 8,
+                      backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
+                      <Text style={{ fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569', flex: 1 }}>
+                        Need the pre-formatted structure? Download the sample CSV template first.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={handleDownloadCsvTemplate}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: '#2563EB',
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#fff' }}>Get Template</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Preview Section */}
+                  {csvParsedRows.length > 0 && (
+                    <View style={{ gap: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#1E293B' }}>
+                          Preview Accounts ({csvParsedRows.length})
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <View
+                            style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 4,
+                              backgroundColor: '#DCFCE7',
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#166534' }}>
+                              ● {csvParsedRows.filter(r => r.isValid).length} Ready
+                            </Text>
+                          </View>
+                          {csvParsedRows.filter(r => !r.isValid).length > 0 && (
+                            <View
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                                borderRadius: 4,
+                                backgroundColor: '#FEE2E2',
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: '#991B1B' }}>
+                                ▲ {csvParsedRows.filter(r => !r.isValid).length} Invalid
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Scrollable Preview Table */}
+                      <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#E2E8F0', borderRadius: 8 }}>
+                        <View style={{ minWidth: 680 }}>
+                          {/* Table Header */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                              borderBottomWidth: 1,
+                              borderBottomColor: isDarkMode ? '#334155' : '#E2E8F0',
+                            }}
+                          >
+                            <Text style={{ width: 90, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>STATUS</Text>
+                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>FIRST NAME</Text>
+                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>LAST NAME</Text>
+                            <Text style={{ width: 200, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>EMAIL</Text>
+                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>ROLE</Text>
+                          </View>
+
+                          {/* Table Body */}
+                          {csvParsedRows.map((row, idx) => (
+                            <View
+                              key={idx}
+                              style={{
+                                flexDirection: 'row',
+                                paddingVertical: 10,
+                                paddingHorizontal: 12,
+                                borderBottomWidth: idx === csvParsedRows.length - 1 ? 0 : 1,
+                                borderBottomColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                                backgroundColor: isDarkMode
+                                  ? (idx % 2 === 0 ? '#1E293B' : '#0F172A')
+                                  : (idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'),
+                              }}
+                            >
+                              <View style={{ width: 90 }}>
+                                {row.isValid ? (
+                                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#16A34A' }}>● Ready</Text>
+                                ) : (
+                                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#DC2626' }} numberOfLines={1}>
+                                    ▲ {row.errorMsg || 'Invalid'}
+                                  </Text>
+                                )}
+                              </View>
+                              <Text style={{ width: 130, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
+                                {row.first_name || '—'}
+                              </Text>
+                              <Text style={{ width: 130, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
+                                {row.last_name || '—'}
+                              </Text>
+                              <Text style={{ width: 200, fontSize: 12, color: isDarkMode ? '#93C5FD' : '#2563EB' }} numberOfLines={1}>
+                                {row.email || '—'}
+                              </Text>
+                              <Text style={{ width: 120, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
+                                {row.role || 'requestor'}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </View>
+                  )}
+                </ScrollView>
+
+                {/* Footer */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'flex-end',
+                    gap: 12,
+                    paddingHorizontal: 20,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: isDarkMode ? '#334155' : '#E2E8F0',
+                    backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsCsvModalOpen(false);
+                      setCsvParsedRows([]);
+                      setCsvFileName('');
+                    }}
+                    disabled={isImportingCsv}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#475569' : '#CBD5E1',
+                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#CBD5E1' : '#475569' }}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleConfirmCsvImport}
+                    disabled={isImportingCsv || csvParsedRows.filter(r => r.isValid).length === 0}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      backgroundColor:
+                        csvParsedRows.filter(r => r.isValid).length === 0 || isImportingCsv
+                          ? isDarkMode ? '#334155' : '#94A3B8'
+                          : '#1E3A8A',
+                    }}
+                  >
+                    {isImportingCsv && <ActivityIndicator size="small" color="#FFFFFF" />}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                      {isImportingCsv
+                        ? 'Importing...'
+                        : `Import ${csvParsedRows.filter(r => r.isValid).length} Accounts`}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>

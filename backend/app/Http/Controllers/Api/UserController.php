@@ -98,6 +98,119 @@ class UserController extends Controller
     }
 
     /**
+     * Bulk store newly created resources from CSV import.
+     */
+    public function bulkStore(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'users' => 'required|array|min:1',
+            'users.*.first_name' => 'required|string|max:255',
+            'users.*.last_name' => 'required|string|max:255',
+            'users.*.email' => 'required|string|max:255',
+            'users.*.password' => 'nullable|string',
+            'users.*.role' => 'nullable|string',
+            'users.*.department' => 'nullable|string|max:255',
+            'users.*.position' => 'nullable|string|max:255',
+        ]);
+
+        $created = [];
+        $errors = [];
+
+        foreach ($validated['users'] as $index => $userData) {
+            $rowNum = $index + 1;
+            $email = trim($userData['email']);
+            if (!str_contains($email, '@')) {
+                $email .= '@jmc.edu.ph';
+            }
+
+            if (!str_ends_with(strtolower($email), '@jmc.edu.ph')) {
+                $errors[] = "Row {$rowNum}: Email '{$email}' must end with @jmc.edu.ph.";
+                continue;
+            }
+
+            if (User::where('email', $email)->exists()) {
+                $errors[] = "Row {$rowNum}: Email '{$email}' already exists.";
+                continue;
+            }
+
+            // Auto-generate unique employee ID
+            do {
+                $empId = 'EMP-' . str_pad((string) mt_rand(10000, 99999), 5, '0', STR_PAD_LEFT);
+            } while (User::where('employee_id', $empId)->exists());
+
+            $rawRole = !empty($userData['role']) ? trim($userData['role']) : 'requestor';
+            $role = match (strtolower($rawRole)) {
+                'admin', 'administrator', 'it_admin' => 'it_admin',
+                'publisher', 'it_publisher' => 'it_publisher',
+                'office_head', 'office head', 'department_head', 'dean' => 'office_head',
+                'vice_president', 'vice president', 'vp' => 'vice_president',
+                'imc_qa', 'imc_qa_checker', 'qa' => 'imc_qa_checker',
+                default => 'requestor',
+            };
+
+            $dept = !empty($userData['department']) ? trim($userData['department']) : null;
+            $position = !empty($userData['position']) ? trim($userData['position']) : null;
+
+            if (!$position) {
+                $category = match ($role) {
+                    'it_publisher', 'it_admin' => 'admin',
+                    'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
+                    default => 'requestor',
+                };
+                if ($category === 'approver') {
+                    $position = match ($role) {
+                        'vice_president' => 'Vice President',
+                        'imc_qa_checker' => 'QA / Branding Checker',
+                        default => 'Department Head',
+                    };
+                } elseif ($category === 'admin') {
+                    $position = 'IT Administrator';
+                } else {
+                    $position = 'Staff / Faculty';
+                }
+            }
+
+            $password = !empty($userData['password']) ? $userData['password'] : 'Jmcfi@2026';
+
+            try {
+                $user = User::create([
+                    'employee_id' => $empId,
+                    'first_name' => trim($userData['first_name']),
+                    'middle_name' => !empty($userData['middle_name']) ? trim($userData['middle_name']) : null,
+                    'last_name' => trim($userData['last_name']),
+                    'email' => $email,
+                    'password' => $password,
+                    'department' => $dept,
+                    'position' => $position,
+                    'status' => 'active',
+                ]);
+
+                $user->assignRole($role);
+                $created[] = $user;
+            } catch (\Exception $e) {
+                $errors[] = "Row {$rowNum} ({$email}): " . $e->getMessage();
+            }
+        }
+
+        if (count($created) > 0) {
+            AuditLogService::log(
+                'USERS_BULK_IMPORTED',
+                'Bulk imported ' . count($created) . ' institutional accounts via CSV',
+                'INFO',
+                ['count' => count($created), 'errors_count' => count($errors)],
+                $request
+            );
+        }
+
+        return response()->json([
+            'message' => 'Successfully imported ' . count($created) . ' accounts.',
+            'created_count' => count($created),
+            'data' => UserResource::collection(collect($created)->load('roles')),
+            'errors' => $errors,
+        ], 200);
+    }
+
+    /**
      * Display the specified resource.
      */
     public function show(User $user): JsonResponse
