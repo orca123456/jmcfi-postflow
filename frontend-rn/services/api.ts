@@ -147,6 +147,7 @@ export const policyApi = {
 export const usersApi = {
   list: () => api.get('/users'),
   create: (data: object) => api.post('/users', data),
+  bulkCreate: (data: { users: any[] }) => api.post('/users/bulk', data),
   update: (id: string | number, data: object) => api.put(`/users/${id}`, data),
   delete: (id: string | number) => api.delete(`/users/${id}`),
 };

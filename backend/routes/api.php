@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Users (Admin only)
     Route::get('users/roles', [UserController::class, 'getRoles'])->middleware('role:it_publisher,it_admin');
+    Route::post('users/bulk', [UserController::class, 'bulkStore'])->middleware('role:it_publisher,it_admin');
     Route::apiResource('users', UserController::class)->only(['index', 'store', 'show', 'update', 'destroy'])->middleware('role:it_publisher,it_admin');
 
     // Dashboard
