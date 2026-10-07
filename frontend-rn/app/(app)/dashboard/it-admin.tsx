@@ -603,6 +603,14 @@ export default function ITAdminDashboard() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
+  const [newUserErrors, setNewUserErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    password?: string;
+    role?: string;
+    department?: string;
+  }>({});
 
   const [newUserRole, setNewUserRole] = useState('requestor');
   const [newUserDepartment, setNewUserDepartment] = useState('');
@@ -1016,6 +1024,13 @@ export default function ITAdminDashboard() {
   const [showProfilePassword, setShowProfilePassword] = useState(false);
   const [showProfilePasswordConfirm, setShowProfilePasswordConfirm] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileErrors, setProfileErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    department?: string;
+    passwordConfirm?: string;
+  }>({});
   const profileFilteredDepts = React.useMemo(() => {
     return departmentsForRole(profileRole || 'requestor', departmentsList);
   }, [profileRole, departmentsList]);
@@ -1695,36 +1710,39 @@ export default function ITAdminDashboard() {
 
 
   const handleCreateAccount = async () => {
+    const errors: typeof newUserErrors = {};
+
     if (!newUserFirstName?.trim()) {
-      showToast('Please fill the Firstname.', 'warning');
-      return;
+      errors.firstName = 'Please fill the Firstname.';
     }
     if (!newUserLastName?.trim()) {
-      showToast('Please fill the Lastname.', 'warning');
-      return;
+      errors.lastName = 'Please fill the Lastname.';
     }
     if (!newUserEmail?.trim()) {
-      showToast('Please fill the Email Username.', 'warning');
-      return;
+      errors.email = 'Please fill the Email Username.';
+    } else {
+      const finalEmail = newUserEmail.includes('@') ? newUserEmail.trim() : newUserEmail.trim() + '@jmc.edu.ph';
+      if (!finalEmail.toLowerCase().endsWith('@jmc.edu.ph')) {
+        errors.email = 'Only @jmc.edu.ph email addresses are allowed.';
+      }
     }
     if (!newUserPassword?.trim()) {
-      showToast('Please fill the Password.', 'warning');
-      return;
+      errors.password = 'Please fill the Password.';
     }
     if (!newUserRole) {
-      showToast('Please select the Role.', 'warning');
-      return;
+      errors.role = 'Please select the Role.';
     }
     if (!newUserDepartment?.trim()) {
-      showToast('Please select or add a valid department first.', 'warning');
+      errors.department = 'Please select or add a valid department first.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setNewUserErrors(errors);
       return;
     }
-    // Auto-append @jmc.edu.ph if not already a full email
+    setNewUserErrors({});
+
     const finalEmail = newUserEmail.includes('@') ? newUserEmail.trim() : newUserEmail.trim() + '@jmc.edu.ph';
-    if (!finalEmail.toLowerCase().endsWith('@jmc.edu.ph')) {
-      showToast('Only @jmc.edu.ph email addresses are allowed.', 'warning');
-      return;
-    }
 
     try {
       const randomValues = new Uint32Array(1);
@@ -1759,6 +1777,7 @@ export default function ITAdminDashboard() {
         } catch (_) {}
       }
       setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
+      setNewUserErrors({});
       showToast('Institutional account created successfully!', 'success');
     } catch (e: any) {
       showToast('Failed to create account: ' + (e.response?.data?.message || e.message), 'error');
@@ -1832,26 +1851,31 @@ export default function ITAdminDashboard() {
     setSelectedUser(null);
     setProfilePassword('');
     setProfilePasswordConfirmation('');
+    setProfileErrors({});
   };
 
   const handleSaveProfile = async () => {
     if (!selectedUser) return;
+    const errors: typeof profileErrors = {};
+
     if (!profileFirstName?.trim()) {
-      showToast('Please fill the Firstname.', 'warning');
-      return;
+      errors.firstName = 'Please fill the Firstname.';
     }
     if (!profileLastName?.trim()) {
-      showToast('Please fill the Lastname.', 'warning');
-      return;
+      errors.lastName = 'Please fill the Lastname.';
     }
     if (!profileEmail?.trim()) {
-      showToast('Please fill the Email.', 'warning');
-      return;
+      errors.email = 'Please fill the Email.';
     }
     if (!profileDepartment?.trim()) {
-      showToast('Please select the Department.', 'warning');
+      errors.department = 'Please select the Department.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setProfileErrors(errors);
       return;
     }
+    setProfileErrors({});
     setSavingProfile(true);
     try {
       const roleToSend = roleCategoryOf(profileOriginalRole) === profileRole
@@ -2490,56 +2514,164 @@ export default function ITAdminDashboard() {
             {/* Row 1: First Name + Last Name */}
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>First Name</Text>
-                <TextInput style={styles.formInput} placeholder="e.g. Juan" value={newUserFirstName} onChangeText={setNewUserFirstName} />
+                <Text style={[styles.formLabel, newUserErrors.firstName && { color: '#DC2626' }]}>First Name</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    newUserErrors.firstName && { borderColor: '#DC2626', borderWidth: 1.5 }
+                  ]}
+                  placeholder="e.g. Juan"
+                  value={newUserFirstName}
+                  onChangeText={(val) => {
+                    setNewUserFirstName(val);
+                    if (newUserErrors.firstName) setNewUserErrors(prev => ({ ...prev, firstName: undefined }));
+                  }}
+                />
+                {newUserErrors.firstName && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '500' }}>
+                      {newUserErrors.firstName}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Last Name</Text>
-                <TextInput style={styles.formInput} placeholder="e.g. Dela Cruz" value={newUserLastName} onChangeText={setNewUserLastName} />
+                <Text style={[styles.formLabel, newUserErrors.lastName && { color: '#DC2626' }]}>Last Name</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    newUserErrors.lastName && { borderColor: '#DC2626', borderWidth: 1.5 }
+                  ]}
+                  placeholder="e.g. Dela Cruz"
+                  value={newUserLastName}
+                  onChangeText={(val) => {
+                    setNewUserLastName(val);
+                    if (newUserErrors.lastName) setNewUserErrors(prev => ({ ...prev, lastName: undefined }));
+                  }}
+                />
+                {newUserErrors.lastName && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '500' }}>
+                      {newUserErrors.lastName}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
             {/* Row 2: Email + Password */}
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Email Username</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', height: 38, borderWidth: 1, borderColor: Colors.border, borderRadius: 4, backgroundColor: '#fff', overflow: 'hidden' }}>
+                <Text style={[styles.formLabel, newUserErrors.email && { color: '#DC2626' }]}>Email Username</Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  height: 38,
+                  borderWidth: newUserErrors.email ? 1.5 : 1,
+                  borderColor: newUserErrors.email ? '#DC2626' : Colors.border,
+                  borderRadius: 4,
+                  backgroundColor: '#fff',
+                  overflow: 'hidden'
+                }}>
                   <TextInput
                     style={{ flex: 1, height: 38, paddingHorizontal: 10, fontSize: 13, color: '#1A1A2E', outlineStyle: 'none' } as any}
                     placeholder="e.g. juan.delacruz"
                     value={newUserEmail}
-                    onChangeText={setNewUserEmail}
+                    onChangeText={(val) => {
+                      setNewUserEmail(val);
+                      if (newUserErrors.email) setNewUserErrors(prev => ({ ...prev, email: undefined }));
+                    }}
                     autoCapitalize="none"
                   />
-                  <View style={{ backgroundColor: Colors.background, paddingHorizontal: 8, height: '100%', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: Colors.border }}>
+                  <View style={{
+                    backgroundColor: Colors.background,
+                    paddingHorizontal: 8,
+                    height: '100%',
+                    justifyContent: 'center',
+                    borderLeftWidth: 1,
+                    borderLeftColor: newUserErrors.email ? '#DC2626' : Colors.border
+                  }}>
                     <Text style={{ fontSize: 12, color: Colors.textSecondary }}>@jmc.edu.ph</Text>
                   </View>
                 </View>
+                {newUserErrors.email && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '500' }}>
+                      {newUserErrors.email}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Password</Text>
-                <View style={styles.passwordInputWrapper}>
-                  <TextInput style={styles.passwordInput} placeholder="••••••••" secureTextEntry={!showPassword} value={newUserPassword} onChangeText={setNewUserPassword} autoCapitalize="none" />
+                <Text style={[styles.formLabel, newUserErrors.password && { color: '#DC2626' }]}>Password</Text>
+                <View style={[
+                  styles.passwordInputWrapper,
+                  newUserErrors.password && { borderColor: '#DC2626', borderWidth: 1.5 }
+                ]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="••••••••"
+                    secureTextEntry={!showPassword}
+                    value={newUserPassword}
+                    onChangeText={(val) => {
+                      setNewUserPassword(val);
+                      if (newUserErrors.password) setNewUserErrors(prev => ({ ...prev, password: undefined }));
+                    }}
+                    autoCapitalize="none"
+                  />
                   <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
                     <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
+                {newUserErrors.password && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={15} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '500' }}>
+                      {newUserErrors.password}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
             {/* Row 3: Role + Department */}
             <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
               <View style={styles.formField}>
-                <Text style={[styles.formLabel]} numberOfLines={1}>Role</Text>
+                <Text style={[styles.formLabel, newUserErrors.role && { color: '#DC2626' }]} numberOfLines={1}>Role</Text>
                 <select
                   value={newUserRole}
-                  onChange={(e: any) => setNewUserRole(e.target.value)}
-                  style={{ height: 38, fontSize: 13, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', color: '#1A1A2E', paddingLeft: 10, outline: 'none', cursor: 'pointer', width: '100%' }}
+                  onChange={(e: any) => {
+                    setNewUserRole(e.target.value);
+                    if (newUserErrors.role) setNewUserErrors(prev => ({ ...prev, role: undefined }));
+                  }}
+                  style={{
+                    height: 38,
+                    fontSize: 13,
+                    borderRadius: 4,
+                    border: newUserErrors.role ? '1.5px solid #DC2626' : '1px solid #E5E7EB',
+                    backgroundColor: '#fff',
+                    color: '#1A1A2E',
+                    paddingLeft: 10,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
                 >
                   {ROLE_CATEGORIES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
+                {newUserErrors.role && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '500' }}>
+                      {newUserErrors.role}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.formField}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
-                  <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 4 }]} numberOfLines={1}>Department</Text>
+                  <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 4 }, newUserErrors.department && { color: '#DC2626' }]} numberOfLines={1}>Department</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <TouchableOpacity
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: newUserRole === 'admin' ? '#F3F4F6' : '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: newUserRole === 'admin' ? 0.65 : 1 }}
@@ -2561,11 +2693,33 @@ export default function ITAdminDashboard() {
                 </View>
                 <select
                   value={newUserDepartment}
-                  onChange={(e: any) => setNewUserDepartment(e.target.value)}
-                  style={{ height: 38, fontSize: 13, borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#fff', color: '#1A1A2E', paddingLeft: 10, outline: 'none', cursor: 'pointer', width: '100%' }}
+                  onChange={(e: any) => {
+                    setNewUserDepartment(e.target.value);
+                    if (newUserErrors.department) setNewUserErrors(prev => ({ ...prev, department: undefined }));
+                  }}
+                  style={{
+                    height: 38,
+                    fontSize: 13,
+                    borderRadius: 4,
+                    border: newUserErrors.department ? '1.5px solid #DC2626' : '1px solid #E5E7EB',
+                    backgroundColor: '#fff',
+                    color: '#1A1A2E',
+                    paddingLeft: 10,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
                 >
                   {filteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                 </select>
+                {newUserErrors.department && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '500' }}>
+                      {newUserErrors.department}
+                    </Text>
+                  </View>
+                )}
                 {addingDept && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     <TextInput
@@ -3133,12 +3287,46 @@ export default function ITAdminDashboard() {
                         <Text style={styles.wideSectionTitle}>Personal Information</Text>
                         <View style={styles.wideFieldRow}>
                           <View style={styles.wideFieldHalf}>
-                            <Text style={styles.wideFieldLabel}>First Name</Text>
-                            <TextInput style={styles.wideFieldInput} value={profileFirstName} onChangeText={setProfileFirstName} placeholder="First name" />
+                            <Text style={[styles.wideFieldLabel, profileErrors.firstName && { color: '#DC2626' }]}>First Name</Text>
+                            <TextInput
+                              style={[
+                                styles.wideFieldInput,
+                                profileErrors.firstName && { borderColor: '#DC2626', borderWidth: 1.5 }
+                              ]}
+                              value={profileFirstName}
+                              onChangeText={(val) => {
+                                setProfileFirstName(val);
+                                if (profileErrors.firstName) setProfileErrors(prev => ({ ...prev, firstName: undefined }));
+                              }}
+                              placeholder="First name"
+                            />
+                            {profileErrors.firstName && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="alert-circle-outline" size={13} color="#DC2626" />
+                                <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>{profileErrors.firstName}</Text>
+                              </View>
+                            )}
                           </View>
                           <View style={styles.wideFieldHalf}>
-                            <Text style={styles.wideFieldLabel}>Last Name</Text>
-                            <TextInput style={styles.wideFieldInput} value={profileLastName} onChangeText={setProfileLastName} placeholder="Last name" />
+                            <Text style={[styles.wideFieldLabel, profileErrors.lastName && { color: '#DC2626' }]}>Last Name</Text>
+                            <TextInput
+                              style={[
+                                styles.wideFieldInput,
+                                profileErrors.lastName && { borderColor: '#DC2626', borderWidth: 1.5 }
+                              ]}
+                              value={profileLastName}
+                              onChangeText={(val) => {
+                                setProfileLastName(val);
+                                if (profileErrors.lastName) setProfileErrors(prev => ({ ...prev, lastName: undefined }));
+                              }}
+                              placeholder="Last name"
+                            />
+                            {profileErrors.lastName && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="alert-circle-outline" size={13} color="#DC2626" />
+                                <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>{profileErrors.lastName}</Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                         <View style={styles.wideFieldRow}>
@@ -3158,20 +3346,50 @@ export default function ITAdminDashboard() {
                         <Text style={styles.wideSectionTitle}>Contact & Work</Text>
                         <View style={styles.wideFieldRow}>
                           <View style={styles.wideFieldFull}>
-                            <Text style={styles.wideFieldLabel}>Email Address</Text>
-                            <TextInput style={styles.wideFieldInput} value={profileEmail} onChangeText={setProfileEmail} autoCapitalize="none" keyboardType="email-address" />
+                            <Text style={[styles.wideFieldLabel, profileErrors.email && { color: '#DC2626' }]}>Email Address</Text>
+                            <TextInput
+                              style={[
+                                styles.wideFieldInput,
+                                profileErrors.email && { borderColor: '#DC2626', borderWidth: 1.5 }
+                              ]}
+                              value={profileEmail}
+                              onChangeText={(val) => {
+                                setProfileEmail(val);
+                                if (profileErrors.email) setProfileErrors(prev => ({ ...prev, email: undefined }));
+                              }}
+                              autoCapitalize="none"
+                              keyboardType="email-address"
+                            />
+                            {profileErrors.email && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="alert-circle-outline" size={13} color="#DC2626" />
+                                <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>{profileErrors.email}</Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                         <View style={styles.wideFieldRow}>
                           <View style={styles.wideFieldFull}>
-                            <Text style={styles.wideFieldLabel}>Department</Text>
+                            <Text style={[styles.wideFieldLabel, profileErrors.department && { color: '#DC2626' }]}>Department</Text>
                             <select
                               value={profileDepartment}
-                              onChange={(e: any) => setProfileDepartment(e.target.value)}
-                              style={styles.wideFieldSelect}
+                              onChange={(e: any) => {
+                                setProfileDepartment(e.target.value);
+                                if (profileErrors.department) setProfileErrors(prev => ({ ...prev, department: undefined }));
+                              }}
+                              style={{
+                                ...styles.wideFieldSelect,
+                                ...(profileErrors.department ? { border: '1.5px solid #DC2626' } : {})
+                              }}
                             >
                               {profileFilteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
                             </select>
+                            {profileErrors.department && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Ionicons name="alert-circle-outline" size={13} color="#DC2626" />
+                                <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>{profileErrors.department}</Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                       </View>
