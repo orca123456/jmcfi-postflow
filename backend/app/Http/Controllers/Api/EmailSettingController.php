@@ -127,6 +127,29 @@ class EmailSettingController extends Controller
         $adminName  = $request->user()->full_name;
         $cleanPassword = str_replace(' ', '', $password);
 
+        $tmplHeader = $request->input('email_template_header_title') ?: (SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification');
+        $tmplColor  = $request->input('email_template_brand_color')   ?: (SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000');
+        $tmplFooter = $request->input('email_template_footer_text')  ?: (SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.');
+        $tmplLogo   = $request->input('email_template_logo_url')     ?: (SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '');
+
+        $viewData = [
+            'headerTitle'     => $tmplHeader,
+            'brandColor'      => $tmplColor,
+            'footerText'      => $tmplFooter,
+            'logoUrl'         => $tmplLogo,
+            'userName'        => $adminName,
+            'statusType'      => 'approved',
+            'statusLabel'     => 'Configuration Verified',
+            'bodyMessage'     => 'This is a test notification from JMCFI PostFlow. Your custom email template styling has been applied!',
+            'postTitle'       => 'Annual Campus Activity Request 2026',
+            'reason'          => 'All approval requirements satisfied.',
+            'targetPlatforms' => ['facebook', 'instagram', 'portal'],
+            'actionUrl'       => url(config('app.frontend_url') ?? 'https://jmcfi-postflow-production.up.railway.app'),
+            'buttonText'      => 'View System Dashboard'
+        ];
+
+        $htmlContent = view('emails.custom-template', $viewData)->render();
+
         $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
 
         if ($isSendGrid) {
@@ -149,11 +172,15 @@ class EmailSettingController extends Controller
                             'email' => $fromAddr ?: 'postflow@jmc.edu.ph',
                             'name'  => $fromName ?: 'JMCFI PostFlow'
                         ],
-                        'subject' => '[JMCFI PostFlow] ✅ Test Email — Configuration Successful!',
+                        'subject' => "[{$fromName}] ✅ Email Template Test — Configuration Verified!",
                         'content' => [
                             [
                                 'type'  => 'text/plain',
-                                'value' => "Hello {$adminName},\n\nThis is a test email sent via Twilio SendGrid API from JMCFI PostFlow.\n\nIf you received this, your SendGrid integration is working correctly!\n\n— JMCFI PostFlow System"
+                                'value' => "Hello {$adminName},\n\nThis is a test email sent via Twilio SendGrid API from JMCFI PostFlow with custom template styling.\n\n— JMCFI PostFlow System"
+                            ],
+                            [
+                                'type'  => 'text/html',
+                                'value' => $htmlContent
                             ]
                         ]
                     ],
@@ -161,8 +188,8 @@ class EmailSettingController extends Controller
                 ]);
 
                 if ($res->getStatusCode() >= 200 && $res->getStatusCode() < 300) {
-                    Log::info("SendGrid test email sent successfully to {$adminEmail}");
-                    return response()->json(['message' => "Test email sent via Twilio SendGrid to {$adminEmail}. Please check your inbox!"]);
+                    Log::info("SendGrid test email with custom template sent successfully to {$adminEmail}");
+                    return response()->json(['message' => "Test email with custom template styling sent via Twilio SendGrid to {$adminEmail}. Please check your inbox!"]);
                 }
             } catch (\GuzzleHttp\Exception\ClientException $ge) {
                 $respBody = (string) $ge->getResponse()?->getBody();
@@ -170,7 +197,7 @@ class EmailSettingController extends Controller
                 if (str_contains($respBody, 'authorization') || $ge->getCode() === 401) {
                     return response()->json(['message' => 'SendGrid Authentication Failed (401). Please verify your SendGrid API Key.'], 422);
                 } elseif (str_contains($respBody, 'Single Sender') || $ge->getCode() === 403) {
-                    return response()->json(['message' => 'SendGrid Error: The From Email Address must be verified in Twilio SendGrid (Single Sender Verification).'], 422);
+                    return response()->json(['message' => 'SendGrid Error (403): The From Email Address must be verified in Twilio SendGrid (Settings > Sender Authentication > Single Sender Verification).'], 422);
                 }
                 return response()->json(['message' => 'SendGrid API Error: ' . ($respBody ?: $ge->getMessage())], 422);
             } catch (\Exception $e) {
@@ -179,28 +206,7 @@ class EmailSettingController extends Controller
             }
         }
 
-        $tmplHeader = $request->input('email_template_header_title') ?: (SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification');
-        $tmplColor  = $request->input('email_template_brand_color')   ?: (SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000');
-        $tmplFooter = $request->input('email_template_footer_text')  ?: (SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.');
-        $tmplLogo   = $request->input('email_template_logo_url')     ?: (SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '');
-
         try {
-            $viewData = [
-                'headerTitle' => $tmplHeader,
-                'brandColor' => $tmplColor,
-                'footerText' => $tmplFooter,
-                'logoUrl' => $tmplLogo,
-                'userName' => $adminName,
-                'statusType' => 'approved',
-                'statusLabel' => 'Configuration Verified',
-                'bodyMessage' => 'This is a test notification from JMCFI PostFlow. Your custom email template styling has been applied!',
-                'postTitle' => 'Annual Campus Activity Request 2026',
-                'reason' => 'All approval requirements satisfied.',
-                'targetPlatforms' => ['facebook', 'instagram', 'portal'],
-                'actionUrl' => url(config('app.frontend_url') ?? 'https://jmcfi-postflow-production.up.railway.app'),
-                'buttonText' => 'View System Dashboard'
-            ];
-
             Mail::send('emails.custom-template', $viewData, function ($message) use ($adminEmail, $adminName, $fromName) {
                 $message->to($adminEmail, $adminName)
                         ->subject("[{$fromName}] ✅ Email Template Test — Configuration Verified!");
@@ -262,9 +268,14 @@ class EmailSettingController extends Controller
         $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
 
         if ($isSendGrid) {
-            Config::set('mail.default', 'sendgrid');
-            Config::set('mail.mailers.sendgrid.transport', 'sendgrid');
-            Config::set('mail.mailers.sendgrid.key', $cleanPassword);
+            Config::set('mail.default', 'smtp');
+            Config::set('mail.mailers.smtp.transport', 'smtp');
+            Config::set('mail.mailers.smtp.host', 'smtp.sendgrid.net');
+            Config::set('mail.mailers.smtp.port', 587);
+            Config::set('mail.mailers.smtp.username', 'apikey');
+            Config::set('mail.mailers.smtp.password', $cleanPassword);
+            Config::set('mail.mailers.smtp.encryption', 'tls');
+            Config::set('mail.mailers.smtp.timeout', 12);
         } else {
             Config::set('mail.default', $mailer);
             Config::set('mail.mailers.smtp.transport', 'smtp');

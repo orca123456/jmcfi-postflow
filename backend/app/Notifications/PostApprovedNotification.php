@@ -25,6 +25,11 @@ class PostApprovedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+
         $stageMessages = [
             'office_head'    => "Your Office Head has approved your post request. It has now moved to the Vice-President for the next level of review.",
             'vice_president' => "The Vice-President has approved your post request. It has now been forwarded to the IMC/QA team for their final review.",
@@ -40,20 +45,25 @@ class PostApprovedNotification extends Notification implements ShouldQueue
         $message = $stageMessages[$this->approvedByStage] ?? 'Your post request has been approved and is progressing to the next stage.';
         $subject = $stageSubjects[$this->approvedByStage] ?? '[JMCFI PostFlow] ✅ Post Approved';
 
-        $mail = (new MailMessage)
+        $viewData = [
+            'headerTitle'     => $tmplHeader,
+            'brandColor'      => $tmplColor,
+            'footerText'      => $tmplFooter,
+            'logoUrl'         => $tmplLogo,
+            'userName'        => $notifiable->first_name ?? $notifiable->full_name ?? 'User',
+            'statusType'      => 'approved',
+            'statusLabel'     => 'Post Approved',
+            'bodyMessage'     => $message,
+            'postTitle'       => $this->postRequest->title,
+            'reason'          => $this->approverName ? "Approved by: {$this->approverName}" : null,
+            'targetPlatforms' => $this->postRequest->target_platforms ?? [],
+            'actionUrl'       => url(config('app.frontend_url', 'http://localhost:8081') . "/requestor/posts/{$this->postRequest->id}"),
+            'buttonText'      => 'View Your Request'
+        ];
+
+        return (new MailMessage)
             ->subject("{$subject}: {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line($message)
-            ->line("**Post Title:** {$this->postRequest->title}");
-
-        if ($this->approverName) {
-            $mail->line("**Approved by:** {$this->approverName}");
-        }
-
-        $mail->action('View Your Request', url(config('app.frontend_url', 'http://localhost:8081') . "/requestor/posts/{$this->postRequest->id}"))
-             ->line('Thank you for your patience. **JMCFI PostFlow System**');
-
-        return $mail;
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array
