@@ -496,7 +496,7 @@ class PostRequestController extends Controller
             $remarks = $request->remarks;
             $userId = $user->id;
             $userName = $user->full_name;
-            $hasNextStage = (bool) $nextStage;
+            $hasNextStage = (bool) $nextStage && $nextStage !== 'it_publisher';
             $nextStageName = $nextStage;
 
             app()->terminating(function () use ($workflowService, $postId, $approvedStageName, $userId, $userName, $hasNextStage, $nextStageName, $remarks) {
@@ -505,7 +505,7 @@ class PostRequestController extends Controller
                     if (!$post) return;
 
                     if (!$hasNextStage) {
-                        AutoPublishJob::dispatch($post, $userId)->onQueue('publishing')->delay(now()->addSeconds(5));
+                        AutoPublishJob::dispatch($post, $userId)->onQueue('publishing')->delay(now()->addSeconds(10));
                     }
 
                     if ($hasNextStage) {

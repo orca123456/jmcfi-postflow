@@ -394,7 +394,7 @@ export default function ITAdminDashboard() {
     alert(`IT Action: "${type}" executed for post:\n"${title}"`);
   };
 
-  const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled';
+  const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled' || status === 'publish_failed';
   const isPublishedLikeStatus = (status?: string) => status === 'published' || status === 'approved';
   const isFailedLikeStatus = (status?: string) => status === 'rejected' || status === 'returned_for_revision' || status === 'publish_failed';
   const isProcessingLikeStatus = (status?: string) => status === 'publishing' || status === 'scheduled';
@@ -2424,7 +2424,7 @@ export default function ITAdminDashboard() {
                                 minWidth: canPublishStatus(post.rawStatus) ? 88 : 32,
                                 height: 32,
                                 borderRadius: 16,
-                                backgroundColor: canPublishStatus(post.rawStatus) ? '#DCFCE7' : '#f3f4f6',
+                                backgroundColor: canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#FEE2E2' : '#DCFCE7') : '#f3f4f6',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 flexDirection: 'row',
@@ -2433,10 +2433,14 @@ export default function ITAdminDashboard() {
                                 opacity: publishingPostId === post.id ? 0.6 : 1,
                               }}
                             >
-                              <Ionicons name={canPublishStatus(post.rawStatus) ? 'send-outline' : 'chevron-forward'} size={16} color={canPublishStatus(post.rawStatus) ? '#15803D' : '#6b7280'} />
+                              <Ionicons 
+                                name={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? 'refresh-outline' : 'send-outline') : 'chevron-forward'} 
+                                size={16} 
+                                color={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D') : '#6b7280'} 
+                              />
                               {canPublishStatus(post.rawStatus) && (
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>
-                                  {publishingPostId === post.id ? 'Publishing' : 'Publish'}
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D' }}>
+                                  {publishingPostId === post.id ? 'Publishing' : (post.rawStatus === 'publish_failed' ? 'Retry' : 'Publish')}
                                 </Text>
                               )}
                             </TouchableOpacity>
@@ -2461,7 +2465,7 @@ export default function ITAdminDashboard() {
                                 width: canPublishStatus(post.rawStatus) ? 74 : 32,
                                 height: 32,
                                 borderRadius: 16,
-                                backgroundColor: canPublishStatus(post.rawStatus) ? '#DCFCE7' : '#f3f4f6',
+                                backgroundColor: canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#FEE2E2' : '#DCFCE7') : '#f3f4f6',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 flexDirection: 'row',
@@ -2469,10 +2473,14 @@ export default function ITAdminDashboard() {
                                 opacity: publishingPostId === post.id ? 0.6 : 1,
                               }}
                             >
-                              <Ionicons name={canPublishStatus(post.rawStatus) ? 'send-outline' : 'chevron-forward'} size={16} color={canPublishStatus(post.rawStatus) ? '#15803D' : '#6b7280'} />
+                              <Ionicons 
+                                name={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? 'refresh-outline' : 'send-outline') : 'chevron-forward'} 
+                                size={16} 
+                                color={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D') : '#6b7280'} 
+                              />
                               {canPublishStatus(post.rawStatus) && (
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#15803D' }}>
-                                  {publishingPostId === post.id ? '...' : 'Publish'}
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D' }}>
+                                  {publishingPostId === post.id ? '...' : (post.rawStatus === 'publish_failed' ? 'Retry' : 'Publish')}
                                 </Text>
                               )}
                             </TouchableOpacity>

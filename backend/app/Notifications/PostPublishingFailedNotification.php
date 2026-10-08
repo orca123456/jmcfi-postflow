@@ -34,8 +34,9 @@ class PostPublishingFailedNotification extends Notification implements ShouldQue
             ->line("**Target Platforms:** {$platforms}")
             ->line("**Error Reason:** {$this->errorMessage}")
             ->line("**Failed at:** " . now()->format('M d, Y H:i'))
-            ->action('Publish Manually', url(config('app.frontend_url', 'http://localhost:8081') . "/admin/posts/{$this->postRequest->id}"))
-            ->line('Please log in to the dashboard and use the **Force Publish Manually** button to resolve this.')
+            ->line('💡 If this is caused by expired or missing credentials, please check your **Platform Tokens** or **Developer API Tokens** in the Admin Dashboard.')
+            ->action('Open Dashboard & Publish Manually', url(config('app.frontend_url', env('APP_FRONTEND_URL', 'http://localhost:3000')) . "/dashboard/it-admin"))
+            ->line('Please log in to the dashboard to review the error and retry publishing manually.')
             ->line('**JMCFI PostFlow System**');
     }
 
