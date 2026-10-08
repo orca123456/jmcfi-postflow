@@ -24,30 +24,46 @@ class PostPublishedSuccessNotification extends Notification implements ShouldQue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'Jose Maria College Foundation, Inc.';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+
         $platforms = implode(', ', $this->postRequest->target_platforms ?? []);
         $fbPostId  = $this->publishResults['facebook']['id'] ?? null;
+        $wpLink    = $this->publishResults['wordpress']['link'] ?? null;
 
-        $mail = (new MailMessage)
-            ->subject("[JMCFI PostFlow] ✅ Published Successfully: {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line("The following post has been **successfully published** to the target platforms.")
-            ->line("**Post Title:** {$this->postRequest->title}")
-            ->line("**Published to:** {$platforms}")
-            ->line("**Published at:** " . now()->format('M d, Y H:i'));
-
+        $extraDetails = [];
         if ($fbPostId && $fbPostId !== 'mock_fb_post_12345') {
-            $mail->line("**Facebook Post ID:** {$fbPostId}");
+            $extraDetails['Facebook Post ID'] = $fbPostId;
+        }
+        if (!empty($wpLink)) {
+            $extraDetails['WordPress Article'] = $wpLink;
         }
 
-        if (!empty($this->publishResults['wordpress']['link'])) {
-            $mail->line('WordPress article: ' . $this->publishResults['wordpress']['link']);
-        }
+        $frontendUrl = config('app.frontend_url') ?: 'https://jmcfi-postflow-production.up.railway.app';
+        $dashboardUrl = rtrim($frontendUrl, '/') . "/dashboard/it-admin";
 
-        $mail->action('View in Dashboard', url(config('app.frontend_url', 'http://localhost:8081') . "/admin/posts/{$this->postRequest->id}"))
-             ->line('No action is required. This is a confirmation email.')
-             ->line('**JMCFI PostFlow System**');
+        $viewData = [
+            'headerTitle'        => $tmplHeader,
+            'brandColor'         => $tmplColor,
+            'footerText'         => $tmplFooter,
+            'logoUrl'            => $tmplLogo,
+            'userName'           => $notifiable->first_name ?? $notifiable->full_name ?? 'System Administrator',
+            'statusType'         => 'published',
+            'statusLabel'        => 'Published Successfully',
+            'bodyMessage'        => 'The following post has been successfully published to the target social platforms.',
+            'postTitle'          => $this->postRequest->title,
+            'publishedPlatforms' => $platforms ?: 'facebook, instagram',
+            'publishedAt'        => now()->format('M d, Y H:i'),
+            'extraDetails'       => $extraDetails,
+            'actionUrl'          => $dashboardUrl,
+            'buttonText'         => 'View in Dashboard',
+        ];
 
-        return $mail;
+        return (new MailMessage)
+            ->subject("[JMCFI PostFlow] ✅ Published Successfully: {$this->postRequest->title}")
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array

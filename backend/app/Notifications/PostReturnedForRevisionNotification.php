@@ -25,24 +25,42 @@ class PostReturnedForRevisionNotification extends Notification implements Should
 
     public function toMail(object $notifiable): MailMessage
     {
-        $message = (new MailMessage)
-            ->subject("Revision Required: {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line("Your post request requires revision.")
-            ->line("**Post:** {$this->postRequest->title}")
-            ->line("**Reason:** " . ($this->reason ?? 'No specific reason provided'));
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'Jose Maria College Foundation, Inc.';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
 
+        $frontendUrl = config('app.frontend_url') ?: 'https://jmcfi-postflow-production.up.railway.app';
+        $actionUrl = rtrim($frontendUrl, '/') . "/requestor/posts/{$this->postRequest->id}/edit";
+
+        $extraDetails = [];
         if ($this->revisionGuidance && !empty($this->revisionGuidance)) {
-            $message->line('**Revision Guidance:**');
             foreach ($this->revisionGuidance as $category => $suggestions) {
                 if (!empty($suggestions)) {
-                    $message->line("- **{$category}:** " . implode('; ', $suggestions));
+                    $extraDetails["Guidance ({$category})"] = implode('; ', $suggestions);
                 }
             }
         }
 
-        return $message->action('Revise Post', url(config('app.frontend_url') . "/requestor/posts/{$this->postRequest->id}/edit"))
-            ->line('Please revise and resubmit your post.');
+        $viewData = [
+            'headerTitle'   => $tmplHeader,
+            'brandColor'    => $tmplColor,
+            'footerText'    => $tmplFooter,
+            'logoUrl'       => $tmplLogo,
+            'userName'      => $notifiable->first_name ?? $notifiable->full_name ?? 'Requestor',
+            'statusType'    => 'revision',
+            'statusLabel'   => 'Revision Required',
+            'bodyMessage'   => 'Your post request requires some updates before it can proceed with approval.',
+            'postTitle'     => $this->postRequest->title,
+            'reason'        => $this->reason ?? 'Please review the requested changes and submit a revised version.',
+            'extraDetails'  => $extraDetails,
+            'actionUrl'     => $actionUrl,
+            'buttonText'    => 'Revise Post',
+        ];
+
+        return (new MailMessage)
+            ->subject("[JMCFI PostFlow] ⚠️ Revision Required: {$this->postRequest->title}")
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array
