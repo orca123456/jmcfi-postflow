@@ -20,7 +20,7 @@ class FacebookPublishingService
 
         $this->pageId = $pageId ? (string) $pageId->value : env('FACEBOOK_PAGE_ID', '');
         $this->accessToken = $accessToken ? (string) $accessToken->value : env('FACEBOOK_PAGE_ACCESS_TOKEN', '');
-        $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');
+        $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v26.0');
     }
 
     /**
@@ -34,9 +34,7 @@ class FacebookPublishingService
     public function publishPost(string $message, ?string $mediaPath = null): ?array
     {
         if (empty($this->pageId) || empty($this->accessToken)) {
-            Log::warning('Facebook API credentials not configured. Skipping real publish.');
-            // Fallback for testing: return a mock ID if credentials are not present.
-            return ['id' => 'mock_fb_post_12345'];
+            throw new Exception('Facebook credentials are not configured. Save a valid Page ID and Page Access Token in IT Admin Dashboard.');
         }
 
         $isUrl = $mediaPath ? filter_var($mediaPath, FILTER_VALIDATE_URL) : false;

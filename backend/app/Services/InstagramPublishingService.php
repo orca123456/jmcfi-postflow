@@ -20,7 +20,7 @@ class InstagramPublishingService
 
         $this->businessAccountId = $businessAccountId ? (string) $businessAccountId->value : env('INSTAGRAM_BUSINESS_ACCOUNT_ID', '');
         $this->accessToken = $accessToken ? (string) $accessToken->value : env('INSTAGRAM_ACCESS_TOKEN', '');
-        $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v19.0');
+        $this->graphApiVersion = env('FACEBOOK_GRAPH_API_VERSION', 'v26.0');
     }
 
     public function publishPost(string $caption, ?string $imageUrl): array
