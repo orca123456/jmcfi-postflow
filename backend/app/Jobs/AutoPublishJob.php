@@ -157,6 +157,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 
             $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
             $this->notifyITAdmins(new PostPublishingFailedNotification($this->postRequest, $e->getMessage()));
+            try { \App\Services\AuditLogService::log('POST_PUBLISH_FAILED', "Failed to auto-publish post \"{$this->postRequest->title}\": {$e->getMessage()}", 'ERROR', ['postId' => $this->postRequest->id, 'error' => $e->getMessage()]); } catch (\Throwable $_) {}
 
             throw $e;
         }
@@ -167,6 +168,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         Log::critical("AutoPublishJob: All retries exhausted for post ID {$this->postRequest->id}. Final error: {$exception->getMessage()}");
 
         $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
+        try { \App\Services\AuditLogService::log('POST_PUBLISH_FAILED', "All retries exhausted for post \"{$this->postRequest->title}\": {$exception->getMessage()}", 'ERROR', ['postId' => $this->postRequest->id, 'error' => $exception->getMessage()]); } catch (\Throwable $_) {}
 
         $this->notifyITAdmins(new PostPublishingFailedNotification(
             $this->postRequest,
