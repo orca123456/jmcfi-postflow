@@ -41,17 +41,30 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
         $stageLabel   = $stageLabels[$stage]   ?? 'Review';
         $stageMessage = $stageMessages[$stage] ?? 'A post request requires your action.';
 
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+
+        $viewData = [
+            'headerTitle'     => $tmplHeader,
+            'brandColor'      => $tmplColor,
+            'footerText'      => $tmplFooter,
+            'logoUrl'         => $tmplLogo,
+            'userName'        => $notifiable->first_name ?? $notifiable->full_name ?? 'Approver',
+            'statusType'      => 'pending',
+            'statusLabel'     => "Action Required — {$stageLabel}",
+            'bodyMessage'     => $stageMessage,
+            'postTitle'       => $this->postRequest->title,
+            'reason'          => "Submitted by: {$this->postRequest->requestor?->full_name} ({$this->postRequest->requestor?->department})",
+            'targetPlatforms' => $this->postRequest->target_platforms ?? [],
+            'actionUrl'       => url(config('app.frontend_url', 'http://localhost:8081') . "/approver/posts/{$this->postRequest->id}"),
+            'buttonText'      => 'Review & Take Action'
+        ];
+
         return (new MailMessage)
             ->subject("[JMCFI PostFlow] Action Required — {$stageLabel}: {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line($stageMessage)
-            ->line("**Post Title:** {$this->postRequest->title}")
-            ->line("**Category:** {$this->postRequest->category?->name}")
-            ->line("**Submitted by:** {$this->postRequest->requestor?->full_name}")
-            ->line("**Department:** {$this->postRequest->requestor?->department}")
-            ->action('Review & Take Action', url(config('app.frontend_url', 'http://localhost:8081') . "/approver/posts/{$this->postRequest->id}"))
-            ->line('Please review the post and take action at your earliest convenience.')
-            ->line('Thank you, **JMCFI PostFlow System**');
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array
