@@ -1423,6 +1423,47 @@ export default function ITAdminDashboard() {
     }
   };
 
+  const [uploadingEmailLogo, setUploadingEmailLogo] = useState(false);
+
+  const handleUploadEmailLogo = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/gif';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingEmailLogo(true);
+        try {
+          const res = await (emailSettingsApi as any).uploadLogo(file);
+          const logoUrl = res.data?.logo_url || '';
+          setEmailFields(prev => ({ ...prev, email_template_logo_url: logoUrl }));
+          showToast('Email template logo uploaded successfully!', 'success');
+        } catch (err: any) {
+          showToast('Failed to upload logo: ' + (err.response?.data?.message || err.message), 'error');
+        } finally {
+          setUploadingEmailLogo(false);
+        }
+      };
+      input.click();
+    } else {
+      showToast('Logo upload is available on web browsers.', 'info');
+    }
+  };
+
+  const handleRemoveEmailLogo = async () => {
+    setUploadingEmailLogo(true);
+    try {
+      await (emailSettingsApi as any).removeLogo();
+      setEmailFields(prev => ({ ...prev, email_template_logo_url: '' }));
+      showToast('Email template logo removed.', 'success');
+    } catch (err: any) {
+      showToast('Failed to remove logo: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingEmailLogo(false);
+    }
+  };
+
   const handleTestEmail = async () => {
     const activeFrom = emailFields.mail_from_address || emailFields.mail_username;
     if (!activeFrom) {
@@ -4358,11 +4399,72 @@ $response = curl_exec($ch);`}
                     </View>
                   </View>
 
-                  {/* Logo URL */}
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
-                      Logo Image URL (Optional)
-                    </Text>
+                  {/* Logo Image & Upload */}
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
+                        Logo Image (Upload File or HTTPS Link)
+                      </Text>
+                      {emailFields.email_template_logo_url ? (
+                        <TouchableOpacity
+                          onPress={handleRemoveEmailLogo}
+                          disabled={uploadingEmailLogo}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        >
+                          <Ionicons name="trash-outline" size={13} color="#EF4444" />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#EF4444' }}>Remove</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    {/* Action Row: Upload Button & Live Thumbnail */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <TouchableOpacity
+                        onPress={handleUploadEmailLogo}
+                        disabled={uploadingEmailLogo}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          backgroundColor: '#0F172A',
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          opacity: uploadingEmailLogo ? 0.7 : 1,
+                        }}
+                      >
+                        {uploadingEmailLogo ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" />
+                        )}
+                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                          {uploadingEmailLogo ? 'Uploading...' : 'Upload Logo File'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {emailFields.email_template_logo_url ? (
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          backgroundColor: '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                        }}>
+                          <Image
+                            source={{ uri: emailFields.email_template_logo_url }}
+                            style={{ width: 28, height: 28, borderRadius: 4 }}
+                            resizeMode="contain"
+                          />
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#10B981' }}>Active Logo</Text>
+                        </View>
+                      ) : null}
+                    </View>
+
                     <View style={{
                       minHeight: 44,
                       borderRadius: 8,
@@ -4376,13 +4478,13 @@ $response = curl_exec($ch);`}
                         style={{ fontSize: 13, color: '#0F172A', outlineStyle: 'none' } as any}
                         value={emailFields.email_template_logo_url}
                         onChangeText={v => setEmailFields(p => ({ ...p, email_template_logo_url: v }))}
-                        placeholder="https://example.com/logo.png"
+                        placeholder="https://example.com/logo.png or uploaded /email-template-logo"
                         placeholderTextColor="#94A3B8"
                         autoCapitalize="none"
                       />
                     </View>
                     <Text style={{ fontSize: 11, color: '#94A3B8' }}>
-                      HTTPS link to school or institutional logo (recommended height 40px - 60px).
+                      Click "Upload Logo File" to upload PNG, JPG, or SVG from your device, or paste an external HTTPS URL.
                     </Text>
                   </View>
 

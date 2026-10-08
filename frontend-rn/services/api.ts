@@ -209,6 +209,14 @@ export const emailSettingsApi = {
   get: () => api.get('/email-settings'),
   update: (data: object) => api.post('/email-settings', data),
   test: (data?: object) => api.post('/email-settings/test', data || {}, { timeout: 15000 }),
+  uploadLogo: (file: File) => {
+    const form = new FormData();
+    form.append('logo', file);
+    return api.post('/email-settings/logo', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  removeLogo: () => api.delete('/email-settings/logo'),
 };
 
 // ── API Tokens endpoints (Developer API) ──────────────────────────────────

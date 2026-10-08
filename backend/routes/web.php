@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\PostMedia;
 use App\Models\User;
 use App\Http\Controllers\Api\SanctumSecurity\AuthController;
+use App\Http\Controllers\Api\EmailSettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -76,6 +77,7 @@ Route::get('/instagram-media/{media}.jpg', function (PostMedia $media) {
 })->name('instagram.media');
 
 Route::match(['GET', 'HEAD', 'OPTIONS'], '/profile-photo/{user}', [AuthController::class, 'getPhoto'])->whereNumber('user')->name('profile.photo');
+Route::match(['GET', 'HEAD', 'OPTIONS'], '/email-template-logo', [EmailSettingController::class, 'getLogo'])->name('email.template.logo');
 
 Route::get('/storage/{path}', function (string $path) {
     $filename = basename($path);

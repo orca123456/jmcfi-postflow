@@ -111,6 +111,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings'])->middleware('role:it_publisher,it_admin');
     Route::post('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'updateSettings'])->middleware('role:it_publisher,it_admin');
     Route::post('email-settings/test', [App\Http\Controllers\Api\EmailSettingController::class, 'sendTestEmail'])->middleware('role:it_publisher,it_admin');
+    Route::post('email-settings/logo', [App\Http\Controllers\Api\EmailSettingController::class, 'uploadLogo'])->middleware('role:it_publisher,it_admin');
+    Route::delete('email-settings/logo', [App\Http\Controllers\Api\EmailSettingController::class, 'removeLogo'])->middleware('role:it_publisher,it_admin');
 
     // Developer API Tokens (Admin only, or accessible by users)
     Route::get('api-tokens', [ApiTokenController::class, 'index'])->middleware('role:it_publisher,it_admin');

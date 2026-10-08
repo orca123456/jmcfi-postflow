@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Storage;
+use App\Services\AuditLogService;
 
 class EmailSettingController extends Controller
 {
@@ -302,5 +304,146 @@ class EmailSettingController extends Controller
         Mail::purge('smtp');
         Mail::purge($mailer);
         Mail::purge();
+    }
+
+    /**
+     * Upload an institutional logo image for email templates.
+     */
+    public function uploadLogo(Request $request): JsonResponse
+    {
+        if ($request->user()?->roleCategory() !== 'admin') {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $request->validate([
+            'logo' => 'required|image|mimes:jpeg,png,jpg,webp,svg,gif|max:5120',
+        ]);
+
+        $file = $request->file('logo');
+        $mime = $file->getMimeType() ?: 'image/png';
+        $bytes = file_get_contents($file->getRealPath());
+
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+
+        // Delete old uploaded logo file if exists
+        $oldPath = SystemSetting::where('key', 'email_template_logo_path')->value('value');
+        if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
+            Storage::disk($disk)->delete($oldPath);
+        }
+
+        $path = $file->store('email-logos', $disk);
+
+        // Store file path and base64 fallback in database
+        SystemSetting::updateOrCreate(
+            ['key' => 'email_template_logo_path'],
+            ['value' => $path, 'type' => 'string', 'description' => 'Email template logo file path', 'is_public' => false]
+        );
+        SystemSetting::updateOrCreate(
+            ['key' => 'email_template_logo_data'],
+            ['value' => base64_encode($bytes), 'type' => 'string', 'description' => 'Email template logo binary base64', 'is_public' => false]
+        );
+        SystemSetting::updateOrCreate(
+            ['key' => 'email_template_logo_mime'],
+            ['value' => $mime, 'type' => 'string', 'description' => 'Email template logo mime type', 'is_public' => false]
+        );
+
+        // Compute publicly accessible URL
+        $publicUrl = url('/email-template-logo');
+
+        SystemSetting::updateOrCreate(
+            ['key' => 'email_template_logo_url'],
+            ['value' => $publicUrl, 'type' => 'string', 'description' => 'Mail setting: email_template_logo_url', 'is_public' => false]
+        );
+
+        AuditLogService::log('EMAIL_TEMPLATE_LOGO_UPLOADED', 'Uploaded custom email template logo', 'INFO', [], $request);
+
+        return response()->json([
+            'message' => 'Logo uploaded successfully.',
+            'logo_url' => $publicUrl,
+        ]);
+    }
+
+    /**
+     * Remove the custom uploaded email template logo.
+     */
+    public function removeLogo(Request $request): JsonResponse
+    {
+        if ($request->user()?->roleCategory() !== 'admin') {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        $oldPath = SystemSetting::where('key', 'email_template_logo_path')->value('value');
+        if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
+            Storage::disk($disk)->delete($oldPath);
+        }
+
+        SystemSetting::where('key', 'email_template_logo_path')->update(['value' => '']);
+        SystemSetting::where('key', 'email_template_logo_data')->update(['value' => '']);
+        SystemSetting::where('key', 'email_template_logo_url')->update(['value' => '']);
+
+        AuditLogService::log('EMAIL_TEMPLATE_LOGO_REMOVED', 'Removed custom email template logo', 'INFO', [], $request);
+
+        return response()->json([
+            'message' => 'Logo removed successfully.',
+            'logo_url' => '',
+        ]);
+    }
+
+    /**
+     * Public endpoint to serve the email template logo to email clients.
+     */
+    public function getLogo()
+    {
+        $base64 = SystemSetting::where('key', 'email_template_logo_data')->value('value');
+        $mime = SystemSetting::where('key', 'email_template_logo_mime')->value('value') ?: 'image/png';
+
+        if (!empty($base64)) {
+            $content = base64_decode($base64);
+            return response($content, 200, [
+                'Content-Type' => $mime,
+                'Content-Length' => (string) strlen($content),
+                'Cache-Control' => 'public, max-age=86400',
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+                'Access-Control-Allow-Headers' => '*',
+            ]);
+        }
+
+        $path = SystemSetting::where('key', 'email_template_logo_path')->value('value');
+        if (!$path) {
+            abort(404);
+        }
+
+        $path = str_replace('\\', '/', (string) $path);
+        if ($path === '' || str_contains($path, '..') || str_starts_with($path, '/')) {
+            abort(404);
+        }
+
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+
+        try {
+            if (! Storage::disk($disk)->exists($path)) {
+                if ($disk !== 'public' && Storage::disk('public')->exists($path)) {
+                    $disk = 'public';
+                } else {
+                    abort(404);
+                }
+            }
+
+            $content = Storage::disk($disk)->get($path);
+            $mimeType = Storage::disk($disk)->mimeType($path) ?: 'image/png';
+        } catch (\Throwable) {
+            abort(404);
+        }
+
+        return response($content, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => (string) strlen($content),
+            'Cache-Control' => 'public, max-age=86400',
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers' => '*',
+        ]);
     }
 }
