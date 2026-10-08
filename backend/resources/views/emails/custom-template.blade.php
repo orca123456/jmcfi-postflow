@@ -53,6 +53,8 @@
         .badge-rejected { background-color: #FEE2E2; color: #991B1B; }
         .badge-failed { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
         .badge-approved { background-color: #DCFCE7; color: #166534; }
+        .badge-published, .badge-success { background-color: #DCFCE7; color: #166534; }
+        .badge-ready { background-color: #E0F2FE; color: #075985; }
         .badge-revision { background-color: #FEF3C7; color: #92400E; }
         .badge-pending { background-color: #E0F2FE; color: #075985; }
         .details-card {
@@ -117,6 +119,12 @@
                 @if(!empty($reason))
                     <div class="details-item"><strong>Reason / Notes:</strong> {{ $reason }}</div>
                 @endif
+                @if(!empty($publishedAt))
+                    <div class="details-item"><strong>Published At:</strong> {{ $publishedAt }}</div>
+                @endif
+                @if(!empty($publishedPlatforms))
+                    <div class="details-item"><strong>Published To:</strong> {{ is_array($publishedPlatforms) ? implode(', ', $publishedPlatforms) : $publishedPlatforms }}</div>
+                @endif
                 @if(!empty($errorMessage))
                     <div class="details-item" style="color: #DC2626;"><strong>Error Reason:</strong> {{ $errorMessage }}</div>
                     <div class="details-item" style="color: #475569; font-size: 13px; margin-top: 6px;">💡 If this is caused by expired or missing credentials, please check your <strong>Platform Tokens</strong> or <strong>Developer API Tokens</strong> in the Admin Dashboard.</div>
@@ -126,6 +134,13 @@
                 @endif
                 @if(!empty($targetPlatforms))
                     <div class="details-item"><strong>Target Platforms:</strong> {{ is_array($targetPlatforms) ? implode(', ', $targetPlatforms) : $targetPlatforms }}</div>
+                @endif
+                @if(!empty($extraDetails) && is_array($extraDetails))
+                    @foreach($extraDetails as $label => $val)
+                        @if(!empty($val))
+                            <div class="details-item"><strong>{{ $label }}:</strong> {!! str_starts_with($val, 'http') ? '<a href="' . e($val) . '" target="_blank" style="color: ' . ($brandColor ?? '#800000') . ';">' . e($val) . '</a>' : e($val) !!}</div>
+                        @endif
+                    @endforeach
                 @endif
             </div>
 

@@ -21,21 +21,41 @@ class PostReadyForPublishingNotification extends Notification implements ShouldQ
 
     public function toMail(object $notifiable): MailMessage
     {
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'Jose Maria College Foundation, Inc.';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+
         $platforms = implode(', ', $this->postRequest->target_platforms ?? []);
         $schedule  = $this->postRequest->preferred_schedule_at?->format('M d, Y H:i') ?? 'ASAP';
+        $frontendUrl = config('app.frontend_url') ?: 'https://jmcfi-postflow-production.up.railway.app';
+        $actionUrl = rtrim($frontendUrl, '/') . "/dashboard/it-admin";
+
+        $extraDetails = [
+            'Category' => $this->postRequest->category?->name ?? 'General',
+            'Target Platforms' => $platforms ?: 'All',
+            'Preferred Schedule' => $schedule,
+            'Requested By' => $this->postRequest->requestor?->full_name ?? 'Staff',
+        ];
+
+        $viewData = [
+            'headerTitle'   => $tmplHeader,
+            'brandColor'    => $tmplColor,
+            'footerText'    => $tmplFooter,
+            'logoUrl'       => $tmplLogo,
+            'userName'      => $notifiable->first_name ?? $notifiable->full_name ?? 'Publisher',
+            'statusType'    => 'ready',
+            'statusLabel'   => 'Ready to Publish',
+            'bodyMessage'   => 'A post request has successfully passed all approval stages and is ready to be published.',
+            'postTitle'     => $this->postRequest->title,
+            'extraDetails'  => $extraDetails,
+            'actionUrl'     => $actionUrl,
+            'buttonText'    => 'View & Publish Post',
+        ];
 
         return (new MailMessage)
-            ->subject("[JMCFI PostFlow] 📢 Post Fully Approved & Ready to Publish: {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line("A post request has passed **all approval stages** and is now ready to be published.")
-            ->line("**Post Title:** {$this->postRequest->title}")
-            ->line("**Category:** {$this->postRequest->category?->name}")
-            ->line("**Target Platforms:** {$platforms}")
-            ->line("**Preferred Schedule:** {$schedule}")
-            ->line("**Requested by:** {$this->postRequest->requestor?->full_name}")
-            ->action('View & Publish Post', url(config('app.frontend_url', 'http://localhost:8081') . "/admin/posts/{$this->postRequest->id}"))
-            ->line('The system will attempt to auto-publish this post. You may also publish it manually from the dashboard.')
-            ->line('Thank you, **JMCFI PostFlow System**');
+            ->subject("[JMCFI PostFlow] 📢 Ready to Publish: {$this->postRequest->title}")
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array
