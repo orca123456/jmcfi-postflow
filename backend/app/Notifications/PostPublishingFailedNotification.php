@@ -24,20 +24,34 @@ class PostPublishingFailedNotification extends Notification implements ShouldQue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
+        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
+        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
+        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+
         $platforms = implode(', ', $this->postRequest->target_platforms ?? []);
+
+        $viewData = [
+            'headerTitle'     => $tmplHeader,
+            'brandColor'      => $tmplColor,
+            'footerText'      => $tmplFooter,
+            'logoUrl'         => $tmplLogo,
+            'userName'        => $notifiable->first_name ?? $notifiable->full_name ?? 'Administrator',
+            'statusType'      => 'failed',
+            'statusLabel'     => '🚨 Publish Failed',
+            'bodyMessage'     => 'The system failed to automatically broadcast this post. Manual intervention is required.',
+            'postTitle'       => $this->postRequest->title,
+            'reason'          => null,
+            'errorMessage'    => $this->errorMessage,
+            'failedAt'        => now()->format('M d, Y H:i'),
+            'targetPlatforms' => $platforms,
+            'actionUrl'       => url(config('app.frontend_url', env('APP_FRONTEND_URL', 'http://localhost:3000')) . "/dashboard/it-admin"),
+            'buttonText'      => 'Open Dashboard & Publish Manually',
+        ];
 
         return (new MailMessage)
             ->subject("[JMCFI PostFlow] 🚨 URGENT: Failed to Publish — {$this->postRequest->title}")
-            ->greeting("Hello {$notifiable->first_name},")
-            ->line("⚠️ The system **failed to automatically publish** the following post. Manual intervention is required.")
-            ->line("**Post Title:** {$this->postRequest->title}")
-            ->line("**Target Platforms:** {$platforms}")
-            ->line("**Error Reason:** {$this->errorMessage}")
-            ->line("**Failed at:** " . now()->format('M d, Y H:i'))
-            ->line('💡 If this is caused by expired or missing credentials, please check your **Platform Tokens** or **Developer API Tokens** in the Admin Dashboard.')
-            ->action('Open Dashboard & Publish Manually', url(config('app.frontend_url', env('APP_FRONTEND_URL', 'http://localhost:3000')) . "/dashboard/it-admin"))
-            ->line('Please log in to the dashboard to review the error and retry publishing manually.')
-            ->line('**JMCFI PostFlow System**');
+            ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array

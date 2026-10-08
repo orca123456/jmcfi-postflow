@@ -1382,7 +1382,7 @@ export default function ITAdminDashboard() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [showEmailPassword, setShowEmailPassword] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [templateScenario, setTemplateScenario] = useState<'rejected' | 'approved' | 'revision'>('rejected');
+  const [templateScenario, setTemplateScenario] = useState<'rejected' | 'approved' | 'revision' | 'failed'>('rejected');
 
   useEffect(() => {
     (emailSettingsApi as any).get()
@@ -4418,11 +4418,12 @@ $response = curl_exec($ch);`}
                     <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155' }}>
                       Preview Email Scenario:
                     </Text>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                       {[
                         { id: 'rejected', label: '❌ Rejected', color: '#DC2626' },
                         { id: 'approved', label: '✅ Approved', color: '#16A34A' },
                         { id: 'revision', label: '⚠️ Revision', color: '#D97706' },
+                        { id: 'failed', label: '🚨 Publish Failed', color: '#E11D48' },
                       ].map(scen => {
                         const isSelected = templateScenario === scen.id;
                         return (
@@ -4431,6 +4432,7 @@ $response = curl_exec($ch);`}
                             onPress={() => setTemplateScenario(scen.id as any)}
                             style={{
                               flex: 1,
+                              minWidth: 90,
                               paddingVertical: 8,
                               borderRadius: 8,
                               borderWidth: 1,
@@ -4440,7 +4442,7 @@ $response = curl_exec($ch);`}
                             }}
                           >
                             <Text style={{
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: isSelected ? '800' : '600',
                               color: isSelected ? scen.color : '#64748B',
                             }}>
@@ -4493,13 +4495,13 @@ $response = curl_exec($ch);`}
                     gap: 4,
                   }}>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
-                      Subject: {templateScenario === 'rejected' ? '[JMCFI PostFlow] ❌ Post Revision Requested' : templateScenario === 'approved' ? '[JMCFI PostFlow] ✅ Post Approved & Published' : '[JMCFI PostFlow] ⚠️ Action Required on Post'}
+                      Subject: {templateScenario === 'rejected' ? '[JMCFI PostFlow] ❌ Post Revision Requested' : templateScenario === 'approved' ? '[JMCFI PostFlow] ✅ Post Approved & Published' : templateScenario === 'failed' ? '[JMCFI PostFlow] 🚨 URGENT: Failed to Publish — Nycopost' : '[JMCFI PostFlow] ⚠️ Action Required on Post'}
                     </Text>
                     <Text style={{ fontSize: 12, color: '#64748B' }}>
                       From: <Text style={{ fontWeight: '700', color: '#334155' }}>{emailFields.mail_from_name || 'JMCFI PostFlow'}</Text> &lt;{emailFields.mail_from_address || emailFields.mail_username || 'postflow@jmc.edu.ph'}&gt;
                     </Text>
                     <Text style={{ fontSize: 12, color: '#64748B' }}>
-                      To: <Text style={{ fontWeight: '700', color: '#334155' }}>faculty.requestor@jmc.edu.ph</Text>
+                      To: <Text style={{ fontWeight: '700', color: '#334155' }}>{templateScenario === 'failed' ? 'it.admin@jmc.edu.ph' : 'faculty.requestor@jmc.edu.ph'}</Text>
                     </Text>
                   </View>
 
@@ -4551,21 +4553,21 @@ $response = curl_exec($ch);`}
                           paddingHorizontal: 12,
                           paddingVertical: 6,
                           borderRadius: 6,
-                          backgroundColor: templateScenario === 'rejected' ? '#FEF2F2' : templateScenario === 'approved' ? '#F0FDF4' : '#FFFBEB',
+                          backgroundColor: templateScenario === 'rejected' || templateScenario === 'failed' ? '#FEF2F2' : templateScenario === 'approved' ? '#F0FDF4' : '#FFFBEB',
                           borderWidth: 1,
-                          borderColor: templateScenario === 'rejected' ? '#FECACA' : templateScenario === 'approved' ? '#BBF7D0' : '#FDE68A',
+                          borderColor: templateScenario === 'rejected' || templateScenario === 'failed' ? '#FECACA' : templateScenario === 'approved' ? '#BBF7D0' : '#FDE68A',
                         }}>
                           <Text style={{
                             fontSize: 12,
                             fontWeight: '800',
-                            color: templateScenario === 'rejected' ? '#DC2626' : templateScenario === 'approved' ? '#16A34A' : '#D97706',
+                            color: templateScenario === 'rejected' || templateScenario === 'failed' ? '#DC2626' : templateScenario === 'approved' ? '#16A34A' : '#D97706',
                           }}>
-                            {templateScenario === 'rejected' ? '❌ POST REJECTED / NEEDS REVISION' : templateScenario === 'approved' ? '✅ POST APPROVED FOR PUBLISHING' : '⚠️ REVISION REQUIRED BY APPROVER'}
+                            {templateScenario === 'rejected' ? '❌ POST REJECTED / NEEDS REVISION' : templateScenario === 'approved' ? '✅ POST APPROVED FOR PUBLISHING' : templateScenario === 'failed' ? '🚨 AUTO-PUBLISH FAILED / ACTION REQUIRED' : '⚠️ REVISION REQUIRED BY APPROVER'}
                           </Text>
                         </View>
 
                         <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>
-                          Hello Prof. Juan Dela Cruz,
+                          {templateScenario === 'failed' ? 'Hello IT Administrator,' : 'Hello Prof. Juan Dela Cruz,'}
                         </Text>
 
                         <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20 }}>
@@ -4573,6 +4575,8 @@ $response = curl_exec($ch);`}
                             ? 'Your submitted post announcement has been reviewed by the department head and requires changes before it can be published.'
                             : templateScenario === 'approved'
                             ? 'Great news! Your post announcement has been officially approved and scheduled for multi-channel publishing.'
+                            : templateScenario === 'failed'
+                            ? 'The system failed to automatically broadcast this post to the configured platforms. Manual intervention or credential check is required.'
                             : 'Your post announcement is currently under review and requires minor updates.'}
                         </Text>
 
@@ -4586,14 +4590,24 @@ $response = curl_exec($ch);`}
                           gap: 6,
                         }}>
                           <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
-                            📌 Post Title: Annual Student Orientation 2026
+                            📌 Post Title: {templateScenario === 'failed' ? 'Nycopost' : 'Annual Student Orientation 2026'}
                           </Text>
                           <Text style={{ fontSize: 12, color: '#64748B' }}>
-                            Department: College of Computer Studies
+                            Department: {templateScenario === 'failed' ? 'BSA' : 'College of Computer Studies'}
                           </Text>
                           <Text style={{ fontSize: 12, color: '#64748B' }}>
-                            Target Channels: Facebook, Instagram, Student Portal
+                            Target Channels: Facebook, Instagram
                           </Text>
+                          {templateScenario === 'failed' && (
+                            <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 4 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
+                                Error Reason: Instagram: Instagram credentials are not configured.
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#475569' }}>
+                                💡 If this is caused by expired credentials, check Platform Tokens or Developer API Tokens in the Admin Dashboard.
+                              </Text>
+                            </View>
+                          )}
                           {templateScenario === 'rejected' && (
                             <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
                               <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
@@ -4613,7 +4627,7 @@ $response = curl_exec($ch);`}
                           marginTop: 4,
                         }}>
                           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
-                            {templateScenario === 'rejected' ? 'Edit & Resubmit Post' : 'View Post Status in Dashboard'}
+                            {templateScenario === 'failed' ? 'Open Dashboard & Publish Manually' : templateScenario === 'rejected' ? 'Edit & Resubmit Post' : 'View Post Status in Dashboard'}
                           </Text>
                         </TouchableOpacity>
                       </View>

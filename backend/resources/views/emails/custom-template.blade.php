@@ -51,6 +51,7 @@
             text-transform: uppercase;
         }
         .badge-rejected { background-color: #FEE2E2; color: #991B1B; }
+        .badge-failed { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
         .badge-approved { background-color: #DCFCE7; color: #166534; }
         .badge-revision { background-color: #FEF3C7; color: #92400E; }
         .badge-pending { background-color: #E0F2FE; color: #075985; }
@@ -115,6 +116,13 @@
                 @endif
                 @if(!empty($reason))
                     <div class="details-item"><strong>Reason / Notes:</strong> {{ $reason }}</div>
+                @endif
+                @if(!empty($errorMessage))
+                    <div class="details-item" style="color: #DC2626;"><strong>Error Reason:</strong> {{ $errorMessage }}</div>
+                    <div class="details-item" style="color: #475569; font-size: 13px; margin-top: 6px;">💡 If this is caused by expired or missing credentials, please check your <strong>Platform Tokens</strong> or <strong>Developer API Tokens</strong> in the Admin Dashboard.</div>
+                @endif
+                @if(!empty($failedAt))
+                    <div class="details-item"><strong>Failed At:</strong> {{ $failedAt }}</div>
                 @endif
                 @if(!empty($targetPlatforms))
                     <div class="details-item"><strong>Target Platforms:</strong> {{ is_array($targetPlatforms) ? implode(', ', $targetPlatforms) : $targetPlatforms }}</div>
