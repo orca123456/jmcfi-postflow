@@ -99,7 +99,8 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                     if (in_array($disk, ['s3', 'b2'], true)) {
                         $mediaPath = $media->url ?? Storage::disk($disk)->url($media->file_path);
                     } else {
-                        $mediaPath = Storage::disk('public')->path($media->file_path);
+                        $localPath = Storage::disk('public')->path($media->file_path);
+                        $mediaPath = file_exists($localPath) ? $localPath : route('instagram.media', ['media' => $media->id]);
                     }
                 }
 
