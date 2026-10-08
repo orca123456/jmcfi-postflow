@@ -25,8 +25,8 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
-    public array $backoff = [30, 60, 120];
+    public int $tries = 1;
+
     public int $timeout = 120;
     public int $uniqueFor = 300;
 
@@ -288,6 +288,12 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
     private function notifyITAdmins(object $notification): void
     {
         try {
+            $cacheKey = 'post_publish_failed_alert_sent_' . $this->postRequest->id;
+            if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                Log::info("Skipping duplicate failure notification for post {$this->postRequest->id}");
+                return;
+            }
+            \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addHours(2));
             $itAdmins = User::whereHas('roles', fn ($query) => $query->whereIn('name', ['it_publisher', 'it_admin', 'admin']))
                 ->where('status', 'active')
                 ->get();
