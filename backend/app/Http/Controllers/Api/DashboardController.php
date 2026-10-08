@@ -546,23 +546,71 @@ class DashboardController extends Controller
      */
     public function getAnalyticsOverview(Request $request): JsonResponse
     {
-        $cacheKey = 'dashboard_analytics';
+        $period = $request->input('period', 'this_month');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $cacheKey = 'dashboard_analytics_' . $period . '_' . ($startDate ?? '') . '_' . ($endDate ?? '');
 
         if ($request->boolean('fresh')) {
             Cache::forget($cacheKey);
         }
 
         // Cache for 5 seconds max so navigation is fast but data stays current
-        $data = Cache::remember($cacheKey, 5, function () {
-            // ── Total Volume: single count ──
-            $totalVolume = PostRequest::count();
+        $data = Cache::remember($cacheKey, 5, function () use ($period, $startDate, $endDate) {
+            $baseQuery = PostRequest::query();
 
-            // ── Active Users: count users with at least one post ──
-            $activeUsers = User::whereHas('postRequests')->count();
+            if ($period === 'this_month') {
+                $baseQuery->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]);
+            } elseif ($period === 'last_month') {
+                $baseQuery->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
+            } elseif ($period === '3_months') {
+                $baseQuery->where('created_at', '>=', now()->subMonths(3)->startOfDay());
+            } elseif ($period === 'this_year') {
+                $baseQuery->whereYear('created_at', now()->year);
+            } elseif ($period === 'custom' && ($startDate || $endDate)) {
+                if ($startDate && $endDate) {
+                    $baseQuery->whereBetween('created_at', [
+                        \Carbon\Carbon::parse($startDate)->startOfDay(),
+                        \Carbon\Carbon::parse($endDate)->endOfDay()
+                    ]);
+                } elseif ($startDate) {
+                    $baseQuery->where('created_at', '>=', \Carbon\Carbon::parse($startDate)->startOfDay());
+                } elseif ($endDate) {
+                    $baseQuery->where('created_at', '<=', \Carbon\Carbon::parse($endDate)->endOfDay());
+                }
+            }
+
+            // ── Total Volume: single count ──
+            $totalVolume = (clone $baseQuery)->count();
+
+            // ── Active Users: count users with at least one post in period ──
+            $activeUsers = User::whereHas('postRequests', function ($q) use ($period, $startDate, $endDate) {
+                if ($period === 'this_month') {
+                    $q->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]);
+                } elseif ($period === 'last_month') {
+                    $q->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
+                } elseif ($period === '3_months') {
+                    $q->where('created_at', '>=', now()->subMonths(3)->startOfDay());
+                } elseif ($period === 'this_year') {
+                    $q->whereYear('created_at', now()->year);
+                } elseif ($period === 'custom' && ($startDate || $endDate)) {
+                    if ($startDate && $endDate) {
+                        $q->whereBetween('created_at', [
+                            \Carbon\Carbon::parse($startDate)->startOfDay(),
+                            \Carbon\Carbon::parse($endDate)->endOfDay()
+                        ]);
+                    } elseif ($startDate) {
+                        $q->where('created_at', '>=', \Carbon\Carbon::parse($startDate)->startOfDay());
+                    } elseif ($endDate) {
+                        $q->where('created_at', '<=', \Carbon\Carbon::parse($endDate)->endOfDay());
+                    }
+                }
+            })->count();
 
             // ── Compliance Rate ──
-            $approvedCount = PostRequest::where('status', PostRequest::STATUS_APPROVED)->count();
-            $rejectedCount = PostRequest::where('status', PostRequest::STATUS_REJECTED)->count();
+            $approvedCount = (clone $baseQuery)->where('status', PostRequest::STATUS_APPROVED)->count();
+            $rejectedCount = (clone $baseQuery)->where('status', PostRequest::STATUS_REJECTED)->count();
             $complianceRate = ($approvedCount + $rejectedCount) > 0
                 ? round(($approvedCount / ($approvedCount + $rejectedCount)) * 100, 1) . '%'
                 : '0%';
@@ -571,7 +619,7 @@ class DashboardController extends Controller
 
             // ── Department Breakdown ──
             $departments = \App\Models\Department::all();
-            $postsWithUser = PostRequest::with(['requestor'])->get(['id', 'requestor_id']);
+            $postsWithUser = (clone $baseQuery)->with(['requestor'])->get(['id', 'requestor_id']);
             $deptCounts = [];
             foreach ($postsWithUser as $pr) {
                 $uDept = $pr->requestor?->department ?? '';
@@ -595,7 +643,7 @@ class DashboardController extends Controller
             });
 
             // ── Platform Stats ──
-            $platformRaw = PostRequest::selectRaw("
+            $platformRaw = (clone $baseQuery)->selectRaw("
                     COUNT(CASE WHEN target_platforms::text ILIKE '%facebook%' THEN 1 END) as facebook_count,
                     COUNT(CASE WHEN target_platforms::text ILIKE '%instagram%' THEN 1 END) as instagram_count,
                     COUNT(CASE WHEN target_platforms::text ILIKE '%website%' OR target_platforms::text ILIKE '%web%' THEN 1 END) as website_count
@@ -633,8 +681,8 @@ class DashboardController extends Controller
             ];
 
             // ── Content Published & Pending ──
-            $contentPublished = PostRequest::where('status', PostRequest::STATUS_PUBLISHED)->count();
-            $pendingApproval  = PostRequest::whereIn('status', [
+            $contentPublished = (clone $baseQuery)->where('status', PostRequest::STATUS_PUBLISHED)->count();
+            $pendingApproval  = (clone $baseQuery)->whereIn('status', [
                 PostRequest::STATUS_PENDING_OFFICE_HEAD,
                 PostRequest::STATUS_PENDING_VICE_PRESIDENT,
                 PostRequest::STATUS_PENDING_PRESIDENT,
@@ -648,21 +696,19 @@ class DashboardController extends Controller
             $postsByMonth = [];
             try {
                 $driver = \DB::getDriverName();
+                $monthQuery = (clone $baseQuery);
                 if ($driver === 'pgsql') {
-                    $rawMonth = PostRequest::selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count')
-                        ->whereYear('created_at', $currentYear)
+                    $rawMonth = $monthQuery->selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count')
                         ->groupByRaw('EXTRACT(MONTH FROM created_at)')
                         ->pluck('count', 'month')
                         ->toArray();
                 } elseif ($driver === 'sqlite') {
-                    $rawMonth = PostRequest::selectRaw("cast(strftime('%m', created_at) as integer) as month, COUNT(*) as count")
-                        ->whereYear('created_at', $currentYear)
+                    $rawMonth = $monthQuery->selectRaw("cast(strftime('%m', created_at) as integer) as month, COUNT(*) as count")
                         ->groupByRaw("strftime('%m', created_at)")
                         ->pluck('count', 'month')
                         ->toArray();
                 } else {
-                    $rawMonth = PostRequest::selectRaw('MONTH(created_at) as month, COUNT(*) as count')
-                        ->whereYear('created_at', $currentYear)
+                    $rawMonth = $monthQuery->selectRaw('MONTH(created_at) as month, COUNT(*) as count')
                         ->groupByRaw('MONTH(created_at)')
                         ->pluck('count', 'month')
                         ->toArray();
@@ -671,7 +717,7 @@ class DashboardController extends Controller
                     $postsByMonth[(int)$mKey] = (int)$mCount;
                 }
             } catch (\Throwable $e) {
-                $postsThisYear = PostRequest::whereYear('created_at', $currentYear)->get(['created_at']);
+                $postsThisYear = (clone $baseQuery)->get(['created_at']);
                 foreach ($postsThisYear as $pr) {
                     if ($pr->created_at) {
                         $m = (int) $pr->created_at->format('n');
