@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\UserResource;
 use App\Models\User;
+use App\Notifications\AccountCreatedCredentialsNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -91,6 +92,13 @@ class UserController extends Controller
             'role' => $validated['role'],
             'department' => $dept,
         ], $request);
+
+        // Send Welcome & Credentials Email to the user's institutional inbox
+        try {
+            $user->notify(new AccountCreatedCredentialsNotification($user, $validated['password'], $validated['role']));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to dispatch welcome email to {$user->email}: " . $e->getMessage());
+        }
 
         return response()->json([
             'data' => new UserResource($user->load('roles'))
@@ -187,6 +195,13 @@ class UserController extends Controller
 
                 $user->assignRole($role);
                 $created[] = $user;
+
+                // Send Welcome & Credentials Email to user's institutional email
+                try {
+                    $user->notify(new AccountCreatedCredentialsNotification($user, $password, $role));
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed to dispatch welcome email to {$user->email}: " . $e->getMessage());
+                }
             } catch (\Exception $e) {
                 $errors[] = "Row {$rowNum} ({$email}): " . $e->getMessage();
             }

@@ -1802,7 +1802,7 @@ export default function ITAdminDashboard() {
       }
       setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
       setNewUserErrors({});
-      showToast('Institutional account created successfully!', 'success');
+      showToast('Institutional account created! Login credentials emailed to user.', 'success');
     } catch (e: any) {
       showToast('Failed to create account: ' + (e.response?.data?.message || e.message), 'error');
     }
