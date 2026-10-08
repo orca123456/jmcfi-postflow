@@ -318,12 +318,29 @@ class UserController extends Controller
                 'email' => $user->email,
                 'name' => $user->full_name,
             ];
+
+            // If force delete is requested, safely reassign or clean up orphan records
+            if (request()->boolean('force')) {
+                $adminId = request()->user()->id;
+                \Illuminate\Support\Facades\DB::transaction(function () use ($user, $adminId) {
+                    \App\Models\PostRequest::where('requestor_id', $user->id)->update(['requestor_id' => $adminId]);
+                    \Illuminate\Support\Facades\DB::table('approval_workflows')->where('approver_id', $user->id)->delete();
+                    \Illuminate\Support\Facades\DB::table('policy_violations')->where('user_id', $user->id)->delete();
+                    \Illuminate\Support\Facades\DB::table('publishing_records')->where('published_by', $user->id)->update(['published_by' => $adminId]);
+                    $user->delete();
+                });
+
+                AuditLogService::log('USER_FORCE_DELETED', 'Force deleted institutional account and reassigned posts: ' . $deleted['name'], 'WARNING', $deleted, request());
+                return response()->json(null, 204);
+            }
+
             $user->delete();
-            AuditLogService::log('USER_DELETED', 'Deleted institutional account: ' . $deleted['name'], 'WARNING', $deleted);
+            AuditLogService::log('USER_DELETED', 'Deleted institutional account: ' . $deleted['name'], 'WARNING', $deleted, request());
             return response()->json(null, 204);
         } catch (\Illuminate\Database\QueryException $e) {
             return response()->json([
                 'success' => false,
+                'has_associations' => true,
                 'message' => 'Cannot delete this user because they are associated with existing content or approvals.'
             ], 400);
         }
