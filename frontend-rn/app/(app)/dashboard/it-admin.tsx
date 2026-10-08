@@ -1547,9 +1547,6 @@ export default function ITAdminDashboard() {
       facebook_access_token: tokenFields.facebook_access_token.trim(),
       instagram_business_account_id: tokenFields.instagram_business_account_id.trim(),
       instagram_access_token: String(tokenFields.instagram_access_token || tokenFields.facebook_access_token || '').trim(),
-      wordpress_url: tokenFields.wordpress_url.trim(),
-      wordpress_username: tokenFields.wordpress_username.trim(),
-      wordpress_app_password: tokenFields.wordpress_app_password.trim(),
     };
 
     if (!payload.facebook_page_id || !payload.facebook_access_token) {
@@ -1558,11 +1555,11 @@ export default function ITAdminDashboard() {
     }
 
     setSavingTokens(true);
-    setSavingTokenPlatform('all');
+    setSavingTokenPlatform('facebook');
     setValidatingTokens(true);
     try {
       const saveRes = await tokenSettingsApi.update(payload);
-      setSavedTokenFields({ ...payload });
+      setSavedTokenFields(prev => ({ ...prev, ...payload }));
       setVerifiedConnections(saveRes.data.connections || {});
       const validationRes = await tokenSettingsApi.validate(payload);
       const derived = validationRes.data?.derived || {};
@@ -1581,10 +1578,10 @@ export default function ITAdminDashboard() {
         };
         const updatedRes = await tokenSettingsApi.update(updatedPayload);
         setVerifiedConnections(updatedRes.data.connections || {});
-        setSavedTokenFields({ ...updatedPayload });
-        setTokenFields(updatedPayload);
+        setSavedTokenFields(prev => ({ ...prev, ...updatedPayload }));
+        setTokenFields(prev => ({ ...prev, ...updatedPayload }));
       } else {
-        setTokenFields(payload);
+        setTokenFields(prev => ({ ...prev, ...payload }));
       }
 
       setTokenLastUpdated(saveRes.data.last_updated || new Date().toLocaleString());
