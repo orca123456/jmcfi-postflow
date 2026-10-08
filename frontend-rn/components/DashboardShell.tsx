@@ -917,40 +917,6 @@ export function DashboardShell({
                     </AnimatedTouchable>
                   ))}
                 </View>
-
-                <View style={styles.sidebarDivider} />
-
-                <View style={{ gap: 4, paddingBottom: 16 }}>
-                  <AnimatedTouchable
-                    style={[
-                      styles.sidebarNavItem,
-                      {
-                        width: sidebarWidthAnim.interpolate({
-                          inputRange: [MIN_WIDTH, MAX_WIDTH],
-                          outputRange: [48, MAX_WIDTH - 16]
-                        })
-                      }
-                    ]}
-                    onPress={() => {
-                      if (sidebarOpenedByHover) closeSidebar();
-                      handleLogout();
-                    }}
-                  >
-                    <View style={styles.sidebarNavIconWrapper}>
-                      <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
-                    </View>
-                    <Animated.View style={{ 
-                      opacity: sidebarWidthAnim.interpolate({
-                        inputRange: [MIN_WIDTH, MAX_WIDTH],
-                        outputRange: [0, 1]
-                      }) 
-                    }}>
-                      <Text style={styles.sidebarNavLabel} numberOfLines={1}>
-                        Sign Out
-                      </Text>
-                    </Animated.View>
-                  </AnimatedTouchable>
-                </View>
               </View>
 
 
@@ -1042,22 +1008,6 @@ export function DashboardShell({
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
-            <View style={styles.mobileDrawerDivider} />
-
-            {/* Footer Actions */}
-            <View style={styles.mobileDrawerFooter}>
-              <TouchableOpacity
-                style={styles.mobileDrawerNavItem}
-                onPress={() => {
-                  closeMobileDrawer();
-                  handleLogout();
-                }}
-              >
-                <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.mobileDrawerNavLabel}>Sign Out</Text>
-              </TouchableOpacity>
-            </View>
           </Animated.View>
         </View>
       )}
