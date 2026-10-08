@@ -197,6 +197,7 @@ const ANALYTICS_PERIOD_OPTIONS = [
   { value: '3_months', label: 'Last 3 Months' },
   { value: 'this_year', label: 'This Year' },
   { value: 'all_time', label: 'All Time' },
+  { value: 'custom', label: 'Custom Range' },
 ];
 
 const getInitialUsers = (): any[] => {
@@ -1620,11 +1621,32 @@ export default function ITAdminDashboard() {
 
   // Analytics Period Filter State
   const [isAnalyticsPeriodOpen, setIsAnalyticsPeriodOpen] = useState(false);
+  const [analyticsCustomStartDate, setAnalyticsCustomStartDate] = useState('');
+  const [analyticsCustomEndDate, setAnalyticsCustomEndDate] = useState('');
 
   const handleSelectAnalyticsPeriod = (periodValue: string) => {
     setAnalyticsPeriod(periodValue);
+    if (periodValue !== 'custom') {
+      setIsAnalyticsPeriodOpen(false);
+      dashboardApi.getAnalyticsOverview({ period: periodValue }).then((res) => {
+        if (res.data?.data) {
+          setAnalyticsOverview(res.data.data);
+        }
+      }).catch(() => {});
+    }
+  };
+
+  const handleApplyCustomAnalyticsRange = () => {
+    if (!analyticsCustomStartDate && !analyticsCustomEndDate) {
+      showToast('Please select at least a start or end date.', 'warning');
+      return;
+    }
     setIsAnalyticsPeriodOpen(false);
-    dashboardApi.getAnalyticsOverview({ period: periodValue }).then((res) => {
+    dashboardApi.getAnalyticsOverview({
+      period: 'custom',
+      start_date: analyticsCustomStartDate || undefined,
+      end_date: analyticsCustomEndDate || undefined,
+    }).then((res) => {
       if (res.data?.data) {
         setAnalyticsOverview(res.data.data);
       }
@@ -1696,7 +1718,9 @@ export default function ITAdminDashboard() {
 
     const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
-    const filename = `postflow-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = analyticsPeriod === 'custom' && (analyticsCustomStartDate || analyticsCustomEndDate)
+      ? `postflow-analytics-${analyticsCustomStartDate || 'start'}_to_${analyticsCustomEndDate || 'end'}.csv`
+      : `postflow-analytics-${analyticsPeriod}-${new Date().toISOString().slice(0, 10)}.csv`;
 
     const success = await triggerCsvDownload(filename, csv);
     if (success) {
@@ -5172,13 +5196,17 @@ $response = curl_exec($ch);`}
                   >
                     <Ionicons name="calendar-outline" size={15} color={Colors.textSecondary} />
                     <Text style={styles.analyticsActionText}>
-                      {ANALYTICS_PERIOD_OPTIONS.find((opt) => opt.value === analyticsPeriod)?.label || 'This Month'}
+                      {analyticsPeriod === 'custom'
+                        ? (analyticsCustomStartDate && analyticsCustomEndDate
+                            ? `${analyticsCustomStartDate} – ${analyticsCustomEndDate}`
+                            : analyticsCustomStartDate || analyticsCustomEndDate || 'Custom Range')
+                        : ANALYTICS_PERIOD_OPTIONS.find((opt) => opt.value === analyticsPeriod)?.label || 'This Month'}
                     </Text>
                     <Ionicons name={isAnalyticsPeriodOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.textSecondary} />
                   </TouchableOpacity>
 
                   {isAnalyticsPeriodOpen && (
-                    <View style={styles.analyticsPeriodDropdown}>
+                    <View style={[styles.analyticsPeriodDropdown, analyticsPeriod === 'custom' && { minWidth: 260 }]}>
                       {ANALYTICS_PERIOD_OPTIONS.map((opt) => (
                         <TouchableOpacity
                           key={opt.value}
@@ -5201,6 +5229,62 @@ $response = curl_exec($ch);`}
                           )}
                         </TouchableOpacity>
                       ))}
+
+                      {analyticsPeriod === 'custom' && (
+                        <View style={{ padding: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#E2E8F0' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#94A3B8' : Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                          <input
+                            type="date"
+                            style={{
+                              height: 32,
+                              fontSize: 12,
+                              borderRadius: 6,
+                              border: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                              paddingLeft: 8,
+                              paddingRight: 8,
+                              outline: 'none',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                              width: '100%',
+                              marginBottom: 8,
+                              boxSizing: 'border-box'
+                            }}
+                            value={analyticsCustomStartDate}
+                            onChange={(e) => setAnalyticsCustomStartDate(e.target.value)}
+                          />
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#94A3B8' : Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                          <input
+                            type="date"
+                            style={{
+                              height: 32,
+                              fontSize: 12,
+                              borderRadius: 6,
+                              border: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                              paddingLeft: 8,
+                              paddingRight: 8,
+                              outline: 'none',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                              width: '100%',
+                              marginBottom: 10,
+                              boxSizing: 'border-box'
+                            }}
+                            value={analyticsCustomEndDate}
+                            onChange={(e) => setAnalyticsCustomEndDate(e.target.value)}
+                          />
+                          <TouchableOpacity
+                            style={{
+                              backgroundColor: '#7C3AED',
+                              paddingVertical: 7,
+                              borderRadius: 6,
+                              alignItems: 'center',
+                            }}
+                            onPress={handleApplyCustomAnalyticsRange}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Apply Range</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
