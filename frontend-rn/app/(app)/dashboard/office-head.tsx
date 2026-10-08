@@ -533,7 +533,7 @@ export default function OfficeHeadDashboard() {
     userPosition = user.position;
   }
 
-  const greetingName = user?.name ? `${userPosition} ${user.name}` : userPosition;
+  const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || userPosition;
 
   const isPendingStatus = (status: string) => {
     if (viewerIsVicePresident) return status === 'PENDING_VICE_PRESIDENT';
@@ -622,7 +622,7 @@ export default function OfficeHeadDashboard() {
           {activeTab === 'dashboard' && (
             <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
               <View>
-                <Text style={[styles.greetingTitle, !isTablet && { fontSize: 18 }]}>Welcome {greetingName}! 👋</Text>
+                <Text style={[styles.greetingTitle, !isTablet && { fontSize: 18 }]}>Welcome, {greetingUserName}! 👋</Text>
                 <Text style={styles.greetingSubtitle}>
                   Overview of departmental content submissions, approvals, and quality clearance queues.
                 </Text>

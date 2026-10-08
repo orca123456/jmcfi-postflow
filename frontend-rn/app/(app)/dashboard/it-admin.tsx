@@ -234,6 +234,7 @@ export default function ITAdminDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user, setUser } = useAuthStore();
+  const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Administrator';
   const queryClient = useQueryClient();
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
@@ -2102,6 +2103,14 @@ export default function ITAdminDashboard() {
       {/* ── OVERVIEW TAB ── */}
       {activeTab === 'overview' && (
         <>
+          <View style={[styles.dashboardHeaderRow, { marginBottom: 20 }, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
+            <View>
+              <Text style={[styles.welcomeTitle, !isTablet && { fontSize: 18 }]}>Welcome, {greetingUserName}</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Here is an overview of institutional content submissions and publishing queues.
+              </Text>
+            </View>
+          </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 24, justifyContent: 'space-between', width: '100%' }}>
             {/* Stat Card 1: TOTAL CONTENT */}
             <TouchableOpacity style={{ width: isTablet ? '23.5%' : '47.5%', maxWidth: isTablet ? '23.5%' : '47.5%', flexShrink: 0, minWidth: 0, overflow: 'hidden', marginBottom: 8, ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}) }} onPress={() => setRequestsStatus('All Status')} activeOpacity={0.8}>
@@ -5187,7 +5196,7 @@ $response = curl_exec($ch);`}
             <View style={[styles.analyticsHeader, !isLargeScreen && styles.analyticsHeaderStacked]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.analyticsTitle}>System Analytics</Text>
-                <Text style={styles.analyticsSubtitle}>Welcome back! Here's what's happening with your publications.</Text>
+                <Text style={styles.analyticsSubtitle}>Welcome back, {greetingUserName}! Here's what's happening with your publications.</Text>
               </View>
               <View style={styles.analyticsHeaderActions}>
                 <View style={styles.analyticsPeriodDropdownContainer}>

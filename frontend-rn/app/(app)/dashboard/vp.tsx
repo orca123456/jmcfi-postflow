@@ -34,6 +34,7 @@ export default function VPDashboard() {
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   const { user } = useAuthStore();
+  const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Vice President';
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
 
@@ -558,7 +559,7 @@ export default function VPDashboard() {
           {activeTab === 'dashboard' && (
             <View style={styles.dashboardHeaderRow}>
               <View>
-                <Text style={styles.greetingTitle}>Good morning, Vice President! 👋</Text>
+                <Text style={styles.greetingTitle}>Welcome, {greetingUserName}! 👋</Text>
                 <Text style={styles.greetingSubtitle}>
                   Review and approve content requests from departments.
                 </Text>
