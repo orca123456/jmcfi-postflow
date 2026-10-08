@@ -40,6 +40,7 @@ export default function RequestorDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
+  const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Requestor';
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
@@ -1078,7 +1079,7 @@ export default function RequestorDashboard() {
         <View style={styles.dashboardContainer}>
           <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
             <View>
-              <Text style={[styles.welcomeTitle, !isTablet && { fontSize: 18 }]}>Welcome, Requestor</Text>
+              <Text style={[styles.welcomeTitle, !isTablet && { fontSize: 18 }]}>Welcome, {greetingUserName}</Text>
               <Text style={styles.welcomeSubtitle}>
                 Here is an overview of your department's content activity for this semester.
               </Text>

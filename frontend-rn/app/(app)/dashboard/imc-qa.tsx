@@ -34,6 +34,7 @@ export default function ImcQaDashboard() {
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   const { user } = useAuthStore();
+  const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Quality Lead';
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
 
@@ -562,7 +563,7 @@ export default function ImcQaDashboard() {
           {activeTab === 'dashboard' && (
             <View style={styles.dashboardHeaderRow}>
               <View>
-                <Text style={styles.greetingTitle}>Welcome, Quality Lead! 👋</Text>
+                <Text style={styles.greetingTitle}>Welcome, {greetingUserName}! 👋</Text>
                 <Text style={styles.greetingSubtitle}>
                   Institutional compliance status, brand checker boards, and active quality review queues.
                 </Text>
