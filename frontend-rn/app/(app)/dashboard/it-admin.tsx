@@ -653,7 +653,6 @@ export default function ITAdminDashboard() {
   // Confirm delete modal state
   const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<any>(null);
   const [confirmDeleteUserEmail, setConfirmDeleteUserEmail] = useState('');
-  const [deleteConflictUser, setDeleteConflictUser] = useState<any | null>(null);
 
   // CSV Import state
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
@@ -1815,11 +1814,11 @@ export default function ITAdminDashboard() {
     setConfirmDeleteUserEmail(u?.email || '');
   };
 
-  const handleConfirmDeleteUser = async (force: boolean = false) => {
-    const id = confirmDeleteUserId || deleteConflictUser?.id;
+  const handleConfirmDeleteUser = async () => {
+    const id = confirmDeleteUserId;
     if (!id) return;
     try {
-      await usersApi.delete(id, force ? { force: true } : undefined);
+      await usersApi.delete(id);
       const updated = users.filter(u => String(u.id) !== String(id));
       setUsers(updated);
       if (Platform.OS === 'web') {
@@ -1827,38 +1826,12 @@ export default function ITAdminDashboard() {
           localStorage.setItem('postflow_users_cache', JSON.stringify(updated));
         } catch (_) {}
       }
-      showToast(force ? 'Account deleted and posts reassigned successfully.' : 'User deleted successfully.', 'success');
-      setDeleteConflictUser(null);
+      showToast('User account deleted successfully.', 'success');
+    } catch (e: any) {
+      showToast('Failed to delete user: ' + (e.response?.data?.message || e.message), 'error');
+    } finally {
       setConfirmDeleteUserId(null);
       setConfirmDeleteUserEmail('');
-    } catch (e: any) {
-      if (e.response?.data?.has_associations || e.response?.data?.message?.includes('associated with existing content')) {
-        const u = users.find(user => String(user.id) === String(id));
-        setConfirmDeleteUserId(null);
-        setDeleteConflictUser(u || { id, email: confirmDeleteUserEmail });
-      } else {
-        showToast('Failed to delete user: ' + (e.response?.data?.message || e.message), 'error');
-        setConfirmDeleteUserId(null);
-        setConfirmDeleteUserEmail('');
-      }
-    }
-  };
-
-  const handleDeactivateConflictUser = async () => {
-    if (!deleteConflictUser) return;
-    try {
-      await usersApi.update(deleteConflictUser.id, { status: 'inactive' });
-      const updated = users.map(u => String(u.id) === String(deleteConflictUser.id) ? { ...u, status: 'inactive' } : u);
-      setUsers(updated);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_users_cache', JSON.stringify(updated));
-        } catch (_) {}
-      }
-      showToast('User account successfully deactivated.', 'success');
-      setDeleteConflictUser(null);
-    } catch (e: any) {
-      showToast('Failed to deactivate user: ' + (e.response?.data?.message || e.message), 'error');
     }
   };
 
@@ -2936,66 +2909,10 @@ export default function ITAdminDashboard() {
                     <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => handleConfirmDeleteUser(false)}
+                    onPress={handleConfirmDeleteUser}
                     style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#DC2626', alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Yes, Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Delete Conflict Resolution Modal */}
-          <Modal
-            visible={deleteConflictUser !== null}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setDeleteConflictUser(null)}
-          >
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-              <View style={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 24, width: '100%', maxWidth: 430, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 }}>
-                <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                    <Ionicons name="warning-outline" size={26} color="#D97706" />
-                  </View>
-                  <Text style={{ fontSize: 17, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : Colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
-                    Existing Activity Found
-                  </Text>
-                  <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : Colors.textSecondary, textAlign: 'center', lineHeight: 19 }}>
-                    <Text style={{ fontWeight: '600', color: isDarkMode ? '#F8FAFC' : Colors.textPrimary }}>{deleteConflictUser?.email || 'This user'}</Text>
-                    <Text> is associated with existing post requests or approval workflows. How would you like to handle this account?</Text>
-                  </Text>
-                </View>
-
-                <View style={{ gap: 10 }}>
-                  <TouchableOpacity
-                    onPress={handleDeactivateConflictUser}
-                    style={{ paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, backgroundColor: isDarkMode ? '#1E3A5F' : '#EFF6FF', borderWidth: 1, borderColor: isDarkMode ? '#2563EB' : '#BFDBFE', flexDirection: 'row', alignItems: 'center', gap: 12 }}
-                  >
-                    <Ionicons name="shield-checkmark-outline" size={20} color="#2563EB" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#93C5FD' : '#1D4ED8' }}>Deactivate Account (Recommended)</Text>
-                      <Text style={{ fontSize: 11, color: isDarkMode ? '#60A5FA' : '#3B82F6', marginTop: 2 }}>Blocks login immediately while preserving all post history</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => handleConfirmDeleteUser(true)}
-                    style={{ paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, backgroundColor: isDarkMode ? '#3B1818' : '#FEF2F2', borderWidth: 1, borderColor: isDarkMode ? '#DC2626' : '#FECACA', flexDirection: 'row', alignItems: 'center', gap: 12 }}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#DC2626" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#FCA5A5' : '#DC2626' }}>Force Delete & Reassign</Text>
-                      <Text style={{ fontSize: 11, color: isDarkMode ? '#F87171' : '#EF4444', marginTop: 2 }}>Reassigns posts to Administrator and deletes the user</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setDeleteConflictUser(null)}
-                    style={{ paddingVertical: 10, borderRadius: 8, backgroundColor: isDarkMode ? '#334155' : Colors.background, alignItems: 'center', marginTop: 4 }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : Colors.textPrimary }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
