@@ -51,6 +51,7 @@ class PublishingController extends Controller
 
         try {
             DB::beginTransaction();
+            Cache::forget('post_publish_failed_alert_sent_' . $post->id);
 
             $platforms = is_string($post->target_platforms) ? json_decode($post->target_platforms, true) : $post->target_platforms;
             if (!is_array($platforms)) {
