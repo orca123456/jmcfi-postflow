@@ -643,11 +643,20 @@ class DashboardController extends Controller
             });
 
             // ── Platform Stats ──
-            $platformRaw = (clone $baseQuery)->selectRaw("
-                    COUNT(CASE WHEN target_platforms::text ILIKE '%facebook%' THEN 1 END) as facebook_count,
-                    COUNT(CASE WHEN target_platforms::text ILIKE '%instagram%' THEN 1 END) as instagram_count,
-                    COUNT(CASE WHEN target_platforms::text ILIKE '%website%' OR target_platforms::text ILIKE '%web%' THEN 1 END) as website_count
-                ")->first();
+            $driver = \Illuminate\Support\Facades\DB::getDriverName();
+            if ($driver === 'pgsql') {
+                $platformRaw = (clone $baseQuery)->selectRaw("
+                        COUNT(CASE WHEN target_platforms::text ILIKE '%facebook%' THEN 1 END) as facebook_count,
+                        COUNT(CASE WHEN target_platforms::text ILIKE '%instagram%' THEN 1 END) as instagram_count,
+                        COUNT(CASE WHEN target_platforms::text ILIKE '%website%' OR target_platforms::text ILIKE '%web%' THEN 1 END) as website_count
+                    ")->first();
+            } else {
+                $platformRaw = (clone $baseQuery)->selectRaw("
+                        COUNT(CASE WHEN target_platforms LIKE '%facebook%' THEN 1 END) as facebook_count,
+                        COUNT(CASE WHEN target_platforms LIKE '%instagram%' THEN 1 END) as instagram_count,
+                        COUNT(CASE WHEN target_platforms LIKE '%website%' OR target_platforms LIKE '%web%' THEN 1 END) as website_count
+                    ")->first();
+            }
 
             $facebookCount  = (int) ($platformRaw->facebook_count ?? 0);
             $instagramCount = (int) ($platformRaw->instagram_count ?? 0);
@@ -762,4 +771,20 @@ class DashboardController extends Controller
             'data' => $data,
         ]);
     }
+
+    /**
+     * Get recent policy violation trends and summary.
+     */
+    public function getViolationTrends(Request $request): JsonResponse
+    {
+        $violations = \App\Models\PolicyViolation::latest()
+            ->take(50)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $violations,
+        ]);
+    }
 }
+
