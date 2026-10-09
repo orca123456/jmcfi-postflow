@@ -28,7 +28,7 @@ class StorePostRequest extends FormRequest
 
         if ($this->hasFile('media')) {
             $rules['media'] = ['nullable'];
-            $rules['media.*'] = ['nullable', 'file', 'max:32768'];
+            $rules['media.*'] = ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:25600'];
         }
 
         if ($this->hasFile('supporting_docs')) {
@@ -44,6 +44,9 @@ class StorePostRequest extends FormRequest
         return [
             'title.required' => 'A post title is required.',
             'caption_narrative.required' => 'Please provide a content caption for your post.',
+            'media.*.image' => 'Uploaded media must be an image (JPEG, PNG, WebP). Videos are not allowed.',
+            'media.*.mimes' => 'Only JPEG, PNG, and WebP images are allowed. Video files are not supported.',
+            'media.*.max' => 'Each image file may not exceed 25MB.',
         ];
     }
 
