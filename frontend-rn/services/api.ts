@@ -195,11 +195,26 @@ export const auditLogsApi = {
 };
 
 // ── Token Settings endpoints ────────────────────────────────────────────────
+let inFlightTokenSettingsPromise: Promise<any> | null = null;
+let inFlightAiSettingsPromise: Promise<any> | null = null;
+
 export const tokenSettingsApi = {
-  getAI: () => api.get('/ai-settings'),
+  getAI: () => {
+    if (inFlightAiSettingsPromise) return inFlightAiSettingsPromise;
+    inFlightAiSettingsPromise = api.get('/ai-settings').finally(() => {
+      inFlightAiSettingsPromise = null;
+    });
+    return inFlightAiSettingsPromise;
+  },
   updateAI: (data: { provider: string; model: string; api_key?: string }) => api.post('/ai-settings', data),
   clearAI: () => api.delete('/ai-settings'),
-  get: () => api.get('/token-settings'),
+  get: () => {
+    if (inFlightTokenSettingsPromise) return inFlightTokenSettingsPromise;
+    inFlightTokenSettingsPromise = api.get('/token-settings').finally(() => {
+      inFlightTokenSettingsPromise = null;
+    });
+    return inFlightTokenSettingsPromise;
+  },
   update: (data: object) => api.post('/token-settings', data),
   validate: (data: object) => api.post('/token-settings/validate', data),
 };
