@@ -230,6 +230,32 @@ const getInitialAuditLogs = (): any[] => {
   return [];
 };
 
+const getInitialTokensCache = (): {
+  tokens?: Record<string, string>;
+  connections?: Record<string, boolean>;
+  last_updated?: string;
+} | null => {
+  if (Platform.OS === 'web') {
+    try {
+      const c = localStorage.getItem('postflow_tokens_cache');
+      if (c) return JSON.parse(c);
+    } catch (_) {}
+  }
+  return null;
+};
+
+const saveTokensToCache = (tokens: Record<string, string>, connections: Record<string, boolean>, lastUpdated?: string) => {
+  if (Platform.OS === 'web') {
+    try {
+      localStorage.setItem('postflow_tokens_cache', JSON.stringify({
+        tokens,
+        connections,
+        last_updated: lastUpdated || new Date().toLocaleString(),
+      }));
+    } catch (_) {}
+  }
+};
+
 export default function ITAdminDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -544,8 +570,10 @@ export default function ITAdminDashboard() {
     // 5. Preload Social & AI Tokens for Tab [tokens] so it's 100% instant
     tokenSettingsApi.get().then(res => {
       const t = res.data?.tokens || {};
+      const conns = res.data?.connections || {};
+      const updated = res.data?.last_updated || 'Never';
       setSavedTokenFields(t);
-      setVerifiedConnections(res.data?.connections || {});
+      setVerifiedConnections(conns);
       setTokenFields(prev => ({
         ...prev,
         facebook_page_id: t.facebook_page_id || '',
@@ -556,7 +584,8 @@ export default function ITAdminDashboard() {
         wordpress_username: t.wordpress_username || '',
         wordpress_app_password: t.wordpress_app_password || '',
       }));
-      setTokenLastUpdated(res.data?.last_updated || 'Never');
+      setTokenLastUpdated(updated);
+      saveTokensToCache(t, conns, updated);
     }).catch(() => {});
 
     tokenSettingsApi.getAI().then(res => {
@@ -1244,29 +1273,33 @@ export default function ITAdminDashboard() {
   }, [previewPost?.image]);
 
   // ── Token Management State ──
-  const [tokenFields, setTokenFields] = useState({
-    facebook_page_id: '',
-    facebook_access_token: '',
-    instagram_business_account_id: '',
-    instagram_access_token: '',
-    wordpress_url: '',
-    wordpress_username: '',
-    wordpress_app_password: '',
-  });
-  const [savedTokenFields, setSavedTokenFields] = useState<Record<string, string>>({});
-  const [verifiedConnections, setVerifiedConnections] = useState<Record<string, boolean>>({});
-  const [tokenLastUpdated, setTokenLastUpdated] = useState('');
+  const initialTokensCache = getInitialTokensCache();
+  const [tokenFields, setTokenFields] = useState(() => ({
+    facebook_page_id: initialTokensCache?.tokens?.facebook_page_id || '',
+    facebook_access_token: initialTokensCache?.tokens?.facebook_access_token || '',
+    instagram_business_account_id: initialTokensCache?.tokens?.instagram_business_account_id || '',
+    instagram_access_token: initialTokensCache?.tokens?.instagram_access_token || '',
+    wordpress_url: initialTokensCache?.tokens?.wordpress_url || '',
+    wordpress_username: initialTokensCache?.tokens?.wordpress_username || '',
+    wordpress_app_password: initialTokensCache?.tokens?.wordpress_app_password || '',
+  }));
+  const [savedTokenFields, setSavedTokenFields] = useState<Record<string, string>>(() => initialTokensCache?.tokens || {});
+  const [verifiedConnections, setVerifiedConnections] = useState<Record<string, boolean>>(() => initialTokensCache?.connections || {});
+  const [tokenLastUpdated, setTokenLastUpdated] = useState(() => initialTokensCache?.last_updated || '');
   const [savingTokens, setSavingTokens] = useState(false);
   const [savingTokenPlatform, setSavingTokenPlatform] = useState<'all' | 'meta' | 'facebook' | 'instagram' | 'wordpress' | null>(null);
   const [validatingTokens, setValidatingTokens] = useState(false);
   const [showTokenField, setShowTokenField] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    if (activeTab !== 'tokens') return;
     tokenSettingsApi.get()
       .then(res => {
-        const t = res.data.tokens || {};
+        const t = res.data?.tokens || {};
+        const conns = res.data?.connections || {};
+        const updated = res.data?.last_updated || 'Never';
         setSavedTokenFields(t);
-        setVerifiedConnections(res.data.connections || {});
+        setVerifiedConnections(conns);
         setTokenFields(prev => ({
           ...prev,
           facebook_page_id: t.facebook_page_id || '',
@@ -1277,7 +1310,8 @@ export default function ITAdminDashboard() {
           wordpress_username: t.wordpress_username || '',
           wordpress_app_password: t.wordpress_app_password || '',
         }));
-        setTokenLastUpdated(res.data.last_updated || 'Never');
+        setTokenLastUpdated(updated);
+        saveTokensToCache(t, conns, updated);
       })
       .catch(() => { });
   }, [activeTab]);
@@ -1287,10 +1321,13 @@ export default function ITAdminDashboard() {
     setSavingTokenPlatform('all');
     try {
       const res = await tokenSettingsApi.update(tokenFields);
+      const conns = res.data?.connections || {};
+      const updated = res.data?.last_updated || new Date().toLocaleString();
       setSavedTokenFields({ ...tokenFields });
-      setVerifiedConnections(res.data.connections || {});
+      setVerifiedConnections(conns);
       showToast('Tokens saved successfully!', 'success');
-      setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
+      setTokenLastUpdated(updated);
+      saveTokensToCache(tokenFields, conns, updated);
     } catch (e: any) {
       showToast('Failed to save tokens: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
@@ -1318,10 +1355,14 @@ export default function ITAdminDashboard() {
     setSavingTokenPlatform(platform);
     try {
       const res = await tokenSettingsApi.update(payload);
-      setSavedTokenFields(prev => ({ ...prev, ...payload }));
-      setVerifiedConnections(res.data.connections || {});
+      const newSaved = { ...savedTokenFields, ...payload };
+      const conns = res.data?.connections || {};
+      const updated = res.data?.last_updated || new Date().toLocaleString();
+      setSavedTokenFields(newSaved);
+      setVerifiedConnections(conns);
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens saved!`, 'success');
-      setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
+      setTokenLastUpdated(updated);
+      saveTokensToCache(newSaved, conns, updated);
     } catch (e: any) {
       setVerifiedConnections(prev => ({ ...prev, [platform]: false }));
       showToast('Failed to save: ' + (e.response?.data?.message || e.message), 'error');
@@ -1351,10 +1392,14 @@ export default function ITAdminDashboard() {
     setSavingTokenPlatform(platform);
     try {
       const res = await tokenSettingsApi.update(payload);
-      setSavedTokenFields(prev => ({ ...prev, ...payload }));
-      setVerifiedConnections(res.data.connections || {});
+      const newSaved = { ...savedTokenFields, ...payload };
+      const conns = res.data?.connections || {};
+      const updated = res.data?.last_updated || new Date().toLocaleString();
+      setSavedTokenFields(newSaved);
+      setVerifiedConnections(conns);
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} tokens cleared!`, 'success');
-      setTokenLastUpdated(res.data.last_updated || new Date().toLocaleString());
+      setTokenLastUpdated(updated);
+      saveTokensToCache(newSaved, conns, updated);
     } catch (e: any) {
       showToast('Failed to clear: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
@@ -1605,8 +1650,10 @@ export default function ITAdminDashboard() {
     setValidatingTokens(true);
     try {
       const saveRes = await tokenSettingsApi.update(payload);
+      let activePayload: Record<string, string> = payload;
+      let activeConnections = saveRes.data.connections || {};
       setSavedTokenFields(prev => ({ ...prev, ...payload }));
-      setVerifiedConnections(saveRes.data.connections || {});
+      setVerifiedConnections(activeConnections);
       const validationRes = await tokenSettingsApi.validate(payload);
       const derived = validationRes.data?.derived || {};
 
@@ -1622,15 +1669,19 @@ export default function ITAdminDashboard() {
             ? derived.facebook_access_token
             : payload.instagram_access_token,
         };
+        activePayload = updatedPayload;
         const updatedRes = await tokenSettingsApi.update(updatedPayload);
-        setVerifiedConnections(updatedRes.data.connections || {});
+        activeConnections = updatedRes.data.connections || {};
+        setVerifiedConnections(activeConnections);
         setSavedTokenFields(prev => ({ ...prev, ...updatedPayload }));
         setTokenFields(prev => ({ ...prev, ...updatedPayload }));
       } else {
         setTokenFields(prev => ({ ...prev, ...payload }));
       }
 
-      setTokenLastUpdated(saveRes.data.last_updated || new Date().toLocaleString());
+      const updatedTime = saveRes.data.last_updated || new Date().toLocaleString();
+      setTokenLastUpdated(updatedTime);
+      saveTokensToCache({ ...savedTokenFields, ...activePayload }, activeConnections, updatedTime);
       const detail = describeMetaValidation(validationRes.data?.checks);
       showToast(
         validationRes.data?.valid

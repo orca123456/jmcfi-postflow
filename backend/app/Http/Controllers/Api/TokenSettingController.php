@@ -25,19 +25,32 @@ class TokenSettingController extends Controller
             'wordpress_url', 'wordpress_username', 'wordpress_app_password',
         ];
 
+        $allKeys = array_merge($keys, [
+            'tokens_last_updated',
+            'facebook_credentials_verified',
+            'instagram_credentials_verified',
+            'wordpress_credentials_verified',
+        ]);
+
+        $settings = SystemSetting::whereIn('key', $allKeys)->pluck('value', 'key');
+
         $tokens = [];
         foreach ($keys as $key) {
-            $val = SystemSetting::where('key', $key)->value('value');
-            $tokens[$key] = $val ?? '';
+            $tokens[$key] = $settings->get($key) ?? '';
         }
 
-        // Also return last updated timestamp
-        $lastUpdated = SystemSetting::where('key', 'tokens_last_updated')->value('value') ?? 'Never';
+        $lastUpdated = $settings->get('tokens_last_updated') ?? 'Never';
+
+        $connections = [
+            'facebook' => $settings->get('facebook_credentials_verified') === '1',
+            'instagram' => $settings->get('instagram_credentials_verified') === '1',
+            'wordpress' => $settings->get('wordpress_credentials_verified') === '1',
+        ];
 
         return response()->json([
             'tokens' => $tokens,
             'last_updated' => $lastUpdated,
-            'connections' => $this->connectionStatus(),
+            'connections' => $connections,
         ]);
     }
 

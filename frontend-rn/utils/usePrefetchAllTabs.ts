@@ -101,7 +101,19 @@ export function usePrefetchAllTabs(role: string | undefined, isInitialLoading: b
         // Token settings tab
         queryClient.prefetchQuery({
           queryKey: ['token-settings-prefetch'],
-          queryFn: () => tokenSettingsApi.get(),
+          queryFn: async () => {
+            const res = await tokenSettingsApi.get();
+            if (Platform.OS === 'web' && res?.data) {
+              try {
+                localStorage.setItem('postflow_tokens_cache', JSON.stringify({
+                  tokens: res.data.tokens || {},
+                  connections: res.data.connections || {},
+                  last_updated: res.data.last_updated || 'Never',
+                }));
+              } catch (_) {}
+            }
+            return res;
+          },
           staleTime: 5 * 60 * 1000,
         }),
         // AI settings
