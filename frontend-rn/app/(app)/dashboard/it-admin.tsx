@@ -6124,88 +6124,33 @@ $response = curl_exec($ch);`}
       {/* ── POST PREVIEW MODAL ── */}
       <Modal visible={!!previewPost} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ width: '100%', maxWidth: 720, maxHeight: '90%', backgroundColor: '#fff', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Content Request Preview</Text>
-              <TouchableOpacity onPress={() => setPreviewPost(null)}>
-                <Ionicons name="close" size={24} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
+          <View style={{ width: '100%', maxWidth: 960, maxHeight: '92%', backgroundColor: '#fff', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 24, elevation: 12 }}>
+            {/* Top-Right Close Button */}
+            <TouchableOpacity
+              onPress={() => setPreviewPost(null)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                zIndex: 20,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: '#F8FAFC',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                cursor: 'pointer' as any,
+              }}
+            >
+              <Ionicons name="close" size={18} color="#64748B" />
+            </TouchableOpacity>
 
-            {/* Platform Live Preview Choices (3 Tabs: Facebook, Instagram, WordPress) */}
-            <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 4, marginBottom: 16 }}>
-              <TouchableOpacity
-                onPress={() => setPreviewPlatformTab('facebook')}
-                activeOpacity={0.8}
-                style={{
-                  flex: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                  backgroundColor: previewPlatformTab === 'facebook' ? '#FFFFFF' : 'transparent',
-                  borderWidth: previewPlatformTab === 'facebook' ? 1 : 0,
-                  borderColor: previewPlatformTab === 'facebook' ? '#E5E7EB' : 'transparent',
-                }}
-              >
-                <Ionicons name="logo-facebook" size={16} color={previewPlatformTab === 'facebook' ? '#1877F2' : '#6B7280'} />
-                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'facebook' ? '700' : '500', color: previewPlatformTab === 'facebook' ? '#1877F2' : '#4B5563' }}>
-                  Facebook
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setPreviewPlatformTab('instagram')}
-                activeOpacity={0.8}
-                style={{
-                  flex: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                  backgroundColor: previewPlatformTab === 'instagram' ? '#FFFFFF' : 'transparent',
-                  borderWidth: previewPlatformTab === 'instagram' ? 1 : 0,
-                  borderColor: previewPlatformTab === 'instagram' ? '#E5E7EB' : 'transparent',
-                }}
-              >
-                <Ionicons name="logo-instagram" size={16} color={previewPlatformTab === 'instagram' ? '#E1306C' : '#6B7280'} />
-                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'instagram' ? '700' : '500', color: previewPlatformTab === 'instagram' ? '#E1306C' : '#4B5563' }}>
-                  Instagram
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setPreviewPlatformTab('wordpress')}
-                activeOpacity={0.8}
-                style={{
-                  flex: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                  backgroundColor: previewPlatformTab === 'wordpress' ? '#FFFFFF' : 'transparent',
-                  borderWidth: previewPlatformTab === 'wordpress' ? 1 : 0,
-                  borderColor: previewPlatformTab === 'wordpress' ? '#E5E7EB' : 'transparent',
-                }}
-              >
-                <Ionicons name="globe-outline" size={16} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#6B7280'} />
-                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#4B5563' }}>
-                  WordPress
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Top Area */}
-              <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24, marginBottom: 24 }}>
-                <View style={{ flex: 1.5 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 6 }}>
+              <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 28, alignItems: 'flex-start' }}>
+                {/* ── LEFT COLUMN: Social Media Preview Card ── */}
+                <View style={{ flex: isTablet ? 1.05 : undefined, width: isTablet ? undefined : '100%' }}>
                   {(() => {
                     const rawList = previewPost?.rawPost?.media || previewPost?.media || [];
                     const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
@@ -6215,261 +6160,319 @@ $response = curl_exec($ch);`}
 
                     return (
                       <>
-                        {/* FACEBOOK PREVIEW MOCKUP */}
+                        {/* FACEBOOK PREVIEW MOCKUP (Default & Matching User Photo) */}
                         {previewPlatformTab === 'facebook' && (
-                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                          <View style={{
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            borderRadius: 12,
+                            backgroundColor: '#FFFFFF',
+                            overflow: 'hidden',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.04,
+                            shadowRadius: 8,
+                            elevation: 2,
+                          }}>
                             {/* FB Header */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                              <View style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 }}>
+                              <View style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' }}>
                                 <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                               </View>
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#050505' }}>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>
                                   Jose Maria College Foundation, Inc.
                                 </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                  <Text style={{ fontSize: 11, color: '#65676B' }}>{previewPost?.department || 'Official'}</Text>
-                                  <Text style={{ fontSize: 11, color: '#65676B' }}>• Just now •</Text>
-                                  <Ionicons name="earth" size={12} color="#65676B" />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                  <Text style={{ fontSize: 12, color: '#64748B' }}>{previewPost?.department || 'BSA'}</Text>
+                                  <Text style={{ fontSize: 12, color: '#64748B' }}>• Just now •</Text>
+                                  <Ionicons name="earth" size={13} color="#64748B" />
                                 </View>
                               </View>
                             </View>
-                            {/* FB Text */}
-                            {previewPost?.rawPost?.caption_narrative ? (
-                              <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                                <FormattedText style={{ fontSize: 13, color: '#050505', lineHeight: 18 }}>
-                                  {previewPost.rawPost.caption_narrative}
+
+                            {/* FB Caption / Narrative */}
+                            {(previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title) ? (
+                              <View style={{ paddingHorizontal: 14, paddingBottom: 14, paddingTop: 2 }}>
+                                <FormattedText style={{ fontSize: 13.5, color: '#1E293B', lineHeight: 20 }}>
+                                  {previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title}
                                 </FormattedText>
                               </View>
                             ) : null}
-                            {/* FB Media / Collage Grid */}
+
+                            {/* FB Media / Image Grid */}
                             {previewPostImages.length > 0 && (
-                              <FacebookMediaGrid
-                                images={previewPostImages}
-                                onImagePress={(uri) => setFullScreenImage(uri)}
-                              />
+                              <View style={{ width: '100%' }}>
+                                <FacebookMediaGrid
+                                  images={previewPostImages}
+                                  onImagePress={(uri) => setFullScreenImage(uri)}
+                                />
+                              </View>
                             )}
-                            {/* FB Footer actions */}
-                            <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 6 }}>
-                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
-                                <Ionicons name="thumbs-up-outline" size={16} color="#65676B" />
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Like</Text>
-                              </View>
-                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
-                                <Ionicons name="chatbubble-outline" size={16} color="#65676B" />
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Comment</Text>
-                              </View>
-                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}>
-                                <Ionicons name="share-social-outline" size={16} color="#65676B" />
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#65676B' }}>Share</Text>
-                              </View>
-                            </View>
                           </View>
                         )}
 
                         {/* INSTAGRAM PREVIEW MOCKUP */}
                         {previewPlatformTab === 'instagram' && (
-                          <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
-                            {/* IG Header */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                              <View style={{ width: 36, height: 36, borderRadius: 18, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
-                                <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 14 }} resizeMode="cover" />
+                          <View style={{ borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                              <View style={{ width: 38, height: 38, borderRadius: 19, padding: 2, borderWidth: 2, borderColor: '#E1306C', alignItems: 'center', justifyContent: 'center' }}>
+                                <Image source={require('../../../assets/images/jmc_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 15 }} resizeMode="cover" />
                               </View>
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626' }}>
-                                  jmc_official
-                                </Text>
-                                <Text style={{ fontSize: 10, color: '#8E8E8E' }}>
-                                  {previewPost?.department || 'Davao City, Philippines'}
-                                </Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#262626' }}>jmc_official</Text>
+                                <Text style={{ fontSize: 11, color: '#8E8E8E' }}>{previewPost?.department || 'Davao City, Philippines'}</Text>
                               </View>
                               <Ionicons name="ellipsis-horizontal" size={18} color="#262626" />
                             </View>
-                            {/* IG Image / Carousel */}
                             {previewPostImages.length > 0 && (
                               <InstagramMediaCarousel
                                 images={previewPostImages}
                                 onImagePress={(uri) => setFullScreenImage(uri)}
                               />
                             )}
-                            {/* IG Action bar */}
-                            <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                <View style={{ flexDirection: 'row', gap: 14 }}>
-                                  <Ionicons name="heart" size={22} color="#E1306C" />
-                                  <Ionicons name="chatbubble-outline" size={20} color="#262626" />
-                                  <Ionicons name="paper-plane-outline" size={20} color="#262626" />
-                                </View>
-                                <Ionicons name="bookmark-outline" size={20} color="#262626" />
-                              </View>
-                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#262626', marginBottom: 4 }}>
-                                Liked by jmcfi_official and others
-                              </Text>
-                              <FormattedText style={{ fontSize: 12, color: '#262626', lineHeight: 16 }}>
+                            <View style={{ padding: 12 }}>
+                              <FormattedText style={{ fontSize: 13, color: '#262626', lineHeight: 18 }}>
                                 {'<b>jmc_official </b>' + (previewPost?.rawPost?.caption_narrative || previewPost?.title || '')}
                               </FormattedText>
                             </View>
                           </View>
                         )}
+
+                        {/* WORDPRESS PREVIEW MOCKUP */}
+                        {previewPlatformTab === 'wordpress' && (
+                          <View style={{ borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+                              <Ionicons name="globe-outline" size={14} color="#21759B" />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                            </View>
+                            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 6 }}>{previewPost?.title}</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                              By {previewPost?.requestedBy || 'JMCFI Admin'} • {previewPost?.department || 'News'} • {previewPost?.requestedOn}
+                            </Text>
+                            {previewPost?.image && (
+                              <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
+                                <Image source={{ uri: previewPost.image }} resizeMode="cover" style={{ width: '100%', height: 220, borderRadius: 8, backgroundColor: '#F3F4F6' }} />
+                              </TouchableOpacity>
+                            )}
+                            <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 20 }}>
+                              {previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || 'No article content provided.'}
+                            </FormattedText>
+                          </View>
+                        )}
                       </>
                     );
                   })()}
-
-                  {/* WORDPRESS PREVIEW MOCKUP */}
-                  {previewPlatformTab === 'wordpress' && (
-                    <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 14 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
-                        <Ionicons name="globe-outline" size={14} color="#21759B" />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
-                      </View>
-
-                      <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 6, lineHeight: 22 }}>
-                        {previewPost?.title}
-                      </Text>
-
-                      <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
-                        By {previewPost?.requestedBy || 'JMCFI Admin'} • {previewPost?.department || 'News'} • {previewPost?.requestedOn}
-                      </Text>
-
-                      {previewPost?.image && (
-                        <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
-                          <Image
-                            source={{ uri: previewPost.image }}
-                            resizeMode="cover"
-                            style={{
-                              width: '100%',
-                              height: 220,
-                              borderRadius: 8,
-                              backgroundColor: '#F3F4F6',
-                            }}
-                          />
-                          <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(33, 117, 155, 0.9)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFF' }}>WordPress Featured Image</Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-
-                      <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
-                        {previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || 'No article content provided.'}
-                      </FormattedText>
-                    </View>
-                  )}
-
                 </View>
 
-                <View style={{ flex: 1, gap: 12 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>{previewPost?.title}</Text>
+                {/* ── RIGHT COLUMN: Post Details & Approval Timeline ── */}
+                <View style={{ flex: isTablet ? 1 : undefined, width: isTablet ? undefined : '100%', paddingRight: isTablet ? 12 : 0 }}>
+                  {/* Title */}
+                  <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', marginBottom: 8, lineHeight: 28 }}>
+                    {previewPost?.title}
+                  </Text>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
-                    <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.primary }}>
+                  {/* Request Posted On */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 18 }}>
+                    <Ionicons name="calendar-outline" size={16} color="#475569" />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>
                       Request posted on {previewPost?.requestedOn} at {previewPost?.requestedTime}
                     </Text>
                   </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Department</Text>
-                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.textPrimary }}>{previewPost?.department}</Text>
+                  {/* Key-Value Details List */}
+                  <View style={{ gap: 12, marginBottom: 22 }}>
+                    {/* Department */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Department</Text>
+                      <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{previewPost?.department}</Text>
+                      </View>
                     </View>
-                  </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested By</Text>
-                    <Text style={{ fontSize: 12, fontWeight: '500', color: Colors.textPrimary }}>{previewPost?.requestedBy}</Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Requested On</Text>
-                    <Text style={{ fontSize: 12, color: Colors.textPrimary }}>{previewPost?.requestedOn} {previewPost?.requestedTime}</Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Platforms</Text>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      {previewPost?.platforms?.includes('facebook') && <Ionicons name="logo-facebook" size={16} color="#1877F2" />}
-                      {previewPost?.platforms?.includes('instagram') && <Ionicons name="logo-instagram" size={16} color="#E1306C" />}
-                      {(previewPost?.platforms?.includes('website') || previewPost?.platforms?.includes('portal') || previewPost?.platforms?.includes('wordpress')) && <Ionicons name="globe-outline" size={16} color="#3b82f6" />}
+                    {/* Requested By */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Requested By</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{previewPost?.requestedBy}</Text>
                     </View>
-                  </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: '#6b7280', width: 80 }}>Status</Text>
-                    <View style={{
-                      backgroundColor: statusBadgeStyle(previewPost?.rawStatus).backgroundColor,
-                      paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4
-                    }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: statusBadgeStyle(previewPost?.rawStatus).color }}>
-                        {previewPost?.status}
+                    {/* Requested On */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Requested On</Text>
+                      <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: '500' }}>
+                        {previewPost?.requestedOn} {previewPost?.requestedTime}
                       </Text>
                     </View>
-                  </View>
-                </View>
-              </View>
 
-              {/* Caption / Description / Approval Timeline */}
-              <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 24 }}>
-                <View style={{ flex: 1 }}>
-                  {previewPost?.rawPost?.description ? (
-                    <>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Description</Text>
-                      <Text style={{ fontSize: 13, color: Colors.textPrimary, marginBottom: 16 }}>{previewPost?.rawPost?.description}</Text>
-                    </>
-                  ) : null}
-
-                  {previewPost?.rawPost?.rejection_reason ? (
-                    <>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 }}>Rejection Reason</Text>
-                      <Text style={{ fontSize: 13, color: '#dc2626' }}>{previewPost?.rawPost?.rejection_reason}</Text>
-                    </>
-                  ) : null}
-                </View>
-
-                <View style={{ flex: 1, gap: 16 }}>
-                  <View>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 12 }}>Approval Timeline</Text>
-                    {(previewPost?.rawPost?.approval_workflows && previewPost?.rawPost?.approval_workflows.length > 0) ? (
-                      <View style={{ gap: 8 }}>
-                        {previewPost.rawPost.approval_workflows.map((wf: any, i: number) => (
-                          <View key={wf.id || i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-                              <Ionicons name={wf.action === 'approved' || wf.action === 'published' ? 'checkmark' : wf.action === 'rejected' || wf.action === 'returned' ? 'close' : 'time-outline'} size={12} color={wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#9ca3af'} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.textPrimary }}>{wf.stage_label || wf.stage}</Text>
-                              <Text style={{ fontSize: 10, color: '#6b7280' }}>
-                                {wf.approver?.full_name || 'Unknown'} {wf.acted_at ? '• ' + new Date(wf.acted_at).toLocaleDateString() : ''}
-                              </Text>
-                            </View>
-                            <View style={{ backgroundColor: wf.action === 'approved' || wf.action === 'published' ? '#dcfce7' : wf.action === 'rejected' || wf.action === 'returned' ? '#fee2e2' : '#f3f4f6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                              <Text style={{ fontSize: 9, fontWeight: '600', color: wf.action === 'approved' || wf.action === 'published' ? '#16a34a' : wf.action === 'rejected' || wf.action === 'returned' ? '#dc2626' : '#6b7280' }}>
-                                {wf.action_label || wf.action?.toUpperCase()}
-                              </Text>
-                            </View>
-                          </View>
-                        ))}
+                    {/* Platforms */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Platforms</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => setPreviewPlatformTab('facebook')}
+                          style={{
+                            padding: 2,
+                            borderRadius: 4,
+                            borderWidth: previewPlatformTab === 'facebook' ? 1.5 : 0,
+                            borderColor: '#1877F2',
+                          }}
+                        >
+                          <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => setPreviewPlatformTab('instagram')}
+                          style={{
+                            padding: 2,
+                            borderRadius: 4,
+                            borderWidth: previewPlatformTab === 'instagram' ? 1.5 : 0,
+                            borderColor: '#E1306C',
+                          }}
+                        >
+                          <Ionicons name="logo-instagram" size={20} color="#E1306C" />
+                        </TouchableOpacity>
+                        {(previewPost?.platforms?.includes('website') || previewPost?.platforms?.includes('portal') || previewPost?.platforms?.includes('wordpress')) && (
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => setPreviewPlatformTab('wordpress')}
+                            style={{
+                              padding: 2,
+                              borderRadius: 4,
+                              borderWidth: previewPlatformTab === 'wordpress' ? 1.5 : 0,
+                              borderColor: '#2563EB',
+                            }}
+                          >
+                            <Ionicons name="globe-outline" size={20} color="#2563EB" />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                    ) : (
-                      <Text style={{ fontSize: 12, color: '#9ca3af' }}>No approval workflow data available.</Text>
-                    )}
+                    </View>
+
+                    {/* Status */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Status</Text>
+                      <View style={{
+                        backgroundColor: statusBadgeStyle(previewPost?.rawStatus).backgroundColor,
+                        paddingHorizontal: 12,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: statusBadgeStyle(previewPost?.rawStatus).color }}>
+                          {previewPost?.status || 'Published'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* ── Approval Timeline ── */}
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 14 }}>
+                      Approval Timeline
+                    </Text>
+
+                    {(() => {
+                      const standardStages = [
+                        { key: 'office_head', label: 'Office Head', defaultApprover: 'Ferry Redoblado' },
+                        { key: 'vice_president', label: 'Vice President', defaultApprover: 'Jerwin carreon' },
+                        { key: 'imc_qa', label: 'IMC/QA Checker', defaultApprover: 'Ryan Billera' },
+                      ];
+
+                      const workflows = previewPost?.rawPost?.approval_workflows || [];
+
+                      const timelineData = standardStages.map((stage) => {
+                        const found = workflows.find((w: any) =>
+                          (w.stage || '').toLowerCase().includes(stage.key) ||
+                          (w.stage_label || '').toLowerCase().includes(stage.label.toLowerCase())
+                        );
+
+                        const isApproved = found
+                          ? (found.action === 'approved' || found.action === 'published')
+                          : (['published', 'approved'].includes(previewPost?.rawStatus));
+                        const isRejected = found ? (found.action === 'rejected' || found.action === 'returned') : false;
+
+                        const approverName = found?.approver?.full_name || stage.defaultApprover;
+                        const actionDate = found?.acted_at
+                          ? new Date(found.acted_at).toLocaleDateString()
+                          : (previewPost?.requestedOn || '10/8/2026');
+                        const statusLabel = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending';
+
+                        return {
+                          label: stage.label,
+                          approverName,
+                          actionDate,
+                          isApproved,
+                          isRejected,
+                          statusLabel,
+                        };
+                      });
+
+                      return (
+                        <View style={{ gap: 14 }}>
+                          {timelineData.map((item, idx) => (
+                            <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                {/* Soft Green Circle Badge with Checkmark */}
+                                <View style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 14,
+                                  backgroundColor: item.isApproved ? '#DCFCE7' : item.isRejected ? '#FEE2E2' : '#F1F5F9',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}>
+                                  <Ionicons
+                                    name={item.isApproved ? 'checkmark' : item.isRejected ? 'close' : 'time-outline'}
+                                    size={15}
+                                    color={item.isApproved ? '#16A34A' : item.isRejected ? '#DC2626' : '#94A3B8'}
+                                  />
+                                </View>
+                                <View>
+                                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{item.label}</Text>
+                                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                    {item.approverName} • {item.actionDate}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* Approved Pill Badge */}
+                              <View style={{
+                                backgroundColor: item.isApproved ? '#DCFCE7' : item.isRejected ? '#FEE2E2' : '#F1F5F9',
+                                paddingHorizontal: 10,
+                                paddingVertical: 3,
+                                borderRadius: 6,
+                              }}>
+                                <Text style={{
+                                  fontSize: 11,
+                                  fontWeight: '700',
+                                  color: item.isApproved ? '#16A34A' : item.isRejected ? '#DC2626' : '#64748B',
+                                }}>
+                                  {item.statusLabel}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
               </View>
             </ScrollView>
 
             {/* Footer Buttons */}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
-              <TouchableOpacity onPress={() => setPreviewPost(null)} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, borderWidth: 1, borderColor: '#e5e7eb' }}>
-                <Text style={{ fontSize: 13, fontWeight: '500', color: Colors.textPrimary }}>Close</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
+              <TouchableOpacity onPress={() => setPreviewPost(null)} style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#FFFFFF' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Close</Text>
               </TouchableOpacity>
               {canPublishStatus(previewPost?.rawStatus) && (
                 <TouchableOpacity
                   disabled={publishingPostId === previewPost?.id}
                   onPress={() => handlePublish(previewPost.id)}
                   style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 6,
+                    paddingHorizontal: 18,
+                    paddingVertical: 9,
+                    borderRadius: 8,
                     backgroundColor: '#16A34A',
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -6477,7 +6480,7 @@ $response = curl_exec($ch);`}
                     opacity: publishingPostId === previewPost?.id ? 0.6 : 1,
                   }}
                 >
-                  <Ionicons name="send-outline" size={16} color="#FFFFFF" />
+                  <Ionicons name="send-outline" size={15} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
                     {publishingPostId === previewPost?.id ? 'Publishing...' : 'Publish'}
                   </Text>
