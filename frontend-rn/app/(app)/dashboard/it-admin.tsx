@@ -6125,29 +6125,96 @@ $response = curl_exec($ch);`}
       <Modal visible={!!previewPost} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 960, maxHeight: '92%', backgroundColor: '#fff', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 24, elevation: 12 }}>
-            {/* Top-Right Close Button */}
-            <TouchableOpacity
-              onPress={() => setPreviewPost(null)}
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                zIndex: 20,
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#F8FAFC',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-                cursor: 'pointer' as any,
-              }}
-            >
-              <Ionicons name="close" size={18} color="#64748B" />
-            </TouchableOpacity>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>Content Request Preview</Text>
+              <TouchableOpacity onPress={() => setPreviewPost(null)} style={{ padding: 4, borderRadius: 6 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 6 }}>
+            {/* Platform Live Preview Choices (3 Tabs: Facebook, Instagram, WordPress) */}
+            <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 8, padding: 4, marginBottom: 18 }}>
+              <TouchableOpacity
+                onPress={() => setPreviewPlatformTab('facebook')}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: previewPlatformTab === 'facebook' ? '#FFFFFF' : 'transparent',
+                  borderWidth: previewPlatformTab === 'facebook' ? 1 : 0,
+                  borderColor: previewPlatformTab === 'facebook' ? '#E2E8F0' : 'transparent',
+                  shadowColor: '#000',
+                  shadowOpacity: previewPlatformTab === 'facebook' ? 0.04 : 0,
+                  shadowRadius: 2,
+                  elevation: previewPlatformTab === 'facebook' ? 1 : 0,
+                }}
+              >
+                <Ionicons name="logo-facebook" size={16} color={previewPlatformTab === 'facebook' ? '#1877F2' : '#64748B'} />
+                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'facebook' ? '700' : '500', color: previewPlatformTab === 'facebook' ? '#1877F2' : '#475569' }}>
+                  Facebook
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setPreviewPlatformTab('instagram')}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: previewPlatformTab === 'instagram' ? '#FFFFFF' : 'transparent',
+                  borderWidth: previewPlatformTab === 'instagram' ? 1 : 0,
+                  borderColor: previewPlatformTab === 'instagram' ? '#E2E8F0' : 'transparent',
+                  shadowColor: '#000',
+                  shadowOpacity: previewPlatformTab === 'instagram' ? 0.04 : 0,
+                  shadowRadius: 2,
+                  elevation: previewPlatformTab === 'instagram' ? 1 : 0,
+                }}
+              >
+                <Ionicons name="logo-instagram" size={16} color={previewPlatformTab === 'instagram' ? '#E1306C' : '#64748B'} />
+                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'instagram' ? '700' : '500', color: previewPlatformTab === 'instagram' ? '#E1306C' : '#475569' }}>
+                  Instagram
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setPreviewPlatformTab('wordpress')}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: previewPlatformTab === 'wordpress' ? '#FFFFFF' : 'transparent',
+                  borderWidth: previewPlatformTab === 'wordpress' ? 1 : 0,
+                  borderColor: previewPlatformTab === 'wordpress' ? '#E2E8F0' : 'transparent',
+                  shadowColor: '#000',
+                  shadowOpacity: previewPlatformTab === 'wordpress' ? 0.04 : 0,
+                  shadowRadius: 2,
+                  elevation: previewPlatformTab === 'wordpress' ? 1 : 0,
+                }}
+              >
+                <Ionicons name="globe-outline" size={16} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#64748B'} />
+                <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#475569' }}>
+                  WordPress
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
               <View style={{ flexDirection: isTablet ? 'row' : 'column', gap: 28, alignItems: 'flex-start' }}>
                 {/* ── LEFT COLUMN: Social Media Preview Card ── */}
                 <View style={{ flex: isTablet ? 1.05 : undefined, width: isTablet ? undefined : '100%' }}>
