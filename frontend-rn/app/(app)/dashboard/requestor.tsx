@@ -1694,28 +1694,55 @@ export default function RequestorDashboard() {
                       onPress={async () => {
                       try {
                         const result = await DocumentPicker.getDocumentAsync({
-                          type: ['image/*', 'video/*'],
+                          type: ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'],
                           multiple: true,
                           copyToCacheDirectory: true,
                         });
                         if (!result.canceled && result.assets) {
-                          setMediaFiles(result.assets);
+                          const hasVideo = result.assets.some((a: any) =>
+                            a.mimeType?.startsWith('video/') ||
+                            /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(a.name || '')
+                          );
+                          if (hasVideo) {
+                            showToast('Video uploads are not allowed. Please select photos (JPG, PNG, WebP) only.', 'error');
+                          }
+                          const validImages = result.assets.filter((a: any) =>
+                            !a.mimeType?.startsWith('video/') &&
+                            !/\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(a.name || '')
+                          );
+                          if (validImages.length > 0) {
+                            setMediaFiles(validImages);
+                          }
                         }
                       } catch (e) {
                         if (Platform.OS === 'web') {
                           const input = document.createElement('input');
                           input.type = 'file';
                           input.multiple = true;
-                          input.accept = 'image/*,video/*';
+                          input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
                           input.onchange = (ev: any) => {
-                            const files = Array.from(ev.target.files || []).map((f: any) => ({
-                              uri: URL.createObjectURL(f),
-                              name: f.name,
-                              mimeType: f.type,
-                              size: f.size,
-                              file: f,
-                            }));
-                            setMediaFiles(files);
+                            const rawFiles = Array.from(ev.target.files || []) as File[];
+                            const hasVideo = rawFiles.some(f =>
+                              f.type.startsWith('video/') ||
+                              /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(f.name)
+                            );
+                            if (hasVideo) {
+                              showToast('Video uploads are not allowed. Please select photos (JPG, PNG, WebP) only.', 'error');
+                            }
+                            const validFiles = rawFiles.filter(f =>
+                              !f.type.startsWith('video/') &&
+                              !/\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(f.name)
+                            );
+                            if (validFiles.length > 0) {
+                              const files = validFiles.map((f: any) => ({
+                                uri: URL.createObjectURL(f),
+                                name: f.name,
+                                mimeType: f.type,
+                                size: f.size,
+                                file: f,
+                              }));
+                              setMediaFiles(files);
+                            }
                           };
                           input.click();
                         }
@@ -1735,7 +1762,7 @@ export default function RequestorDashboard() {
                       <Text style={styles.uploadZoneSubtitle}>
                         {mediaFiles.length > 0
                           ? mediaFiles.map((f: any) => f.name).join(', ')
-                          : 'Images (JPG, PNG) or Videos (MP4) up to 50MB'}
+                          : 'Images (JPG, PNG, WebP) up to 25MB'}
                       </Text>
                     </TouchableOpacity>
 
