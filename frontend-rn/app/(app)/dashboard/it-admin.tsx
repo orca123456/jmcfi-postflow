@@ -1257,7 +1257,7 @@ export default function ITAdminDashboard() {
   const [verifiedConnections, setVerifiedConnections] = useState<Record<string, boolean>>({});
   const [tokenLastUpdated, setTokenLastUpdated] = useState('');
   const [savingTokens, setSavingTokens] = useState(false);
-  const [savingTokenPlatform, setSavingTokenPlatform] = useState<'all' | 'facebook' | 'instagram' | 'wordpress' | null>(null);
+  const [savingTokenPlatform, setSavingTokenPlatform] = useState<'all' | 'meta' | 'facebook' | 'instagram' | 'wordpress' | null>(null);
   const [validatingTokens, setValidatingTokens] = useState(false);
   const [showTokenField, setShowTokenField] = useState<Record<string, boolean>>({});
 
@@ -1308,6 +1308,11 @@ export default function ITAdminDashboard() {
     const keys = platformFields[platform];
     const payload: Record<string, string> = {};
     keys.forEach(k => { payload[k] = String((tokenFields as any)[k] || '').trim(); });
+
+    if (platform === 'instagram' && !payload.instagram_access_token && tokenFields.facebook_access_token) {
+      payload.instagram_access_token = tokenFields.facebook_access_token.trim();
+      setTokenFields(prev => ({ ...prev, instagram_access_token: payload.instagram_access_token }));
+    }
 
     setSavingTokens(true);
     setSavingTokenPlatform(platform);
@@ -1447,7 +1452,7 @@ export default function ITAdminDashboard() {
       };
       input.click();
     } else {
-      showToast('Logo upload is available on web browsers.', 'info');
+      showToast('Logo upload is available on web browsers.', 'warning');
     }
   };
 
@@ -1596,7 +1601,7 @@ export default function ITAdminDashboard() {
     }
 
     setSavingTokens(true);
-    setSavingTokenPlatform('facebook');
+    setSavingTokenPlatform('meta');
     setValidatingTokens(true);
     try {
       const saveRes = await tokenSettingsApi.update(payload);
@@ -3680,73 +3685,119 @@ export default function ITAdminDashboard() {
                 </View>
               </Card>
 
-              {platformCards.map((platform) => (
-                <Card key={platform.id} style={[styles.tokensIntegrationCard, !isLargeScreen && styles.tokensIntegrationCardMobile]}>
-                  <View style={[styles.tokensPlatformIntro, !isLargeScreen && styles.tokensPlatformIntroMobile]}>
-                    <View style={[styles.tokensPlatformIcon, { backgroundColor: platform.color }]}>
-                      <Ionicons name={platform.icon as any} size={25} color="#FFFFFF" />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.tokensPlatformName}>{platform.name}</Text>
-                      <Text style={styles.tokensPlatformDescription}>{platform.description}</Text>
-                      <View style={[styles.tokensConnectionBadge, isConnected(platform) && styles.tokensConnectionBadgeConnected]}>
-                        <View style={[styles.tokensConnectionDot, isConnected(platform) && styles.tokensConnectionDotConnected]} />
-                        <Text style={[styles.tokensConnectionText, isConnected(platform) && styles.tokensConnectionTextConnected]}>
-                          {isConnected(platform) ? 'Connected' : 'Not Connected'}
-                        </Text>
+              {platformCards.map((platform) => {
+                const isSavingThisPlatform =
+                  savingTokenPlatform === platform.id ||
+                  (savingTokenPlatform === 'meta' && (platform.id === 'facebook' || platform.id === 'instagram'));
+
+                // Has any non-empty value in input fields
+                const hasValues = platform.fields.some((field) =>
+                  Boolean(String((tokenFields as any)[field.key] || '').trim())
+                );
+
+                // Has any saved value in database
+                const hasSavedValues = platform.fields.some((field) =>
+                  Boolean(String(savedTokenFields[field.key] || '').trim())
+                );
+
+                // Already saved and completely unchanged
+                const isSavedAndUnchanged =
+                  hasValues &&
+                  platform.fields.every((field) => {
+                    const currentVal = String((tokenFields as any)[field.key] || '').trim();
+                    const savedVal = String(savedTokenFields[field.key] || '').trim();
+                    return Boolean(currentVal) && currentVal === savedVal;
+                  });
+
+                // Disable Save Changes if:
+                // 1) Currently saving
+                // 2) No values entered
+                // 3) Already saved and no changes made (no longer clickable until edited or cleared)
+                const isSaveDisabled = savingTokens || !hasValues || isSavedAndUnchanged;
+
+                // Clear is disabled if currently saving or if fields and saved values are both empty
+                const isClearDisabled = savingTokens || (!hasValues && !hasSavedValues);
+
+                return (
+                  <Card key={platform.id} style={[styles.tokensIntegrationCard, !isLargeScreen && styles.tokensIntegrationCardMobile]}>
+                    <View style={[styles.tokensPlatformIntro, !isLargeScreen && styles.tokensPlatformIntroMobile]}>
+                      <View style={[styles.tokensPlatformIcon, { backgroundColor: platform.color }]}>
+                        <Ionicons name={platform.icon as any} size={25} color="#FFFFFF" />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.tokensPlatformName}>{platform.name}</Text>
+                        <Text style={styles.tokensPlatformDescription}>{platform.description}</Text>
+                        <View style={[styles.tokensConnectionBadge, isConnected(platform) && styles.tokensConnectionBadgeConnected]}>
+                          <View style={[styles.tokensConnectionDot, isConnected(platform) && styles.tokensConnectionDotConnected]} />
+                          <Text style={[styles.tokensConnectionText, isConnected(platform) && styles.tokensConnectionTextConnected]}>
+                            {isConnected(platform) ? 'Connected' : 'Not Connected'}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
 
-                  <View style={styles.tokensFormPanel}>
-                    <View style={[styles.tokensFieldGrid, !isLargeScreen && styles.tokensFieldGridMobile]}>
-                      {platform.fields.map((field) => (
-                        <View key={field.key} style={styles.tokensField}>
-                          <View style={styles.tokensLabelRow}>
-                            <Text style={styles.tokensFieldLabel}>{field.label}</Text>
-                            <Ionicons name="help-circle-outline" size={13} color="#94A3B8" />
+                    <View style={styles.tokensFormPanel}>
+                      <View style={[styles.tokensFieldGrid, !isLargeScreen && styles.tokensFieldGridMobile]}>
+                        {platform.fields.map((field) => (
+                          <View key={field.key} style={styles.tokensField}>
+                            <View style={styles.tokensLabelRow}>
+                              <Text style={styles.tokensFieldLabel}>{field.label}</Text>
+                              <Ionicons name="help-circle-outline" size={13} color="#94A3B8" />
+                            </View>
+                            <View style={styles.tokensInputWrap}>
+                              <TextInput
+                                style={styles.tokensInput as any}
+                                placeholder={field.placeholder}
+                                placeholderTextColor="#94A3B8"
+                                value={(tokenFields as any)[field.key]}
+                                secureTextEntry={field.sensitive && !showTokenField[field.key]}
+                                onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
+                              />
+                              {field.sensitive ? (
+                                <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={styles.tokensEyeButton}>
+                                  <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={18} color="#64748B" />
+                                </TouchableOpacity>
+                              ) : null}
+                            </View>
+                            <Text style={styles.tokensFieldHint}>{field.hint}</Text>
                           </View>
-                          <View style={styles.tokensInputWrap}>
-                            <TextInput
-                              style={styles.tokensInput as any}
-                              placeholder={field.placeholder}
-                              placeholderTextColor="#94A3B8"
-                              value={(tokenFields as any)[field.key]}
-                              secureTextEntry={field.sensitive && !showTokenField[field.key]}
-                              onChangeText={(v) => setTokenFields(prev => ({ ...prev, [field.key]: v }))}
-                            />
-                            {field.sensitive ? (
-                              <TouchableOpacity onPress={() => toggleTokenVisibility(field.key)} style={styles.tokensEyeButton}>
-                                <Ionicons name={showTokenField[field.key] ? 'eye-off-outline' : 'eye-outline'} size={18} color="#64748B" />
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                          <Text style={styles.tokensFieldHint}>{field.hint}</Text>
-                        </View>
-                      ))}
+                        ))}
+                      </View>
+                      <View style={[styles.tokensCardActions, !isLargeScreen && styles.tokensCardActionsMobile]}>
+                        <TouchableOpacity
+                          onPress={() => handleClearPlatformTokens(platform.id)}
+                          disabled={isClearDisabled}
+                          style={[styles.tokensClearButton, !isLargeScreen && styles.tokensFullWidthButton, isClearDisabled && styles.tokensButtonDisabled]}
+                        >
+                          <Text style={styles.tokensClearButtonText}>Clear</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleSavePlatformTokens(platform.id)}
+                          disabled={isSaveDisabled}
+                          style={[
+                            styles.tokensSaveButton,
+                            !isLargeScreen && styles.tokensFullWidthButton,
+                            isSaveDisabled && {
+                              backgroundColor: isSavedAndUnchanged ? '#64748B' : '#94A3B8',
+                              opacity: 0.7,
+                              cursor: 'not-allowed' as any,
+                            },
+                          ]}
+                        >
+                          <Ionicons
+                            name={isSavingThisPlatform ? 'sync-outline' : isSavedAndUnchanged ? 'checkmark-circle-outline' : 'save-outline'}
+                            size={15}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.tokensSaveButtonText}>
+                            {isSavingThisPlatform ? 'Saving...' : isSavedAndUnchanged ? 'Saved' : 'Save Changes'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={[styles.tokensCardActions, !isLargeScreen && styles.tokensCardActionsMobile]}>
-                      <TouchableOpacity
-                        onPress={() => handleClearPlatformTokens(platform.id)}
-                        disabled={savingTokens}
-                        style={[styles.tokensClearButton, !isLargeScreen && styles.tokensFullWidthButton, savingTokens && styles.tokensButtonDisabled]}
-                      >
-                        <Text style={styles.tokensClearButtonText}>Clear</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleSavePlatformTokens(platform.id)}
-                        disabled={savingTokens}
-                        style={[styles.tokensSaveButton, !isLargeScreen && styles.tokensFullWidthButton, savingTokens && styles.tokensButtonDisabled]}
-                      >
-                        <Ionicons name="save-outline" size={15} color="#FFFFFF" />
-                        <Text style={styles.tokensSaveButtonText}>
-                          {savingTokenPlatform === platform.id ? 'Saving...' : 'Save Changes'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </View>
           );
         })()

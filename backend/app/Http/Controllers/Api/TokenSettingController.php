@@ -76,6 +76,9 @@ class TokenSettingController extends Controller
             foreach ($fields as $field) {
                 $values[$field] = $this->requestValueOrSetting($request, $validated, $field);
             }
+            if ($platform === 'instagram' && empty($values['instagram_access_token'])) {
+                $values['instagram_access_token'] = $this->requestValueOrSetting($request, $validated, 'facebook_access_token');
+            }
             if (count(array_filter($values, fn ($value) => $value !== '')) === 0) {
                 $verified[$platform] = false;
                 continue;
@@ -87,10 +90,12 @@ class TokenSettingController extends Controller
                 if ($platform === 'wordpress') {
                     $this->verifyWordPress($values);
                 } else {
-                    $metaValues = array_merge(array_fill_keys([
-                        'facebook_page_id', 'facebook_access_token',
-                        'instagram_business_account_id', 'instagram_access_token',
-                    ], ''), $values);
+                    $metaValues = [
+                        'facebook_page_id' => $this->requestValueOrSetting($request, $validated, 'facebook_page_id'),
+                        'facebook_access_token' => $this->requestValueOrSetting($request, $validated, 'facebook_access_token'),
+                        'instagram_business_account_id' => $this->requestValueOrSetting($request, $validated, 'instagram_business_account_id'),
+                        'instagram_access_token' => $this->requestValueOrSetting($request, $validated, 'instagram_access_token') ?: $this->requestValueOrSetting($request, $validated, 'facebook_access_token'),
+                    ];
                     $checks = $this->validateTokens(new Request($metaValues))->getData(true)['checks'];
                     if (!$checks[$platform]['valid']) {
                         throw ValidationException::withMessages([$fields[0] => $checks[$platform]['error'] ?? 'Invalid credentials.']);
@@ -109,6 +114,10 @@ class TokenSettingController extends Controller
 
             $value = $validated[$key] ?? '';
             $value = is_string($value) ? trim($value) : '';
+
+            if ($key === 'instagram_access_token' && $value === '') {
+                $value = $this->requestValueOrSetting($request, $validated, 'facebook_access_token');
+            }
 
             SystemSetting::updateOrCreate(
                 ['key' => $key],
@@ -171,9 +180,9 @@ class TokenSettingController extends Controller
         $pageId = $this->requestValueOrSetting($request, $validated, 'facebook_page_id');
         $facebookToken = $this->requestValueOrSetting($request, $validated, 'facebook_access_token');
         $instagramId = $this->requestValueOrSetting($request, $validated, 'instagram_business_account_id');
-        $instagramToken = $request->exists('instagram_access_token')
-            ? trim((string) ($validated['instagram_access_token'] ?? ''))
-            : (SystemSetting::where('key', 'instagram_access_token')->value('value') ?: $facebookToken);
+        $instagramToken = $request->exists('instagram_access_token') && trim((string) ($validated['instagram_access_token'] ?? '')) !== ''
+            ? trim((string) $validated['instagram_access_token'])
+            : ($this->requestValueOrSetting($request, $validated, 'instagram_access_token') ?: $facebookToken);
 
         $version = env('FACEBOOK_GRAPH_API_VERSION', 'v26.0');
         $checks = [
