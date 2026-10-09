@@ -559,12 +559,14 @@ class PostRequestController extends Controller
 
         return DB::transaction(function () use ($request, $postRequest, $user, $reason) {
             $currentStage = $postRequest->currentApprovalStage();
-            $currentStage->update([
-                'action' => 'rejected',
-                'approver_id' => $user->id,
-                'remarks' => $reason,
-                'acted_at' => now(),
-            ]);
+            if ($currentStage) {
+                $currentStage->update([
+                    'action' => 'rejected',
+                    'approver_id' => $user->id,
+                    'remarks' => $reason,
+                    'acted_at' => now(),
+                ]);
+            }
 
             $postRequest->update([
                 'status' => PostRequest::STATUS_REJECTED,
@@ -638,12 +640,14 @@ class PostRequestController extends Controller
 
         return DB::transaction(function () use ($request, $postRequest, $user, $reason) {
             $currentStage = $postRequest->currentApprovalStage();
-            $currentStage->update([
-                'action' => 'returned_for_revision',
-                'approver_id' => $user->id,
-                'remarks' => $reason,
-                'acted_at' => now(),
-            ]);
+            if ($currentStage) {
+                $currentStage->update([
+                    'action' => 'returned_for_revision',
+                    'approver_id' => $user->id,
+                    'remarks' => $reason,
+                    'acted_at' => now(),
+                ]);
+            }
 
             $postRequest->update([
                 'status' => PostRequest::STATUS_RETURNED_FOR_REVISION,

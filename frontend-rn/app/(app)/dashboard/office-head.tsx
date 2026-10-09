@@ -705,21 +705,10 @@ export default function OfficeHeadDashboard() {
                       : 'All Departmental Submissions'}
               </Text>
 
-              <View style={[styles.tableControlsRight, { flexDirection: 'column', alignItems: isTablet ? 'flex-end' : 'stretch', gap: 8 }]}>
-                {/* Search Bar (Top Right) */}
-                <View style={[styles.searchBox, { width: isTablet ? 240 : '100%' }]}>
-                  <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search requests..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                </View>
-
-                {/* Filters Row (Bottom Right) */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: isTablet ? 'flex-end' : 'space-between', zIndex: 100 }}>
-                  {/* Date Range Dropdown Selector (Align Left) */}
+              <View style={[styles.tableControlsRight, { flexDirection: isTablet ? 'row' : 'column', alignItems: isTablet ? 'center' : 'stretch', gap: 8, zIndex: 100 }]}>
+                {/* Filters Row: Date Filter + Department Filter */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 100, flex: isTablet ? undefined : 1 }}>
+                  {/* Date Range Dropdown Selector */}
                   <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 60 : 40, flex: isTablet ? undefined : 1 }}>
                     <TouchableOpacity
                       style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 120, justifyContent: 'space-between' }]}
@@ -800,6 +789,17 @@ export default function OfficeHeadDashboard() {
                       )}
                     </View>
                   )}
+                </View>
+
+                {/* Search Bar */}
+                <View style={[styles.searchBox, { width: isTablet ? 240 : '100%', height: 36 }]}>
+                  <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search requests..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
                 </View>
               </View>
             </View>
