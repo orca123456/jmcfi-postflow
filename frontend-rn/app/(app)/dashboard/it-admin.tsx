@@ -6440,9 +6440,9 @@ $response = curl_exec($ch);`}
 
                     {(() => {
                       const standardStages = [
-                        { key: 'office_head', label: 'Office Head', defaultApprover: 'Ferry Redoblado' },
-                        { key: 'vice_president', label: 'Vice President', defaultApprover: 'Jerwin carreon' },
-                        { key: 'imc_qa', label: 'IMC/QA Checker', defaultApprover: 'Ryan Billera' },
+                        { key: 'office_head', label: 'Office Head' },
+                        { key: 'vice_president', label: 'Vice President' },
+                        { key: 'imc_qa', label: 'IMC/QA Checker' },
                       ];
 
                       const workflows = previewPost?.rawPost?.approval_workflows || [];
@@ -6456,12 +6456,14 @@ $response = curl_exec($ch);`}
                         const isApproved = found
                           ? (found.action === 'approved' || found.action === 'published')
                           : (['published', 'approved'].includes(previewPost?.rawStatus));
-                        const isRejected = found ? (found.action === 'rejected' || found.action === 'returned') : false;
+                        const isRejected = found ? (found.action === 'rejected' || found.action === 'returned' || found.action === 'returned_for_revision') : false;
 
-                        const approverName = found?.approver?.full_name || stage.defaultApprover;
+                        // Dynamic approver from database; fallback only if no approver record exists
+                        const approverName = found?.approver?.full_name
+                          || (isApproved ? 'Assigned Approver' : 'Awaiting Review');
                         const actionDate = found?.acted_at
                           ? new Date(found.acted_at).toLocaleDateString()
-                          : (previewPost?.requestedOn || '10/8/2026');
+                          : (isApproved && previewPost?.requestedOn ? previewPost.requestedOn : '—');
                         const statusLabel = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending';
 
                         return {
