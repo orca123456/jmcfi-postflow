@@ -690,8 +690,214 @@ export default function ITAdminDashboard() {
   const [csvParsedRows, setCsvParsedRows] = useState<any[]>([]);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
 
+  const handleDownloadExcelTemplate = () => {
+    const excelHtml = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <!--[if gte mso 9]>
+  <xml>
+    <x:ExcelWorkbook>
+      <x:ExcelWorksheets>
+        <x:ExcelWorksheet>
+          <x:Name>User Accounts Template</x:Name>
+          <x:WorksheetOptions>
+            <x:DisplayGridlines/>
+          </x:WorksheetOptions>
+        </x:ExcelWorksheet>
+      </x:ExcelWorksheets>
+    </x:ExcelWorkbook>
+  </xml>
+  <![endif]-->
+  <style>
+    body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; margin: 0; padding: 20px; color: #1E293B; }
+    .banner-cell {
+      background-color: #EBDCF9;
+      border: 1px solid #C084FC;
+      border-bottom: 4px solid #5B21B6;
+      padding: 16px 20px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .inst-title {
+      font-family: 'Times New Roman', Georgia, serif;
+      font-size: 20pt;
+      font-weight: bold;
+      color: #1E1B4B;
+      letter-spacing: 1px;
+      line-height: 1.2;
+      margin: 0;
+    }
+    .inst-subtitle {
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      color: #4B5563;
+      margin: 3px 0 2px 0;
+    }
+    .inst-address {
+      font-family: Arial, sans-serif;
+      font-size: 8.5pt;
+      font-weight: bold;
+      color: #1F2937;
+      margin: 2px 0;
+    }
+    .inst-contact {
+      font-family: Arial, sans-serif;
+      font-size: 8pt;
+      color: #4B5563;
+      margin: 4px 0;
+    }
+    .inst-motto {
+      font-family: Arial, sans-serif;
+      font-size: 10pt;
+      font-weight: 800;
+      color: #1E1B4B;
+      margin-top: 4px;
+    }
+    .doc-title {
+      background-color: #2E1065;
+      color: #FFFFFF;
+      font-size: 11pt;
+      font-weight: bold;
+      text-align: center;
+      padding: 8px;
+    }
+    .instruction-bar {
+      background-color: #F5EEFD;
+      color: #4C1D95;
+      font-size: 8.5pt;
+      padding: 6px 12px;
+      border-bottom: 1px solid #D8B4FE;
+    }
+    .data-header {
+      background-color: #C7E5C8;
+      color: #14532D;
+      font-weight: bold;
+      font-size: 10pt;
+      border: 1px solid #94A3B8;
+      padding: 10px 8px;
+      text-align: center;
+      vertical-align: middle;
+      height: 32px;
+    }
+    .data-row td {
+      border: 1px solid #CBD5E1;
+      padding: 8px 10px;
+      font-size: 9.5pt;
+      vertical-align: middle;
+    }
+    .row-even { background-color: #FFFFFF; }
+    .row-odd { background-color: #F8FAFC; }
+    .role-badge { font-weight: bold; color: #1E40AF; text-align: center; }
+    .guidance-box {
+      margin-top: 20px;
+      background-color: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      padding: 14px;
+      font-size: 8.5pt;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <table cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td colspan="7" class="banner-cell">
+        <div class="inst-title">JOSE MARIA COLLEGE</div>
+        <div class="inst-title" style="font-size: 16pt;">FOUNDATION, INC.</div>
+        <div class="inst-subtitle">(formerly JOSE MARIA COLLEGE)</div>
+        <div class="inst-address">KJC COMPOUND, PHIL-JAP FRIENDSHIP HIGHWAY, SASA, DAVAO CITY</div>
+        <div class="inst-contact">&#127760; www.jmc.edu.ph &nbsp;|&nbsp; &#9993; communications@jmc.edu.ph &nbsp;|&nbsp; &#9742; (+639) 994970107</div>
+        <div class="inst-motto">Assured &bull; Consistent &bull; Quality Education</div>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="7" class="doc-title">
+        USER ACCOUNTS BULK IMPORT TEMPLATE
+      </td>
+    </tr>
+    <tr>
+      <td colspan="7" class="instruction-bar">
+        <b>NOTE:</b> Do NOT modify the column headers in Row 4. Required fields: <i>first_name</i>, <i>last_name</i>, <i>email</i> (must end with @jmc.edu.ph). Valid roles: <i>requestor</i>, <i>office_head</i>, <i>vice_president</i>, <i>imc_qa</i>, <i>it_admin</i>.
+      </td>
+    </tr>
+    <tr>
+      <th class="data-header" style="width: 140px;">first_name</th>
+      <th class="data-header" style="width: 140px;">last_name</th>
+      <th class="data-header" style="width: 250px;">email</th>
+      <th class="data-header" style="width: 130px;">password</th>
+      <th class="data-header" style="width: 130px;">role</th>
+      <th class="data-header" style="width: 240px;">department</th>
+      <th class="data-header" style="width: 200px;">position</th>
+    </tr>
+    <tr class="data-row row-even">
+      <td>Juan</td>
+      <td>Dela Cruz</td>
+      <td>juan.delacruz@jmc.edu.ph</td>
+      <td>Jmcfi@2026</td>
+      <td class="role-badge">requestor</td>
+      <td>College of Computer Studies</td>
+      <td>Staff / Faculty</td>
+    </tr>
+    <tr class="data-row row-odd">
+      <td>Maria</td>
+      <td>Santos</td>
+      <td>maria.santos@jmc.edu.ph</td>
+      <td>Jmcfi@2026</td>
+      <td class="role-badge">office_head</td>
+      <td>College of Education</td>
+      <td>Department Head</td>
+    </tr>
+    <tr class="data-row row-even">
+      <td>Antonio</td>
+      <td>Luna</td>
+      <td>antonio.luna@jmc.edu.ph</td>
+      <td>Jmcfi@2026</td>
+      <td class="role-badge">requestor</td>
+      <td>Basic Education Department</td>
+      <td>Faculty</td>
+    </tr>
+    <tr>
+      <td colspan="7" style="height: 16px;"></td>
+    </tr>
+    <tr>
+      <td colspan="7" class="guidance-box">
+        <b>Allowed System Roles:</b><br/>
+        &bull; <b>requestor</b> &mdash; Faculty members, Instructors, Teachers, Department Staff<br/>
+        &bull; <b>office_head</b> &mdash; College Deans, Department Heads, Unit Chiefs<br/>
+        &bull; <b>vice_president</b> &mdash; Vice President for Academic / Institutional Affairs<br/>
+        &bull; <b>imc_qa</b> &mdash; Integrated Marketing Communications & Quality Assurance Checkers<br/>
+        &bull; <b>it_admin</b> &mdash; IT & Systems Administrators<br/><br/>
+        <b>Password Rule:</b> If left blank, the system automatically assigns <i>Jmcfi@2026</i> as initial password.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'jmcfi_user_accounts_template.xls');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('Excel template downloaded successfully!', 'success');
+    }
+  };
+
   const handleDownloadCsvTemplate = () => {
     const csvContent = [
+      '# ====================================================================================================',
+      '# JOSE MARIA COLLEGE FOUNDATION, INC.',
+      '# (formerly JOSE MARIA COLLEGE) - KJC COMPOUND, PHIL-JAP FRIENDSHIP HIGHWAY, SASA, DAVAO CITY',
+      '# Portal: www.jmc.edu.ph | communications@jmc.edu.ph | (+639) 994970107',
+      '# Motto: Assured • Consistent • Quality Education',
+      '# Bulk User Accounts Import Template (Allowed roles: requestor, office_head, vice_president, imc_qa, it_admin)',
+      '# ====================================================================================================',
       'first_name,last_name,email,password,role,department,position',
       'Juan,Dela Cruz,juan.delacruz@jmc.edu.ph,Jmcfi@2026,requestor,College of Computer Studies,Staff / Faculty',
       'Maria,Santos,maria.santos@jmc.edu.ph,Jmcfi@2026,office_head,College of Education,Department Head',
@@ -713,9 +919,91 @@ export default function ITAdminDashboard() {
   };
 
   const parseCsvText = (text: string) => {
+    // 1. Check if the file is an HTML/table export (from .xls template)
+    if (text.toLowerCase().includes('<table') || text.toLowerCase().includes('<tr')) {
+      const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+      const cellRegex = /<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi;
+      const tableRows: string[][] = [];
+      let trMatch;
+      while ((trMatch = trRegex.exec(text)) !== null) {
+        const rowContent = trMatch[1];
+        const cells: string[] = [];
+        let cellMatch;
+        while ((cellMatch = cellRegex.exec(rowContent)) !== null) {
+          const val = cellMatch[1]
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/&bull;/gi, '•')
+            .trim();
+          cells.push(val);
+        }
+        if (cells.length > 0) {
+          tableRows.push(cells);
+        }
+      }
+
+      // Find the row containing 'first_name' or 'email'
+      let headerRowIndex = -1;
+      for (let i = 0; i < tableRows.length; i++) {
+        const normalized = tableRows[i].map(c => c.toLowerCase().replace(/[\s_-]+/g, ''));
+        if (normalized.some(c => c.includes('first')) && (normalized.some(c => c.includes('email')) || normalized.some(c => c.includes('last')))) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      if (headerRowIndex !== -1 && headerRowIndex < tableRows.length - 1) {
+        const headers = tableRows[headerRowIndex].map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
+        const rows: any[] = [];
+        for (let i = headerRowIndex + 1; i < tableRows.length; i++) {
+          const values = tableRows[i];
+          if (values.every(v => v === '')) continue;
+          if (values.length < 3) continue; // Ignore guidance / footer rows
+
+          const rowObj: any = {};
+          headers.forEach((h, idx) => {
+            const val = values[idx] || '';
+            if (h.includes('first')) rowObj.first_name = val;
+            else if (h.includes('last')) rowObj.last_name = val;
+            else if (h.includes('email') || h.includes('user')) rowObj.email = val;
+            else if (h.includes('pass')) rowObj.password = val;
+            else if (h.includes('role')) rowObj.role = val;
+            else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
+            else if (h.includes('pos')) rowObj.position = val;
+          });
+
+          let email = String(rowObj.email || '').trim();
+          if (email && !email.includes('@')) {
+            email += '@jmc.edu.ph';
+          }
+          rowObj.email = email;
+
+          const errors: string[] = [];
+          if (!rowObj.first_name?.trim()) errors.push('Missing Firstname');
+          if (!rowObj.last_name?.trim()) errors.push('Missing Lastname');
+          if (!rowObj.email?.trim()) errors.push('Missing Email');
+          else if (!rowObj.email.toLowerCase().endsWith('@jmc.edu.ph')) errors.push('Must end with @jmc.edu.ph');
+
+          rowObj.isValid = errors.length === 0;
+          rowObj.errorMsg = errors.join(', ');
+          rowObj.role = rowObj.role || 'requestor';
+          rowObj.department = rowObj.department || (filteredDepts[0]?.display_name || 'General Department');
+          rowObj.password = rowObj.password || 'Jmcfi@2026';
+          rows.push(rowObj);
+        }
+
+        if (rows.length > 0) {
+          setCsvParsedRows(rows);
+          return;
+        }
+      }
+    }
+
+    // 2. Standard CSV parsing
     const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
     if (lines.length < 2) {
-      showToast('CSV file is empty or missing a header row.', 'warning');
+      showToast('File is empty or missing a header row.', 'warning');
       return;
     }
 
@@ -738,11 +1026,23 @@ export default function ITAdminDashboard() {
       return result;
     };
 
-    const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
+    // Find the header row (skip comment/banner lines starting with # or metadata)
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(lines.length, 25); i++) {
+      const parsed = parseRow(lines[i]).map(c => c.toLowerCase().replace(/[\s_-]+/g, ''));
+      if (parsed.some(c => c.includes('first')) && (parsed.some(c => c.includes('email')) || parsed.some(c => c.includes('last')))) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+
+    const headers = parseRow(lines[headerRowIdx]).map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
     const rows: any[] = [];
 
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseRow(lines[i]);
+    for (let i = headerRowIdx + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('#')) continue;
+      const values = parseRow(line);
       if (values.every(v => v === '')) continue;
 
       const rowObj: any = {};
@@ -778,7 +1078,7 @@ export default function ITAdminDashboard() {
     }
 
     if (rows.length === 0) {
-      showToast('No user records found in CSV file.', 'warning');
+      showToast('No user records found in file.', 'warning');
       return;
     }
 
@@ -790,7 +1090,7 @@ export default function ITAdminDashboard() {
       if (Platform.OS === 'web') {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.csv,text/csv';
+        input.accept = '.csv,text/csv,.xls,application/vnd.ms-excel';
         input.onchange = (e: any) => {
           const file = e.target.files?.[0];
           if (!file) return;
@@ -807,7 +1107,7 @@ export default function ITAdminDashboard() {
         input.click();
       } else {
         const result = await DocumentPicker.getDocumentAsync({
-          type: ['text/csv', 'text/comma-separated-values'],
+          type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
           copyToCacheDirectory: true,
         });
         if (!result.canceled && result.assets && result.assets[0]) {
@@ -819,7 +1119,7 @@ export default function ITAdminDashboard() {
         }
       }
     } catch (err: any) {
-      showToast('Failed to read CSV file: ' + err.message, 'error');
+      showToast('Failed to read template file: ' + err.message, 'error');
     }
   };
 
@@ -2608,7 +2908,7 @@ export default function ITAdminDashboard() {
               <Text style={[styles.sectionHeader, { marginBottom: 0 }]}>Create New Institutional Account</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity
-                  onPress={handleDownloadCsvTemplate}
+                  onPress={handleDownloadExcelTemplate}
                   activeOpacity={0.7}
                   style={{
                     flexDirection: 'row',
@@ -3158,25 +3458,48 @@ export default function ITAdminDashboard() {
                       backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
                       borderWidth: 1,
                       borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                      flexWrap: 'wrap',
+                      gap: 10,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 260 }}>
                       <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
                       <Text style={{ fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569', flex: 1 }}>
-                        Need the pre-formatted structure? Download the sample CSV template first.
+                        Need the pre-formatted structure? Download the official template with institutional header.
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={handleDownloadCsvTemplate}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        backgroundColor: '#2563EB',
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#fff' }}>Get Template</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={handleDownloadExcelTemplate}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          backgroundColor: '#15803D',
+                        }}
+                      >
+                        <Ionicons name="document-text-outline" size={14} color="#fff" />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Excel (.xls)</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleDownloadCsvTemplate}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          backgroundColor: '#2563EB',
+                        }}
+                      >
+                        <Ionicons name="download-outline" size={14} color="#fff" />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>CSV (.csv)</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {/* Preview Section */}
@@ -3218,7 +3541,7 @@ export default function ITAdminDashboard() {
 
                       {/* Scrollable Preview Table */}
                       <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#E2E8F0', borderRadius: 8 }}>
-                        <View style={{ minWidth: 680 }}>
+                        <View style={{ minWidth: 980 }}>
                           {/* Table Header */}
                           <View
                             style={{
@@ -3231,10 +3554,12 @@ export default function ITAdminDashboard() {
                             }}
                           >
                             <Text style={{ width: 90, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>STATUS</Text>
-                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>FIRST NAME</Text>
-                            <Text style={{ width: 130, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>LAST NAME</Text>
-                            <Text style={{ width: 200, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>EMAIL</Text>
-                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>ROLE</Text>
+                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>FIRST NAME</Text>
+                            <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>LAST NAME</Text>
+                            <Text style={{ width: 190, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>EMAIL</Text>
+                            <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>ROLE</Text>
+                            <Text style={{ width: 190, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>DEPARTMENT</Text>
+                            <Text style={{ width: 160, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>POSITION</Text>
                           </View>
 
                           {/* Table Body */}
@@ -3261,17 +3586,23 @@ export default function ITAdminDashboard() {
                                   </Text>
                                 )}
                               </View>
-                              <Text style={{ width: 130, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
+                              <Text style={{ width: 120, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
                                 {row.first_name || '—'}
                               </Text>
-                              <Text style={{ width: 130, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
+                              <Text style={{ width: 120, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
                                 {row.last_name || '—'}
                               </Text>
-                              <Text style={{ width: 200, fontSize: 12, color: isDarkMode ? '#93C5FD' : '#2563EB' }} numberOfLines={1}>
+                              <Text style={{ width: 190, fontSize: 12, color: isDarkMode ? '#93C5FD' : '#2563EB' }} numberOfLines={1}>
                                 {row.email || '—'}
                               </Text>
-                              <Text style={{ width: 120, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
+                              <Text style={{ width: 110, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
                                 {row.role || 'requestor'}
+                              </Text>
+                              <Text style={{ width: 190, fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569' }} numberOfLines={1}>
+                                {row.department || '—'}
+                              </Text>
+                              <Text style={{ width: 160, fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569' }} numberOfLines={1}>
+                                {row.position || '—'}
                               </Text>
                             </View>
                           ))}
