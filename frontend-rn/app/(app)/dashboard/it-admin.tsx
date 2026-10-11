@@ -802,7 +802,7 @@ export default function ITAdminDashboard() {
 <body>
   <table cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td colspan="7" class="banner-cell">
+      <td colspan="6" class="banner-cell">
         <div class="inst-title">JOSE MARIA COLLEGE</div>
         <div class="inst-title" style="font-size: 16pt;">FOUNDATION, INC.</div>
         <div class="inst-subtitle">(formerly JOSE MARIA COLLEGE)</div>
@@ -812,56 +812,37 @@ export default function ITAdminDashboard() {
       </td>
     </tr>
     <tr>
-      <td colspan="7" class="doc-title">
+      <td colspan="6" class="doc-title">
         USER ACCOUNTS BULK IMPORT TEMPLATE
       </td>
     </tr>
     <tr>
-      <td colspan="7" class="instruction-bar">
+      <td colspan="6" class="instruction-bar">
         <b>NOTE:</b> Do NOT modify the column headers in Row 4. Required fields: <i>first_name</i>, <i>last_name</i>, <i>email</i> (must end with @jmc.edu.ph). Valid roles: <i>requestor</i>, <i>office_head</i>, <i>vice_president</i>, <i>imc_qa</i>, <i>it_admin</i>.
       </td>
     </tr>
     <tr>
-      <th class="data-header" style="width: 140px;">first_name</th>
-      <th class="data-header" style="width: 140px;">last_name</th>
-      <th class="data-header" style="width: 250px;">email</th>
-      <th class="data-header" style="width: 130px;">password</th>
-      <th class="data-header" style="width: 130px;">role</th>
-      <th class="data-header" style="width: 240px;">department</th>
-      <th class="data-header" style="width: 200px;">position</th>
+      <th class="data-header" style="width: 150px;">first_name</th>
+      <th class="data-header" style="width: 150px;">last_name</th>
+      <th class="data-header" style="width: 260px;">email</th>
+      <th class="data-header" style="width: 140px;">password</th>
+      <th class="data-header" style="width: 140px;">role</th>
+      <th class="data-header" style="width: 260px;">department</th>
     </tr>
-    <tr class="data-row row-even">
-      <td>Juan</td>
-      <td>Dela Cruz</td>
-      <td>juan.delacruz@jmc.edu.ph</td>
-      <td>Jmcfi@2026</td>
-      <td class="role-badge">requestor</td>
-      <td>College of Computer Studies</td>
-      <td>Staff / Faculty</td>
-    </tr>
-    <tr class="data-row row-odd">
-      <td>Maria</td>
-      <td>Santos</td>
-      <td>maria.santos@jmc.edu.ph</td>
-      <td>Jmcfi@2026</td>
-      <td class="role-badge">office_head</td>
-      <td>College of Education</td>
-      <td>Department Head</td>
-    </tr>
-    <tr class="data-row row-even">
-      <td>Antonio</td>
-      <td>Luna</td>
-      <td>antonio.luna@jmc.edu.ph</td>
-      <td>Jmcfi@2026</td>
-      <td class="role-badge">requestor</td>
-      <td>Basic Education Department</td>
-      <td>Faculty</td>
+    ${Array.from({ length: 100 }, (_, i) => `
+    <tr class="data-row ${i % 2 === 0 ? 'row-even' : 'row-odd'}">
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>`).join('')}
+    <tr>
+      <td colspan="6" style="height: 16px;"></td>
     </tr>
     <tr>
-      <td colspan="7" style="height: 16px;"></td>
-    </tr>
-    <tr>
-      <td colspan="7" class="guidance-box">
+      <td colspan="6" class="guidance-box">
         <b>Allowed System Roles:</b><br/>
         &bull; <b>requestor</b> &mdash; Faculty members, Instructors, Teachers, Department Staff<br/>
         &bull; <b>office_head</b> &mdash; College Deans, Department Heads, Unit Chiefs<br/>
@@ -898,10 +879,7 @@ export default function ITAdminDashboard() {
       '# Motto: Assured • Consistent • Quality Education',
       '# Bulk User Accounts Import Template (Allowed roles: requestor, office_head, vice_president, imc_qa, it_admin)',
       '# ====================================================================================================',
-      'first_name,last_name,email,password,role,department,position',
-      'Juan,Dela Cruz,juan.delacruz@jmc.edu.ph,Jmcfi@2026,requestor,College of Computer Studies,Staff / Faculty',
-      'Maria,Santos,maria.santos@jmc.edu.ph,Jmcfi@2026,office_head,College of Education,Department Head',
-      'Antonio,Luna,antonio.luna@jmc.edu.ph,Jmcfi@2026,requestor,Basic Education Department,Faculty',
+      'first_name,last_name,email,password,role,department',
     ].join('\n');
 
     if (Platform.OS === 'web') {
@@ -3541,7 +3519,7 @@ export default function ITAdminDashboard() {
 
                       {/* Scrollable Preview Table */}
                       <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#E2E8F0', borderRadius: 8 }}>
-                        <View style={{ minWidth: 980 }}>
+                        <View style={{ minWidth: 830 }}>
                           {/* Table Header */}
                           <View
                             style={{
@@ -3558,8 +3536,7 @@ export default function ITAdminDashboard() {
                             <Text style={{ width: 120, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>LAST NAME</Text>
                             <Text style={{ width: 190, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>EMAIL</Text>
                             <Text style={{ width: 110, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>ROLE</Text>
-                            <Text style={{ width: 190, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>DEPARTMENT</Text>
-                            <Text style={{ width: 160, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>POSITION</Text>
+                            <Text style={{ width: 200, fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>DEPARTMENT</Text>
                           </View>
 
                           {/* Table Body */}
@@ -3598,11 +3575,8 @@ export default function ITAdminDashboard() {
                               <Text style={{ width: 110, fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#1E293B' }} numberOfLines={1}>
                                 {row.role || 'requestor'}
                               </Text>
-                              <Text style={{ width: 190, fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569' }} numberOfLines={1}>
+                              <Text style={{ width: 200, fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569' }} numberOfLines={1}>
                                 {row.department || '—'}
-                              </Text>
-                              <Text style={{ width: 160, fontSize: 12, color: isDarkMode ? '#CBD5E1' : '#475569' }} numberOfLines={1}>
-                                {row.position || '—'}
                               </Text>
                             </View>
                           ))}
