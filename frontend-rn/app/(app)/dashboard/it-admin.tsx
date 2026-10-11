@@ -42,6 +42,7 @@ import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
+import * as XLSX from 'xlsx';
 
 interface StatCardProps {
   label: string;
@@ -896,148 +897,73 @@ export default function ITAdminDashboard() {
     }
   };
 
-  const parseCsvText = (text: string) => {
-    // 1. Check if the file is an HTML/table export (from .xls template)
-    const isHtml = text.toLowerCase().includes('<table') || text.toLowerCase().includes('<tr');
-    if (isHtml) {
-      const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-      const cellRegex = /<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi;
-      const tableRows: string[][] = [];
-      let trMatch;
-      while ((trMatch = trRegex.exec(text)) !== null) {
-        const rowContent = trMatch[1];
-        const cells: string[] = [];
-        let cellMatch;
-        while ((cellMatch = cellRegex.exec(rowContent)) !== null) {
-          const val = cellMatch[1]
-            .replace(/<[^>]+>/g, '')
-            .replace(/&nbsp;/gi, ' ')
-            .replace(/&amp;/gi, '&')
-            .replace(/&bull;/gi, '•')
-            .trim();
-          cells.push(val);
-        }
-        if (cells.length > 0) {
-          tableRows.push(cells);
-        }
+  const parseSpreadsheetData = (data: ArrayBuffer | Uint8Array | string) => {
+    let workbook: XLSX.WorkBook;
+    try {
+      if (typeof data === 'string') {
+        workbook = XLSX.read(data, { type: 'string' });
+      } else {
+        const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
+        workbook = XLSX.read(u8, { type: 'array' });
       }
-
-      // Find the row containing 'first_name' or 'email'
-      let headerRowIndex = -1;
-      for (let i = 0; i < tableRows.length; i++) {
-        const normalized = tableRows[i].map(c => c.toLowerCase().replace(/[\s_-]+/g, ''));
-        if (normalized.some(c => c.includes('first')) && (normalized.some(c => c.includes('email')) || normalized.some(c => c.includes('last')))) {
-          headerRowIndex = i;
-          break;
-        }
-      }
-
-      if (headerRowIndex === -1) {
-        showToast('Invalid template format: Could not find header row with first_name, last_name, and email.', 'error');
-        return;
-      }
-
-      const headers = tableRows[headerRowIndex].map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
-      const rows: any[] = [];
-      for (let i = headerRowIndex + 1; i < tableRows.length; i++) {
-        const values = tableRows[i];
-        // Skip guidance notes or banners
-        if (values.length < 3) continue;
-        if (values.some(v => v.includes('Allowed System Roles') || v.includes('Password Rule') || v.includes('NOTE:'))) continue;
-
-        const rowObj: any = {};
-        headers.forEach((h, idx) => {
-          const val = values[idx] || '';
-          if (h.includes('first')) rowObj.first_name = val;
-          else if (h.includes('last')) rowObj.last_name = val;
-          else if (h.includes('email') || h.includes('user')) rowObj.email = val;
-          else if (h.includes('pass')) rowObj.password = val;
-          else if (h.includes('role')) rowObj.role = val;
-          else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
-        });
-
-        // If first_name, last_name, and email are all empty, it's an unused blank template row — skip it!
-        if (!rowObj.first_name?.trim() && !rowObj.last_name?.trim() && !rowObj.email?.trim()) {
-          continue;
-        }
-
-        let email = String(rowObj.email || '').trim();
-        if (email && !email.includes('@')) {
-          email += '@jmc.edu.ph';
-        }
-        rowObj.email = email;
-
-        const errors: string[] = [];
-        if (!rowObj.first_name?.trim()) errors.push('Missing Firstname');
-        if (!rowObj.last_name?.trim()) errors.push('Missing Lastname');
-        if (!rowObj.email?.trim()) errors.push('Missing Email');
-        else if (!rowObj.email.toLowerCase().endsWith('@jmc.edu.ph')) errors.push('Must end with @jmc.edu.ph');
-
-        rowObj.isValid = errors.length === 0;
-        rowObj.errorMsg = errors.join(', ');
-        rowObj.role = rowObj.role || 'requestor';
-        rowObj.department = rowObj.department || (filteredDepts[0]?.display_name || 'General Department');
-        rowObj.password = rowObj.password || 'Jmcfi@2026';
-        rows.push(rowObj);
-      }
-
-      if (rows.length === 0) {
-        showToast('The uploaded Excel template has no user data entered yet. Please fill in names and emails first.', 'warning');
-        setCsvParsedRows([]);
-        return;
-      }
-
-      setCsvParsedRows(rows);
-      return; // Never fall through to CSV parser for HTML files
-    }
-
-    // 2. Standard CSV parsing
-    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-    if (lines.length < 2) {
-      showToast('File is empty or missing a header row.', 'warning');
+    } catch (err: any) {
+      showToast('Unable to parse spreadsheet file: ' + (err.message || 'Unknown error'), 'error');
       return;
     }
 
-    const parseRow = (line: string): string[] => {
-      const result: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      result.push(current.trim());
-      return result;
-    };
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+      showToast('Spreadsheet has no sheets.', 'warning');
+      return;
+    }
 
-    // Find the header row (skip comment/banner lines starting with # or metadata)
-    let headerRowIdx = 0;
-    for (let i = 0; i < Math.min(lines.length, 25); i++) {
-      const parsed = parseRow(lines[i]).map(c => c.toLowerCase().replace(/[\s_-]+/g, ''));
-      if (parsed.some(c => c.includes('first')) && (parsed.some(c => c.includes('email')) || parsed.some(c => c.includes('last')))) {
-        headerRowIdx = i;
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+    if (!rawRows || rawRows.length === 0) {
+      showToast('File is empty.', 'warning');
+      return;
+    }
+
+    // Find the actual column header row:
+    // It must have at least 3 distinct columns and contain separate cells for first_name, last_name, and email
+    let headerRowIndex = -1;
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      if (!Array.isArray(row) || row.length < 3) continue;
+
+      const normCells = row.map(c => String(c ?? '').toLowerCase().replace(/[\s_-]+/g, ''));
+      const hasFirst = normCells.some(c => c === 'firstname' || c.includes('firstname') || c.startsWith('first'));
+      const hasLast = normCells.some(c => c === 'lastname' || c.includes('lastname') || c.startsWith('last'));
+      const hasEmail = normCells.some(c => c === 'email' || c.includes('email'));
+
+      if (hasFirst && hasLast && hasEmail) {
+        headerRowIndex = i;
         break;
       }
     }
 
-    const headers = parseRow(lines[headerRowIdx]).map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
+    if (headerRowIndex === -1) {
+      showToast('Invalid template format: Could not find header row with first_name, last_name, and email.', 'error');
+      return;
+    }
+
+    const headers = rawRows[headerRowIndex].map((h: any) => String(h ?? '').toLowerCase().replace(/[\s_-]+/g, ''));
     const rows: any[] = [];
 
-    for (let i = headerRowIdx + 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.startsWith('#')) continue;
-      const values = parseRow(line);
+    for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+      const values = rawRows[i];
+      if (!Array.isArray(values) || values.length === 0) continue;
+
+      // Skip instruction/guidance/legend notes
+      const joined = values.map(v => String(v ?? '')).join(' ');
+      if (joined.includes('Allowed System Roles') || joined.includes('Password Rule') || joined.includes('NOTE:') || joined.includes('Motto:')) {
+        continue;
+      }
 
       const rowObj: any = {};
-      headers.forEach((h, idx) => {
-        const val = values[idx] || '';
+      headers.forEach((h: string, idx: number) => {
+        const val = String(values[idx] ?? '').trim();
         if (h.includes('first')) rowObj.first_name = val;
         else if (h.includes('last')) rowObj.last_name = val;
         else if (h.includes('email') || h.includes('user')) rowObj.email = val;
@@ -1046,7 +972,7 @@ export default function ITAdminDashboard() {
         else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
       });
 
-      // Skip unused blank rows
+      // Skip empty template rows where first_name, last_name, and email are all blank
       if (!rowObj.first_name?.trim() && !rowObj.last_name?.trim() && !rowObj.email?.trim()) {
         continue;
       }
@@ -1072,7 +998,7 @@ export default function ITAdminDashboard() {
     }
 
     if (rows.length === 0) {
-      showToast('No user records found in file. Please enter user accounts before importing.', 'warning');
+      showToast('The uploaded template has no user data entered yet. Please fill in user rows before importing.', 'warning');
       setCsvParsedRows([]);
       return;
     }
@@ -1085,32 +1011,37 @@ export default function ITAdminDashboard() {
       if (Platform.OS === 'web') {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.csv,text/csv,.xls,application/vnd.ms-excel';
+        input.accept = '.csv,text/csv,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         input.onchange = (e: any) => {
           const file = e.target.files?.[0];
           if (!file) return;
           setCsvFileName(file.name);
           const reader = new FileReader();
           reader.onload = (event: any) => {
-            const content = event.target?.result as string;
-            if (content) {
-              parseCsvText(content);
+            const buffer = event.target?.result as ArrayBuffer;
+            if (buffer) {
+              parseSpreadsheetData(buffer);
             }
           };
-          reader.readAsText(file);
+          reader.readAsArrayBuffer(file);
         };
         input.click();
       } else {
         const result = await DocumentPicker.getDocumentAsync({
-          type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+          type: [
+            'text/csv',
+            'text/comma-separated-values',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ],
           copyToCacheDirectory: true,
         });
         if (!result.canceled && result.assets && result.assets[0]) {
           const file = result.assets[0];
           setCsvFileName(file.name);
           const response = await fetch(file.uri);
-          const text = await response.text();
-          parseCsvText(text);
+          const buffer = await response.arrayBuffer();
+          parseSpreadsheetData(buffer);
         }
       }
     } catch (err: any) {
