@@ -898,7 +898,8 @@ export default function ITAdminDashboard() {
 
   const parseCsvText = (text: string) => {
     // 1. Check if the file is an HTML/table export (from .xls template)
-    if (text.toLowerCase().includes('<table') || text.toLowerCase().includes('<tr')) {
+    const isHtml = text.toLowerCase().includes('<table') || text.toLowerCase().includes('<tr');
+    if (isHtml) {
       const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
       const cellRegex = /<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi;
       const tableRows: string[][] = [];
@@ -931,51 +932,63 @@ export default function ITAdminDashboard() {
         }
       }
 
-      if (headerRowIndex !== -1 && headerRowIndex < tableRows.length - 1) {
-        const headers = tableRows[headerRowIndex].map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
-        const rows: any[] = [];
-        for (let i = headerRowIndex + 1; i < tableRows.length; i++) {
-          const values = tableRows[i];
-          if (values.every(v => v === '')) continue;
-          if (values.length < 3) continue; // Ignore guidance / footer rows
-
-          const rowObj: any = {};
-          headers.forEach((h, idx) => {
-            const val = values[idx] || '';
-            if (h.includes('first')) rowObj.first_name = val;
-            else if (h.includes('last')) rowObj.last_name = val;
-            else if (h.includes('email') || h.includes('user')) rowObj.email = val;
-            else if (h.includes('pass')) rowObj.password = val;
-            else if (h.includes('role')) rowObj.role = val;
-            else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
-            else if (h.includes('pos')) rowObj.position = val;
-          });
-
-          let email = String(rowObj.email || '').trim();
-          if (email && !email.includes('@')) {
-            email += '@jmc.edu.ph';
-          }
-          rowObj.email = email;
-
-          const errors: string[] = [];
-          if (!rowObj.first_name?.trim()) errors.push('Missing Firstname');
-          if (!rowObj.last_name?.trim()) errors.push('Missing Lastname');
-          if (!rowObj.email?.trim()) errors.push('Missing Email');
-          else if (!rowObj.email.toLowerCase().endsWith('@jmc.edu.ph')) errors.push('Must end with @jmc.edu.ph');
-
-          rowObj.isValid = errors.length === 0;
-          rowObj.errorMsg = errors.join(', ');
-          rowObj.role = rowObj.role || 'requestor';
-          rowObj.department = rowObj.department || (filteredDepts[0]?.display_name || 'General Department');
-          rowObj.password = rowObj.password || 'Jmcfi@2026';
-          rows.push(rowObj);
-        }
-
-        if (rows.length > 0) {
-          setCsvParsedRows(rows);
-          return;
-        }
+      if (headerRowIndex === -1) {
+        showToast('Invalid template format: Could not find header row with first_name, last_name, and email.', 'error');
+        return;
       }
+
+      const headers = tableRows[headerRowIndex].map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
+      const rows: any[] = [];
+      for (let i = headerRowIndex + 1; i < tableRows.length; i++) {
+        const values = tableRows[i];
+        // Skip guidance notes or banners
+        if (values.length < 3) continue;
+        if (values.some(v => v.includes('Allowed System Roles') || v.includes('Password Rule') || v.includes('NOTE:'))) continue;
+
+        const rowObj: any = {};
+        headers.forEach((h, idx) => {
+          const val = values[idx] || '';
+          if (h.includes('first')) rowObj.first_name = val;
+          else if (h.includes('last')) rowObj.last_name = val;
+          else if (h.includes('email') || h.includes('user')) rowObj.email = val;
+          else if (h.includes('pass')) rowObj.password = val;
+          else if (h.includes('role')) rowObj.role = val;
+          else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
+        });
+
+        // If first_name, last_name, and email are all empty, it's an unused blank template row — skip it!
+        if (!rowObj.first_name?.trim() && !rowObj.last_name?.trim() && !rowObj.email?.trim()) {
+          continue;
+        }
+
+        let email = String(rowObj.email || '').trim();
+        if (email && !email.includes('@')) {
+          email += '@jmc.edu.ph';
+        }
+        rowObj.email = email;
+
+        const errors: string[] = [];
+        if (!rowObj.first_name?.trim()) errors.push('Missing Firstname');
+        if (!rowObj.last_name?.trim()) errors.push('Missing Lastname');
+        if (!rowObj.email?.trim()) errors.push('Missing Email');
+        else if (!rowObj.email.toLowerCase().endsWith('@jmc.edu.ph')) errors.push('Must end with @jmc.edu.ph');
+
+        rowObj.isValid = errors.length === 0;
+        rowObj.errorMsg = errors.join(', ');
+        rowObj.role = rowObj.role || 'requestor';
+        rowObj.department = rowObj.department || (filteredDepts[0]?.display_name || 'General Department');
+        rowObj.password = rowObj.password || 'Jmcfi@2026';
+        rows.push(rowObj);
+      }
+
+      if (rows.length === 0) {
+        showToast('The uploaded Excel template has no user data entered yet. Please fill in names and emails first.', 'warning');
+        setCsvParsedRows([]);
+        return;
+      }
+
+      setCsvParsedRows(rows);
+      return; // Never fall through to CSV parser for HTML files
     }
 
     // 2. Standard CSV parsing
@@ -1021,7 +1034,6 @@ export default function ITAdminDashboard() {
       const line = lines[i].trim();
       if (line.startsWith('#')) continue;
       const values = parseRow(line);
-      if (values.every(v => v === '')) continue;
 
       const rowObj: any = {};
       headers.forEach((h, idx) => {
@@ -1032,8 +1044,12 @@ export default function ITAdminDashboard() {
         else if (h.includes('pass')) rowObj.password = val;
         else if (h.includes('role')) rowObj.role = val;
         else if (h.includes('dept') || h.includes('department')) rowObj.department = val;
-        else if (h.includes('pos')) rowObj.position = val;
       });
+
+      // Skip unused blank rows
+      if (!rowObj.first_name?.trim() && !rowObj.last_name?.trim() && !rowObj.email?.trim()) {
+        continue;
+      }
 
       let email = String(rowObj.email || '').trim();
       if (email && !email.includes('@')) {
@@ -1056,7 +1072,8 @@ export default function ITAdminDashboard() {
     }
 
     if (rows.length === 0) {
-      showToast('No user records found in file.', 'warning');
+      showToast('No user records found in file. Please enter user accounts before importing.', 'warning');
+      setCsvParsedRows([]);
       return;
     }
 
