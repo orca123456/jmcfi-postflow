@@ -342,10 +342,7 @@ export function DashboardShell({
         background-color: #1E293B !important;
         border-color: #334155 !important;
       }
-      .dark-theme [data-modal="alert-box"] div,
-      .dark-theme [data-modal="alert-box"] span {
-        color: #F8FAFC !important;
-      }
+
 
       /* React Native Web Atomic Text Classes */
       .dark-theme .r-color-15ijx5m,
