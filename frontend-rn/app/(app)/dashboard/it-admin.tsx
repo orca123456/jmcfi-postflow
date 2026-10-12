@@ -692,182 +692,52 @@ export default function ITAdminDashboard() {
   const [isImportingCsv, setIsImportingCsv] = useState(false);
 
   const handleDownloadExcelTemplate = () => {
-    const excelHtml = `
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <!--[if gte mso 9]>
-  <xml>
-    <x:ExcelWorkbook>
-      <x:ExcelWorksheets>
-        <x:ExcelWorksheet>
-          <x:Name>User Accounts Template</x:Name>
-          <x:WorksheetOptions>
-            <x:DisplayGridlines/>
-          </x:WorksheetOptions>
-        </x:ExcelWorksheet>
-      </x:ExcelWorksheets>
-    </x:ExcelWorkbook>
-  </xml>
-  <![endif]-->
-  <style>
-    body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; margin: 0; padding: 20px; color: #1E293B; }
-    .banner-cell {
-      background-color: #EBDCF9;
-      border: 1px solid #C084FC;
-      border-bottom: 4px solid #5B21B6;
-      padding: 16px 20px;
-      text-align: center;
-      vertical-align: middle;
-    }
-    .inst-title {
-      font-family: 'Times New Roman', Georgia, serif;
-      font-size: 20pt;
-      font-weight: bold;
-      color: #1E1B4B;
-      letter-spacing: 1px;
-      line-height: 1.2;
-      margin: 0;
-    }
-    .inst-subtitle {
-      font-family: Arial, sans-serif;
-      font-size: 9pt;
-      color: #4B5563;
-      margin: 3px 0 2px 0;
-    }
-    .inst-address {
-      font-family: Arial, sans-serif;
-      font-size: 8.5pt;
-      font-weight: bold;
-      color: #1F2937;
-      margin: 2px 0;
-    }
-    .inst-contact {
-      font-family: Arial, sans-serif;
-      font-size: 8pt;
-      color: #4B5563;
-      margin: 4px 0;
-    }
-    .inst-motto {
-      font-family: Arial, sans-serif;
-      font-size: 10pt;
-      font-weight: 800;
-      color: #1E1B4B;
-      margin-top: 4px;
-    }
-    .doc-title {
-      background-color: #2E1065;
-      color: #FFFFFF;
-      font-size: 11pt;
-      font-weight: bold;
-      text-align: center;
-      padding: 8px;
-    }
-    .instruction-bar {
-      background-color: #F5EEFD;
-      color: #4C1D95;
-      font-size: 8.5pt;
-      padding: 6px 12px;
-      border-bottom: 1px solid #D8B4FE;
-    }
-    .data-header {
-      background-color: #C7E5C8;
-      color: #14532D;
-      font-weight: bold;
-      font-size: 10pt;
-      border: 1px solid #94A3B8;
-      padding: 10px 8px;
-      text-align: center;
-      vertical-align: middle;
-      height: 32px;
-    }
-    .data-row td {
-      border: 1px solid #CBD5E1;
-      padding: 8px 10px;
-      font-size: 9.5pt;
-      vertical-align: middle;
-    }
-    .row-even { background-color: #FFFFFF; }
-    .row-odd { background-color: #F8FAFC; }
-    .role-badge { font-weight: bold; color: #1E40AF; text-align: center; }
-    .guidance-box {
-      margin-top: 20px;
-      background-color: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      padding: 14px;
-      font-size: 8.5pt;
-      color: #475569;
-    }
-  </style>
-</head>
-<body>
-  <table cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td colspan="6" class="banner-cell">
-        <div class="inst-title">JOSE MARIA COLLEGE</div>
-        <div class="inst-title" style="font-size: 16pt;">FOUNDATION, INC.</div>
-        <div class="inst-subtitle">(formerly JOSE MARIA COLLEGE)</div>
-        <div class="inst-address">KJC COMPOUND, PHIL-JAP FRIENDSHIP HIGHWAY, SASA, DAVAO CITY</div>
-        <div class="inst-contact">&#127760; www.jmc.edu.ph &nbsp;|&nbsp; &#9993; communications@jmc.edu.ph &nbsp;|&nbsp; &#9742; (+639) 994970107</div>
-        <div class="inst-motto">Assured &bull; Consistent &bull; Quality Education</div>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="6" class="doc-title">
-        USER ACCOUNTS BULK IMPORT TEMPLATE
-      </td>
-    </tr>
-    <tr>
-      <td colspan="6" class="instruction-bar">
-        <b>NOTE:</b> Do NOT modify the column headers in Row 4. Required fields: <i>first_name</i>, <i>last_name</i>, <i>email</i> (must end with @jmc.edu.ph). Valid roles: <i>requestor</i>, <i>office_head</i>, <i>vice_president</i>, <i>imc_qa</i>, <i>it_admin</i>.
-      </td>
-    </tr>
-    <tr>
-      <th class="data-header" style="width: 150px;">first_name</th>
-      <th class="data-header" style="width: 150px;">last_name</th>
-      <th class="data-header" style="width: 260px;">email</th>
-      <th class="data-header" style="width: 140px;">password</th>
-      <th class="data-header" style="width: 140px;">role</th>
-      <th class="data-header" style="width: 260px;">department</th>
-    </tr>
-    ${Array.from({ length: 100 }, (_, i) => `
-    <tr class="data-row ${i % 2 === 0 ? 'row-even' : 'row-odd'}">
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>`).join('')}
-    <tr>
-      <td colspan="6" style="height: 16px;"></td>
-    </tr>
-    <tr>
-      <td colspan="6" class="guidance-box">
-        <b>Allowed System Roles:</b><br/>
-        &bull; <b>requestor</b> &mdash; Faculty members, Instructors, Teachers, Department Staff<br/>
-        &bull; <b>office_head</b> &mdash; College Deans, Department Heads, Unit Chiefs<br/>
-        &bull; <b>vice_president</b> &mdash; Vice President for Academic / Institutional Affairs<br/>
-        &bull; <b>imc_qa</b> &mdash; Integrated Marketing Communications & Quality Assurance Checkers<br/>
-        &bull; <b>it_admin</b> &mdash; IT & Systems Administrators<br/><br/>
-        <b>Password Rule:</b> If left blank, the system automatically assigns <i>Jmcfi@2026</i> as initial password.
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+    try {
+      const wb = XLSX.utils.book_new();
+      const headers = ['first_name', 'last_name', 'email', 'password', 'role', 'department'];
+      const sampleRow = [
+        'Juan',
+        'Dela Cruz',
+        'juan.delacruz@jmc.edu.ph',
+        'Jmcfi@2026',
+        'requestor',
+        filteredDepts[0]?.display_name || 'College of Computer Studies',
+      ];
 
-    if (Platform.OS === 'web') {
-      const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'jmcfi_user_accounts_template.xls');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showToast('Excel template downloaded successfully!', 'success');
+      // Add headers and 100 pre-formatted template rows
+      const data = [
+        headers,
+        sampleRow,
+        ...Array.from({ length: 99 }, () => ['', '', '', '', '', '']),
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [
+        { wch: 18 }, // first_name
+        { wch: 18 }, // last_name
+        { wch: 32 }, // email
+        { wch: 16 }, // password
+        { wch: 18 }, // role
+        { wch: 34 }, // department
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Institutional Accounts');
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'jmcfi_user_accounts_template.xlsx');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast('Excel template (.xlsx) downloaded successfully!', 'success');
+      }
+    } catch (err: any) {
+      showToast('Failed to generate Excel template: ' + err.message, 'error');
     }
   };
 
@@ -926,20 +796,39 @@ export default function ITAdminDashboard() {
     }
 
     // Find the actual column header row:
-    // It must have at least 3 distinct columns and contain separate cells for first_name, last_name, and email
+    // Strategy 1: Look for distinct columns for first_name, last_name, and email
     let headerRowIndex = -1;
     for (let i = 0; i < rawRows.length; i++) {
       const row = rawRows[i];
-      if (!Array.isArray(row) || row.length < 3) continue;
+      if (!Array.isArray(row) || row.length < 2) continue;
 
-      const normCells = row.map(c => String(c ?? '').toLowerCase().replace(/[\s_-]+/g, ''));
-      const hasFirst = normCells.some(c => c === 'firstname' || c.includes('firstname') || c.startsWith('first'));
-      const hasLast = normCells.some(c => c === 'lastname' || c.includes('lastname') || c.startsWith('last'));
-      const hasEmail = normCells.some(c => c === 'email' || c.includes('email'));
+      const normCells = row.map(c => String(c ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ''));
 
-      if (hasFirst && hasLast && hasEmail) {
+      // Each header cell must be short (<= 30 characters) to filter out banner notes or instructions
+      const firstIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'firstname' || c.includes('firstname') || c.startsWith('first')));
+      const lastIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'lastname' || c.includes('lastname') || c.startsWith('last')));
+      const emailIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'email' || c.includes('email')));
+
+      if (firstIdx !== -1 && lastIdx !== -1 && emailIdx !== -1 && firstIdx !== lastIdx && firstIdx !== emailIdx && lastIdx !== emailIdx) {
         headerRowIndex = i;
         break;
+      }
+    }
+
+    // Strategy 2: Fallback if first & last name are combined in a single 'name' or 'fullname' column
+    if (headerRowIndex === -1) {
+      for (let i = 0; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (!Array.isArray(row) || row.length < 2) continue;
+
+        const normCells = row.map(c => String(c ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ''));
+        const nameIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'name' || c === 'fullname' || c.includes('fullname')));
+        const emailIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'email' || c.includes('email')));
+
+        if (nameIdx !== -1 && emailIdx !== -1 && nameIdx !== emailIdx) {
+          headerRowIndex = i;
+          break;
+        }
       }
     }
 
@@ -966,6 +855,11 @@ export default function ITAdminDashboard() {
         const val = String(values[idx] ?? '').trim();
         if (h.includes('first')) rowObj.first_name = val;
         else if (h.includes('last')) rowObj.last_name = val;
+        else if (h === 'name' || h === 'fullname' || h.includes('fullname')) {
+          const parts = val.split(' ');
+          rowObj.first_name = parts[0] || '';
+          rowObj.last_name = parts.slice(1).join(' ') || '';
+        }
         else if (h.includes('email') || h.includes('user')) rowObj.email = val;
         else if (h.includes('pass')) rowObj.password = val;
         else if (h.includes('role')) rowObj.role = val;
@@ -3408,7 +3302,7 @@ export default function ITAdminDashboard() {
                         }}
                       >
                         <Ionicons name="document-text-outline" size={14} color="#fff" />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Excel (.xls)</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Excel (.xlsx)</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleDownloadCsvTemplate}
