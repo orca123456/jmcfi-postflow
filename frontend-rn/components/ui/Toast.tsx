@@ -175,39 +175,14 @@ export const Toast: React.FC<ToastProps> = ({
             {message}
           </Text>
 
-          {/* Action Button: Single full-width OK button for Success; Dismiss + OK for Error/Warning */}
-          {isSuccess ? (
-            <TouchableOpacity
-              style={styles.fullOkBtn}
-              onPress={handleOk}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.okText}>OK</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[
-                  styles.dismissBtn,
-                  { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
-                ]}
-                onPress={handleDismiss}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.dismissText, { color: isDarkMode ? '#E2E8F0' : '#475569' }]}>
-                  Dismiss
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.okBtn}
-                onPress={handleOk}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.okText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Action Button: Single full-width OK button */}
+          <TouchableOpacity
+            style={styles.fullOkBtn}
+            onPress={handleOk}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.okText}>OK</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
