@@ -619,10 +619,12 @@ export default function RequestorDashboard() {
   }, []);
 
   const [toastVisible, setToastVisible] = useState(false);
+  const [toastTitle, setToastTitle] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success', title?: string) => {
+    setToastTitle(title);
     setToastMessage(msg);
     setToastType(type);
     setToastVisible(true);
@@ -933,7 +935,7 @@ export default function RequestorDashboard() {
   const handleCheckPolicy = async () => {
     const plainText = caption.replace(/<[^>]*>/g, '').trim();
     if (!plainText) {
-      showToast('Please write a caption first before checking policy alignment.', 'error');
+      showToast('Please write a caption first before checking policy alignment.', 'error', 'Caption Required');
       return;
     }
 
@@ -1073,7 +1075,14 @@ export default function RequestorDashboard() {
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       userPhotoUrl={profilePhotoUrl}
     >
-      <Toast visible={toastVisible} message={toastMessage} type={toastType} onHide={() => setToastVisible(false)} />
+      <Toast
+        visible={toastVisible}
+        title={toastTitle}
+        message={toastMessage}
+        type={toastType}
+        onHide={() => setToastVisible(false)}
+        onDismiss={() => setToastVisible(false)}
+      />
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
       {activeTab === 'dashboard' && (
         <View style={styles.dashboardContainer}>
@@ -3567,7 +3576,7 @@ export default function RequestorDashboard() {
         onApplySuggestedCaption={(text) => {
           setCaption(text);
           setIsComplianceModalVisible(false);
-          showToast('AI refined caption applied to post!', 'success');
+          showToast('AI refined caption applied to post!', 'success', 'Caption Applied');
         }}
       />
 

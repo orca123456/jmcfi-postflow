@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
-import { Colors, BorderRadius } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../store/theme';
+import { deriveAlertTitle } from './ui/Toast';
 
 export function CustomAlertProvider({ children }: { children: React.ReactNode }) {
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
-  const [alertConfig, setAlertConfig] = useState<{ message: string; visible: boolean }>({
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message: string;
+    visible: boolean;
+    type?: 'success' | 'error' | 'info' | 'warning';
+    onOk?: () => void;
+    onDismiss?: () => void;
+  }>({
+    title: '',
     message: '',
     visible: false,
+    type: 'error',
   });
 
   useEffect(() => {
@@ -17,14 +27,81 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
     if (Platform.OS === 'web') {
       originalWindowAlert = window.alert;
       window.alert = (message: any) => {
-        setAlertConfig({ message: String(message), visible: true });
+        const msgStr = String(message ?? '');
+        setAlertConfig({
+          title: deriveAlertTitle(undefined, msgStr, 'error'),
+          message: msgStr,
+          visible: true,
+          type: 'error',
+          onOk: () => setAlertConfig((prev) => ({ ...prev, visible: false })),
+          onDismiss: () => setAlertConfig((prev) => ({ ...prev, visible: false })),
+        });
       };
     }
 
     originalAlertAlert = Alert.alert;
-    Alert.alert = (title: string, message?: string) => {
-      const fullMessage = message ? `${title}\n\n${message}` : title;
-      setAlertConfig({ message: fullMessage, visible: true });
+    Alert.alert = (title: string, message?: string, buttons?: any[]) => {
+      let finalTitle = title;
+      let finalMessage = message;
+      let alertType: 'error' | 'warning' | 'info' | 'success' = 'error';
+
+      if (!message) {
+        finalMessage = title;
+        finalTitle = deriveAlertTitle(undefined, title, 'error');
+      } else {
+        const lowerTitle = (title || '').toLowerCase();
+        if (lowerTitle.includes('success') || lowerTitle.includes('completed')) {
+          alertType = 'success';
+        } else if (lowerTitle.includes('warning') || lowerTitle.includes('select')) {
+          alertType = 'warning';
+        } else if (lowerTitle.includes('info')) {
+          alertType = 'info';
+        } else {
+          alertType = 'error';
+        }
+      }
+
+      let onOkHandler = () => setAlertConfig((prev) => ({ ...prev, visible: false }));
+      let onDismissHandler = () => setAlertConfig((prev) => ({ ...prev, visible: false }));
+
+      if (Array.isArray(buttons) && buttons.length > 0) {
+        const okBtn =
+          buttons.find(
+            (b) =>
+              (b?.text || '').toLowerCase() === 'ok' ||
+              b?.style !== 'cancel'
+          ) || buttons[buttons.length - 1];
+        const cancelBtn = buttons.find(
+          (b) =>
+            b?.style === 'cancel' ||
+            (b?.text || '').toLowerCase() === 'cancel' ||
+            (b?.text || '').toLowerCase() === 'dismiss'
+        );
+
+        if (okBtn && typeof okBtn.onPress === 'function') {
+          const originalPress = okBtn.onPress;
+          onOkHandler = () => {
+            setAlertConfig((prev) => ({ ...prev, visible: false }));
+            originalPress();
+          };
+        }
+        if (cancelBtn && typeof cancelBtn.onPress === 'function') {
+          const originalCancel = cancelBtn.onPress;
+          onDismissHandler = () => {
+            setAlertConfig((prev) => ({ ...prev, visible: false }));
+            originalCancel();
+          };
+        }
+      }
+
+      setAlertConfig({
+        title: finalTitle,
+        message: finalMessage || '',
+        visible: true,
+        type: alertType,
+        onOk: onOkHandler,
+        onDismiss: onDismissHandler,
+      });
     };
 
     return () => {
@@ -37,14 +114,65 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  // On web, every react-native <Modal> portals into <body> on FIRST mount and
-  // every modal overlay uses the same z-index (9999), so a Modal mounted EARLIER
-  // is painted UNDER a Modal mounted later. The alert Modal was always mounted
-  // from app start (before the it-admin/profile modals), so its portal ended up
-  // BEFORE them in the DOM -> the error/notification box appeared BEHIND the
-  // floating edit box. Mounting the alert Modal only while it is visible makes
-  // its portal the LAST child of <body> whenever it shows, so it always renders
-  // on top of every other modal.
+  const isSuccess = alertConfig.type === 'success';
+  const displayTitle = deriveAlertTitle(alertConfig.title, alertConfig.message, alertConfig.type || 'error');
+
+  const iconConfig = {
+    success: {
+      name: 'checkmark' as const,
+      color: '#10B981',
+      darkColor: '#34D399',
+      haloBg: '#DCFCE7',
+      darkHaloBg: 'rgba(16, 185, 129, 0.18)',
+    },
+    error: {
+      name: 'alert-circle-outline' as const,
+      color: '#EF4444',
+      darkColor: '#F87171',
+      haloBg: '#FEE2E2',
+      darkHaloBg: 'rgba(239, 68, 68, 0.18)',
+    },
+    warning: {
+      name: 'alert-circle-outline' as const,
+      color: '#F59E0B',
+      darkColor: '#FBBF24',
+      haloBg: '#FEF3C7',
+      darkHaloBg: 'rgba(245, 158, 11, 0.18)',
+    },
+    info: {
+      name: 'information-circle-outline' as const,
+      color: '#2563EB',
+      darkColor: '#60A5FA',
+      haloBg: '#DBEAFE',
+      darkHaloBg: 'rgba(37, 99, 235, 0.18)',
+    },
+  }[alertConfig.type || 'error'] || {
+    name: 'alert-circle-outline' as const,
+    color: '#EF4444',
+    darkColor: '#F87171',
+    haloBg: '#FEE2E2',
+    darkHaloBg: 'rgba(239, 68, 68, 0.18)',
+  };
+
+  const activeColor = isDarkMode ? iconConfig.darkColor : iconConfig.color;
+  const activeHaloBg = isDarkMode ? iconConfig.darkHaloBg : iconConfig.haloBg;
+
+  const handleDismiss = () => {
+    if (alertConfig.onDismiss) {
+      alertConfig.onDismiss();
+    } else {
+      setAlertConfig((prev) => ({ ...prev, visible: false }));
+    }
+  };
+
+  const handleOk = () => {
+    if (alertConfig.onOk) {
+      alertConfig.onOk();
+    } else {
+      setAlertConfig((prev) => ({ ...prev, visible: false }));
+    }
+  };
+
   return (
     <>
       {children}
@@ -52,7 +180,7 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
         <Modal
           transparent
           animationType="fade"
-          onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+          onRequestClose={handleDismiss}
         >
           <View style={styles.overlay}>
             <View
@@ -60,27 +188,71 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
                 styles.alertBox,
                 {
                   backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                  borderColor: isDarkMode ? '#334155' : '#E5E7EB',
-                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#334155' : 'rgba(0, 0, 0, 0.06)',
                 },
               ]}
               {...({ 'data-modal': 'alert-box' } as any)}
             >
-              <Text style={[styles.alertTitle, { color: isDarkMode ? '#F8FAFC' : '#0B2545' }]}>
-                JMCFI PostFlow
+              {/* Top-Right Close Button (Hidden on Success Modal) */}
+              {!isSuccess && (
+                <TouchableOpacity
+                  style={styles.closeBtn}
+                  onPress={handleDismiss}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={20} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                </TouchableOpacity>
+              )}
+
+              {/* Centered Glowing Halo & Icon */}
+              <View style={[styles.iconHalo, { backgroundColor: activeHaloBg }]}>
+                <Ionicons name={iconConfig.name} size={32} color={activeColor} />
+              </View>
+
+              {/* Title */}
+              <Text style={[styles.title, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>
+                {displayTitle}
               </Text>
-              <Text style={[styles.alertMessage, { color: isDarkMode ? '#F8FAFC' : '#1A1A2E' }]}>
+
+              {/* Subtitle / Message */}
+              <Text style={[styles.message, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
                 {alertConfig.message}
               </Text>
-              <TouchableOpacity
-                style={[
-                  styles.okButton,
-                  { backgroundColor: isDarkMode ? '#2563EB' : '#0B2545' },
-                ]}
-                onPress={() => setAlertConfig({ ...alertConfig, visible: false })}
-              >
-                <Text style={styles.okButtonText}>OK</Text>
-              </TouchableOpacity>
+
+              {/* Action Button: Single full-width OK for Success; Dismiss + OK for Error/Warning */}
+              {isSuccess ? (
+                <TouchableOpacity
+                  style={styles.fullOkBtn}
+                  onPress={handleOk}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.okText}>OK</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dismissBtn,
+                      { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                    ]}
+                    onPress={handleDismiss}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.dismissText, { color: isDarkMode ? '#E2E8F0' : '#475569' }]}>
+                      Dismiss
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.okBtn}
+                    onPress={handleOk}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.okText}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
@@ -92,45 +264,106 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999,
+    padding: 16,
+    zIndex: 99999,
   },
   alertBox: {
-    backgroundColor: '#fff',
-    borderRadius: BorderRadius.md,
-    padding: 24,
-    width: 320,
-    maxWidth: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  alertTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    marginBottom: 12,
-  },
-  alertMessage: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  okButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
+    width: 350,
+    maxWidth: '92%',
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingTop: 32,
+    paddingBottom: 24,
     paddingHorizontal: 24,
-    borderRadius: BorderRadius.sm,
-    alignSelf: 'flex-end',
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
   },
-  okButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  closeBtn: {
+    position: 'absolute',
+    top: 18,
+    right: 18,
+    padding: 4,
+    zIndex: 10,
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+  },
+  iconHalo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  message: {
     fontSize: 14,
-  }
+    lineHeight: 21,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 6,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  dismissBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+  },
+  dismissText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  okBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+  },
+  fullOkBtn: {
+    width: '100%',
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+  },
+  okText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
