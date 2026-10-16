@@ -218,7 +218,7 @@ export default function LoginScreen() {
                 style={styles.logo}
                 resizeMode="contain"
               />
-              <Text style={styles.headerTitle}>JMCFI PostFLow</Text>
+              <Text style={styles.headerTitle}>JMCFI PostFlow</Text>
             </View>
 
             <View style={styles.formContainer}>
