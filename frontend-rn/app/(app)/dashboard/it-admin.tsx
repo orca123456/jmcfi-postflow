@@ -692,17 +692,30 @@ export default function ITAdminDashboard() {
   const [csvParsedRows, setCsvParsedRows] = useState<any[]>([]);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
 
-  const handleDownloadExcelTemplate = () => {
+  const handleDownloadExcelTemplate = async () => {
     try {
       if (Platform.OS === 'web') {
-        const byteCharacters = atob(JMCFI_EXCEL_TEMPLATE_BASE64);
-        const byteNumbers = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        let blob: Blob;
+        let isOfflineFallback = false;
+
+        try {
+          const res = await usersApi.downloadTemplate();
+          blob = new Blob([res.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          });
+        } catch (networkErr: any) {
+          console.warn('Backend download failed, falling back to local base64 template:', networkErr);
+          isOfflineFallback = true;
+          const byteCharacters = atob(JMCFI_EXCEL_TEMPLATE_BASE64);
+          const byteNumbers = new Uint8Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          blob = new Blob([byteNumbers], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          });
         }
-        const blob = new Blob([byteNumbers], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
+
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -711,7 +724,12 @@ export default function ITAdminDashboard() {
         link.click();
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        showToast('Excel template (.xlsx) downloaded successfully!', 'success');
+
+        if (isOfflineFallback) {
+          showToast('Offline template downloaded (reflects system configuration at last sync).', 'warning');
+        } else {
+          showToast('Live Excel template with dynamic dependent dropdowns downloaded successfully!', 'success');
+        }
       } else {
         showToast('Excel template downloaded successfully!', 'success');
       }
