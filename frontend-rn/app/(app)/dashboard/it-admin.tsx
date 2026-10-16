@@ -743,31 +743,6 @@ export default function ITAdminDashboard() {
     }
   };
 
-  const handleDownloadCsvTemplate = () => {
-    const csvContent = [
-      '# ====================================================================================================',
-      '# JOSE MARIA COLLEGE FOUNDATION, INC.',
-      '# (formerly JOSE MARIA COLLEGE) - KJC COMPOUND, PHIL-JAP FRIENDSHIP HIGHWAY, SASA, DAVAO CITY',
-      '# Website: www.jmc.edu.ph | communications@jmc.edu.ph | (+639) 994970107',
-      '# Motto: Assured • Consistent • Quality Education',
-      '# Bulk User Accounts Import Template (Allowed roles: requestor, office_head, vice_president, imc_qa, it_admin)',
-      '# ====================================================================================================',
-      'first_name,last_name,email,password,role,department',
-    ].join('\n');
-
-    if (Platform.OS === 'web') {
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'jmcfi_user_accounts_template.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showToast('CSV template downloaded successfully!', 'success');
-    }
-  };
 
   const parseSpreadsheetData = (data: ArrayBuffer | Uint8Array | string) => {
     let workbook: XLSX.WorkBook;
@@ -3354,21 +3329,6 @@ export default function ITAdminDashboard() {
                         <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>
                           {isDownloadingExcelTemplate ? 'Downloading...' : 'Excel (.xlsx)'}
                         </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleDownloadCsvTemplate}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: 6,
-                          backgroundColor: '#2563EB',
-                        }}
-                      >
-                        <Ionicons name="download-outline" size={14} color="#fff" />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>CSV (.csv)</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
