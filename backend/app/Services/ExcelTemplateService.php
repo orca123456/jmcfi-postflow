@@ -117,7 +117,7 @@ class ExcelTemplateService
     /**
      * Generate the .xlsx template using the python generator script and system data.
      */
-    public static function generateTemplate(?string $targetOutputPath = null): string
+    public static function generateTemplate(?string $targetOutputPath = null, bool $force = false): string
     {
         $outputPath = $targetOutputPath ?: public_path('templates/jmcfi_user_accounts_template.xlsx');
         $outputDir = dirname($outputPath);
@@ -126,6 +126,17 @@ class ExcelTemplateService
         }
 
         $systemData = self::getSystemRoleDepartmentData();
+        $dataHash = md5(json_encode($systemData));
+        $hashFile = $outputDir . '/.template_hash';
+
+        // Return cached template immediately if configuration hasn't changed
+        if (!$force && file_exists($outputPath) && file_exists($hashFile)) {
+            $cachedHash = trim((string) @file_get_contents($hashFile));
+            if ($cachedHash === $dataHash && filesize($outputPath) > 1000) {
+                return $outputPath;
+            }
+        }
+
         $tempJsonPath = tempnam(sys_get_temp_dir(), 'jmcfi_tmpl_') . '.json';
         file_put_contents($tempJsonPath, json_encode($systemData, JSON_PRETTY_PRINT));
 
@@ -144,6 +155,8 @@ class ExcelTemplateService
             Log::error($msg);
             throw new \RuntimeException($msg);
         }
+
+        @file_put_contents($hashFile, $dataHash);
 
         // Sync with frontend assets if accessible
         try {
