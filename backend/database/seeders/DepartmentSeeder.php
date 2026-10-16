@@ -74,13 +74,45 @@ class DepartmentSeeder extends Seeder
             }
         }
 
-        // ── Backfill college departments ────────────────────────────────
+        // ── Seed college departments (available for requestor and approver) ──
+        $collegeDepartments = [
+            [
+                'name' => 'BSA',
+                'display_name' => 'BSA',
+                'description' => 'Bachelor of Science in Accountancy',
+                'is_system' => false,
+                'is_active' => true,
+                'role_categories' => ['requestor', 'approver'],
+            ],
+            [
+                'name' => 'College of Information Technology',
+                'display_name' => 'College of Information Technology',
+                'description' => 'College of Information Technology',
+                'is_system' => false,
+                'is_active' => true,
+                'role_categories' => ['requestor', 'approver'],
+            ],
+            [
+                'name' => 'Psyc',
+                'display_name' => 'Psyc',
+                'description' => 'Department of Psychology',
+                'is_system' => false,
+                'is_active' => true,
+                'role_categories' => ['requestor', 'approver'],
+            ],
+        ];
+
+        foreach ($collegeDepartments as $dept) {
+            Department::updateOrCreate(
+                ['name' => $dept['name']],
+                $dept
+            );
+        }
+
         // College departments are the ONLY departments available for the
         // requestor role. They also double as approver departments because
         // assigning an approver to a college department automatically
         // makes them the Office Head (department head) for that college.
-        //
-        // System departments (ITO, IMC, VPAA) are NOT available for requestors.
         Department::where('is_system', false)
             ->update(['role_categories' => json_encode(['requestor', 'approver'])]);
     }

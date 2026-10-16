@@ -360,8 +360,30 @@ class UserController extends Controller
     /**
      * Download dynamic Excel template with system-synchronized dependent dropdowns
      */
-    public function downloadTemplate(): BinaryFileResponse
+    public function downloadTemplate(Request $request): BinaryFileResponse
     {
+        // If frontend passes client-side active departments, ensure any new ones are persisted
+        if ($request->has('departments') && is_array($request->input('departments'))) {
+            foreach ($request->input('departments') as $deptData) {
+                $name = is_string($deptData) ? trim($deptData) : trim($deptData['display_name'] ?? $deptData['name'] ?? '');
+                if (!empty($name)) {
+                    $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $name));
+                    $cats = is_array($deptData) && !empty($deptData['role_categories'])
+                        ? (array) $deptData['role_categories']
+                        : ['requestor', 'approver'];
+                    \App\Models\Department::firstOrCreate(
+                        ['display_name' => $name],
+                        [
+                            'name' => $slug,
+                            'is_active' => true,
+                            'is_system' => false,
+                            'role_categories' => $cats,
+                        ]
+                    );
+                }
+            }
+        }
+
         $path = ExcelTemplateService::generateTemplate();
         return response()->download($path, 'jmcfi_user_accounts_template.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

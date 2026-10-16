@@ -699,7 +699,13 @@ export default function ITAdminDashboard() {
         let isOfflineFallback = false;
 
         try {
-          const res = await usersApi.downloadTemplate();
+          const res = await usersApi.downloadTemplate({
+            departments: departmentsList.map((d: any) => ({
+              display_name: d.display_name,
+              name: d.name,
+              role_categories: d.role_categories,
+            })),
+          });
           blob = new Blob([res.data], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           });
