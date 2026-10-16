@@ -749,7 +749,7 @@ export default function ITAdminDashboard() {
       '# ====================================================================================================',
       '# JOSE MARIA COLLEGE FOUNDATION, INC.',
       '# (formerly JOSE MARIA COLLEGE) - KJC COMPOUND, PHIL-JAP FRIENDSHIP HIGHWAY, SASA, DAVAO CITY',
-      '# Portal: www.jmc.edu.ph | communications@jmc.edu.ph | (+639) 994970107',
+      '# Website: www.jmc.edu.ph | communications@jmc.edu.ph | (+639) 994970107',
       '# Motto: Assured • Consistent • Quality Education',
       '# Bulk User Accounts Import Template (Allowed roles: requestor, office_head, vice_president, imc_qa, it_admin)',
       '# ====================================================================================================',
@@ -1754,7 +1754,7 @@ export default function ITAdminDashboard() {
         }) : prev);
       }
       await postsApi.setFeaturedMedia(postId, mediaId);
-      showToast('WordPress featured image updated!', 'success');
+      showToast('Website featured image updated!', 'success');
       loadPostsData();
     } catch (e: any) {
       showToast('Failed to update featured image: ' + (e.response?.data?.message || e.message), 'error');
@@ -1869,7 +1869,7 @@ export default function ITAdminDashboard() {
     { name: 'Facebook', percentage: 65, barColor: Colors.primary },
     { name: 'Instagram', percentage: 15, barColor: '#B45309' },
     { name: 'Twitter/X', percentage: 10, barColor: Colors.textSecondary },
-    { name: 'Portal', percentage: 10, barColor: '#3B82F6' },
+    { name: 'Website', percentage: 10, barColor: '#3B82F6' },
   ];
 
   // Analytics Period Filter State
@@ -3845,9 +3845,9 @@ export default function ITAdminDashboard() {
             },
             {
               id: 'wordpress' as const,
-              name: 'WordPress',
-              description: 'Connect your WordPress website for automatic publishing.',
-              icon: 'logo-wordpress' as const,
+              name: 'Website',
+              description: 'Connect your website for automatic publishing.',
+              icon: 'globe-outline' as const,
               color: '#0073AA',
               fields: [
                 { key: 'wordpress_url', label: 'Site URL', hint: 'Enter your WordPress site URL', placeholder: 'https://your-school.edu' },
@@ -6420,7 +6420,7 @@ $response = curl_exec($ch);`}
               </TouchableOpacity>
             </View>
 
-            {/* Platform Live Preview Choices (3 Tabs: Facebook, Instagram, WordPress) */}
+            {/* Platform Live Preview Choices (3 Tabs: Facebook, Instagram, Website) */}
             <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 8, padding: 4, marginBottom: 18 }}>
               <TouchableOpacity
                 onPress={() => setPreviewPlatformTab('facebook')}
@@ -6496,7 +6496,7 @@ $response = curl_exec($ch);`}
               >
                 <Ionicons name="globe-outline" size={16} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#64748B'} />
                 <Text style={{ fontSize: 13, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#475569' }}>
-                  WordPress
+                  Website
                 </Text>
               </TouchableOpacity>
             </View>
@@ -6593,12 +6593,12 @@ $response = curl_exec($ch);`}
                           </View>
                         )}
 
-                        {/* WORDPRESS PREVIEW MOCKUP */}
+                        {/* WEBSITE PREVIEW MOCKUP */}
                         {previewPlatformTab === 'wordpress' && (
                           <View style={{ borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 16 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
                               <Ionicons name="globe-outline" size={14} color="#21759B" />
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>Website Article Preview</Text>
                             </View>
                             <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 6 }}>{previewPost?.title}</Text>
                             <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
