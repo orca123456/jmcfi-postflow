@@ -876,6 +876,35 @@ final class ApiRoutesTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_users_bulk_import_succeeds(): void
+    {
+        $admin = $this->createTestUser('it_admin');
+        Sanctum::actingAs($admin);
+
+        $payload = [
+            'users' => [
+                [
+                    'first_name' => 'Test',
+                    'last_name' => 'BulkUser',
+                    'email' => 'test.bulk@jmc.edu.ph',
+                    'role' => 'Requestor',
+                    'department' => 'BSBA',
+                    'password' => 'Jmcfi@2026',
+                ]
+            ]
+        ];
+
+        $response = $this->postJson('/api/users/bulk', $payload);
+        $response->assertStatus(200)
+                 ->assertJsonPath('created_count', 1);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'test.bulk@jmc.edu.ph',
+            'first_name' => 'Test',
+            'last_name' => 'BulkUser',
+        ]);
+    }
+
     // =========================================================================
     // 8. SETTINGS (AI, POLICY, TOKEN, EMAIL)
     // =========================================================================

@@ -194,6 +194,7 @@ class UserController extends Controller
                 ]);
 
                 $user->assignRole($role);
+                $user->load('roles');
                 $created[] = $user;
 
                 // Send Welcome & Credentials Email to user's institutional email
@@ -220,7 +221,7 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Successfully imported ' . count($created) . ' accounts.',
             'created_count' => count($created),
-            'data' => UserResource::collection(collect($created)->load('roles')),
+            'data' => UserResource::collection(new \Illuminate\Database\Eloquent\Collection($created)),
             'errors' => $errors,
         ], 200);
     }
