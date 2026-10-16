@@ -61,7 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('categories', [CategoryController::class, 'index']);
 
     // Users (Admin only)
-    Route::get('users/template', [UserController::class, 'downloadTemplate'])->middleware('role:it_publisher,it_admin');
+    Route::match(['GET', 'POST'], 'users/template', [UserController::class, 'downloadTemplate'])->middleware('role:it_publisher,it_admin');
     Route::get('users/roles', [UserController::class, 'getRoles'])->middleware('role:it_publisher,it_admin');
     Route::post('users/bulk', [UserController::class, 'bulkStore'])->middleware('role:it_publisher,it_admin');
     Route::apiResource('users', UserController::class)->only(['index', 'store', 'show', 'update', 'destroy'])->middleware('role:it_publisher,it_admin');
