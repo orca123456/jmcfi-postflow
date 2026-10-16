@@ -77,17 +77,18 @@ class UserController extends Controller
 
         $user = User::create([
             'employee_id' => $validated['employee_id'],
-            'first_name' => $validated['first_name'],
-            'middle_name' => $validated['middle_name'] ?? null,
-            'last_name' => $validated['last_name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
+            'first_name' => trim($validated['first_name']),
+            'middle_name' => !empty($validated['middle_name']) ? trim($validated['middle_name']) : null,
+            'last_name' => trim($validated['last_name']),
+            'email' => strtolower(trim($validated['email'])),
+            'password' => Hash::make(trim($validated['password'])),
             'department' => $dept,
             'position' => $position,
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
 
-        $user->assignRole($validated['role']);
+        $user->syncRoles([$validated['role']]);
 
         AuditLogService::log('USER_CREATED', 'Created institutional account: ' . $user->full_name, 'INFO', [
             'target_user_id' => $user->id,
@@ -109,7 +110,7 @@ class UserController extends Controller
     }
 
     /**
-     * Bulk store newly created resources from CSV import.
+     * Bulk store newly created resources from CSV/Excel import.
      */
     public function bulkStore(Request $request): JsonResponse
     {
@@ -129,25 +130,16 @@ class UserController extends Controller
 
         foreach ($validated['users'] as $index => $userData) {
             $rowNum = $index + 1;
-            $email = trim($userData['email']);
-            if (!str_contains($email, '@')) {
-                $email .= '@jmc.edu.ph';
+            $rawEmail = trim($userData['email'] ?? '');
+            if (!str_contains($rawEmail, '@')) {
+                $rawEmail .= '@jmc.edu.ph';
             }
+            $email = strtolower($rawEmail);
 
-            if (!str_ends_with(strtolower($email), '@jmc.edu.ph')) {
+            if (!str_ends_with($email, '@jmc.edu.ph')) {
                 $errors[] = "Row {$rowNum}: Email '{$email}' must end with @jmc.edu.ph.";
                 continue;
             }
-
-            if (User::where('email', $email)->exists()) {
-                $errors[] = "Row {$rowNum}: Email '{$email}' already exists.";
-                continue;
-            }
-
-            // Auto-generate unique employee ID
-            do {
-                $empId = 'EMP-' . str_pad((string) mt_rand(10000, 99999), 5, '0', STR_PAD_LEFT);
-            } while (User::where('employee_id', $empId)->exists());
 
             $dept = !empty($userData['department']) ? trim($userData['department']) : null;
             $rawRole = !empty($userData['role']) ? trim($userData['role']) : 'requestor';
@@ -198,30 +190,57 @@ class UserController extends Controller
                 }
             }
 
-            $password = !empty($userData['password']) ? $userData['password'] : 'Jmcfi@2026';
+            $rawPassword = !empty($userData['password']) ? trim((string)$userData['password']) : 'Jmcfi@2026';
+            $hashedPassword = Hash::make($rawPassword);
 
             try {
-                $user = User::create([
-                    'employee_id' => $empId,
-                    'first_name' => trim($userData['first_name']),
-                    'middle_name' => !empty($userData['middle_name']) ? trim($userData['middle_name']) : null,
-                    'last_name' => trim($userData['last_name']),
-                    'email' => $email,
-                    'password' => $password,
-                    'department' => $dept,
-                    'position' => $position,
-                    'status' => 'active',
-                ]);
+                // If user with this email already exists, update their record and credentials
+                $existingUser = User::whereRaw('LOWER(email) = ?', [$email])->first();
+                if ($existingUser) {
+                    $existingUser->update([
+                        'first_name' => trim($userData['first_name']),
+                        'middle_name' => !empty($userData['middle_name']) ? trim($userData['middle_name']) : $existingUser->middle_name,
+                        'last_name' => trim($userData['last_name']),
+                        'email' => $email,
+                        'password' => $hashedPassword,
+                        'department' => $dept,
+                        'position' => $position,
+                        'status' => 'active',
+                        'email_verified_at' => $existingUser->email_verified_at ?: now(),
+                    ]);
+                    $existingUser->syncRoles([$role]);
+                    $existingUser->load('roles');
+                    $created[] = $existingUser;
+                } else {
+                    // Auto-generate unique employee ID
+                    do {
+                        $empId = 'EMP-' . str_pad((string) mt_rand(10000, 99999), 5, '0', STR_PAD_LEFT);
+                    } while (User::where('employee_id', $empId)->exists());
 
-                $user->assignRole($role);
-                $user->load('roles');
-                $created[] = $user;
+                    $user = User::create([
+                        'employee_id' => $empId,
+                        'first_name' => trim($userData['first_name']),
+                        'middle_name' => !empty($userData['middle_name']) ? trim($userData['middle_name']) : null,
+                        'last_name' => trim($userData['last_name']),
+                        'email' => $email,
+                        'password' => $hashedPassword,
+                        'department' => $dept,
+                        'position' => $position,
+                        'status' => 'active',
+                        'email_verified_at' => now(),
+                    ]);
+
+                    $user->syncRoles([$role]);
+                    $user->load('roles');
+                    $created[] = $user;
+                }
 
                 // Send Welcome & Credentials Email to user's institutional email
                 try {
-                    $user->notify(new AccountCreatedCredentialsNotification($user, $password, $role));
+                    $notifiableUser = $existingUser ?? $user;
+                    $notifiableUser->notify(new AccountCreatedCredentialsNotification($notifiableUser, $rawPassword, $role));
                 } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning("Failed to dispatch welcome email to {$user->email}: " . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::warning("Failed to dispatch welcome email to {$email}: " . $e->getMessage());
                 }
             } catch (\Exception $e) {
                 $errors[] = "Row {$rowNum} ({$email}): " . $e->getMessage();
@@ -231,19 +250,24 @@ class UserController extends Controller
         if (count($created) > 0) {
             AuditLogService::log(
                 'USERS_BULK_IMPORTED',
-                'Bulk imported ' . count($created) . ' institutional accounts via CSV',
+                'Bulk imported ' . count($created) . ' institutional accounts via spreadsheet',
                 'INFO',
                 ['count' => count($created), 'errors_count' => count($errors)],
                 $request
             );
         }
 
+        $statusCode = count($created) > 0 ? 200 : (count($errors) > 0 ? 422 : 200);
+        $message = count($created) > 0
+            ? 'Successfully imported ' . count($created) . ' accounts.' . (count($errors) > 0 ? ' (' . count($errors) . ' rows skipped)' : '')
+            : (count($errors) > 0 ? 'Failed to import accounts: ' . implode('; ', $errors) : 'No accounts were imported.');
+
         return response()->json([
-            'message' => 'Successfully imported ' . count($created) . ' accounts.',
+            'message' => $message,
             'created_count' => count($created),
             'data' => UserResource::collection(new \Illuminate\Database\Eloquent\Collection($created)),
             'errors' => $errors,
-        ], 200);
+        ], $statusCode);
     }
 
     /**

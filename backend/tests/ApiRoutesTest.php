@@ -905,6 +905,73 @@ final class ApiRoutesTest extends TestCase
         ]);
     }
 
+    public function test_imported_users_can_authenticate_via_login_endpoint(): void
+    {
+        $admin = $this->createTestUser('it_admin');
+        Sanctum::actingAs($admin);
+
+        $testEmail = 'Import.UserTest@jmc.edu.ph';
+        $testPassword = 'CustomSecurePass@2026';
+
+        $payload = [
+            'users' => [
+                [
+                    'first_name' => 'Imported',
+                    'last_name' => 'Tester',
+                    'email' => $testEmail,
+                    'role' => 'Requestor',
+                    'department' => 'College of Information Technology',
+                    'password' => $testPassword,
+                ]
+            ]
+        ];
+
+        $importResponse = $this->postJson('/api/users/bulk', $payload);
+        $importResponse->assertStatus(200)
+                       ->assertJsonPath('created_count', 1);
+
+        // Verify password is securely hashed in database and NOT plain text
+        $user = \App\Models\User::where('email', strtolower($testEmail))->first();
+        $this->assertNotNull($user);
+        $this->assertNotEquals($testPassword, $user->password);
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check($testPassword, $user->password));
+        $this->assertTrue($user->hasRole('requestor'));
+        $this->assertEquals('College of Information Technology', $user->department);
+
+        // Verify user can successfully log in with credentials
+        $loginResponse = $this->postJson('/api/auth/login', [
+            'email' => strtolower($testEmail),
+            'password' => $testPassword,
+        ]);
+
+        $loginResponse->assertStatus(200)
+                      ->assertJsonStructure(['user', 'token', 'token_type'])
+                      ->assertJsonPath('user.email', strtolower($testEmail))
+                      ->assertJsonPath('user.department', 'College of Information Technology');
+    }
+
+    public function test_users_bulk_import_validation_and_error_handling(): void
+    {
+        $admin = $this->createTestUser('it_admin');
+        Sanctum::actingAs($admin);
+
+        // Missing required fields
+        $payload = [
+            'users' => [
+                [
+                    'first_name' => '',
+                    'last_name' => 'Invalid',
+                    'email' => 'not-an-email',
+                    'role' => 'NonExistentRole',
+                ]
+            ]
+        ];
+
+        $response = $this->postJson('/api/users/bulk', $payload);
+        $response->assertStatus(422)
+                 ->assertJsonStructure(['errors']);
+    }
+
     public function test_admin_can_download_dynamic_excel_template(): void
     {
         $admin = $this->createTestUser('it_admin');
