@@ -691,21 +691,18 @@ export default function ITAdminDashboard() {
   const [csvFileName, setCsvFileName] = useState('');
   const [csvParsedRows, setCsvParsedRows] = useState<any[]>([]);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [isDownloadingExcelTemplate, setIsDownloadingExcelTemplate] = useState(false);
 
   const handleDownloadExcelTemplate = async () => {
+    if (isDownloadingExcelTemplate) return;
+    setIsDownloadingExcelTemplate(true);
     try {
       if (Platform.OS === 'web') {
         let blob: Blob;
         let isOfflineFallback = false;
 
         try {
-          const res = await usersApi.downloadTemplate({
-            departments: departmentsList.map((d: any) => ({
-              display_name: d.display_name,
-              name: d.name,
-              role_categories: d.role_categories,
-            })),
-          });
+          const res = await usersApi.downloadTemplate();
           blob = new Blob([res.data], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           });
@@ -741,6 +738,8 @@ export default function ITAdminDashboard() {
       }
     } catch (err: any) {
       showToast('Failed to download Excel template: ' + (err.message || 'Unknown error'), 'error');
+    } finally {
+      setIsDownloadingExcelTemplate(false);
     }
   };
 
@@ -2767,6 +2766,7 @@ export default function ITAdminDashboard() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity
                   onPress={handleDownloadExcelTemplate}
+                  disabled={isDownloadingExcelTemplate}
                   activeOpacity={0.7}
                   style={{
                     flexDirection: 'row',
@@ -2778,11 +2778,16 @@ export default function ITAdminDashboard() {
                     backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
                     borderWidth: 1,
                     borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                    opacity: isDownloadingExcelTemplate ? 0.7 : 1,
                   }}
                 >
-                  <Ionicons name="download-outline" size={15} color={isDarkMode ? '#94A3B8' : '#475569'} />
+                  {isDownloadingExcelTemplate ? (
+                    <ActivityIndicator size="small" color={isDarkMode ? '#94A3B8' : '#475569'} />
+                  ) : (
+                    <Ionicons name="download-outline" size={15} color={isDarkMode ? '#94A3B8' : '#475569'} />
+                  )}
                   <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
-                    Download Template
+                    {isDownloadingExcelTemplate ? 'Downloading...' : 'Download Template'}
                   </Text>
                 </TouchableOpacity>
 
@@ -3329,6 +3334,7 @@ export default function ITAdminDashboard() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <TouchableOpacity
                         onPress={handleDownloadExcelTemplate}
+                        disabled={isDownloadingExcelTemplate}
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
@@ -3337,10 +3343,17 @@ export default function ITAdminDashboard() {
                           paddingVertical: 6,
                           borderRadius: 6,
                           backgroundColor: '#15803D',
+                          opacity: isDownloadingExcelTemplate ? 0.7 : 1,
                         }}
                       >
-                        <Ionicons name="document-text-outline" size={14} color="#fff" />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Excel (.xlsx)</Text>
+                        {isDownloadingExcelTemplate ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Ionicons name="document-text-outline" size={14} color="#fff" />
+                        )}
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>
+                          {isDownloadingExcelTemplate ? 'Downloading...' : 'Excel (.xlsx)'}
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleDownloadCsvTemplate}
