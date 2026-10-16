@@ -805,12 +805,12 @@ export default function ITAdminDashboard() {
       const row = rawRows[i];
       if (!Array.isArray(row) || row.length < 2) continue;
 
-      const normCells = row.map(c => String(c ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ''));
+      const normCells = Array.from(row).map(c => String(c ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ''));
 
       // Each header cell must be short (<= 30 characters) to filter out banner notes or instructions
-      const firstIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'firstname' || c.includes('firstname') || c.startsWith('first')));
-      const lastIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'lastname' || c.includes('lastname') || c.startsWith('last')));
-      const emailIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'email' || c.includes('email')));
+      const firstIdx = normCells.findIndex(c => typeof c === 'string' && c.length > 0 && c.length <= 30 && (c === 'firstname' || c.includes('firstname') || c.startsWith('first')));
+      const lastIdx = normCells.findIndex(c => typeof c === 'string' && c.length > 0 && c.length <= 30 && (c === 'lastname' || c.includes('lastname') || c.startsWith('last')));
+      const emailIdx = normCells.findIndex(c => typeof c === 'string' && c.length > 0 && c.length <= 30 && (c === 'email' || c.includes('email')));
 
       if (firstIdx !== -1 && lastIdx !== -1 && emailIdx !== -1 && firstIdx !== lastIdx && firstIdx !== emailIdx && lastIdx !== emailIdx) {
         headerRowIndex = i;
@@ -824,9 +824,9 @@ export default function ITAdminDashboard() {
         const row = rawRows[i];
         if (!Array.isArray(row) || row.length < 2) continue;
 
-        const normCells = row.map(c => String(c ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ''));
-        const nameIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'name' || c === 'fullname' || c.includes('fullname')));
-        const emailIdx = normCells.findIndex(c => c.length > 0 && c.length <= 30 && (c === 'email' || c.includes('email')));
+        const normCells = Array.from(row).map(c => String(c ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ''));
+        const nameIdx = normCells.findIndex(c => typeof c === 'string' && c.length > 0 && c.length <= 30 && (c === 'name' || c === 'fullname' || c.includes('fullname')));
+        const emailIdx = normCells.findIndex(c => typeof c === 'string' && c.length > 0 && c.length <= 30 && (c === 'email' || c.includes('email')));
 
         if (nameIdx !== -1 && emailIdx !== -1 && nameIdx !== emailIdx) {
           headerRowIndex = i;
@@ -874,11 +874,11 @@ export default function ITAdminDashboard() {
         continue;
       }
 
-      let email = String(rowObj.email || '').trim();
+      let email = String(rowObj.email || '').trim().toLowerCase();
       if (email && !email.includes('@')) {
         email += '@jmc.edu.ph';
       }
-      rowObj.email = email;
+      rowObj.email = email.toLowerCase();
 
       const errors: string[] = [];
       if (!rowObj.first_name?.trim()) errors.push('Missing Firstname');
@@ -909,7 +909,7 @@ export default function ITAdminDashboard() {
       rowObj.isValid = errors.length === 0;
       rowObj.errorMsg = errors.join(', ');
       rowObj.role = rowObj.role || 'requestor';
-      rowObj.password = rowObj.password || 'Jmcfi@2026';
+      rowObj.password = rowObj.password?.trim() || 'Jmcfi@2026';
       rows.push(rowObj);
     }
 
@@ -976,13 +976,21 @@ export default function ITAdminDashboard() {
     try {
       const res = await usersApi.bulkCreate({ users: validRows });
       const newCreated = res.data?.data || [];
+      const backendErrors = res.data?.errors || [];
+
+      if (newCreated.length === 0) {
+        const errorDetail = backendErrors.length > 0 ? backendErrors.join('; ') : (res.data?.message || 'No accounts could be imported.');
+        showToast('Import failed: ' + errorDetail, 'error');
+        return;
+      }
+
       const updatedList = [
         ...newCreated.map((u: any) => ({
           ...u,
           role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
           created_at: new Date(u.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
         })),
-        ...users,
+        ...users.filter(u => !newCreated.some((n: any) => n.id === u.id || n.email?.toLowerCase() === u.email?.toLowerCase())),
       ];
       setUsers(updatedList);
       if (Platform.OS === 'web') {
@@ -991,13 +999,21 @@ export default function ITAdminDashboard() {
         } catch (_) {}
       }
 
-      const msg = res.data?.message || `Successfully imported ${validRows.length} accounts!`;
-      showToast(msg, 'success');
+      if (backendErrors.length > 0) {
+        showToast(`Imported ${newCreated.length} accounts. Note: ${backendErrors.join('; ')}`, 'warning');
+      } else {
+        const msg = res.data?.message || `Successfully imported ${newCreated.length} accounts!`;
+        showToast(msg, 'success');
+      }
+
       setIsCsvModalOpen(false);
       setCsvParsedRows([]);
       setCsvFileName('');
     } catch (e: any) {
-      showToast('Import failed: ' + (e.response?.data?.message || e.message), 'error');
+      const errMsg = e.response?.data?.errors?.length
+        ? e.response.data.errors.join('; ')
+        : (e.response?.data?.message || e.message);
+      showToast('Import failed: ' + errMsg, 'error');
     } finally {
       setIsImportingCsv(false);
     }
