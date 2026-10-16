@@ -158,40 +158,38 @@ class ExcelTemplateService
 
         @file_put_contents($hashFile, $dataHash);
 
-        // Sync with frontend assets if accessible
+        // Sync with frontend assets if accessible (local development only)
         try {
             $frontendAssetPath = base_path('../frontend-rn/assets/templates/jmcfi_user_accounts_template.xlsx');
-            $frontendAssetDir = dirname($frontendAssetPath);
-            if (!is_dir($frontendAssetDir)) {
-                @mkdir($frontendAssetDir, 0755, true);
-            }
-            @copy($outputPath, $frontendAssetPath);
+            if (is_dir(dirname($frontendAssetPath))) {
+                @copy($outputPath, $frontendAssetPath);
 
-            // Also update the base64 fallback in frontend-rn/constants/excelTemplateBase64.ts
-            $frontendBase64Path = base_path('../frontend-rn/constants/excelTemplateBase64.ts');
-            if (file_exists(dirname($frontendBase64Path))) {
-                $base64Content = base64_encode(file_get_contents($outputPath));
-                $tsCode = "// Auto-generated synchronized JMCFI Excel template base64 with dynamic role & department dropdowns\n"
-                    . "export const JMCFI_EXCEL_TEMPLATE_BASE64 = \"" . $base64Content . "\";\n";
-                file_put_contents($frontendBase64Path, $tsCode);
+                // Also update the base64 fallback in frontend-rn/constants/excelTemplateBase64.ts
+                $frontendBase64Path = base_path('../frontend-rn/constants/excelTemplateBase64.ts');
+                if (file_exists(dirname($frontendBase64Path))) {
+                    $base64Content = base64_encode(file_get_contents($outputPath));
+                    $tsCode = "// Auto-generated synchronized JMCFI Excel template base64 with dynamic role & department dropdowns\n"
+                        . "export const JMCFI_EXCEL_TEMPLATE_BASE64 = \"" . $base64Content . "\";\n";
+                    file_put_contents($frontendBase64Path, $tsCode);
+                }
             }
         } catch (\Throwable $e) {
-            Log::warning('ExcelTemplateService: Could not sync frontend template assets: ' . $e->getMessage());
+            // Silently ignore in production container where ../frontend-rn does not exist
         }
 
         return $outputPath;
     }
 
     /**
-     * Get the latest template file path, generating if missing.
+     * Get the latest template file path, returning cached file immediately if present.
      */
     public static function getTemplatePath(): string
     {
         $path = public_path('templates/jmcfi_user_accounts_template.xlsx');
-        if (!file_exists($path)) {
-            return self::generateTemplate($path);
+        if (file_exists($path) && filesize($path) > 1000) {
+            return $path;
         }
-        return $path;
+        return self::generateTemplate($path);
     }
 
     /**
@@ -199,13 +197,8 @@ class ExcelTemplateService
      */
     private static function resolvePythonCommand(): string
     {
-        $candidates = ['python', 'py -3', 'python3'];
-        foreach ($candidates as $cand) {
-            exec("{$cand} --version 2>&1", $out, $code);
-            if ($code === 0) {
-                return $cand;
-            }
-            $out = [];
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return 'python3';
         }
         return 'python';
     }
