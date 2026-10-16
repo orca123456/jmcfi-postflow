@@ -43,6 +43,7 @@ import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictur
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import * as XLSX from 'xlsx';
+import { JMCFI_EXCEL_TEMPLATE_BASE64 } from '../../../constants/excelTemplateBase64';
 
 interface StatCardProps {
   label: string;
@@ -693,39 +694,15 @@ export default function ITAdminDashboard() {
 
   const handleDownloadExcelTemplate = () => {
     try {
-      const wb = XLSX.utils.book_new();
-      const headers = ['first_name', 'last_name', 'email', 'password', 'role', 'department'];
-      const sampleRow = [
-        'Juan',
-        'Dela Cruz',
-        'juan.delacruz@jmc.edu.ph',
-        'Jmcfi@2026',
-        'requestor',
-        filteredDepts[0]?.display_name || 'College of Computer Studies',
-      ];
-
-      // Add headers and 100 pre-formatted template rows
-      const data = [
-        headers,
-        sampleRow,
-        ...Array.from({ length: 99 }, () => ['', '', '', '', '', '']),
-      ];
-
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws['!cols'] = [
-        { wch: 18 }, // first_name
-        { wch: 18 }, // last_name
-        { wch: 32 }, // email
-        { wch: 16 }, // password
-        { wch: 18 }, // role
-        { wch: 34 }, // department
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Institutional Accounts');
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-
       if (Platform.OS === 'web') {
-        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const byteCharacters = atob(JMCFI_EXCEL_TEMPLATE_BASE64);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -733,11 +710,13 @@ export default function ITAdminDashboard() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         showToast('Excel template (.xlsx) downloaded successfully!', 'success');
+      } else {
+        showToast('Excel template downloaded successfully!', 'success');
       }
     } catch (err: any) {
-      showToast('Failed to generate Excel template: ' + err.message, 'error');
+      showToast('Failed to download Excel template: ' + (err.message || 'Unknown error'), 'error');
     }
   };
 
