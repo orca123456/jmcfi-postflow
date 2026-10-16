@@ -54,29 +54,29 @@ def generate_template(output_path, config_data=None):
     })
 
     fmt_institution_title = wb.add_format({
-        'font_name': 'Georgia',
-        'font_size': 16,
+        'font_name': 'Old English Text MT',
+        'font_size': 18,
         'bold': True,
-        'font_color': '#1E3A8A', # Deep Navy
+        'font_color': '#000000', # Black
         'align': 'center',
         'valign': 'vcenter'
     })
 
     fmt_foundation = wb.add_format({
-        'font_name': 'Calibri',
+        'font_name': 'Arial',
         'font_size': 11,
         'bold': True,
-        'font_color': '#374151', # Charcoal Gray
+        'font_color': '#000000', # Black
         'align': 'center',
         'valign': 'vcenter'
     })
 
     fmt_address = wb.add_format({
         'font_name': 'Calibri',
-        'font_size': 8.5,
+        'font_size': 9,
         'italic': True,
         'underline': True,
-        'font_color': '#4B5563',
+        'font_color': '#222222',
         'align': 'center',
         'valign': 'vcenter'
     })
@@ -84,23 +84,22 @@ def generate_template(output_path, config_data=None):
     fmt_contact = wb.add_format({
         'font_name': 'Calibri',
         'font_size': 8.5,
-        'font_color': '#4B5563',
+        'font_color': '#333333',
         'align': 'center',
         'valign': 'vcenter'
     })
 
-    fmt_motto = wb.add_format({
+    fmt_tagline = wb.add_format({
         'font_name': 'Calibri',
-        'font_size': 8.5,
-        'italic': True,
+        'font_size': 9,
         'bold': True,
-        'font_color': '#5B0FB8', # Royal Purple
+        'font_color': '#000000', # Black
         'align': 'center',
         'valign': 'vcenter'
     })
 
     fmt_divider = wb.add_format({
-        'bg_color': '#5B0FB8',
+        'bg_color': '#5B0FB8', # Royal Purple divider
         'border': 0
     })
 
@@ -108,8 +107,8 @@ def generate_template(output_path, config_data=None):
         'font_name': 'Calibri',
         'font_size': 11,
         'bold': True,
-        'font_color': '#FFFFFF',
-        'bg_color': '#5B0FB8', # Royal Purple
+        'font_color': '#FFFFFF', # White text
+        'bg_color': '#5B0FB8', # Royal Purple header
         'align': 'center',
         'valign': 'vcenter',
         'top': 1,
@@ -128,33 +127,33 @@ def generate_template(output_path, config_data=None):
         'bottom': 1,
         'left': 1,
         'right': 1,
-        'border_color': '#D1D5DB'
+        'border_color': '#E5E7EB'
     })
 
     # Column Widths
     ws.set_column('A:A', 18) # first_name
     ws.set_column('B:B', 18) # last_name
-    ws.set_column('C:C', 30) # email
+    ws.set_column('C:C', 32) # email
     ws.set_column('D:D', 18) # password
     ws.set_column('E:E', 20) # role
     ws.set_column('F:F', 38) # department
 
     # Row Heights
-    ws.set_row(0, 24) # Row 1: JOSE MARIA COLLEGE
+    ws.set_row(0, 26) # Row 1: JOSE MARIA COLLEGE
     ws.set_row(1, 16) # Row 2: FOUNDATION, INC.
     ws.set_row(2, 14) # Row 3: Address
     ws.set_row(3, 14) # Row 4: Contacts
-    ws.set_row(4, 14) # Row 5: Motto
-    ws.set_row(5, 6)  # Row 6: Purple Divider Bar
+    ws.set_row(4, 15) # Row 5: Tagline
+    ws.set_row(5, 5)  # Row 6: Purple Divider Bar
     ws.set_row(6, 26) # Row 7: Table Headers
 
     # Populate Letterhead
     ws.merge_range('A1:A5', '', fmt_logo_cell)
     ws.merge_range('B1:F1', 'JOSE MARIA COLLEGE', fmt_institution_title)
     ws.merge_range('B2:F2', 'FOUNDATION, INC.', fmt_foundation)
-    ws.merge_range('B3:F3', 'KJC Compound, Phil-Jap Friendship Highway, Sasa, Davao City, Philippines', fmt_address)
-    ws.merge_range('B4:F4', 'Portal: www.jmc.edu.ph | communications@jmc.edu.ph | (+639) 994970107', fmt_contact)
-    ws.merge_range('B5:F5', 'Assured • Consistent • Quality Education', fmt_motto)
+    ws.merge_range('B3:F3', 'KJC Compound, Phil-Jap Friendship Highway, Sasa, Davao City, Phillipines', fmt_address)
+    ws.merge_range('B4:F4', 'www.jmc.edu.ph    |    communications@jmc.edu.ph', fmt_contact)
+    ws.merge_range('B5:F5', 'Assured • Consistent • Quality Education', fmt_tagline)
 
     # Purple Divider Line on Row 6 (A6:F6)
     ws.merge_range('A6:F6', '', fmt_divider)
@@ -169,9 +168,9 @@ def generate_template(output_path, config_data=None):
         if os.path.exists(logo_path):
             ws.insert_image('A1', logo_path, {
                 'x_offset': 16,
-                'y_offset': 4,
-                'x_scale': 0.17,
-                'y_scale': 0.17,
+                'y_offset': 6,
+                'x_scale': 0.18,
+                'y_scale': 0.18,
                 'object_position': 1
             })
             break
@@ -221,35 +220,36 @@ def generate_template(output_path, config_data=None):
             # If no departments exist for this role, point named range to the empty cell
             wb.define_name(named_range_id, '=SystemData!$Z$1')
 
-    # Rows 8 to 60: Empty formatted data rows with dynamic dropdowns
+    # Rows 8 to 60: Empty formatted data rows
     for r in range(7, 60):
-        excel_row_num = r + 1
         ws.set_row(r, 20)
         for c in range(6):
             ws.write_blank(r, c, '', fmt_data_cell)
 
-        # Role Dropdown in Column E (index 4)
-        ws.data_validation(r, 4, r, 4, {
-            'validate': 'list',
-            'source': '=SystemRoles',
-            'ignore_blank': True,
-            'input_title': 'Select Role',
-            'input_message': 'Choose a valid system role (Approver, Requestor, Admin)',
-            'error_title': 'Invalid Role',
-            'error_message': 'Please select a valid role from the dropdown list.'
-        })
+    # Role Dropdown across E8:E60
+    ws.data_validation('E8:E60', {
+        'validate': 'list',
+        'source': '=SystemRoles',
+        'ignore_blank': True,
+        'input_title': 'Select Role',
+        'input_message': 'Choose a valid system role (Requestor, Approver, Admin)',
+        'error_type': 'stop',
+        'error_title': 'Invalid Role',
+        'error_message': 'Please select a valid role from the dropdown list.'
+    })
 
-        # Dependent Department Dropdown in Column F (index 5)
-        # Evaluates =INDIRECT(SUBSTITUTE($E8, " ", "_"))
-        ws.data_validation(r, 5, r, 5, {
-            'validate': 'list',
-            'source': f'=INDIRECT(SUBSTITUTE($E{excel_row_num}, " ", "_"))',
-            'ignore_blank': True,
-            'input_title': 'Select Department',
-            'input_message': 'Select role in Column E first, then choose from role-assigned departments.',
-            'error_title': 'Invalid Department',
-            'error_message': 'Please select a department that belongs to the selected role.'
-        })
+    # Dependent Department Dropdown across F8:F60
+    # Standard Excel formula =INDIRECT($E8) natively maps to named ranges Requestor, Approver, Admin
+    ws.data_validation('F8:F60', {
+        'validate': 'list',
+        'source': '=INDIRECT($E8)',
+        'ignore_blank': True,
+        'input_title': 'Select Department',
+        'input_message': 'Select role in Column E first, then choose from role-assigned departments.',
+        'error_type': 'stop',
+        'error_title': 'Invalid Department',
+        'error_message': 'Please select a valid department assigned to the selected role.'
+    })
 
     wb.close()
     print(f"Successfully generated dynamic template at: {output_path}")
