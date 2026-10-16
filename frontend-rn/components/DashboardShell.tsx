@@ -580,7 +580,7 @@ export function DashboardShell({
               resizeMode="contain"
             />
             <Text style={styles.logoText} numberOfLines={1}>
-              {width > 420 ? 'JMCFI PostFLow' : 'PostFLow'}
+              {width > 420 ? 'JMCFI PostFlow' : 'PostFlow'}
             </Text>
           </TouchableOpacity>
         </View>
