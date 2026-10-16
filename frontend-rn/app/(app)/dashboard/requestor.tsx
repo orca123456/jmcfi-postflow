@@ -1522,7 +1522,7 @@ export default function RequestorDashboard() {
                         <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
                           <Ionicons name="globe-outline" size={18} color="#059669" />
                         </View>
-                        <Text style={styles.platformNameText}>Website Portal</Text>
+                        <Text style={styles.platformNameText}>Website</Text>
                       </View>
                       <View style={[styles.checkboxOutline, platforms.portal && styles.checkboxChecked]}>
                         {platforms.portal && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
@@ -1836,13 +1836,13 @@ export default function RequestorDashboard() {
                     <View style={{ marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: Colors.border }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="logo-wordpress" size={16} color="#21759B" />
+                          <Ionicons name="globe-outline" size={16} color="#21759B" />
                           <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>
-                            WordPress Featured Image Choice
+                            Website Featured Image Choice
                           </Text>
                         </View>
                         <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                          {mediaFiles.length === 1 ? '1 image attached' : `${mediaFiles.length} images attached — tap to select 1 for WordPress`}
+                          {mediaFiles.length === 1 ? '1 image attached' : `${mediaFiles.length} images attached — tap to select 1 for Website`}
                         </Text>
                       </View>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
@@ -1867,7 +1867,7 @@ export default function RequestorDashboard() {
                             >
                               {isSelected && (
                                 <View style={{ position: 'absolute', top: 4, right: 4, zIndex: 5, backgroundColor: '#21759B', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>WordPress</Text>
+                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>Website</Text>
                                 </View>
                               )}
                               <View style={{ width: '100%', height: 64, borderRadius: 6, overflow: 'hidden', backgroundColor: '#E5E7EB', marginBottom: 4, justifyContent: 'center', alignItems: 'center' }}>
@@ -1901,7 +1901,7 @@ export default function RequestorDashboard() {
                     <Text style={styles.cardTitle}>Live Preview</Text>
                   </View>
 
-                  {/* Platform Choice Selector (3 Choices: Facebook, Instagram, WordPress) */}
+                  {/* Platform Choice Selector (3 Choices: Facebook, Instagram, Website) */}
                   <View style={{
                     flexDirection: 'row',
                     backgroundColor: isDarkMode ? '#0F172A' : '#F3F4F6',
@@ -2009,7 +2009,7 @@ export default function RequestorDashboard() {
                         fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500',
                         color: previewPlatformTab === 'wordpress' ? '#21759B' : (isDarkMode ? '#94A3B8' : '#4B5563')
                       }}>
-                        WordPress
+                        Website
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -2206,7 +2206,7 @@ export default function RequestorDashboard() {
                               alignSelf: 'flex-start',
                             }}>
                               <Ionicons name="globe-outline" size={13} color="#21759B" />
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#38BDF8' : '#21759B' }}>WordPress Article Preview</Text>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#38BDF8' : '#21759B' }}>Website Article Preview</Text>
                             </View>
 
                             <Text style={{ fontSize: 16, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 4, lineHeight: 20 }}>
@@ -2221,14 +2221,14 @@ export default function RequestorDashboard() {
                               <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginBottom: 10 }}>
                                 <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: 180, borderRadius: 6, backgroundColor: '#f3f4f6' }} resizeMode="cover" />
                                 <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(33, 117, 155, 0.9)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>WordPress Featured Image</Text>
+                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>Website Featured Image</Text>
                                 </View>
                               </TouchableOpacity>
                             ) : (
                               <View style={[styles.mockPostMediaPlaceholder, { height: 120, marginBottom: 10 }]}>
                                 <Ionicons name="image-outline" size={28} color={Colors.textMuted} />
                                 <Text style={styles.mockPostMediaPlaceholderText}>
-                                  Upload media for WordPress Featured Image...
+                                  Upload media for Website Featured Image...
                                 </Text>
                               </View>
                             )}
@@ -3203,7 +3203,7 @@ export default function RequestorDashboard() {
                         } else if (pLower === 'portal' || pLower === 'website' || pLower === 'wordpress') {
                           iconName = 'globe-outline';
                           iconColor = '#059669';
-                          label = 'WordPress / Website';
+                          label = 'Website';
                         }
 
                         return (
@@ -3270,7 +3270,7 @@ export default function RequestorDashboard() {
                 </TouchableOpacity>
               </View>
 
-              {/* Platform Choice Selector (3 Choices: Facebook, Instagram, WordPress) */}
+              {/* Platform Choice Selector (3 Choices: Facebook, Instagram, Website) */}
               <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 3, marginBottom: 12 }}>
                 <TouchableOpacity
                   onPress={() => setPreviewPlatformTab('facebook')}
@@ -3334,7 +3334,7 @@ export default function RequestorDashboard() {
                 >
                   <Ionicons name="globe-outline" size={15} color={previewPlatformTab === 'wordpress' ? '#21759B' : '#6B7280'} />
                   <Text style={{ fontSize: 12, fontWeight: previewPlatformTab === 'wordpress' ? '700' : '500', color: previewPlatformTab === 'wordpress' ? '#21759B' : '#4B5563' }}>
-                    WordPress
+                    Website
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -3454,7 +3454,7 @@ export default function RequestorDashboard() {
                         <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 14 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
                             <Ionicons name="globe-outline" size={13} color="#21759B" />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>WordPress Article Preview</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>Website Article Preview</Text>
                           </View>
 
                           <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 4, lineHeight: 20 }}>
@@ -3469,14 +3469,14 @@ export default function RequestorDashboard() {
                             <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(activePreviewUri)} style={{ marginBottom: 10 }}>
                               <Image source={{ uri: activePreviewUri }} style={{ width: '100%', height: 180, borderRadius: 6, backgroundColor: '#f3f4f6' }} resizeMode="cover" />
                               <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(33, 117, 155, 0.9)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>WordPress Featured Image</Text>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>Website Featured Image</Text>
                               </View>
                             </TouchableOpacity>
                           ) : (
                             <View style={[styles.mockPostMediaPlaceholder, { height: 120, marginBottom: 10 }]}>
                               <Ionicons name="image-outline" size={28} color={Colors.textMuted} />
                               <Text style={styles.mockPostMediaPlaceholderText}>
-                                Upload media for WordPress Featured Image...
+                                Upload media for Website Featured Image...
                               </Text>
                             </View>
                           )}
