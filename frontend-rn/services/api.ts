@@ -150,6 +150,7 @@ export const usersApi = {
   bulkCreate: (data: { users: any[] }) => api.post('/users/bulk', data),
   update: (id: string | number, data: object) => api.put(`/users/${id}`, data),
   delete: (id: string | number, params?: any) => api.delete(`/users/${id}`, { params }),
+  downloadTemplate: () => api.get('/users/template', { responseType: 'blob' }),
 };
 
 // ── Departments endpoints ───────────────────────────────────────────────────

@@ -905,6 +905,64 @@ final class ApiRoutesTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_download_dynamic_excel_template(): void
+    {
+        $admin = $this->createTestUser('it_admin');
+        Sanctum::actingAs($admin);
+
+        $response = $this->get('/api/users/template');
+        $response->assertStatus(200);
+        $this->assertTrue(
+            str_contains($response->headers->get('Content-Type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        );
+        $this->assertTrue(
+            str_contains($response->headers->get('Content-Disposition'), 'jmcfi_user_accounts_template.xlsx')
+        );
+    }
+
+    public function test_excel_template_service_dynamic_role_department_mappings(): void
+    {
+        // Create an Approver-only department
+        $approverDept = \App\Models\Department::create([
+            'name' => 'test_vp_office',
+            'display_name' => 'Test VP Office',
+            'is_active' => true,
+            'role_categories' => ['approver']
+        ]);
+
+        // Create a Requestor-and-Approver college department
+        $collegeDept = \App\Models\Department::create([
+            'name' => 'test_college',
+            'display_name' => 'Test College of Engineering',
+            'is_active' => true,
+            'role_categories' => ['requestor', 'approver']
+        ]);
+
+        $data = \App\Services\ExcelTemplateService::getSystemRoleDepartmentData();
+
+        // 1. Verify Requestor has College, but NOT VP Office
+        $this->assertContains('Test College of Engineering', $data['mappings']['Requestor']);
+        $this->assertNotContains('Test VP Office', $data['mappings']['Requestor']);
+
+        // 2. Verify Approver has both College and VP Office
+        $this->assertContains('Test College of Engineering', $data['mappings']['Approver']);
+        $this->assertContains('Test VP Office', $data['mappings']['Approver']);
+
+        // 3. Verify Admin does NOT have College or VP Office
+        $this->assertNotContains('Test College of Engineering', $data['mappings']['Admin']);
+        $this->assertNotContains('Test VP Office', $data['mappings']['Admin']);
+
+        // 4. Verify deactivation removes department from template options
+        $collegeDept->update(['is_active' => false]);
+        $freshData = \App\Services\ExcelTemplateService::getSystemRoleDepartmentData();
+        $this->assertNotContains('Test College of Engineering', $freshData['mappings']['Requestor']);
+        $this->assertNotContains('Test College of Engineering', $freshData['mappings']['Approver']);
+
+        // Cleanup
+        $approverDept->forceDelete();
+        $collegeDept->forceDelete();
+    }
+
     // =========================================================================
     // 8. SETTINGS (AI, POLICY, TOKEN, EMAIL)
     // =========================================================================

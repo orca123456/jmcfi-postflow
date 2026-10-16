@@ -70,6 +70,10 @@ class DepartmentController extends Controller
                 'role_categories' => $mergedCategories,
             ], $request);
 
+            try {
+                \App\Services\ExcelTemplateService::generateTemplate();
+            } catch (\Throwable $e) {}
+
             return response()->json([
                 'data' => $existingDepartment,
             ]);
@@ -87,6 +91,10 @@ class DepartmentController extends Controller
             'department_id' => $department->id,
             'role_categories' => $categories,
         ], $request);
+
+        try {
+            \App\Services\ExcelTemplateService::generateTemplate();
+        } catch (\Throwable $e) {}
 
         return response()->json([
             'data' => $department,
@@ -113,6 +121,10 @@ class DepartmentController extends Controller
             'department_id' => $department->id,
             'fields' => array_keys($validated),
         ], $request);
+
+        try {
+            \App\Services\ExcelTemplateService::generateTemplate();
+        } catch (\Throwable $e) {}
 
         return response()->json([
             'data' => $department,
@@ -141,6 +153,11 @@ class DepartmentController extends Controller
                     'department_id' => $department->id,
                     'removed_role_category' => $roleCategory,
                 ], $request);
+
+                try {
+                    \App\Services\ExcelTemplateService::generateTemplate();
+                } catch (\Throwable $e) {}
+
                 return response()->json(['data' => $department]);
             }
         }
@@ -152,6 +169,11 @@ class DepartmentController extends Controller
         AuditLogService::log('DEPARTMENT_DELETED', 'Deleted department: ' . $deletedName, 'WARNING', [
             'department_id' => $deletedId,
         ], $request);
+
+        try {
+            \App\Services\ExcelTemplateService::generateTemplate();
+        } catch (\Throwable $e) {}
+
         return response()->json(null, 204);
     }
 

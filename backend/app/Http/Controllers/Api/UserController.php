@@ -7,11 +7,13 @@ use App\Http\Resources\Api\UserResource;
 use App\Models\User;
 use App\Notifications\AccountCreatedCredentialsNotification;
 use App\Services\AuditLogService;
+use App\Services\ExcelTemplateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class UserController extends Controller
 {
@@ -146,17 +148,22 @@ class UserController extends Controller
                 $empId = 'EMP-' . str_pad((string) mt_rand(10000, 99999), 5, '0', STR_PAD_LEFT);
             } while (User::where('employee_id', $empId)->exists());
 
+            $dept = !empty($userData['department']) ? trim($userData['department']) : null;
             $rawRole = !empty($userData['role']) ? trim($userData['role']) : 'requestor';
             $role = match (strtolower($rawRole)) {
                 'admin', 'administrator', 'it_admin' => 'it_admin',
                 'publisher', 'it_publisher' => 'it_publisher',
+                'approver' => match (true) {
+                    str_contains(strtolower($dept ?? ''), 'marketing') || str_contains(strtolower($dept ?? ''), 'imc') => 'imc_qa_checker',
+                    str_contains(strtolower($dept ?? ''), 'president') || str_contains(strtolower($dept ?? ''), 'vpaa') || str_contains(strtolower($dept ?? ''), 'vice') => 'vice_president',
+                    default => 'office_head',
+                },
                 'office_head', 'office head', 'department_head', 'dean' => 'office_head',
                 'vice_president', 'vice president', 'vp' => 'vice_president',
                 'imc_qa', 'imc_qa_checker', 'qa' => 'imc_qa_checker',
                 default => 'requestor',
             };
 
-            $dept = !empty($userData['department']) ? trim($userData['department']) : null;
             $position = !empty($userData['position']) ? trim($userData['position']) : null;
 
             if (!$position) {
@@ -347,6 +354,20 @@ class UserController extends Controller
         $roles = Role::all();
         return response()->json([
             'data' => $roles
+        ]);
+    }
+
+    /**
+     * Download dynamic Excel template with system-synchronized dependent dropdowns
+     */
+    public function downloadTemplate(): BinaryFileResponse
+    {
+        $path = ExcelTemplateService::generateTemplate();
+        return response()->download($path, 'jmcfi_user_accounts_template.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
         ]);
     }
 }
