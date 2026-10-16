@@ -74,6 +74,16 @@ class ExcelTemplateService
 
             foreach ($departments as $dept) {
                 $deptCategories = array_map('strtolower', (array) ($dept->role_categories ?? []));
+                if (empty($deptCategories)) {
+                    $nameLower = strtolower($dept->display_name . ' ' . $dept->name);
+                    if (str_contains($nameLower, 'information technology office') || str_contains($nameLower, 'it office')) {
+                        $deptCategories = ['admin'];
+                    } elseif (str_contains($nameLower, 'marketing') || str_contains($nameLower, 'imc') || str_contains($nameLower, 'president') || str_contains($nameLower, 'vpaa') || str_contains($nameLower, 'vice')) {
+                        $deptCategories = ['approver'];
+                    } else {
+                        $deptCategories = ['requestor', 'approver'];
+                    }
+                }
                 $hasAccess = false;
                 foreach ($aliases as $alias) {
                     if (in_array($alias, $deptCategories, true)) {

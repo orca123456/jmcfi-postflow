@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\UserResource;
+use App\Models\Department;
 use App\Models\User;
 use App\Notifications\AccountCreatedCredentialsNotification;
 use App\Services\AuditLogService;
@@ -164,14 +165,26 @@ class UserController extends Controller
                 default => 'requestor',
             };
 
+            $category = match ($role) {
+                'it_publisher', 'it_admin' => 'admin',
+                'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
+                default => 'requestor',
+            };
+
+            if ($dept) {
+                $deptRecord = Department::where('display_name', $dept)->orWhere('name', $dept)->first();
+                if ($deptRecord && !empty($deptRecord->role_categories)) {
+                    $deptCats = array_map('strtolower', (array) $deptRecord->role_categories);
+                    if (!in_array($category, $deptCats, true)) {
+                        $errors[] = "Row {$rowNum}: Department '{$dept}' is not assigned to role '{$rawRole}'.";
+                        continue;
+                    }
+                }
+            }
+
             $position = !empty($userData['position']) ? trim($userData['position']) : null;
 
             if (!$position) {
-                $category = match ($role) {
-                    'it_publisher', 'it_admin' => 'admin',
-                    'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
-                    default => 'requestor',
-                };
                 if ($category === 'approver') {
                     $position = match ($role) {
                         'vice_president' => 'Vice President',

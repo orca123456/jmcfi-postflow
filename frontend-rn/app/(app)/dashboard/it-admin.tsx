@@ -886,10 +886,29 @@ export default function ITAdminDashboard() {
       if (!rowObj.email?.trim()) errors.push('Missing Email');
       else if (!rowObj.email.toLowerCase().endsWith('@jmc.edu.ph')) errors.push('Must end with @jmc.edu.ph');
 
+      const rawRole = (rowObj.role || 'requestor').trim().toLowerCase();
+      const roleCategory = rawRole.includes('admin')
+        ? 'admin'
+        : (rawRole.includes('approv') || rawRole.includes('head') || rawRole.includes('president') || rawRole.includes('qa')
+            ? 'approver'
+            : 'requestor');
+
+      const allowedDeptsForThisRole = departmentsForRole(roleCategory, departmentsList);
+      if (rowObj.department?.trim() && allowedDeptsForThisRole.length > 0) {
+        const deptNorm = normalizeDepartmentName(rowObj.department);
+        const matchesAllowed = allowedDeptsForThisRole.some((d: any) =>
+          normalizeDepartmentName(d.display_name) === deptNorm || normalizeDepartmentName(d.name) === deptNorm
+        );
+        if (!matchesAllowed) {
+          errors.push(`Invalid department "${rowObj.department}" for role "${rowObj.role || 'Requestor'}"`);
+        }
+      } else if (!rowObj.department?.trim()) {
+        rowObj.department = allowedDeptsForThisRole[0]?.display_name || 'College of Information Technology';
+      }
+
       rowObj.isValid = errors.length === 0;
       rowObj.errorMsg = errors.join(', ');
       rowObj.role = rowObj.role || 'requestor';
-      rowObj.department = rowObj.department || (filteredDepts[0]?.display_name || 'General Department');
       rowObj.password = rowObj.password || 'Jmcfi@2026';
       rows.push(rowObj);
     }
