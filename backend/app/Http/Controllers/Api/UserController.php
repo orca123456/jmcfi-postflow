@@ -399,8 +399,9 @@ class UserController extends Controller
      */
     public function downloadTemplate(Request $request): BinaryFileResponse
     {
-        // If frontend passes client-side active departments, ensure any new ones are persisted
-        if ($request->has('departments') && is_array($request->input('departments'))) {
+        // If frontend passes new departments to sync, update and regenerate
+        if ($request->has('departments') && is_array($request->input('departments')) && count($request->input('departments')) > 0) {
+            $changed = false;
             foreach ($request->input('departments') as $deptData) {
                 $name = is_string($deptData) ? trim($deptData) : trim($deptData['display_name'] ?? $deptData['name'] ?? '');
                 if (!empty($name)) {
@@ -408,7 +409,7 @@ class UserController extends Controller
                     $cats = is_array($deptData) && !empty($deptData['role_categories'])
                         ? (array) $deptData['role_categories']
                         : ['requestor', 'approver'];
-                    \App\Models\Department::firstOrCreate(
+                    $dept = \App\Models\Department::firstOrCreate(
                         ['display_name' => $name],
                         [
                             'name' => $slug,
@@ -417,11 +418,17 @@ class UserController extends Controller
                             'role_categories' => $cats,
                         ]
                     );
+                    if ($dept->wasRecentlyCreated) {
+                        $changed = true;
+                    }
                 }
+            }
+            if ($changed) {
+                ExcelTemplateService::generateTemplate(null, true);
             }
         }
 
-        $path = ExcelTemplateService::generateTemplate();
+        $path = ExcelTemplateService::getTemplatePath();
         return response()->download($path, 'jmcfi_user_accounts_template.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
