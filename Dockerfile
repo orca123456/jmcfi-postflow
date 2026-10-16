@@ -23,6 +23,12 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
 
 RUN apk add --no-cache git unzip supervisor
 
+# Python + xlsxwriter are required by backend/scripts/generate_excel_template.py
+# (dynamic Excel template with role -> department dependent dropdowns)
+RUN apk add --no-cache python3 py3-pip \
+    && pip3 install --no-cache-dir --break-system-packages xlsxwriter \
+    && python3 -c "import xlsxwriter; print('xlsxwriter', xlsxwriter.__version__)"
+
 # Install PHP extensions required by your Laravel app
 RUN install-php-extensions \
     pdo_pgsql \
@@ -70,6 +76,9 @@ RUN printf '%s\n' \
 
 # Copy the built frontend from STAGE 1 into Laravel's public directory
 COPY --from=frontend-builder /app/frontend-rn/dist/ ./public/
+
+# Writable folder for the generated Excel template
+RUN mkdir -p public/templates && chmod -R 777 public/templates
 
 # Use the app's Caddyfile instead of the image default so startup logs stay clean.
 COPY Caddyfile /etc/caddy/Caddyfile
