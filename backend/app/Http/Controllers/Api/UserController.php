@@ -58,20 +58,18 @@ class UserController extends Controller
         $dept = $validated['department'] ?? null;
         $role = $validated['role'];
         $position = $validated['position'] ?? null;
-        if (!$position) {
+        if (!$position || str_contains(strtolower($position), 'staff') || str_contains(strtolower($position), 'faculty')) {
             $category = match ($role) {
                 'it_publisher', 'it_admin' => 'admin',
                 'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
                 default => 'requestor',
             };
             if ($category === 'approver') {
-                $position = match ($role) {
-                    'vice_president' => 'Vice President',
-                    'imc_qa_checker' => 'QA / Branding Checker',
-                    default => 'Department Head',
-                };
+                $position = 'Approver';
             } elseif ($category === 'admin') {
                 $position = 'IT Administrator';
+            } else {
+                $position = 'Requestor';
             }
         }
 
@@ -176,17 +174,13 @@ class UserController extends Controller
 
             $position = !empty($userData['position']) ? trim($userData['position']) : null;
 
-            if (!$position) {
+            if (!$position || str_contains(strtolower($position), 'staff') || str_contains(strtolower($position), 'faculty')) {
                 if ($category === 'approver') {
-                    $position = match ($role) {
-                        'vice_president' => 'Vice President',
-                        'imc_qa_checker' => 'QA / Branding Checker',
-                        default => 'Department Head',
-                    };
+                    $position = 'Approver';
                 } elseif ($category === 'admin') {
                     $position = 'IT Administrator';
                 } else {
-                    $position = 'Staff / Faculty';
+                    $position = 'Requestor';
                 }
             }
 
@@ -321,15 +315,11 @@ class UserController extends Controller
                     default => 'requestor',
                 };
                 if ($category === 'approver') {
-                    $user->position = match ($validated['role']) {
-                        'vice_president' => 'Vice President',
-                        'imc_qa_checker' => 'QA / Branding Checker',
-                        default => 'Department Head',
-                    };
+                    $user->position = 'Approver';
                 } elseif ($category === 'admin') {
                     $user->position = 'IT Administrator';
                 } else {
-                    $user->position = 'Staff / Faculty';
+                    $user->position = 'Requestor';
                 }
                 $user->save();
             }
