@@ -184,12 +184,8 @@ const shouldShowLogoUploadTile = (department: any): boolean => {
 // Auto-suggested position for category + department (mirrors backend)
 const autoPositionFor = (category: string, department: string): string => {
   if (category === 'admin') return 'IT Administrator';
-  if (category === 'approver') {
-    if (isImcDepartment(department)) return 'QA / Branding Checker';
-    if (department === 'Office of the President' || isVicePresidentDepartment(department)) return 'Vice President';
-    return 'Department Head';
-  }
-  if (category === 'requestor') return 'Staff / Faculty';
+  if (category === 'approver') return 'Approver';
+  if (category === 'requestor') return 'Requestor';
   return '';
 };
 

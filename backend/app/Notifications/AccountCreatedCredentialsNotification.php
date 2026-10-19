@@ -26,25 +26,35 @@ class AccountCreatedCredentialsNotification extends Notification implements Shou
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appUrl     = rtrim(config('app.url') ?: 'https://postflow.jmc.edu.ph', '/');
         $tmplHeader = SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'Jose Maria College Foundation, Inc.';
-        $tmplColor  = SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
-        $tmplFooter = SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
-        $tmplLogo   = SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+        $tmplColor  = SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#4C1D95';
+        $tmplFooter = SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: 'Jose Maria College Foundation, Inc.';
+        $tmplLogo   = SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: "{$appUrl}/images/jmc_logo.png";
+        $headerBg   = "{$appUrl}/images/jmcbg2.jpeg";
 
-        $frontendUrl = config('app.frontend_url') ?: 'https://jmcfi-postflow-production.up.railway.app';
+        $frontendUrl = config('app.frontend_url') ?: 'https://postflow.jmc.edu.ph';
         $loginUrl    = rtrim($frontendUrl, '/') . '/login';
 
-        $roleDisplayName = match ($this->roleName ?? $this->user->roles->first()?->name ?? '') {
-            'it_admin', 'it_publisher' => 'IT Administrator',
-            'office_head' => 'Department / Office Head',
-            'vice_president' => 'Vice President',
-            'imc_qa_checker' => 'IMC / QA Reviewer',
-            'requestor' => 'Staff / Faculty (Requestor)',
-            default => 'Institutional Member',
-        };
+        // Resolve clean Designation: Requestor or Approver (never 'Staff / Faculty')
+        $rawRole = strtolower(trim($this->roleName ?? $this->user->roles->first()?->name ?? 'requestor'));
+        $rawPos  = trim((string)($this->user->position ?? ''));
+
+        if (in_array($rawRole, ['requestor', 'content_requestor'], true)) {
+            $designation = 'Requestor';
+        } elseif (in_array($rawRole, ['approver', 'office_head', 'vice_president', 'imc_qa_checker'], true)) {
+            $designation = 'Approver';
+        } elseif (in_array($rawRole, ['it_admin', 'it_publisher', 'admin'], true)) {
+            $designation = 'IT Administrator';
+        } elseif (!empty($rawPos) && !str_contains(strtolower($rawPos), 'staff') && !str_contains(strtolower($rawPos), 'faculty')) {
+            $designation = $rawPos;
+        } else {
+            $designation = 'Requestor';
+        }
 
         $viewData = [
             'headerTitle' => $tmplHeader,
+            'headerBg'    => $headerBg,
             'brandColor'  => $tmplColor,
             'footerText'  => $tmplFooter,
             'logoUrl'     => $tmplLogo,
@@ -54,8 +64,9 @@ class AccountCreatedCredentialsNotification extends Notification implements Shou
             'email'       => $this->user->email,
             'password'    => $this->plainPassword,
             'department'  => $this->user->department ?: 'N/A',
-            'position'    => $this->user->position ?: $roleDisplayName,
-            'roleName'    => $roleDisplayName,
+            'designation' => $designation,
+            'position'    => $designation,
+            'roleName'    => $designation,
             'loginUrl'    => $loginUrl,
         ];
 
