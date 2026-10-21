@@ -35,7 +35,7 @@ class HealthCheckController extends Controller
             $overallHealthy = false;
             $checks['database'] = [
                 'status' => 'unhealthy',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Database connection error',
             ];
         }
 
@@ -54,7 +54,7 @@ class HealthCheckController extends Controller
             $overallHealthy = false;
             $checks['storage'] = [
                 'status' => 'unhealthy',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Storage error',
             ];
         }
 
@@ -68,7 +68,7 @@ class HealthCheckController extends Controller
         } catch (Throwable $e) {
             $checks['queue'] = [
                 'status' => 'warning',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Queue driver error',
             ];
         }
 

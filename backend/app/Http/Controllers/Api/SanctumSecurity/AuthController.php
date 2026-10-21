@@ -276,9 +276,11 @@ class AuthController extends Controller
             'status' => 'active',
         ]);
 
-        if ($request->role) {
-            $user->assignRole($request->role);
+        $role = 'requestor';
+        if ($request->filled('role') && $request->user()?->hasAnyRole(['it_admin', 'it_publisher'])) {
+            $role = $request->role;
         }
+        $user->assignRole($role);
 
         $token = $user->createToken('postflow-api')->plainTextToken;
 

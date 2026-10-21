@@ -198,61 +198,16 @@ const ANALYTICS_PERIOD_OPTIONS = [
   { value: 'custom', label: 'Custom Range' },
 ];
 
-const getInitialUsers = (): any[] => {
-  if (Platform.OS === 'web') {
-    try {
-      const c = localStorage.getItem('postflow_users_cache');
-      if (c) return JSON.parse(c);
-    } catch (_) {}
-  }
-  return [];
-};
-
-const getInitialDepartments = (): any[] => {
-  if (Platform.OS === 'web') {
-    try {
-      const c = localStorage.getItem('postflow_departments_cache');
-      if (c) return JSON.parse(c);
-    } catch (_) {}
-  }
-  return [];
-};
-
-const getInitialAuditLogs = (): any[] => {
-  if (Platform.OS === 'web') {
-    try {
-      const c = localStorage.getItem('postflow_audit_logs_cache');
-      if (c) return JSON.parse(c);
-    } catch (_) {}
-  }
-  return [];
-};
-
+const getInitialUsers = (): any[] => [];
+const getInitialDepartments = (): any[] => [];
+const getInitialAuditLogs = (): any[] => [];
 const getInitialTokensCache = (): {
   tokens?: Record<string, string>;
   connections?: Record<string, boolean>;
   last_updated?: string;
-} | null => {
-  if (Platform.OS === 'web') {
-    try {
-      const c = localStorage.getItem('postflow_tokens_cache');
-      if (c) return JSON.parse(c);
-    } catch (_) {}
-  }
-  return null;
-};
+} | null => null;
 
-const saveTokensToCache = (tokens: Record<string, string>, connections: Record<string, boolean>, lastUpdated?: string) => {
-  if (Platform.OS === 'web') {
-    try {
-      localStorage.setItem('postflow_tokens_cache', JSON.stringify({
-        tokens,
-        connections,
-        last_updated: lastUpdated || new Date().toLocaleString(),
-      }));
-    } catch (_) {}
-  }
-};
+const saveTokensToCache = (_tokens: Record<string, string>, _connections: Record<string, boolean>, _lastUpdated?: string) => {};
 
 export default function ITAdminDashboard() {
   const router = useRouter();
@@ -524,11 +479,6 @@ export default function ITAdminDashboard() {
       if (res.data?.data) {
         setAuditLogs(res.data.data);
         setAuditLoaded(true);
-        if (Platform.OS === 'web' && res.data.data.length > 0) {
-          try {
-            localStorage.setItem('postflow_audit_logs_cache', JSON.stringify(res.data.data));
-          } catch (_) {}
-        }
       }
     }).catch(() => {});
 
@@ -543,11 +493,6 @@ export default function ITAdminDashboard() {
         }));
         setUsers(mappedUsers);
         setUsersLoaded(true);
-        if (Platform.OS === 'web') {
-          try {
-            localStorage.setItem('postflow_users_cache', JSON.stringify(mappedUsers));
-          } catch (_) {}
-        }
       }
     }).catch(() => {});
 
@@ -557,11 +502,6 @@ export default function ITAdminDashboard() {
       if (fetchedDepts && fetchedDepts.length > 0) {
         const mapped = fetchedDepts.map((d: any) => ({ ...d }));
         setDepartmentsList(mapped);
-        if (Platform.OS === 'web') {
-          try {
-            localStorage.setItem('postflow_departments_cache', JSON.stringify(mapped));
-          } catch (_) {}
-        }
       }
     }).catch(() => {});
 
@@ -583,16 +523,10 @@ export default function ITAdminDashboard() {
         wordpress_app_password: t.wordpress_app_password || '',
       }));
       setTokenLastUpdated(updated);
-      saveTokensToCache(t, conns, updated);
     }).catch(() => {});
 
     tokenSettingsApi.getAI().then(res => {
-      const data = res.data;
-      if (Platform.OS === 'web' && data) {
-        try {
-          localStorage.setItem('postflow_ai_settings_cache', JSON.stringify(data));
-        } catch (_) {}
-      }
+      // AI settings loaded
     }).catch(() => {});
   }, []);
 
@@ -608,11 +542,6 @@ export default function ITAdminDashboard() {
             created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
           }));
           setUsers(mappedUsers);
-          if (Platform.OS === 'web') {
-            try {
-              localStorage.setItem('postflow_users_cache', JSON.stringify(mappedUsers));
-            } catch (_) {}
-          }
         }
       }).catch(() => {});
     }
@@ -963,11 +892,6 @@ export default function ITAdminDashboard() {
         ...users.filter(u => !newCreated.some((n: any) => n.id === u.id || n.email?.toLowerCase() === u.email?.toLowerCase())),
       ];
       setUsers(updatedList);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_users_cache', JSON.stringify(updatedList));
-        } catch (_) {}
-      }
 
       if (backendErrors.length > 0) {
         showToast(`Imported ${newCreated.length} accounts. Note: ${backendErrors.join('; ')}`, 'warning');
@@ -1052,11 +976,6 @@ export default function ITAdminDashboard() {
         const res = await departmentsApi.listFresh();
         const updatedDepts = res.data?.data || [];
         setDepartmentsList(updatedDepts);
-        if (Platform.OS === 'web') {
-          try {
-            localStorage.setItem('postflow_departments_cache', JSON.stringify(updatedDepts));
-          } catch (_) {}
-        }
         setNewUserDepartment(deptName);
         showToast(`Department added to ${newUserRole}.`, 'success');
       } catch (e: any) {
@@ -1080,11 +999,6 @@ export default function ITAdminDashboard() {
       const res = await departmentsApi.listFresh();
       const fresh = res.data?.data || [];
       setDepartmentsList(fresh);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_departments_cache', JSON.stringify(fresh));
-        } catch (_) {}
-      }
       const visible = departmentsForRole(newUserRole, fresh);
       if (visible.length > 0) {
         setNewUserDepartment(visible[0].display_name);
@@ -1117,11 +1031,6 @@ export default function ITAdminDashboard() {
           const res = await departmentsApi.listFresh();
           const fresh = res.data?.data || [];
           setDepartmentsList(fresh);
-          if (Platform.OS === 'web') {
-            try {
-              localStorage.setItem('postflow_departments_cache', JSON.stringify(fresh));
-            } catch (_) {}
-          }
           showToast('Department logo uploaded successfully.', 'success');
         } catch (e: any) {
           showToast('Failed to upload department logo.', 'error');
@@ -1140,11 +1049,6 @@ export default function ITAdminDashboard() {
       const res = await departmentsApi.listFresh();
       const fresh = res.data?.data || [];
       setDepartmentsList(fresh);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_departments_cache', JSON.stringify(fresh));
-        } catch (_) {}
-      }
       
       // Update form default if the currently selected one was deleted
       if (fresh.length > 0) {
@@ -2018,11 +1922,6 @@ export default function ITAdminDashboard() {
       };
       const updatedUsers = [newAccount, ...users];
       setUsers(updatedUsers);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_users_cache', JSON.stringify(updatedUsers));
-        } catch (_) {}
-      }
       setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
       setNewUserErrors({});
       showToast('Institutional account created! Login credentials emailed to user.', 'success');
@@ -2044,11 +1943,6 @@ export default function ITAdminDashboard() {
       await usersApi.delete(id);
       const updated = users.filter(u => String(u.id) !== String(id));
       setUsers(updated);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_users_cache', JSON.stringify(updated));
-        } catch (_) {}
-      }
       showToast('User account deleted successfully.', 'success');
     } catch (e: any) {
       showToast('Failed to delete user: ' + (e.response?.data?.message || e.message), 'error');
@@ -2067,11 +1961,6 @@ export default function ITAdminDashboard() {
       await usersApi.update(id, { role: roleToSend });
       const updated = users.map(u => u.id === id ? { ...u, role: roleToSend } : u);
       setUsers(updated);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_users_cache', JSON.stringify(updated));
-        } catch (_) {}
-      }
       setEditingUserId(null);
       showToast('User role updated successfully!', 'success');
     } catch (e: any) {
@@ -2166,11 +2055,6 @@ export default function ITAdminDashboard() {
         photo_url: updatedUser.photo_url,
       } : u);
       setUsers(updatedList);
-      if (Platform.OS === 'web') {
-        try {
-          localStorage.setItem('postflow_users_cache', JSON.stringify(updatedList));
-        } catch (_) {}
-      }
       showToast('Profile updated successfully!', 'success');
 
       // If the edited user is the currently logged-in user, sync global state

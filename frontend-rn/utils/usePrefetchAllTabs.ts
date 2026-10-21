@@ -52,19 +52,6 @@ export function usePrefetchAllTabs(role: string | undefined, isInitialLoading: b
           queryKey: ['users-prefetch'],
           queryFn: async () => {
             const res = await usersApi.list();
-            const raw = res.data?.data;
-            if (raw && Array.isArray(raw)) {
-              const mappedUsers = raw.map((u: any) => ({
-                ...u,
-                role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
-                created_at: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-              }));
-              if (Platform.OS === 'web' && mappedUsers.length > 0) {
-                try {
-                  localStorage.setItem('postflow_users_cache', JSON.stringify(mappedUsers));
-                } catch (_) {}
-              }
-            }
             return res;
           },
           staleTime: 5 * 60 * 1000,
@@ -74,14 +61,6 @@ export function usePrefetchAllTabs(role: string | undefined, isInitialLoading: b
           queryKey: ['departments-prefetch'],
           queryFn: async () => {
             const res = await departmentsApi.list();
-            const fetchedDepts = res.data?.data;
-            if (fetchedDepts && Array.isArray(fetchedDepts)) {
-              if (Platform.OS === 'web' && fetchedDepts.length > 0) {
-                try {
-                  localStorage.setItem('postflow_departments_cache', JSON.stringify(fetchedDepts));
-                } catch (_) {}
-              }
-            }
             return res;
           },
           staleTime: 5 * 60 * 1000,
@@ -103,15 +82,6 @@ export function usePrefetchAllTabs(role: string | undefined, isInitialLoading: b
           queryKey: ['token-settings-prefetch'],
           queryFn: async () => {
             const res = await tokenSettingsApi.get();
-            if (Platform.OS === 'web' && res?.data) {
-              try {
-                localStorage.setItem('postflow_tokens_cache', JSON.stringify({
-                  tokens: res.data.tokens || {},
-                  connections: res.data.connections || {},
-                  last_updated: res.data.last_updated || 'Never',
-                }));
-              } catch (_) {}
-            }
             return res;
           },
           staleTime: 5 * 60 * 1000,

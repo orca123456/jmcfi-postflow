@@ -153,11 +153,11 @@ const SKELETON_HTML = `
   <script>
     (function() {
       try {
-        var token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+        var token = sessionStorage.getItem('auth_token');
         var path = (window.location && window.location.pathname) || '';
         var isAuthPage = path.indexOf('login') !== -1 || path.indexOf('auth') !== -1;
         var isDashboard = path.indexOf('dashboard') !== -1;
-        if (!token || isAuthPage || (!isDashboard && path === '/')) {
+        if (!token || !isDashboard || isAuthPage) {
           document.documentElement.classList.add('pf-hide-shell');
         }
       } catch(e) {}

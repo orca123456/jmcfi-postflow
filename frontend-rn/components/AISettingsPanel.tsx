@@ -47,27 +47,7 @@ const DEFAULT_MODELS: Record<string, string> = {
 
 type Props = { isVisible?: boolean };
 
-const getInitialSettings = (): Settings | null => {
-  if (Platform.OS === 'web') {
-    try {
-      const c = localStorage.getItem('postflow_ai_settings_cache');
-      if (c) {
-        const parsed = JSON.parse(c);
-        return {
-          ...parsed,
-          providers: Array.isArray(parsed?.providers) ? parsed.providers : [
-            { id: 'deepseek', name: 'DeepSeek' },
-            { id: 'openai', name: 'OpenAI' },
-            { id: 'gemini', name: 'Google Gemini' },
-            { id: 'groq', name: 'Groq' },
-            { id: 'openrouter', name: 'OpenRouter' },
-          ]
-        };
-      }
-    } catch (_) {}
-  }
-  return null;
-};
+const getInitialSettings = (): Settings | null => null;
 
 export function AISettingsPanel({ isVisible = true }: Props) {
   const { width: windowWidth } = useWindowDimensions();
@@ -75,8 +55,8 @@ export function AISettingsPanel({ isVisible = true }: Props) {
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   const [saved, setSaved] = useState<Settings | null>(getInitialSettings);
-  const [provider, setProvider] = useState(() => getInitialSettings()?.provider || 'deepseek');
-  const [model, setModel] = useState(() => getInitialSettings()?.model || DEFAULT_MODELS['deepseek']);
+  const [provider, setProvider] = useState(() => 'deepseek');
+  const [model, setModel] = useState(() => DEFAULT_MODELS['deepseek']);
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -107,11 +87,6 @@ export function AISettingsPanel({ isVisible = true }: Props) {
         { id: 'openrouter', name: 'OpenRouter' },
       ]
     };
-    if (Platform.OS === 'web') {
-      try {
-        localStorage.setItem('postflow_ai_settings_cache', JSON.stringify(sanitized));
-      } catch (_) {}
-    }
     setSaved(sanitized);
 
     // Only clear apiKey and reset inputs if user explicitly saved or cleared credentials

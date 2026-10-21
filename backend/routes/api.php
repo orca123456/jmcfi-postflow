@@ -23,8 +23,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 // Auth routes
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/auth/register', [AuthController::class, 'register'])->middleware(['auth:sanctum', 'role:it_publisher,it_admin']);
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/auth/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
 Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->middleware('auth:sanctum');
@@ -50,11 +50,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ->only(['index', 'store', 'show', 'update', 'destroy'])
         ->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/{postRequest}/submit', [PostRequestController::class, 'submitForApproval'])->where(['postRequest' => '[0-9]{1,19}']);
-    Route::post('posts/{postRequest}/approve', [PostRequestController::class, 'approve'])->where(['postRequest' => '[0-9]{1,19}']);
-    Route::post('posts/{postRequest}/reject', [PostRequestController::class, 'reject'])->where(['postRequest' => '[0-9]{1,19}']);
-    Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision'])->where(['postRequest' => '[0-9]{1,19}']);
-    Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck']);
-    Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/approve', [PostRequestController::class, 'approve'])->middleware('role:office_head,vice_president,imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/reject', [PostRequestController::class, 'reject'])->middleware('role:office_head,vice_president,imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision'])->middleware('role:office_head,vice_president,imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck'])->middleware('throttle:15,1');
+    Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck'])->middleware('throttle:15,1')->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/{postRequest}/featured-media', [PostRequestController::class, 'setFeaturedMedia'])->where(['postRequest' => '[0-9]{1,19}']);
 
     // Categories
@@ -76,9 +76,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Audit Logs (Admin only)
     Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('role:it_publisher,it_admin');
 
-    // Publishing
-    Route::post('publishing/{post}/schedule', [App\Http\Controllers\Api\PublishingController::class, 'schedule']);
-    Route::post('publishing/{post}/publish', [App\Http\Controllers\Api\PublishingController::class, 'publish']);
+    // Publishing (Strictly IT Admin & IT Publisher only)
+    Route::post('publishing/{post}/schedule', [App\Http\Controllers\Api\PublishingController::class, 'schedule'])->middleware('role:it_publisher,it_admin');
+    Route::post('publishing/{post}/publish', [App\Http\Controllers\Api\PublishingController::class, 'publish'])->middleware('role:it_publisher,it_admin');
 
     // Policy Settings (update admin only)
     Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);
@@ -105,8 +105,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('roles/list', [RoleController::class, 'store'])->middleware('role:it_publisher,it_admin');
     Route::delete('roles/list/{role}', [RoleController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
 
-    // Chatbot
-    Route::post('chatbot/message', [ChatbotController::class, 'handleMessage'])->middleware('auth:sanctum');
+    // Chatbot (throttled)
+    Route::post('chatbot/message', [ChatbotController::class, 'handleMessage'])->middleware(['auth:sanctum', 'throttle:20,1']);
 
     // Email Settings (Admin only)
     Route::get('email-settings', [App\Http\Controllers\Api\EmailSettingController::class, 'getSettings'])->middleware('role:it_publisher,it_admin');

@@ -36,7 +36,8 @@ class TokenSettingController extends Controller
 
         $tokens = [];
         foreach ($keys as $key) {
-            $tokens[$key] = $settings->get($key) ?? '';
+            $val = $settings->get($key) ?? '';
+            $tokens[$key] = $this->isSecretKey($key) ? $this->maskSecret($val) : $val;
         }
 
         $lastUpdated = $settings->get('tokens_last_updated') ?? 'Never';
@@ -128,6 +129,10 @@ class TokenSettingController extends Controller
             $value = $validated[$key] ?? '';
             $value = is_string($value) ? trim($value) : '';
 
+            if ($this->isSecretKey($key) && ($value === '' || $this->isMasked($value))) {
+                continue;
+            }
+
             if ($key === 'instagram_access_token' && $value === '') {
                 $value = $this->requestValueOrSetting($request, $validated, 'facebook_access_token');
             }
@@ -193,7 +198,7 @@ class TokenSettingController extends Controller
         $pageId = $this->requestValueOrSetting($request, $validated, 'facebook_page_id');
         $facebookToken = $this->requestValueOrSetting($request, $validated, 'facebook_access_token');
         $instagramId = $this->requestValueOrSetting($request, $validated, 'instagram_business_account_id');
-        $instagramToken = $request->exists('instagram_access_token') && trim((string) ($validated['instagram_access_token'] ?? '')) !== ''
+        $instagramToken = $request->exists('instagram_access_token') && trim((string) ($validated['instagram_access_token'] ?? '')) !== '' && !$this->isMasked($validated['instagram_access_token'])
             ? trim((string) $validated['instagram_access_token'])
             : ($this->requestValueOrSetting($request, $validated, 'instagram_access_token') ?: $facebookToken);
 
@@ -385,10 +390,39 @@ class TokenSettingController extends Controller
     private function requestValueOrSetting(Request $request, array $validated, string $key): string
     {
         if ($request->exists($key)) {
-            return trim((string) ($validated[$key] ?? ''));
+            $val = trim((string) ($validated[$key] ?? ''));
+            if ($this->isSecretKey($key) && ($val === '' || $this->isMasked($val))) {
+                return (string) (SystemSetting::where('key', $key)->value('value') ?? '');
+            }
+            return $val;
         }
 
         return (string) (SystemSetting::where('key', $key)->value('value') ?? '');
+    }
+
+    private function isSecretKey(string $key): bool
+    {
+        return in_array($key, [
+            'facebook_access_token',
+            'instagram_access_token',
+            'wordpress_app_password',
+        ], true);
+    }
+
+    private function isMasked(?string $value): bool
+    {
+        return is_string($value) && str_contains($value, '••••••••');
+    }
+
+    private function maskSecret(?string $value): string
+    {
+        if (!$value || strlen($value) === 0) {
+            return '';
+        }
+        if (strlen($value) <= 10) {
+            return '••••••••';
+        }
+        return substr($value, 0, 4) . '••••••••' . substr($value, -4);
     }
 
     private function checkMetaPermissions(string $accessToken, array $required): array

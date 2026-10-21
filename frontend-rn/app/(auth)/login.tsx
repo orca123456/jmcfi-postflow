@@ -129,6 +129,16 @@ export default function LoginScreen() {
   const [focusedInput, setFocusedInput] = useState<'email' | 'password' | null>(null);
 
   useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('postflow_') || k.includes('rq-v1') || k === 'auth_token' || k === 'auth_user')
+          .forEach(k => localStorage.removeItem(k));
+      } catch (_) {}
+    }
+  }, []);
+
+  useEffect(() => {
     if (lockUntil) {
       // Calculate initial countdown
       const initialRemaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
