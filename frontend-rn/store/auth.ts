@@ -132,11 +132,29 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (_) {}
     await storage.remove('auth_token');
     await storage.remove('auth_user');
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('postflow') || k.includes('auth_') || k.includes('rq-v1'))
+          .forEach(k => localStorage.removeItem(k));
+        Object.keys(sessionStorage)
+          .filter(k => k.startsWith('postflow') || k.includes('auth_'))
+          .forEach(k => sessionStorage.removeItem(k));
+      } catch (_) {}
+    }
     set({ user: null, token: null, isInitialized: true });
   },
 
   loadFromStorage: async () => {
     try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          Object.keys(localStorage)
+            .filter(k => k.startsWith('postflow_') || k.includes('rq-v1') || k === 'auth_token' || k === 'auth_user')
+            .forEach(k => localStorage.removeItem(k));
+        } catch (_) {}
+      }
+
       const token = await storage.get('auth_token');
       const userStr = await storage.get('auth_user');
       if (token && userStr) {

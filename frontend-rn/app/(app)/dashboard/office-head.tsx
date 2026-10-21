@@ -90,15 +90,7 @@ export default function OfficeHeadDashboard() {
   const [requestToReject, setRequestToReject] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
-  const [requestsList, setRequestsList] = useState<any[]>(() => {
-    if (Platform.OS === 'web') {
-      try {
-        const cached = localStorage.getItem('postflow_cached_oh_requests');
-        if (cached) return JSON.parse(cached);
-      } catch (e) {}
-    }
-    return [];
-  });
+  const [requestsList, setRequestsList] = useState<any[]>([]);
   const [approvedRequests, setApprovedRequests] = useState<any[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({
@@ -314,12 +306,6 @@ export default function OfficeHeadDashboard() {
         setRequestsList(pending);
         setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
         setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
-
-        if (Platform.OS === 'web') {
-          try {
-            localStorage.setItem('postflow_cached_oh_requests', JSON.stringify(pending));
-          } catch (e) {}
-        }
       }
 
       const statsData = data.stats || {};

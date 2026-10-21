@@ -20,6 +20,13 @@ export default function RootLayout() {
     loadFromStorage();
     
     if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        }).catch(() => {});
+      }
       if (localStorage.getItem('dark_mode') === 'true') {
         document.documentElement.classList.add('dark-theme');
         document.body.classList.add('dark-theme');

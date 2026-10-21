@@ -2,44 +2,20 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/auth';
-import { QueryClient } from '@tanstack/react-query';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Data stays "fresh" for 10 minutes
+      // Data stays "fresh" for 10 minutes in memory
       staleTime: 10 * 60 * 1000,
-      // Keep data in memory + persisted storage for 24 hours (survives F5)
-      gcTime: 24 * 60 * 60 * 1000,
-      // Don't refetch on window focus — served from persist cache
+      // Keep data in memory for 1 hour
+      gcTime: 60 * 60 * 1000,
+      // Don't refetch on window focus
       refetchOnWindowFocus: false,
       // Retry once on failure
       retry: 1,
     },
-  },
-});
-
-// Persists the ENTIRE React Query cache to localStorage safely.
-// On F5: all tab data loads at 0ms from storage. Background sync updates stale data.
-const persister = createSyncStoragePersister({
-  storage: Platform.OS === 'web' && typeof window !== 'undefined' ? window.localStorage : undefined,
-  key: 'postflow-rq-v1',
-  throttleTime: 1000,
-  serialize: (data) => {
-    try {
-      return JSON.stringify(data);
-    } catch (e) {
-      return '';
-    }
-  },
-  deserialize: (str) => {
-    try {
-      return str ? JSON.parse(str) : undefined;
-    } catch (e) {
-      return undefined;
-    }
   },
 });
 
@@ -125,21 +101,12 @@ export default function AppLayout() {
   }
 
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{
-        persister,
-        // Cache survives for 24 hours across F5 reloads
-        maxAge: 24 * 60 * 60 * 1000,
-        // Cache key version — bump this to invalidate all persisted data
-        buster: 'postflow-v1',
-      }}
-    >
+    <QueryClientProvider client={queryClient}>
       <Stack
         screenOptions={{
           headerShown: false,
         }}
       />
-    </PersistQueryClientProvider>
+    </QueryClientProvider>
   );
 }
