@@ -23,8 +23,27 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        if (app()->environment('production')) {
+        // Content-Security-Policy
+        $csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors 'self'; object-src 'none'; base-uri 'self';";
+        $response->headers->set('Content-Security-Policy', $csp);
+
+        $isHttps = app()->environment('production') || str_starts_with((string) config('app.url'), 'https') || $request->isSecure();
+
+        if ($isHttps) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
+            foreach ($response->headers->getCookies() as $cookie) {
+                $newCookie = $cookie;
+                if (!$newCookie->isSecure()) {
+                    $newCookie = $newCookie->withSecure(true);
+                }
+                if ($newCookie->getName() === 'XSRF-TOKEN' && !$newCookie->isHttpOnly()) {
+                    $newCookie = $newCookie->withHttpOnly(true);
+                }
+                if ($newCookie !== $cookie) {
+                    $response->headers->setCookie($newCookie);
+                }
+            }
         }
 
         return $response;
