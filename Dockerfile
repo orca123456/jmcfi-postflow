@@ -2,6 +2,7 @@
 # STAGE 1: Build React Native Web Frontend
 # ==========================================
 FROM node:20-alpine AS frontend-builder
+RUN apk update && apk upgrade --no-cache
 WORKDIR /app/frontend-rn
 COPY frontend-rn/package*.json ./
 # Skip downloading Playwright browser binaries during build (tests run separately)
@@ -13,7 +14,8 @@ RUN npx expo export -p web && node inject-shell.js
 # ==========================================
 # STAGE 2: Setup FrankenPHP and Laravel
 # ==========================================
-FROM dunglas/frankenphp:1-php8.2-alpine
+# Upgraded to PHP 8.3 patched runtime for CVE-2026-109618 & CVE-2026-109619
+FROM dunglas/frankenphp:1-php8.3-alpine
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_NO_INTERACTION=1 \
@@ -21,7 +23,8 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_MAX_PARALLEL_HTTP=6 \
     COMPOSER_MEMORY_LIMIT=-1
 
-RUN apk add --no-cache git unzip supervisor
+# Force upgrade all OS packages and PHP runtime to latest patched releases
+RUN apk update && apk upgrade --no-cache && apk add --no-cache git unzip supervisor
 
 # Python + xlsxwriter are required by backend/scripts/generate_excel_template.py
 # (dynamic Excel template with role -> department dependent dropdowns)
