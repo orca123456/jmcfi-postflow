@@ -28,11 +28,14 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
       originalWindowAlert = window.alert;
       window.alert = (message: any) => {
         const msgStr = String(message ?? '');
+        const lower = msgStr.toLowerCase();
+        const isSuccess = lower.includes('approved') || lower.includes('success') || lower.includes('successfully') || lower.includes('published') || lower.includes('completed');
+        const alertType = isSuccess ? 'success' : 'error';
         setAlertConfig({
-          title: deriveAlertTitle(undefined, msgStr, 'error'),
+          title: deriveAlertTitle(undefined, msgStr, alertType),
           message: msgStr,
           visible: true,
-          type: 'error',
+          type: alertType,
           onOk: () => setAlertConfig((prev) => ({ ...prev, visible: false })),
           onDismiss: () => setAlertConfig((prev) => ({ ...prev, visible: false })),
         });
@@ -193,21 +196,25 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
               ]}
               {...({ 'data-modal': 'alert-box' } as any)}
             >
-              {/* Top-Right Close Button (Hidden on Success Modal) */}
-              {!isSuccess && (
-                <TouchableOpacity
-                  style={styles.closeBtn}
-                  onPress={handleDismiss}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={20} color={isDarkMode ? '#94A3B8' : '#64748B'} />
-                </TouchableOpacity>
-              )}
+              {/* Top-Right Close Button */}
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={handleDismiss}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={20} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+              </TouchableOpacity>
 
               {/* Centered Glowing Halo & Icon */}
               <View style={[styles.iconHalo, { backgroundColor: activeHaloBg }]}>
-                <Ionicons name={iconConfig.name} size={32} color={activeColor} />
+                {isSuccess ? (
+                  <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2.5, borderColor: activeColor, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="checkmark" size={22} color={activeColor} />
+                  </View>
+                ) : (
+                  <Ionicons name={iconConfig.name} size={32} color={activeColor} />
+                )}
               </View>
 
               {/* Title */}
@@ -220,13 +227,13 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
                 {alertConfig.message}
               </Text>
 
-              {/* Action Button: Single full-width OK button */}
+              {/* Action Button: Done for success, OK for error/warning */}
               <TouchableOpacity
-                style={styles.fullOkBtn}
+                style={[styles.fullOkBtn, isSuccess && { backgroundColor: '#3B0764', shadowColor: '#3B0764' }]}
                 onPress={handleOk}
                 activeOpacity={0.8}
               >
-                <Text style={styles.okText}>OK</Text>
+                <Text style={styles.okText}>{isSuccess ? 'Done' : 'OK'}</Text>
               </TouchableOpacity>
             </View>
           </View>

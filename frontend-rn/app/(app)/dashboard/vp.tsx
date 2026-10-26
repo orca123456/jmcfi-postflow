@@ -28,6 +28,7 @@ import { postsApi, dashboardApi, authApi, resolveImageUrl } from '../../../servi
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
+import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 
 export default function VPDashboard() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function VPDashboard() {
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [approvalSuccessPost, setApprovalSuccessPost] = useState<any | null>(null);
   
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
@@ -366,6 +368,7 @@ export default function VPDashboard() {
     try {
       await postsApi.approve(reqId, {});
       loadData(false);
+      setApprovalSuccessPost(req);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to approve request.');
       loadData(false);
@@ -1460,6 +1463,14 @@ export default function VPDashboard() {
           </View>
         </Modal>
       )}
+
+      {/* Approval Success Popup Modal */}
+      <ApprovalSuccessModal
+        visible={Boolean(approvalSuccessPost)}
+        role="vice_president"
+        postTitle={approvalSuccessPost?.title || 'Request'}
+        onClose={() => setApprovalSuccessPost(null)}
+      />
     </DashboardShell>
   );
 }

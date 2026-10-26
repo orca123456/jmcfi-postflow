@@ -28,6 +28,7 @@ import { postsApi, dashboardApi, authApi, resolveImageUrl } from '../../../servi
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
+import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 
 export default function OfficeHeadDashboard() {
   const router = useRouter();
@@ -83,6 +84,7 @@ export default function OfficeHeadDashboard() {
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [approvalSuccessPost, setApprovalSuccessPost] = useState<any | null>(null);
 
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
@@ -384,9 +386,7 @@ export default function OfficeHeadDashboard() {
     try {
       await postsApi.approve(reqId, {});
       loadData(false);
-      setTimeout(() => {
-        alert(`Request Approved: "${reqTitle}"`);
-      }, 50);
+      setApprovalSuccessPost(req);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to approve request.');
       loadData(false);
@@ -1513,6 +1513,14 @@ export default function OfficeHeadDashboard() {
           </View>
         </Modal>
       )}
+
+      {/* Approval Success Popup Modal */}
+      <ApprovalSuccessModal
+        visible={Boolean(approvalSuccessPost)}
+        role="office_head"
+        postTitle={approvalSuccessPost?.title || 'Request'}
+        onClose={() => setApprovalSuccessPost(null)}
+      />
     </DashboardShell>
   );
 }

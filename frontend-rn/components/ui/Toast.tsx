@@ -31,7 +31,8 @@ export function deriveAlertTitle(
   const text = `${explicitTitle || ''} ${message || ''}`.toLowerCase();
 
   // Success-specific titles
-  if (type === 'success' || text.includes('success') || text.includes('successfully') || text.includes('applied')) {
+  if (type === 'success' || text.includes('success') || text.includes('successfully') || text.includes('applied') || text.includes('approved')) {
+    if (text.includes('approved')) return 'Request Approved';
     if (text.includes('caption') || text.includes('refined caption')) return 'Caption Applied';
     if (text.includes('profile')) return 'Profile Updated';
     if (text.includes('password')) return 'Password Changed';

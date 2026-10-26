@@ -28,6 +28,7 @@ import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictur
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { useQuery } from '@tanstack/react-query';
+import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function ImcQaDashboard() {
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [approvalSuccessPost, setApprovalSuccessPost] = useState<any | null>(null);
   
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
@@ -353,20 +355,20 @@ export default function ImcQaDashboard() {
   // Handlers for actions
   const handleApprove = async (req: any) => {
     const reqId = req.id;
-    const reqTitle = req.title;
+    const isScheduled = req.rawStatus === 'scheduled' || 
+      (Boolean(req.preferred_schedule_at) && 
+       new Date(req.preferred_schedule_at).getTime() > Date.now());
 
     // Instant optimistic UI update (0ms delay)
     setRequestsList(prev => prev.filter(r => r.id !== reqId));
     setOptimisticallyRemovedIds(prev => [...prev, reqId]);
-    setApprovedRequests(prev => [{ ...req, status: 'PUBLISHED' }, ...prev]);
+    setApprovedRequests(prev => [{ ...req, status: isScheduled ? 'SCHEDULED' : 'PUBLISHED' }, ...prev]);
     setSelectedRequest(null);
 
     try {
       await postsApi.approve(reqId, {});
       loadData(false);
-      setTimeout(() => {
-        alert(`QA Clearance Approved: "${reqTitle}"`);
-      }, 50);
+      setApprovalSuccessPost({ ...req, isScheduled });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to approve request.');
       loadData(false);
@@ -1450,6 +1452,15 @@ export default function ImcQaDashboard() {
           </View>
         </Modal>
       )}
+
+      {/* Approval Success Popup Modal */}
+      <ApprovalSuccessModal
+        visible={Boolean(approvalSuccessPost)}
+        role="imc_qa"
+        postTitle={approvalSuccessPost?.title || 'Request'}
+        isScheduled={Boolean(approvalSuccessPost?.isScheduled)}
+        onClose={() => setApprovalSuccessPost(null)}
+      />
     </DashboardShell>
   );
 }
