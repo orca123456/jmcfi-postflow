@@ -29,6 +29,7 @@ import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictur
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
+import { RejectSuccessModal } from '../../../components/ui/RejectSuccessModal';
 
 export default function VPDashboard() {
   const router = useRouter();
@@ -87,6 +88,7 @@ export default function VPDashboard() {
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [approvalSuccessPost, setApprovalSuccessPost] = useState<any | null>(null);
+  const [rejectSuccessPost, setRejectSuccessPost] = useState<any | null>(null);
   
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
@@ -403,6 +405,7 @@ export default function VPDashboard() {
     try {
       await postsApi.reject(reqId, { reason });
       loadData(false);
+      setRejectSuccessPost({ title: targetReq?.title || 'Request', role: 'vpaa' });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to reject request.');
       loadData(false);
@@ -1470,6 +1473,14 @@ export default function VPDashboard() {
         role="vice_president"
         postTitle={approvalSuccessPost?.title || 'Request'}
         onClose={() => setApprovalSuccessPost(null)}
+      />
+
+      {/* Rejection Popup Modal */}
+      <RejectSuccessModal
+        visible={Boolean(rejectSuccessPost)}
+        role="vpaa"
+        postTitle={rejectSuccessPost?.title || 'Request'}
+        onClose={() => setRejectSuccessPost(null)}
       />
     </DashboardShell>
   );

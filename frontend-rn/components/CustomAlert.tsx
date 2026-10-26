@@ -117,7 +117,6 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  const isSuccess = alertConfig.type === 'success';
   const displayTitle = deriveAlertTitle(alertConfig.title, alertConfig.message, alertConfig.type || 'error');
 
   const iconConfig = {
@@ -159,6 +158,10 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
 
   const activeColor = isDarkMode ? iconConfig.darkColor : iconConfig.color;
   const activeHaloBg = isDarkMode ? iconConfig.darkHaloBg : iconConfig.haloBg;
+
+  const isSuccess = alertConfig.type === 'success' || displayTitle.toLowerCase().includes('success') || displayTitle.toLowerCase().includes('approved');
+  const isRejected = displayTitle.toLowerCase().includes('reject') || alertConfig.message.toLowerCase().includes('reject');
+  const isDoneAction = isSuccess || isRejected;
 
   const handleDismiss = () => {
     if (alertConfig.onDismiss) {
@@ -207,10 +210,14 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
               </TouchableOpacity>
 
               {/* Centered Glowing Halo & Icon */}
-              <View style={[styles.iconHalo, { backgroundColor: activeHaloBg }]}>
+              <View style={[styles.iconHalo, { backgroundColor: isRejected ? (isDarkMode ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2') : activeHaloBg }]}>
                 {isSuccess ? (
                   <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2.5, borderColor: activeColor, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="checkmark" size={22} color={activeColor} />
+                  </View>
+                ) : isRejected ? (
+                  <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2.5, borderColor: isDarkMode ? '#F87171' : '#EF4444', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="close" size={22} color={isDarkMode ? '#F87171' : '#EF4444'} />
                   </View>
                 ) : (
                   <Ionicons name={iconConfig.name} size={32} color={activeColor} />
@@ -227,13 +234,13 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
                 {alertConfig.message}
               </Text>
 
-              {/* Action Button: Done for success, OK for error/warning */}
+              {/* Action Button: Done for success/rejected, OK for error/warning */}
               <TouchableOpacity
-                style={[styles.fullOkBtn, isSuccess && { backgroundColor: '#3B0764', shadowColor: '#3B0764' }]}
+                style={[styles.fullOkBtn, isDoneAction && { backgroundColor: '#3B0764', shadowColor: '#3B0764' }]}
                 onPress={handleOk}
                 activeOpacity={0.8}
               >
-                <Text style={styles.okText}>{isSuccess ? 'Done' : 'OK'}</Text>
+                <Text style={styles.okText}>{isDoneAction ? 'Done' : 'OK'}</Text>
               </TouchableOpacity>
             </View>
           </View>

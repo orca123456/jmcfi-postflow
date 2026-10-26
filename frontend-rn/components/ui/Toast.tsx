@@ -52,6 +52,9 @@ export function deriveAlertTitle(
     return 'Success';
   }
 
+  // Rejection titles
+  if (text.includes('reject') || text.includes('rejected')) return 'Request Rejected';
+
   // Error / Warning titles
   if (text.includes('caption')) return 'Caption Required';
   if (text.includes('full name') || text.includes('name required')) return 'Name Required';

@@ -29,6 +29,7 @@ import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictur
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
+import { RejectSuccessModal } from '../../../components/ui/RejectSuccessModal';
 
 export default function OfficeHeadDashboard() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function OfficeHeadDashboard() {
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [approvalSuccessPost, setApprovalSuccessPost] = useState<any | null>(null);
+  const [rejectSuccessPost, setRejectSuccessPost] = useState<any | null>(null);
 
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
@@ -422,9 +424,7 @@ export default function OfficeHeadDashboard() {
     try {
       await postsApi.reject(reqId, { reason });
       loadData(false);
-      setTimeout(() => {
-        alert(`Request Rejected: "${reqTitle}"\nReason: ${reason}`);
-      }, 50);
+      setRejectSuccessPost({ title: reqTitle, role: 'office_head' });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to reject request.');
       loadData(false);
@@ -1520,6 +1520,14 @@ export default function OfficeHeadDashboard() {
         role="office_head"
         postTitle={approvalSuccessPost?.title || 'Request'}
         onClose={() => setApprovalSuccessPost(null)}
+      />
+
+      {/* Rejection Popup Modal */}
+      <RejectSuccessModal
+        visible={Boolean(rejectSuccessPost)}
+        role="office_head"
+        postTitle={rejectSuccessPost?.title || 'Request'}
+        onClose={() => setRejectSuccessPost(null)}
       />
     </DashboardShell>
   );
