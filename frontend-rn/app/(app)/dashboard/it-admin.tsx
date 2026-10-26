@@ -575,6 +575,118 @@ export default function ITAdminDashboard() {
   const [newUserPosition, setNewUserPosition] = useState('');
   const [uploadingDeptId, setUploadingDeptId] = useState<number | null>(null);
 
+  // ── Department Logos Horizontal Mouse Drag & Scroll State ──
+  const deptLogosScrollRef = useRef<ScrollView>(null);
+  const isDraggingDeptLogos = useRef(false);
+  const deptLogosDragMoved = useRef(false);
+  const deptLogosStartX = useRef(0);
+  const deptLogosScrollLeft = useRef(0);
+  const [canScrollDeptLeft, setCanScrollDeptLeft] = useState(false);
+  const [canScrollDeptRight, setCanScrollDeptRight] = useState(false);
+  const [isDeptDragging, setIsDeptDragging] = useState(false);
+
+  const checkDeptLogosScroll = () => {
+    if (Platform.OS === 'web' && deptLogosScrollRef.current) {
+      const node = (deptLogosScrollRef.current as any)?.getScrollableNode?.() || (deptLogosScrollRef.current as any);
+      if (node) {
+        setCanScrollDeptLeft(node.scrollLeft > 6);
+        setCanScrollDeptRight(node.scrollLeft < node.scrollWidth - node.clientWidth - 6);
+      }
+    }
+  };
+
+  const handleDeptScrollBy = (offset: number) => {
+    if (Platform.OS === 'web' && deptLogosScrollRef.current) {
+      const node = (deptLogosScrollRef.current as any)?.getScrollableNode?.() || (deptLogosScrollRef.current as any);
+      if (node && typeof node.scrollBy === 'function') {
+        node.scrollBy({ left: offset, behavior: 'smooth' });
+        setTimeout(checkDeptLogosScroll, 250);
+        return;
+      }
+    }
+    deptLogosScrollRef.current?.scrollTo({ x: offset > 0 ? 300 : 0, animated: true });
+  };
+
+  // Enable mouse cursor drag-to-scroll and mouse wheel scrolling on desktop web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || activeTab !== 'user-management') return;
+
+    const cleanupFns: (() => void)[] = [];
+
+    const timer = setTimeout(() => {
+      const node = (deptLogosScrollRef.current as any)?.getScrollableNode?.() || (deptLogosScrollRef.current as any);
+      if (!node || !node.addEventListener) return;
+
+      checkDeptLogosScroll();
+      node.style.cursor = 'grab';
+      node.style.userSelect = 'none';
+      node.style.webkitUserSelect = 'none';
+
+      const onWheel = (e: WheelEvent) => {
+        if (e.deltaY !== 0 || e.deltaX !== 0) {
+          node.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+          checkDeptLogosScroll();
+        }
+      };
+
+      const onMouseDown = (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        isDraggingDeptLogos.current = true;
+        deptLogosDragMoved.current = false;
+        deptLogosStartX.current = e.pageX;
+        deptLogosScrollLeft.current = node.scrollLeft;
+        node.style.cursor = 'grabbing';
+        setIsDeptDragging(true);
+      };
+
+      const onMouseMove = (e: MouseEvent) => {
+        if (!isDraggingDeptLogos.current) return;
+        const diff = e.pageX - deptLogosStartX.current;
+        if (Math.abs(diff) > 4) {
+          deptLogosDragMoved.current = true;
+        }
+        node.scrollLeft = deptLogosScrollLeft.current - diff;
+        checkDeptLogosScroll();
+      };
+
+      const onMouseUp = () => {
+        if (isDraggingDeptLogos.current) {
+          isDraggingDeptLogos.current = false;
+          node.style.cursor = 'grab';
+          setIsDeptDragging(false);
+          if (deptLogosDragMoved.current) {
+            setTimeout(() => {
+              deptLogosDragMoved.current = false;
+            }, 100);
+          }
+        }
+      };
+
+      const onScroll = () => {
+        checkDeptLogosScroll();
+      };
+
+      node.addEventListener('wheel', onWheel, { passive: true });
+      node.addEventListener('mousedown', onMouseDown);
+      node.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+
+      cleanupFns.push(() => {
+        node.removeEventListener('wheel', onWheel);
+        node.removeEventListener('mousedown', onMouseDown);
+        node.removeEventListener('scroll', onScroll);
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+      });
+    }, 120);
+
+    return () => {
+      clearTimeout(timer);
+      cleanupFns.forEach((fn) => fn());
+    };
+  }, [activeTab, departmentsList]);
+
   // Filtered dept list based on selected role category (Admin/Approver/Requestor)
   const filteredDepts = React.useMemo(() => {
     return departmentsForRole(newUserRole, departmentsList);
@@ -1013,6 +1125,9 @@ export default function ITAdminDashboard() {
   };
 
   const handleUploadDeptLogo = (deptId: number) => {
+    if (deptLogosDragMoved.current) {
+      return;
+    }
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -2908,18 +3023,66 @@ export default function ITAdminDashboard() {
 
           {/* Department Logos Section */}
           <Card style={[styles.userCard, { marginBottom: Spacing.xl }]}>
-            <Text style={[styles.sectionHeader, { marginBottom: 8 }]}>Department Logos</Text>
-            <Text style={{ color: Colors.textSecondary, marginBottom: 24 }}>Upload a logo for each department. Used across the platform.</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={styles.sectionHeader}>Department Logos</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TouchableOpacity
+                  onPress={() => handleDeptScrollBy(-260)}
+                  disabled={!canScrollDeptLeft}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: canScrollDeptLeft ? (isDarkMode ? '#334155' : '#F1F5F9') : (isDarkMode ? '#1E293B' : '#F8FAFC'),
+                    borderWidth: 1,
+                    borderColor: canScrollDeptLeft ? (isDarkMode ? '#475569' : '#CBD5E1') : 'transparent',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    opacity: canScrollDeptLeft ? 1 : 0.35,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chevron-back" size={18} color={isDarkMode ? '#E2E8F0' : '#334155'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDeptScrollBy(260)}
+                  disabled={!canScrollDeptRight}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: canScrollDeptRight ? (isDarkMode ? '#334155' : '#F1F5F9') : (isDarkMode ? '#1E293B' : '#F8FAFC'),
+                    borderWidth: 1,
+                    borderColor: canScrollDeptRight ? (isDarkMode ? '#475569' : '#CBD5E1') : 'transparent',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    opacity: canScrollDeptRight ? 1 : 0.35,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chevron-forward" size={18} color={isDarkMode ? '#E2E8F0' : '#334155'} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <Text style={{ color: Colors.textSecondary, marginBottom: 20 }}>
+              Upload a logo for each department. Click and drag or use the arrows to browse.
+            </Text>
             
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingBottom: 4 }}>
+            <ScrollView
+              ref={deptLogosScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 18, paddingBottom: 6 }}
+              style={Platform.OS === 'web' ? ({ userSelect: 'none', cursor: isDeptDragging ? 'grabbing' : 'grab' } as any) : undefined}
+            >
               {departmentsList
                 .filter(shouldShowLogoUploadTile)
                 .map((dept: any) => {
                 const logoUrl = getDeptLogo(dept.id);
                 return (
-                <View key={dept.id} style={{ width: 176, height: 174, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }}>
+                <View key={dept.id} style={{ width: 176, height: 174, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1, userSelect: 'none' } as any}>
                   <TouchableOpacity 
-                    style={{ height: 124, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}
+                    style={{ height: 124, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6', userSelect: 'none' } as any}
                     onPress={() => handleUploadDeptLogo(dept.id)}
                     disabled={uploadingDeptId === dept.id}
                     activeOpacity={0.82}
@@ -2929,7 +3092,7 @@ export default function ITAdminDashboard() {
                     ) : logoUrl ? (
                       <Image
                         source={{ uri: logoUrl }}
-                        style={{ width: 92, height: 92, borderRadius: 46 }}
+                        style={{ width: 92, height: 92, borderRadius: 46, pointerEvents: 'none' } as any}
                         resizeMode="contain"
                         onError={() => {
                           setBrokenDeptLogoIds(prev => {
@@ -2940,13 +3103,13 @@ export default function ITAdminDashboard() {
                         }}
                       />
                     ) : (
-                      <>
+                      <View style={{ alignItems: 'center', pointerEvents: 'none' } as any}>
                         <Ionicons name="cloud-upload-outline" size={34} color="#A0AEC0" style={{ marginBottom: 10 }} />
                         <Text style={{ fontSize: 11, fontWeight: '500', color: '#A0AEC0' }}>Tap to upload</Text>
-                      </>
+                      </View>
                     )}
                   </TouchableOpacity>
-                  <View style={{ height: 50, justifyContent: 'center', paddingHorizontal: 14, borderTopWidth: 1, borderColor: '#E5E7EB', backgroundColor: Colors.surface }}>
+                  <View style={{ height: 50, justifyContent: 'center', paddingHorizontal: 14, borderTopWidth: 1, borderColor: '#E5E7EB', backgroundColor: Colors.surface, userSelect: 'none' } as any}>
                     <Text style={{ fontSize: 14, fontWeight: '500', color: Colors.textPrimary }} numberOfLines={1}>{dept.display_name}</Text>
                   </View>
                 </View>
