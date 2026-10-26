@@ -1904,10 +1904,12 @@ export default function ITAdminDashboard() {
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditEventTypeFilter, setAuditEventTypeFilter] = useState('ALL');
   const [selectedAuditLog, setSelectedAuditLog] = useState<any | null>(null);
-  const [auditDateFilter, setAuditDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'This Month' | 'Custom Range'>('All Time');
+  const [auditDateFilter, setAuditDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Custom Range'>('All Time');
   const [isAuditDateDropdownOpen, setIsAuditDateDropdownOpen] = useState(false);
   const [auditCustomStartDate, setAuditCustomStartDate] = useState('');
   const [auditCustomEndDate, setAuditCustomEndDate] = useState('');
+  const [tempAuditStartDate, setTempAuditStartDate] = useState('');
+  const [tempAuditEndDate, setTempAuditEndDate] = useState('');
 
 
 
@@ -6432,9 +6434,9 @@ $response = curl_exec($ch);`}
             const startOf7Days = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
             return logDate >= startOf7Days && logDate <= endOfToday;
           }
-          if (auditDateFilter === 'This Month') {
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-            return logDate >= startOfMonth && logDate <= endOfToday;
+          if (auditDateFilter === 'Last 30 Days' || auditDateFilter === 'This Month') {
+            const startOf30Days = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000);
+            return logDate >= startOf30Days && logDate <= endOfToday;
           }
           if (auditDateFilter === 'Custom Range') {
             if (auditCustomStartDate) {
@@ -6515,7 +6517,13 @@ $response = curl_exec($ch);`}
                     )}
 
                     <TouchableOpacity
-                      onPress={() => setIsAuditDateDropdownOpen(prev => !prev)}
+                      onPress={() => {
+                        if (!isAuditDateDropdownOpen) {
+                          setTempAuditStartDate(auditCustomStartDate);
+                          setTempAuditEndDate(auditCustomEndDate);
+                        }
+                        setIsAuditDateDropdownOpen(prev => !prev);
+                      }}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -6543,45 +6551,173 @@ $response = curl_exec($ch);`}
                         backgroundColor: '#FFFFFF',
                         borderWidth: 1,
                         borderColor: '#E2E8F0',
-                        borderRadius: 10,
-                        paddingVertical: 6,
-                        width: 190,
+                        borderRadius: 12,
+                        paddingVertical: 8,
+                        paddingHorizontal: 8,
+                        width: 220,
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 8 },
-                        shadowOpacity: 0.18,
+                        shadowOpacity: 0.16,
                         shadowRadius: 16,
                         elevation: 50,
                         zIndex: 99999,
                       }}>
-                        {(['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'This Month', 'Custom Range'] as const).map(option => {
+                        {(['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days'] as const).map(option => {
                           const isSelected = auditDateFilter === option;
                           return (
                             <TouchableOpacity
                               key={option}
                               onPress={() => {
                                 setAuditDateFilter(option);
+                                setAuditCustomStartDate('');
+                                setAuditCustomEndDate('');
+                                setTempAuditStartDate('');
+                                setTempAuditEndDate('');
                                 setIsAuditDateDropdownOpen(false);
                               }}
                               style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                paddingHorizontal: 14,
-                                paddingVertical: 9,
-                                backgroundColor: isSelected ? '#F5F3FF' : 'transparent',
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                borderRadius: 6,
+                                backgroundColor: isSelected ? '#F1F5F9' : 'transparent',
                               }}
                             >
                               <Text style={{
                                 fontSize: 13,
-                                fontWeight: isSelected ? '700' : '500',
-                                color: isSelected ? '#7C3AED' : '#374151',
+                                fontWeight: isSelected ? '600' : '400',
+                                color: isSelected ? '#0F172A' : '#334155',
                               }}>
                                 {option}
                               </Text>
-                              {isSelected && <Ionicons name="checkmark" size={16} color="#7C3AED" />}
+                              {isSelected && <Ionicons name="checkmark" size={15} color="#0F172A" />}
                             </TouchableOpacity>
                           );
                         })}
+
+                        {/* Custom Range Option */}
+                        <TouchableOpacity
+                          onPress={() => {
+                            setAuditDateFilter('Custom Range');
+                            setTempAuditStartDate(auditCustomStartDate);
+                            setTempAuditEndDate(auditCustomEndDate);
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            borderWidth: auditDateFilter === 'Custom Range' ? 1.5 : 0,
+                            borderColor: '#0F172A',
+                            backgroundColor: auditDateFilter === 'Custom Range' ? '#F8FAFC' : 'transparent',
+                            marginTop: 2,
+                          }}
+                        >
+                          <Text style={{
+                            fontSize: 13,
+                            fontWeight: auditDateFilter === 'Custom Range' ? '700' : '400',
+                            color: auditDateFilter === 'Custom Range' ? '#0F172A' : '#334155',
+                          }}>
+                            Custom Range
+                          </Text>
+                          {auditDateFilter === 'Custom Range' && (
+                            <Ionicons name="checkmark" size={15} color="#0F172A" />
+                          )}
+                        </TouchableOpacity>
+
+                        {/* Custom Date Inputs when Custom Range is active */}
+                        {auditDateFilter === 'Custom Range' && (
+                          <View style={{ marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingHorizontal: 4 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#64748B', marginBottom: 4 }}>
+                              Start Date
+                            </Text>
+                            {Platform.OS === 'web' ? (
+                              <input
+                                type="date"
+                                value={tempAuditStartDate}
+                                onChange={(e: any) => setTempAuditStartDate(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  height: 36,
+                                  padding: '0 10px',
+                                  borderRadius: 8,
+                                  border: '1px solid #CBD5E1',
+                                  fontSize: 13,
+                                  color: '#0F172A',
+                                  backgroundColor: '#FFFFFF',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                  marginBottom: 8,
+                                  fontFamily: 'inherit',
+                                }}
+                              />
+                            ) : (
+                              <TextInput
+                                placeholder="YYYY-MM-DD"
+                                value={tempAuditStartDate}
+                                onChangeText={setTempAuditStartDate}
+                                style={{ height: 36, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', fontSize: 13, color: '#0F172A', marginBottom: 8 }}
+                              />
+                            )}
+
+                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#64748B', marginBottom: 4 }}>
+                              End Date
+                            </Text>
+                            {Platform.OS === 'web' ? (
+                              <input
+                                type="date"
+                                value={tempAuditEndDate}
+                                onChange={(e: any) => setTempAuditEndDate(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  height: 36,
+                                  padding: '0 10px',
+                                  borderRadius: 8,
+                                  border: '1px solid #CBD5E1',
+                                  fontSize: 13,
+                                  color: '#0F172A',
+                                  backgroundColor: '#FFFFFF',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                  marginBottom: 12,
+                                  fontFamily: 'inherit',
+                                }}
+                              />
+                            ) : (
+                              <TextInput
+                                placeholder="YYYY-MM-DD"
+                                value={tempAuditEndDate}
+                                onChangeText={setTempAuditEndDate}
+                                style={{ height: 36, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', fontSize: 13, color: '#0F172A', marginBottom: 12 }}
+                              />
+                            )}
+
+                            <TouchableOpacity
+                              onPress={() => {
+                                setAuditCustomStartDate(tempAuditStartDate);
+                                setAuditCustomEndDate(tempAuditEndDate);
+                                setAuditDateFilter('Custom Range');
+                                setIsAuditDateDropdownOpen(false);
+                              }}
+                              style={{
+                                backgroundColor: '#0B2545',
+                                height: 36,
+                                borderRadius: 8,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '100%',
+                              }}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                                Apply
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
@@ -6592,91 +6728,6 @@ $response = curl_exec($ch);`}
                     <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Export CSV</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* Custom Date Range Picker Bar */}
-                {auditDateFilter === 'Custom Range' && (
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 10,
-                    padding: 10,
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    width: '100%',
-                  }}>
-                    <Ionicons name="calendar" size={16} color="#6366F1" />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>From:</Text>
-                      {Platform.OS === 'web' ? (
-                        <input
-                          type="date"
-                          value={auditCustomStartDate}
-                          onChange={(e: any) => setAuditCustomStartDate(e.target.value)}
-                          style={{
-                            height: 32,
-                            padding: '0 8px',
-                            borderRadius: 6,
-                            border: '1px solid #CBD5E1',
-                            fontSize: 13,
-                            color: '#0F172A',
-                            backgroundColor: '#FFFFFF',
-                            outline: 'none',
-                          }}
-                        />
-                      ) : (
-                        <TextInput
-                          placeholder="YYYY-MM-DD"
-                          value={auditCustomStartDate}
-                          onChangeText={setAuditCustomStartDate}
-                          style={{ height: 32, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', fontSize: 13 }}
-                        />
-                      )}
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>To:</Text>
-                      {Platform.OS === 'web' ? (
-                        <input
-                          type="date"
-                          value={auditCustomEndDate}
-                          onChange={(e: any) => setAuditCustomEndDate(e.target.value)}
-                          style={{
-                            height: 32,
-                            padding: '0 8px',
-                            borderRadius: 6,
-                            border: '1px solid #CBD5E1',
-                            fontSize: 13,
-                            color: '#0F172A',
-                            backgroundColor: '#FFFFFF',
-                            outline: 'none',
-                          }}
-                        />
-                      ) : (
-                        <TextInput
-                          placeholder="YYYY-MM-DD"
-                          value={auditCustomEndDate}
-                          onChangeText={setAuditCustomEndDate}
-                          style={{ height: 32, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', fontSize: 13 }}
-                        />
-                      )}
-                    </View>
-
-                    {(auditCustomStartDate || auditCustomEndDate) && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          setAuditCustomStartDate('');
-                          setAuditCustomEndDate('');
-                        }}
-                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F1F5F9', borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1' }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B' }}>Clear Dates</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
 
                 {/* Active Filters Bar */}
                 {(auditDateFilter !== 'All Time' || auditSearchQuery.trim().length > 0) && (
@@ -6700,8 +6751,18 @@ $response = curl_exec($ch);`}
                       </Text>
                       {auditDateFilter !== 'All Time' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#4F46E5' }}>📅 {auditDateFilter}</Text>
-                          <TouchableOpacity onPress={() => { setAuditDateFilter('All Time'); setAuditCustomStartDate(''); setAuditCustomEndDate(''); }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#4F46E5' }}>
+                            📅 {auditDateFilter === 'Custom Range' && (auditCustomStartDate || auditCustomEndDate)
+                              ? `Custom Range (${auditCustomStartDate || 'Start'} to ${auditCustomEndDate || 'End'})`
+                              : auditDateFilter}
+                          </Text>
+                          <TouchableOpacity onPress={() => {
+                            setAuditDateFilter('All Time');
+                            setAuditCustomStartDate('');
+                            setAuditCustomEndDate('');
+                            setTempAuditStartDate('');
+                            setTempAuditEndDate('');
+                          }}>
                             <Ionicons name="close-circle" size={14} color="#6366F1" />
                           </TouchableOpacity>
                         </View>
@@ -6721,6 +6782,8 @@ $response = curl_exec($ch);`}
                         setAuditDateFilter('All Time');
                         setAuditCustomStartDate('');
                         setAuditCustomEndDate('');
+                        setTempAuditStartDate('');
+                        setTempAuditEndDate('');
                         setAuditSearchQuery('');
                       }}
                     >
