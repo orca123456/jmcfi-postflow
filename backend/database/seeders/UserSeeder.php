@@ -4,12 +4,21 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            if (isset($this->command)) {
+                $this->command->error('UserSeeder cannot be executed in production environment.');
+            }
+            return;
+        }
+
+        $adminPassword = env('SEED_ADMIN_PASSWORD') ?: Str::random(16);
+
         $users = [
             [
                 'employee_id' => 'JMCFI-ADMIN-001',
@@ -17,7 +26,7 @@ class UserSeeder extends Seeder
                 'middle_name' => '',
                 'last_name' => 'Administrator',
                 'email' => 'admin@jmc.edu.ph',
-                'password' => 'password123',
+                'password' => $adminPassword,
                 'phone' => '+639000000001',
                 'department' => 'Information Technology Office',
                 'position' => 'System Administrator',

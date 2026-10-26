@@ -127,10 +127,13 @@ class TokenSettingController extends Controller
             }
 
             $value = $validated[$key] ?? '';
-            $value = is_string($value) ? trim($value) : '';
-
-            if ($this->isSecretKey($key) && ($value === '' || $this->isMasked($value))) {
-                continue;
+            if ($this->isSecretKey($key)) {
+                if ($this->isMasked($value)) {
+                    continue;
+                }
+                if ($value === '' && !$this->isPlatformBeingCleared($request, $key)) {
+                    continue;
+                }
             }
 
             if ($key === 'instagram_access_token' && $value === '') {
@@ -391,13 +394,41 @@ class TokenSettingController extends Controller
     {
         if ($request->exists($key)) {
             $val = trim((string) ($validated[$key] ?? ''));
-            if ($this->isSecretKey($key) && ($val === '' || $this->isMasked($val))) {
+            if ($this->isMasked($val)) {
+                return (string) (SystemSetting::where('key', $key)->value('value') ?? '');
+            }
+            if ($this->isSecretKey($key) && $val === '') {
+                if ($this->isPlatformBeingCleared($request, $key)) {
+                    return '';
+                }
                 return (string) (SystemSetting::where('key', $key)->value('value') ?? '');
             }
             return $val;
         }
 
         return (string) (SystemSetting::where('key', $key)->value('value') ?? '');
+    }
+
+    private function isPlatformBeingCleared(Request $request, string $key): bool
+    {
+        $platformFields = [
+            'facebook'  => ['facebook_page_id', 'facebook_access_token'],
+            'instagram' => ['instagram_business_account_id', 'instagram_access_token'],
+            'wordpress' => ['wordpress_url', 'wordpress_username', 'wordpress_app_password'],
+        ];
+
+        foreach ($platformFields as $fields) {
+            if (in_array($key, $fields, true)) {
+                foreach ($fields as $field) {
+                    if ($request->exists($field) && trim((string)$request->input($field)) !== '') {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isSecretKey(string $key): bool
