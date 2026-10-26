@@ -136,6 +136,8 @@ Route::get('/storage/{path}', function (string $path) {
     ]);
 })->where('path', '.*');
 
+// Dev-only email template previews. Off unless ENABLE_EMAIL_PREVIEWS=true.
+if (filter_var(env('ENABLE_EMAIL_PREVIEWS', false), FILTER_VALIDATE_BOOLEAN)) {
 Route::get('/email-previews/raw/{type}', function (string $type) {
     $requestor = new \App\Models\User([
         'first_name' => 'Den',
@@ -264,6 +266,7 @@ Route::get('/email-previews/{type?}', function (?string $type = 'approver-dept-h
 </body>
 </html>');
 })->name('email.previews');
+}
 
 Route::get('/{any}', function () {
     $path = public_path('index.html');
