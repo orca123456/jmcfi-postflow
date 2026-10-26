@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\SystemSetting;
 use App\Mail\SendGridTransport;
+use App\Mail\ResendTransport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
@@ -62,6 +63,12 @@ class AppServiceProvider extends ServiceProvider
             return new SendGridTransport((string) $apiKey);
         });
 
+        // Register custom Resend HTTP Transport
+        Mail::extend('resend', function (array $config = []) {
+            $apiKey = $config['key'] ?? (Schema::hasTable('system_settings') ? SystemSetting::where('key', 'mail_password')->value('value') : '') ?? '';
+            return new ResendTransport((string) $apiKey);
+        });
+
         // Apply system-wide runtime mail configuration for all system notifications
         try {
             if (Schema::hasTable('system_settings')) {
@@ -76,11 +83,16 @@ class AppServiceProvider extends ServiceProvider
 
                 $cleanPassword = str_replace(' ', '', $password);
                 $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
+                $isResend   = str_contains(strtolower($host), 'resend')   || str_starts_with($cleanPassword, 're_');
 
                 if ($isSendGrid) {
                     Config::set('mail.default', 'sendgrid');
                     Config::set('mail.mailers.sendgrid.transport', 'sendgrid');
                     Config::set('mail.mailers.sendgrid.key', $cleanPassword);
+                } elseif ($isResend) {
+                    Config::set('mail.default', 'resend');
+                    Config::set('mail.mailers.resend.transport', 'resend');
+                    Config::set('mail.mailers.resend.key', $cleanPassword);
                 } else {
                     Config::set('mail.default', $mailer);
                     Config::set('mail.mailers.smtp.transport', 'smtp');

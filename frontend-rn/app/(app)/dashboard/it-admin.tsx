@@ -4310,22 +4310,115 @@ $response = curl_exec($ch);`}
 
           <View style={[styles.emailLayout, !isLargeScreen && styles.emailLayoutStacked]}>
             <Card style={[styles.emailSmtpCard, !isLargeScreen && styles.emailSmtpCardMobile]}>
-              <Text style={styles.emailCardTitle}>Gmail SMTP Configuration</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
+                <Text style={styles.emailCardTitle}>Email Provider Configuration</Text>
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEmailFields(p => ({
+                        ...p,
+                        mail_host: 'smtp.resend.com',
+                        mail_port: '465',
+                        mail_encryption: 'ssl',
+                        mail_username: 'resend',
+                      }));
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      backgroundColor: (emailFields.mail_host || '').toLowerCase().includes('resend') ? '#4F46E5' : '#F1F5F9',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Ionicons name="flash" size={13} color={(emailFields.mail_host || '').toLowerCase().includes('resend') ? '#FFFFFF' : '#475569'} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: (emailFields.mail_host || '').toLowerCase().includes('resend') ? '#FFFFFF' : '#475569' }}>
+                      Resend (Cloud API)
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEmailFields(p => ({
+                        ...p,
+                        mail_host: 'smtp.gmail.com',
+                        mail_port: '587',
+                        mail_encryption: 'tls',
+                      }));
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      backgroundColor: (emailFields.mail_host || '').toLowerCase().includes('gmail') ? '#4F46E5' : '#F1F5F9',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Ionicons name="logo-google" size={13} color={(emailFields.mail_host || '').toLowerCase().includes('gmail') ? '#FFFFFF' : '#475569'} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: (emailFields.mail_host || '').toLowerCase().includes('gmail') ? '#FFFFFF' : '#475569' }}>
+                      Gmail
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEmailFields(p => ({
+                        ...p,
+                        mail_host: 'smtp.sendgrid.net',
+                        mail_port: '587',
+                        mail_encryption: 'tls',
+                        mail_username: 'apikey',
+                      }));
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      backgroundColor: (emailFields.mail_host || '').toLowerCase().includes('sendgrid') ? '#4F46E5' : '#F1F5F9',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Ionicons name="send-outline" size={13} color={(emailFields.mail_host || '').toLowerCase().includes('sendgrid') ? '#FFFFFF' : '#475569'} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: (emailFields.mail_host || '').toLowerCase().includes('sendgrid') ? '#FFFFFF' : '#475569' }}>
+                      SendGrid
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               <Text style={styles.emailCardSubtitle}>
-                Use your school Gmail account to send emails. You need to generate an App Password from{' '}
-                <Text style={styles.emailLinkText}>Google Account - Security - App Passwords</Text>.
+                {(emailFields.mail_host || '').toLowerCase().includes('resend') || (emailFields.mail_password || '').startsWith('re_') ? (
+                  <Text style={{ color: '#4F46E5', fontWeight: '600' }}>
+                    ⚡ Resend HTTPS API Active: Outbound emails are sent securely via Resend HTTP API (bypasses Railway SMTP port blocks). Enter your Resend API Key (starts with re_) as the Password.
+                  </Text>
+                ) : (emailFields.mail_host || '').toLowerCase().includes('sendgrid') || (emailFields.mail_password || '').startsWith('SG.') ? (
+                  <Text style={{ color: '#059669', fontWeight: '600' }}>
+                    ⚡ SendGrid HTTPS API Active: Outbound emails are sent securely via SendGrid API. Enter your SendGrid API Key (starts with SG.) as the Password.
+                  </Text>
+                ) : (
+                  <Text>
+                    Use Resend, SendGrid, or your Gmail account. For Gmail, generate an App Password from{' '}
+                    <Text style={styles.emailLinkText}>Google Account - Security - App Passwords</Text>.
+                  </Text>
+                )}
               </Text>
 
               <View style={[styles.emailTwoColumnRow, !isLargeScreen && styles.emailColumnRow]}>
                 <View style={[styles.emailField, { flex: 2 }]}>
-                  <Text style={styles.emailFieldLabel}>SMTP Host</Text>
+                  <Text style={styles.emailFieldLabel}>SMTP Host / API</Text>
                   <View style={styles.emailInputWrap}>
                     <Ionicons name="server-outline" size={19} color="#94A3B8" />
                     <TextInput
                       style={styles.emailInput as any}
                       value={emailFields.mail_host}
                       onChangeText={v => setEmailFields(p => ({ ...p, mail_host: v }))}
-                      placeholder="smtp.gmail.com"
+                      placeholder="smtp.resend.com"
                       placeholderTextColor="#94A3B8"
                     />
                   </View>
@@ -4338,7 +4431,7 @@ $response = curl_exec($ch);`}
                       style={styles.emailInput as any}
                       value={emailFields.mail_port}
                       onChangeText={v => setEmailFields(p => ({ ...p, mail_port: v }))}
-                      placeholder="587"
+                      placeholder="465"
                       placeholderTextColor="#94A3B8"
                       keyboardType="numeric"
                     />
@@ -4376,14 +4469,26 @@ $response = curl_exec($ch);`}
 
               <View style={[styles.emailTwoColumnRow, !isLargeScreen && styles.emailColumnRow]}>
                 <View style={styles.emailField}>
-                  <Text style={styles.emailFieldLabel}>Gmail Username (Email Address)</Text>
+                  <Text style={styles.emailFieldLabel}>
+                    {(emailFields.mail_host || '').toLowerCase().includes('resend')
+                      ? 'Username (e.g. resend)'
+                      : (emailFields.mail_host || '').toLowerCase().includes('sendgrid')
+                      ? 'Username (apikey)'
+                      : 'Gmail Username (Email Address)'}
+                  </Text>
                   <View style={styles.emailInputWrap}>
                     <Ionicons name="mail-outline" size={18} color="#94A3B8" />
                     <TextInput
                       style={styles.emailInput as any}
                       value={emailFields.mail_username}
                       onChangeText={v => setEmailFields(p => ({ ...p, mail_username: v }))}
-                      placeholder="your-school-email@gmail.com"
+                      placeholder={
+                        (emailFields.mail_host || '').toLowerCase().includes('resend')
+                          ? 'resend'
+                          : (emailFields.mail_host || '').toLowerCase().includes('sendgrid')
+                          ? 'apikey'
+                          : 'your-school-email@gmail.com'
+                      }
                       placeholderTextColor="#94A3B8"
                       keyboardType="email-address"
                       autoCapitalize="none"
@@ -4392,7 +4497,12 @@ $response = curl_exec($ch);`}
                 </View>
                 <View style={styles.emailField}>
                   <Text style={styles.emailFieldLabel}>
-                    Gmail App Password {emailPasswordSet && <Text style={styles.emailPasswordSetText}>Password is set</Text>}
+                    {(emailFields.mail_host || '').toLowerCase().includes('resend')
+                      ? 'Resend API Key'
+                      : (emailFields.mail_host || '').toLowerCase().includes('sendgrid')
+                      ? 'SendGrid API Key'
+                      : 'Gmail App Password'}{' '}
+                    {emailPasswordSet && <Text style={styles.emailPasswordSetText}>Password is set</Text>}
                   </Text>
                   <View style={styles.emailInputWrap}>
                     <Ionicons name="apps-outline" size={18} color="#94A3B8" />
@@ -4400,7 +4510,15 @@ $response = curl_exec($ch);`}
                       style={styles.emailInput as any}
                       value={emailFields.mail_password}
                       onChangeText={v => setEmailFields(p => ({ ...p, mail_password: v }))}
-                      placeholder={emailPasswordSet ? 'Leave blank to keep current' : 'Enter Gmail App Password'}
+                      placeholder={
+                        emailPasswordSet
+                          ? 'Leave blank to keep current'
+                          : (emailFields.mail_host || '').toLowerCase().includes('resend')
+                          ? 're_123456789...'
+                          : (emailFields.mail_host || '').toLowerCase().includes('sendgrid')
+                          ? 'SG.123456789...'
+                          : 'Enter Gmail App Password'
+                      }
                       placeholderTextColor="#94A3B8"
                       secureTextEntry={!showEmailPassword}
                       autoCapitalize="none"
@@ -4414,7 +4532,13 @@ $response = curl_exec($ch);`}
 
               <View style={styles.emailWarningBanner}>
                 <Ionicons name="shield-checkmark-outline" size={17} color="#4F46E5" />
-                <Text style={styles.emailInfoText}>Not your regular Gmail password - generate an App Password from Google Account - Security.</Text>
+                <Text style={styles.emailInfoText}>
+                  {(emailFields.mail_host || '').toLowerCase().includes('resend')
+                    ? 'Resend API keys start with re_ — obtain your key from resend.com/api-keys.'
+                    : (emailFields.mail_host || '').toLowerCase().includes('sendgrid')
+                    ? 'SendGrid API keys start with SG. — obtain your key from app.sendgrid.com.'
+                    : 'Not your regular Gmail password - generate an App Password from Google Account - Security.'}
+                </Text>
               </View>
             </Card>
 

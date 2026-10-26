@@ -156,6 +156,7 @@ class EmailSettingController extends Controller
         $htmlContent = view('emails.custom-template', $viewData)->render();
 
         $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
+        $isResend   = str_contains(strtolower($host), 'resend')   || str_starts_with($cleanPassword, 're_');
 
         if ($isSendGrid) {
             try {
@@ -208,6 +209,44 @@ class EmailSettingController extends Controller
             } catch (\Exception $e) {
                 Log::error("SendGrid exception: " . $e->getMessage());
                 return response()->json(['message' => 'SendGrid Error: ' . $e->getMessage()], 422);
+            }
+        }
+
+        if ($isResend) {
+            try {
+                $client = new \GuzzleHttp\Client();
+                $fromHeader = $fromName ? "{$fromName} <" . ($fromAddr ?: 'onboarding@resend.dev') . ">" : ($fromAddr ?: 'onboarding@resend.dev');
+                $res = $client->post('https://api.resend.com/emails', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $cleanPassword,
+                        'Content-Type'  => 'application/json',
+                    ],
+                    'json' => [
+                        'from'    => $fromHeader,
+                        'to'      => [$adminEmail],
+                        'subject' => "[{$fromName}] ✅ Email Template Test — Configuration Verified!",
+                        'html'    => $htmlContent,
+                        'text'    => "Hello {$adminName},\n\nThis is a test email sent via Resend API from JMCFI PostFlow with custom template styling.\n\n— JMCFI PostFlow System",
+                    ],
+                    'timeout' => 12,
+                ]);
+
+                if ($res->getStatusCode() >= 200 && $res->getStatusCode() < 300) {
+                    Log::info("Resend test email with custom template sent successfully to {$adminEmail}");
+                    return response()->json(['message' => "Test email with custom template styling sent via Resend API to {$adminEmail}. Please check your inbox!"]);
+                }
+            } catch (\GuzzleHttp\Exception\ClientException $ge) {
+                $respBody = (string) $ge->getResponse()?->getBody();
+                Log::error("Resend API error: {$respBody}");
+                if ($ge->getCode() === 401 || str_contains(strtolower($respBody), 'api key')) {
+                    return response()->json(['message' => 'Resend Authentication Failed (401). Please verify your Resend API Key (starts with re_).'], 422);
+                } elseif ($ge->getCode() === 403 || str_contains(strtolower($respBody), 'domain') || str_contains(strtolower($respBody), 'not verified')) {
+                    return response()->json(['message' => 'Resend Error (403): From Email Address domain is not verified in Resend. Please verify your domain in Resend (Domains > Add Domain) or use onboarding@resend.dev for testing.'], 422);
+                }
+                return response()->json(['message' => 'Resend API Error: ' . ($respBody ?: $ge->getMessage())], 422);
+            } catch (\Exception $e) {
+                Log::error("Resend exception: " . $e->getMessage());
+                return response()->json(['message' => 'Resend Error: ' . $e->getMessage()], 422);
             }
         }
 
@@ -271,16 +310,16 @@ class EmailSettingController extends Controller
         }
 
         $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
+        $isResend   = str_contains(strtolower($host), 'resend')   || str_starts_with($cleanPassword, 're_');
 
         if ($isSendGrid) {
-            Config::set('mail.default', 'smtp');
-            Config::set('mail.mailers.smtp.transport', 'smtp');
-            Config::set('mail.mailers.smtp.host', 'smtp.sendgrid.net');
-            Config::set('mail.mailers.smtp.port', 587);
-            Config::set('mail.mailers.smtp.username', 'apikey');
-            Config::set('mail.mailers.smtp.password', $cleanPassword);
-            Config::set('mail.mailers.smtp.encryption', 'tls');
-            Config::set('mail.mailers.smtp.timeout', 12);
+            Config::set('mail.default', 'sendgrid');
+            Config::set('mail.mailers.sendgrid.transport', 'sendgrid');
+            Config::set('mail.mailers.sendgrid.key', $cleanPassword);
+        } elseif ($isResend) {
+            Config::set('mail.default', 'resend');
+            Config::set('mail.mailers.resend.transport', 'resend');
+            Config::set('mail.mailers.resend.key', $cleanPassword);
         } else {
             Config::set('mail.default', $mailer);
             Config::set('mail.mailers.smtp.transport', 'smtp');
@@ -304,6 +343,7 @@ class EmailSettingController extends Controller
 
         // Purge mailer instances so Laravel rebuilds transport with new config
         Mail::purge('sendgrid');
+        Mail::purge('resend');
         Mail::purge('smtp');
         Mail::purge($mailer);
         Mail::purge();
