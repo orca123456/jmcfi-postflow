@@ -63,6 +63,9 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
             }
         }
 
+        $requestedOnDate = $this->postRequest->created_at ?: now();
+        $requestedOn = \Carbon\Carbon::parse($requestedOnDate)->setTimezone('Asia/Manila')->format('F j, Y \a\t g:i A') . ' (PHT)';
+
         // Configure Stage Specifics matching screenshots
         switch ($stage) {
             case 'office_head':
@@ -74,6 +77,7 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
                     'Category'         => $categoryName,
                     'Submitted by'     => "{$requestorName} ({$deptCode})",
                     'Target Platforms' => $targetPlatformsFormatted,
+                    'Requested on'     => $requestedOn,
                 ];
                 break;
 
@@ -84,9 +88,10 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
                 $tableDetails = [
                     'Title'            => $this->postRequest->title,
                     'Category'         => $categoryName,
-                    'Submitted by'     => $requestorName,
+                    'Submitted by'     => "{$requestorName} ({$deptCode})",
                     'Department'       => $deptName,
                     'Target Platforms' => $targetPlatformsFormatted,
+                    'Requested on'     => $requestedOn,
                 ];
                 break;
 
@@ -98,9 +103,10 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
                 $tableDetails = [
                     'Title'            => $this->postRequest->title,
                     'Category'         => $categoryName,
-                    'Submitted by'     => $requestorName,
+                    'Submitted by'     => "{$requestorName} ({$deptCode})",
                     'Department'       => $deptName,
                     'Target Platforms' => $targetPlatformsFormatted,
+                    'Requested on'     => $requestedOn,
                 ];
                 break;
         }
@@ -111,11 +117,14 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
         $viewData = [
             'statusBadge'     => 'ACTION REQUIRED — POST APPROVAL',
             'statusType'      => 'pending',
+            'badgeBgColor'    => '#ede9fe',
+            'badgeTextColor'  => '#4338ca',
             'greeting'        => $greeting,
             'bodyMessage'     => $bodyMessage,
             'tableDetails'    => $tableDetails,
             'actionUrl'       => $actionUrl,
             'buttonText'      => 'Review & Take Action',
+            'buttonColor'     => '#2e0854',
             'footerText'      => '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
         ];
 

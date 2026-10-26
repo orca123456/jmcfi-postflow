@@ -139,7 +139,7 @@ class ApprovalWorkflowService
         }
     }
 
-    public function notifyRequestor(PostRequest $postRequest, string $action, string $reason): void
+    public function notifyRequestor(PostRequest $postRequest, string $action, string $reason, ?string $stage = null, ?string $approverName = null): void
     {
         $requestor = $postRequest->requestor;
         if (!$requestor) return;
@@ -147,17 +147,41 @@ class ApprovalWorkflowService
         try {
             switch ($action) {
                 case 'rejected':
-                    $requestor->notify(new PostRejectedNotification($postRequest, $reason));
+                    $requestor->notify(new PostRejectedNotification($postRequest, $reason, $stage, $approverName));
                     break;
                 case 'returned_for_revision':
                     $requestor->notify(new PostReturnedForRevisionNotification($postRequest, $reason, []));
                     break;
                 case 'approved':
-                    $requestor->notify(new PostApprovedNotification($postRequest));
+                    $requestor->notify(new PostApprovedNotification($postRequest, $stage, $approverName));
                     break;
             }
         } catch (\Throwable $e) {
             Log::warning("Failed to notify requestor of {$action}. Error: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Send an approval reminder notification to the approver for the active/specified stage.
+     */
+    public function sendApprovalReminder(PostRequest $postRequest, ?string $stage = null): bool
+    {
+        try {
+            $stage = $stage ?? $postRequest->currentApprovalStage()?->stage ?? 'office_head';
+            $approval = $postRequest->approvalWorkflows()
+                ->where('stage', $stage)
+                ->first();
+
+            if ($approval && $approval->approver_id) {
+                $approver = User::find($approval->approver_id);
+                if ($approver) {
+                    $approver->notify(new \App\Notifications\ApprovalReminderNotification($postRequest, $stage));
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to send approval reminder for post {$postRequest->id}. Error: " . $e->getMessage());
+        }
+        return false;
     }
 }

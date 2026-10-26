@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('posts/{postRequest}/approve', [PostRequestController::class, 'approve'])->middleware('role:office_head,vice_president,imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/{postRequest}/reject', [PostRequestController::class, 'reject'])->middleware('role:office_head,vice_president,imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/{postRequest}/return-revision', [PostRequestController::class, 'returnForRevision'])->middleware('role:office_head,vice_president,imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/remind', [PostRequestController::class, 'sendReminder'])->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck'])->middleware('throttle:15,1');
     Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck'])->middleware('throttle:15,1')->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/{postRequest}/featured-media', [PostRequestController::class, 'setFeaturedMedia'])->where(['postRequest' => '[0-9]{1,19}']);

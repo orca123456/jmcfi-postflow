@@ -599,13 +599,15 @@ class PostRequestController extends Controller
 
             $postId = $postRequest->id;
             $postTitle = $postRequest->title;
+            $stageName = $currentStage?->stage;
+            $approverName = $user->full_name ?: trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
             $workflowService = $this->workflowService;
 
-            app()->terminating(function () use ($workflowService, $postId, $postTitle, $reason, $request) {
+            app()->terminating(function () use ($workflowService, $postId, $postTitle, $reason, $request, $stageName, $approverName) {
                 try {
                     $p = PostRequest::find($postId);
                     if ($p) {
-                        $workflowService->notifyRequestor($p, 'rejected', $reason);
+                        $workflowService->notifyRequestor($p, 'rejected', $reason, $stageName, $approverName);
                     }
                     AuditLogService::log('CONTENT_REJECT', 'Rejected post: ' . $postTitle, 'WARNING', ['post_id' => $postId, 'reason' => $reason], $request);
                 } catch (\Throwable $e) {
@@ -693,6 +695,35 @@ class PostRequestController extends Controller
                 'message' => 'Post returned for revision',
             ]);
         });
+    }
+
+    public function sendReminder(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $isRequestor = $postRequest->requestor_id === $user->id;
+        $isAdmin = $user->hasRole(['it_admin', 'it_publisher', 'admin']);
+        $isApprover = $user->hasRole(['office_head', 'vice_president', 'imc_qa_checker']);
+
+        if (!$isRequestor && !$isAdmin && !$isApprover) {
+            return response()->json(['message' => 'Unauthorized to send reminder for this post'], 403);
+        }
+
+        if ($postRequest->status !== PostRequest::STATUS_PENDING) {
+            return response()->json(['message' => 'Reminders can only be sent for pending post requests'], 422);
+        }
+
+        $sent = $this->workflowService->sendApprovalReminder($postRequest);
+
+        if ($sent) {
+            AuditLogService::log('REMINDER_SENT', "Approval reminder sent for: {$postRequest->title}", 'INFO', ['post_id' => $postRequest->id], $request);
+            return response()->json(['message' => 'Approval reminder sent successfully']);
+        }
+
+        return response()->json(['message' => 'Unable to send reminder. No active approver found for current stage.'], 400);
     }
 
     public function runAiCheck(PostRequest $postRequest): JsonResponse

@@ -137,58 +137,128 @@ Route::get('/storage/{path}', function (string $path) {
 })->where('path', '.*');
 
 // Dev-only email template previews. Off unless ENABLE_EMAIL_PREVIEWS=true.
-if (filter_var(env('ENABLE_EMAIL_PREVIEWS', false), FILTER_VALIDATE_BOOLEAN)) {
+// Email template previews. Defaults to true.
+if (filter_var(env('ENABLE_EMAIL_PREVIEWS', true), FILTER_VALIDATE_BOOLEAN)) {
 Route::get('/email-previews/raw/{type}', function (string $type) {
-    $requestor = new \App\Models\User([
+    $requestorDen = new \App\Models\User([
         'first_name' => 'Den',
         'last_name'  => 'Mark',
         'department' => 'BSA',
+    ]);
+
+    $requestorApril = new \App\Models\User([
+        'first_name' => 'April Joy',
+        'last_name'  => 'Domopoy',
+        'department' => 'BSA',
+    ]);
+
+    $category = new \App\Models\PostCategory([
+        'name' => 'Announcement',
     ]);
 
     $post = new \App\Models\PostRequest([
         'title'            => 'Test',
         'target_platforms' => ['facebook', 'instagram'],
     ]);
-    $post->setRelation('requestor', $requestor);
+    $post->created_at = \Carbon\Carbon::parse('2026-10-19 14:45:00', 'Asia/Manila');
+    $post->id = 1;
+    $post->setRelation('category', $category);
 
     switch ($type) {
+        // Reminders matching Images 1, 2, 3
+        case 'reminder-dept-head':
+            $post->setRelation('requestor', $requestorApril);
+            $approver = new \App\Models\User(['first_name' => 'Ferry', 'last_name' => '']);
+            $mail = (new \App\Notifications\ApprovalReminderNotification($post, 'office_head', 'Ferry'))->toMail($approver);
+            break;
+
+        case 'reminder-vp':
+            $post->setRelation('requestor', $requestorApril);
+            $post->department = 'College of Information Technology Education';
+            $approver = new \App\Models\User(['first_name' => 'Elena', 'last_name' => 'Santos']);
+            $mail = (new \App\Notifications\ApprovalReminderNotification($post, 'vice_president', 'Elena Santos'))->toMail($approver);
+            break;
+
+        case 'reminder-imc':
+            $post->setRelation('requestor', $requestorApril);
+            $post->department = 'College of Information Technology Education';
+            $approver = new \App\Models\User(['first_name' => 'Angela', 'last_name' => 'Cruz']);
+            $mail = (new \App\Notifications\ApprovalReminderNotification($post, 'imc_qa', 'Angela Cruz'))->toMail($approver);
+            break;
+
+        // Rejections matching Images 4 & 5
+        case 'rejected-dept-head':
+            $post->setRelation('requestor', $requestorDen);
+            $mail = (new \App\Notifications\PostRejectedNotification(
+                $post,
+                'The event date and department details need verification.',
+                'office_head',
+                'Ruel Arana'
+            ))->toMail($requestorDen);
+            break;
+
+        case 'rejected-vp':
+            $post->setRelation('requestor', $requestorDen);
+            $mail = (new \App\Notifications\PostRejectedNotification(
+                $post,
+                'The academic schedule has not yet been confirmed.',
+                'vice_president',
+                'Elena Santos'
+            ))->toMail($requestorDen);
+            break;
+
+        // Approver action required
         case 'approver-dept-head':
+            $post->setRelation('requestor', $requestorApril);
             $approver = new \App\Models\User(['first_name' => 'Ruel', 'last_name' => 'Arana']);
             $mail = (new \App\Notifications\ApprovalNeededNotification($post, 'office_head'))->toMail($approver);
             break;
 
         case 'approver-vp':
+            $post->setRelation('requestor', $requestorApril);
             $approver = new \App\Models\User(['first_name' => 'Elena', 'last_name' => 'Santos']);
             $mail = (new \App\Notifications\ApprovalNeededNotification($post, 'vice_president'))->toMail($approver);
             break;
 
         case 'approver-imc':
+            $post->setRelation('requestor', $requestorApril);
             $approver = new \App\Models\User(['first_name' => 'Angela', 'last_name' => 'Cruz']);
             $mail = (new \App\Notifications\ApprovalNeededNotification($post, 'imc_qa'))->toMail($approver);
             break;
 
+        // Requestor notifications
         case 'requestor-dept-head':
-            $mail = (new \App\Notifications\PostApprovedNotification($post, 'office_head', 'Ruel Arana'))->toMail($requestor);
+            $post->setRelation('requestor', $requestorDen);
+            $mail = (new \App\Notifications\PostApprovedNotification($post, 'office_head', 'Ruel Arana'))->toMail($requestorDen);
             break;
 
         case 'requestor-vp':
-            $mail = (new \App\Notifications\PostApprovedNotification($post, 'vice_president', 'Elena Santos'))->toMail($requestor);
+            $post->setRelation('requestor', $requestorDen);
+            $mail = (new \App\Notifications\PostApprovedNotification($post, 'vice_president', 'Elena Santos'))->toMail($requestorDen);
             break;
 
         case 'requestor-imc':
-            $mail = (new \App\Notifications\PostApprovedNotification($post, 'imc_qa', 'Angela Cruz'))->toMail($requestor);
+            $post->setRelation('requestor', $requestorDen);
+            $mail = (new \App\Notifications\PostApprovedNotification($post, 'imc_qa', 'Angela Cruz'))->toMail($requestorDen);
             break;
 
         case 'requestor-revision':
+            $post->setRelation('requestor', $requestorDen);
             $mail = (new \App\Notifications\PostReturnedForRevisionNotification(
                 $post,
                 'Please adjust the image aspect ratio and add institutional hashtags.',
                 ['Branding' => ['Ensure high-resolution header', 'Include official hashtag']]
-            ))->toMail($requestor);
+            ))->toMail($requestorDen);
             break;
 
         case 'requestor-rejected':
-            $mail = (new \App\Notifications\PostRejectedNotification($post, 'Post topic does not align with academic calendar schedule.'))->toMail($requestor);
+            $post->setRelation('requestor', $requestorDen);
+            $mail = (new \App\Notifications\PostRejectedNotification(
+                $post,
+                'The event date and department details need verification.',
+                'office_head',
+                'Ruel Arana'
+            ))->toMail($requestorDen);
             break;
 
         default:
@@ -198,20 +268,24 @@ Route::get('/email-previews/raw/{type}', function (string $type) {
     return view('emails.custom-template', $mail->viewData);
 })->name('email.preview.raw');
 
-Route::get('/email-previews/{type?}', function (?string $type = 'approver-dept-head') {
+Route::get('/email-previews/{type?}', function (?string $type = 'reminder-dept-head') {
     $previews = [
-        'approver-dept-head' => ['label' => 'Approver: Dept Head', 'group' => 'Approvers'],
-        'approver-vp'        => ['label' => 'Approver: Vice President', 'group' => 'Approvers'],
-        'approver-imc'       => ['label' => 'Approver: IMC', 'group' => 'Approvers'],
+        'reminder-dept-head' => ['label' => 'Reminder: Dept Head', 'group' => 'Reminders'],
+        'reminder-vp'        => ['label' => 'Reminder: VPAA', 'group' => 'Reminders'],
+        'reminder-imc'       => ['label' => 'Reminder: IMC', 'group' => 'Reminders'],
+        'rejected-dept-head' => ['label' => 'Rejected: Dept Head', 'group' => 'Rejections'],
+        'rejected-vp'        => ['label' => 'Rejected: Vice President', 'group' => 'Rejections'],
+        'approver-dept-head' => ['label' => 'Action: Dept Head', 'group' => 'Approvers'],
+        'approver-vp'        => ['label' => 'Action: Vice President', 'group' => 'Approvers'],
+        'approver-imc'       => ['label' => 'Action: IMC', 'group' => 'Approvers'],
         'requestor-dept-head'=> ['label' => 'Approved: Dept Head', 'group' => 'Requestors'],
         'requestor-vp'       => ['label' => 'Approved: VP (VPAA)', 'group' => 'Requestors'],
         'requestor-imc'      => ['label' => 'Approved: IMC Final', 'group' => 'Requestors'],
         'requestor-revision' => ['label' => 'Revision Required', 'group' => 'Requestors'],
-        'requestor-rejected' => ['label' => 'Post Rejected', 'group' => 'Requestors'],
     ];
 
     if (!array_key_exists($type, $previews)) {
-        $type = 'approver-dept-head';
+        $type = 'reminder-dept-head';
     }
 
     $rawUrl = url("/email-previews/raw/{$type}");

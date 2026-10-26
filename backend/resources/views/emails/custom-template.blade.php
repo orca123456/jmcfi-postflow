@@ -92,15 +92,15 @@
         }
         .button {
             display: inline-block;
-            background-color: #430c7b;
+            background-color: #2e0854;
             color: #ffffff !important;
             text-decoration: none;
-            padding: 12px 32px;
+            padding: 12px 34px;
             border-radius: 6px;
-            font-size: 13.5px;
+            font-size: 14px;
             font-weight: 700;
             letter-spacing: 0.2px;
-            box-shadow: 0 2px 8px rgba(67, 12, 123, 0.25);
+            box-shadow: 0 2px 8px rgba(46, 8, 84, 0.25);
         }
         .footer {
             padding: 18px 20px;
@@ -115,7 +115,7 @@
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 28px 12px; color: #1e293b; -webkit-font-smoothing: antialiased;">
     <div class="container" style="max-width: 480px; margin: 0 auto; background-color: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
         <!-- Header Banner Image -->
-        <div class="header-banner-wrap" style="line-height: 0; font-size: 0; border-top-left-radius: 14px; border-top-right-radius: 14px; overflow: hidden; background-color: #430c7b;">
+        <div class="header-banner-wrap" style="line-height: 0; font-size: 0; border-top-left-radius: 14px; border-top-right-radius: 14px; overflow: hidden; background-color: #2e0854;">
             <img src="{{ !empty($headerBannerUrl) ? $headerBannerUrl : asset('images/email_header_banner.png') }}" alt="{{ $headerTitle ?? 'Jose Maria College Foundation, Inc.' }}" class="header-banner-img" style="display: block; width: 100%; height: auto; border: 0;" />
         </div>
 
@@ -123,19 +123,22 @@
             @php
                 $type = strtolower($statusType ?? 'pending');
                 $badgeBg = $badgeBgColor ?? match($type) {
-                    'rejected', 'failed'   => '#fee2e2',
+                    'rejected', 'failed'   => '#ede9fe',
+                    'reminder'             => '#ede9fe',
                     'revision'             => '#fef3c7',
                     'published', 'success' => '#ede9fe',
                     default                => '#ede9fe',
                 };
                 $badgeText = $badgeTextColor ?? match($type) {
-                    'rejected', 'failed'   => '#991b1b',
+                    'rejected', 'failed'   => '#4338ca',
+                    'reminder'             => '#4338ca',
                     'revision'             => '#92400e',
                     'published', 'success' => '#581c87',
                     default                => '#581c87',
                 };
                 $badgeLabel = $statusBadge ?? $statusLabel ?? match($type) {
-                    'rejected'  => 'REJECTED — POST REQUEST',
+                    'rejected'  => 'POST REQUEST REJECTED',
+                    'reminder'  => 'REMINDER — ACTION REQUIRED',
                     'revision'  => 'ACTION REQUIRED — REVISION',
                     'approved'  => 'APPROVED',
                     'published' => 'PUBLISHED',
@@ -229,7 +232,7 @@
             <!-- Action Button -->
             @if(!empty($actionUrl))
                 <div class="button-wrapper" style="text-align: center; margin: 22px 0 16px 0;">
-                    <a href="{{ $actionUrl }}" class="button" style="display: inline-block; background-color: {{ $buttonColor ?? '#430c7b' }}; color: #ffffff !important; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-size: 13.5px; font-weight: 700; letter-spacing: 0.2px; box-shadow: 0 2px 8px rgba(67, 12, 123, 0.25);" target="_blank">
+                    <a href="{{ $actionUrl }}" class="button" style="display: inline-block; background-color: {{ $buttonColor ?? '#2e0854' }}; color: #ffffff !important; text-decoration: none; padding: 12px 34px; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 0.2px; box-shadow: 0 2px 8px rgba(46, 8, 84, 0.25);" target="_blank">
                         {{ $buttonText ?? 'View Your Request' }}
                     </a>
                 </div>
