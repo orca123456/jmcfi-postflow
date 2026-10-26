@@ -365,6 +365,8 @@ final class ApiRoutesTest extends TestCase
 
     public function test_register_validation_rejects_empty_payload(): void
     {
+        $admin = $this->createTestUser('it_admin');
+        Sanctum::actingAs($admin);
         $response = $this->postJson('/api/auth/register', []);
         $response->assertStatus(422);
     }
