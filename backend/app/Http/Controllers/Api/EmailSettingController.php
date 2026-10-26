@@ -138,14 +138,17 @@ class EmailSettingController extends Controller
             'headerTitle'     => $tmplHeader,
             'brandColor'      => $tmplColor,
             'footerText'      => $tmplFooter,
-            'logoUrl'         => $tmplLogo,
+            'headerBannerUrl' => $tmplLogo ?: null,
             'userName'        => $adminName,
+            'statusBadge'     => 'CONFIGURATION VERIFIED',
             'statusType'      => 'approved',
-            'statusLabel'     => 'Configuration Verified',
             'bodyMessage'     => 'This is a test notification from JMCFI PostFlow. Your custom email template styling has been applied!',
-            'postTitle'       => 'Annual Campus Activity Request 2026',
-            'reason'          => 'All approval requirements satisfied.',
-            'targetPlatforms' => ['facebook', 'instagram', 'portal'],
+            'tableDetails'    => [
+                'Title'            => 'Annual Campus Activity Request 2026',
+                'Approved by'      => 'IT Administration',
+                'Category'         => 'Institutional Announcement',
+                'Target Platforms' => 'Facebook, Instagram',
+            ],
             'actionUrl'       => url(config('app.frontend_url') ?? 'https://jmcfi-postflow-production.up.railway.app'),
             'buttonText'      => 'View System Dashboard'
         ];

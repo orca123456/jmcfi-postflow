@@ -24,45 +24,53 @@ class PostPublishedSuccessNotification extends Notification implements ShouldQue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'Jose Maria College Foundation, Inc.';
-        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
-        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
-        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+        $rawPlatforms = $this->postRequest->target_platforms ?? ['facebook', 'instagram'];
+        if (is_string($rawPlatforms)) {
+            $rawPlatforms = json_decode($rawPlatforms, true) ?: [$rawPlatforms];
+        }
+        $targetPlatformsFormatted = !empty($rawPlatforms)
+            ? implode(', ', array_map(fn($p) => ucfirst(strtolower((string)$p)), (array)$rawPlatforms))
+            : 'Facebook, Instagram';
 
-        $platforms = implode(', ', $this->postRequest->target_platforms ?? []);
+        $categoryName = $this->postRequest->category?->name
+            ?? $this->postRequest->other_category_name
+            ?? 'Announcement';
+
+        $userName = $notifiable->first_name ?: $notifiable->full_name ?: 'System Administrator';
+
+        $tableDetails = [
+            'Title'               => $this->postRequest->title,
+            'Category'            => $categoryName,
+            'Published Platforms' => $targetPlatformsFormatted,
+            'Published At'        => now()->format('M d, Y h:i A'),
+        ];
+
         $fbPostId  = $this->publishResults['facebook']['id'] ?? null;
         $wpLink    = $this->publishResults['wordpress']['link'] ?? null;
 
-        $extraDetails = [];
         if ($fbPostId && $fbPostId !== 'mock_fb_post_12345') {
-            $extraDetails['Facebook Post ID'] = $fbPostId;
+            $tableDetails['Facebook Post ID'] = $fbPostId;
         }
         if (!empty($wpLink)) {
-            $extraDetails['WordPress Article'] = $wpLink;
+            $tableDetails['WordPress Article'] = $wpLink;
         }
 
-        $frontendUrl = config('app.frontend_url') ?: 'https://jmcfi-postflow-production.up.railway.app';
+        $frontendUrl = config('app.frontend_url', 'http://localhost:8081');
         $dashboardUrl = rtrim($frontendUrl, '/') . "/dashboard/it-admin";
 
         $viewData = [
-            'headerTitle'        => $tmplHeader,
-            'brandColor'         => $tmplColor,
-            'footerText'         => $tmplFooter,
-            'logoUrl'            => $tmplLogo,
-            'userName'           => $notifiable->first_name ?? $notifiable->full_name ?? 'System Administrator',
-            'statusType'         => 'published',
-            'statusLabel'        => 'Published Successfully',
-            'bodyMessage'        => 'The following post has been successfully published to the target social platforms.',
-            'postTitle'          => $this->postRequest->title,
-            'publishedPlatforms' => $platforms ?: 'facebook, instagram',
-            'publishedAt'        => now()->format('M d, Y H:i'),
-            'extraDetails'       => $extraDetails,
-            'actionUrl'          => $dashboardUrl,
-            'buttonText'         => 'View in Dashboard',
+            'statusBadge'     => 'PUBLISHED — SOCIAL MEDIA',
+            'statusType'      => 'published',
+            'greeting'        => "Hello {$userName},",
+            'bodyMessage'     => 'The following post has been successfully published to the target institutional platforms.',
+            'tableDetails'    => $tableDetails,
+            'actionUrl'       => $dashboardUrl,
+            'buttonText'      => 'View in Dashboard',
+            'footerText'      => '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
         ];
 
         return (new MailMessage)
-            ->subject("[JMCFI PostFlow] ✅ Published Successfully: {$this->postRequest->title}")
+            ->subject("[JMCFI PostFlow] ✅ Published Successfully — {$this->postRequest->title}")
             ->view('emails.custom-template', $viewData);
     }
 

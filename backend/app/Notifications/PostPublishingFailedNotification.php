@@ -24,29 +24,40 @@ class PostPublishingFailedNotification extends Notification implements ShouldQue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
-        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
-        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
-        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+        $rawPlatforms = $this->postRequest->target_platforms ?? ['facebook', 'instagram'];
+        if (is_string($rawPlatforms)) {
+            $rawPlatforms = json_decode($rawPlatforms, true) ?: [$rawPlatforms];
+        }
+        $targetPlatformsFormatted = !empty($rawPlatforms)
+            ? implode(', ', array_map(fn($p) => ucfirst(strtolower((string)$p)), (array)$rawPlatforms))
+            : 'Facebook, Instagram';
 
-        $platforms = implode(', ', $this->postRequest->target_platforms ?? []);
+        $categoryName = $this->postRequest->category?->name
+            ?? $this->postRequest->other_category_name
+            ?? 'Announcement';
+
+        $userName = $notifiable->first_name ?: $notifiable->full_name ?: 'Administrator';
+
+        $tableDetails = [
+            'Title'            => $this->postRequest->title,
+            'Category'         => $categoryName,
+            'Target Platforms' => $targetPlatformsFormatted,
+            'Failed At'        => now()->format('M d, Y h:i A'),
+            'Error Reason'     => $this->errorMessage ?: 'Social platform API returned an unexpected error.',
+        ];
+
+        $frontendUrl = config('app.frontend_url', 'http://localhost:8081');
+        $dashboardUrl = rtrim($frontendUrl, '/') . "/dashboard/it-admin";
 
         $viewData = [
-            'headerTitle'     => $tmplHeader,
-            'brandColor'      => $tmplColor,
-            'footerText'      => $tmplFooter,
-            'logoUrl'         => $tmplLogo,
-            'userName'        => $notifiable->first_name ?? $notifiable->full_name ?? 'Administrator',
+            'statusBadge'     => 'FAILED — PUBLISHING ERROR',
             'statusType'      => 'failed',
-            'statusLabel'     => '🚨 Publish Failed',
-            'bodyMessage'     => 'The system failed to automatically broadcast this post. Manual intervention is required.',
-            'postTitle'       => $this->postRequest->title,
-            'reason'          => null,
-            'errorMessage'    => $this->errorMessage,
-            'failedAt'        => now()->format('M d, Y H:i'),
-            'targetPlatforms' => $platforms,
-            'actionUrl'       => url(config('app.frontend_url', env('APP_FRONTEND_URL', 'http://localhost:3000')) . "/dashboard/it-admin"),
-            'buttonText'      => 'Open Dashboard & Publish Manually',
+            'greeting'        => "Hello {$userName},",
+            'bodyMessage'     => 'The system encountered an error while broadcasting this post to the configured platforms. Please check platform tokens and publish manually.',
+            'tableDetails'    => $tableDetails,
+            'actionUrl'       => $dashboardUrl,
+            'buttonText'      => 'Open Dashboard & Resolve',
+            'footerText'      => '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
         ];
 
         return (new MailMessage)
