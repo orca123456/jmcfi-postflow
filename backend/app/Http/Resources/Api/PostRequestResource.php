@@ -16,9 +16,13 @@ class PostRequestResource extends JsonResource
             'caption_narrative' => $this->caption_narrative,
             'other_category_name' => $this->other_category_name,
             'category' => $this->whenLoaded('category', function () {
+                $categoryName = $this->category->name;
+                if ($this->other_category_name && in_array(strtolower(trim($categoryName)), ['other', 'others'], true)) {
+                    $categoryName = $this->other_category_name;
+                }
                 return [
                     'id' => $this->category->id,
-                    'name' => $this->category->name,
+                    'name' => $categoryName,
                     'slug' => $this->category->slug,
                     'color' => $this->category->color,
                     'icon' => $this->category->icon,

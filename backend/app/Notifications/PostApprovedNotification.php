@@ -72,10 +72,18 @@ class PostApprovedNotification extends Notification implements ShouldQueue
                 break;
 
             case 'imc_qa':
-                $statusBadge = 'APPROVED — IMC';
-                $bodyMessage = 'Your post request has received final approval from IMC and has been automatically published to its target platforms.';
+                $isScheduled = $this->postRequest->preferred_schedule_at && \Carbon\Carbon::parse($this->postRequest->preferred_schedule_at)->isFuture();
+                if ($isScheduled) {
+                    $statusBadge = 'APPROVED & SCHEDULED — IMC';
+                    $schedStr = \Carbon\Carbon::parse($this->postRequest->preferred_schedule_at)->format('m/d/Y \a\t g:i A');
+                    $bodyMessage = "Your post request has received final approval from IMC and is scheduled to be automatically published on {$schedStr}.";
+                    $subject = "[JMCFI PostFlow] Scheduled for Publishing — {$this->postRequest->title}";
+                } else {
+                    $statusBadge = 'APPROVED — IMC';
+                    $bodyMessage = 'Your post request has received final approval from IMC and has been automatically published to its target platforms.';
+                    $subject = "[JMCFI PostFlow] Final Approval by IMC — {$this->postRequest->title}";
+                }
                 $approvedByText = 'IMC — ' . ($this->approverName ?: 'Angela Cruz');
-                $subject = "[JMCFI PostFlow] Final Approval by IMC — {$this->postRequest->title}";
                 break;
 
             default:

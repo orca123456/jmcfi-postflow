@@ -438,6 +438,11 @@ export default function ITAdminDashboard() {
       title: p.title || 'Untitled',
       department: typeof p.requestor?.department === 'string' ? p.requestor.department : (p.requestor?.department?.name || p.requestor?.department?.display_name || 'Unknown'),
       requestedBy: p.requestor?.full_name || 'Unknown',
+      category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+        ? p.other_category_name
+        : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'General')),
+      other_category_name: p.other_category_name || null,
+      preferred_schedule_at: p.preferred_schedule_at || null,
       status: p.status_label || p.status,
       rawStatus: p.status,
       platforms: Array.isArray(p.target_platforms) ? p.target_platforms.map((t: string) => typeof t === 'string' ? t.toLowerCase() : '') : [],
@@ -7158,6 +7163,31 @@ $response = curl_exec($ch);`}
                         {previewPost?.requestedOn} {previewPost?.requestedTime}
                       </Text>
                     </View>
+
+                    {/* Requested to Publish On */}
+                    {(previewPost?.preferred_schedule_at || previewPost?.rawPost?.preferred_schedule_at) && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Requested to Publish On</Text>
+                        <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: '500' }}>
+                          {(() => {
+                            try {
+                              const rawVal = previewPost?.preferred_schedule_at || previewPost?.rawPost?.preferred_schedule_at;
+                              const d = new Date(rawVal);
+                              if (isNaN(d.getTime())) return String(rawVal);
+                              const datePart = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                              let hours = d.getHours();
+                              const ampm = hours >= 12 ? 'PM' : 'AM';
+                              hours = hours % 12;
+                              hours = hours ? hours : 12;
+                              const minutes = d.getMinutes().toString().padStart(2, '0');
+                              return `${datePart} • ${hours}:${minutes} ${ampm}`;
+                            } catch {
+                              return '';
+                            }
+                          })()}
+                        </Text>
+                      </View>
+                    )}
 
                     {/* Platforms */}
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>

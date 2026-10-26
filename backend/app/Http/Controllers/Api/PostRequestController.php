@@ -124,6 +124,7 @@ class PostRequestController extends Controller
                     'slug' => Str::slug($request->title) . '-' . Str::random(6),
                     'caption_narrative' => $request->caption_narrative,
                     'category_id' => $categoryId,
+                    'other_category_name' => $request->other_category_name,
                     'department_id' => $request->user()->id,
                     'requestor_id' => $request->user()->id,
                     'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
@@ -244,6 +245,7 @@ class PostRequestController extends Controller
                 'title' => $request->title ?? $postRequest->title,
                 'caption_narrative' => $request->caption_narrative ?? $postRequest->caption_narrative,
                 'category_id' => $request->category_id ?? $postRequest->category_id,
+                'other_category_name' => $request->has('other_category_name') ? $request->other_category_name : $postRequest->other_category_name,
                 'target_platforms' => $request->target_platforms ?? $postRequest->target_platforms,
                 'preferred_schedule_at' => $request->preferred_schedule_at ?? $postRequest->preferred_schedule_at,
             ]);
@@ -481,8 +483,9 @@ class PostRequestController extends Controller
                 }
             } else {
                 // All approvals done — IMC gave final sign-off
+                $isScheduled = $postRequest->preferred_schedule_at && \Carbon\Carbon::parse($postRequest->preferred_schedule_at)->isFuture();
                 $postRequest->update([
-                    'status' => PostRequest::STATUS_APPROVED,
+                    'status' => $isScheduled ? PostRequest::STATUS_SCHEDULED : PostRequest::STATUS_APPROVED,
                 ]);
             }
 
@@ -505,7 +508,16 @@ class PostRequestController extends Controller
                     if (!$post) return;
 
                     if (!$hasNextStage) {
-                        AutoPublishJob::dispatch($post, $userId)->onQueue('publishing')->delay(now()->addSeconds(10));
+                        $isScheduled = $post->preferred_schedule_at && \Carbon\Carbon::parse($post->preferred_schedule_at)->isFuture();
+                        if ($isScheduled) {
+                            AutoPublishJob::dispatch($post, $userId)
+                                ->onQueue('publishing')
+                                ->delay(\Carbon\Carbon::parse($post->preferred_schedule_at));
+                        } else {
+                            AutoPublishJob::dispatch($post, $userId)
+                                ->onQueue('publishing')
+                                ->delay(now()->addSeconds(10));
+                        }
                     }
 
                     if ($hasNextStage) {

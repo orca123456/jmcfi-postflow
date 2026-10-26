@@ -534,7 +534,11 @@ export default function RequestorDashboard() {
       title: p.title || 'Untitled',
       caption: p.caption_narrative || '',
       platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
-      category: p.category?.name || 'Category',
+      category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+        ? p.other_category_name
+        : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
+      other_category_name: p.other_category_name || null,
+      preferred_schedule_at: p.preferred_schedule_at || null,
       department: p.requestor?.department || 'Department',
       date: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
       time: p.created_at ? new Date(p.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
@@ -542,10 +546,26 @@ export default function RequestorDashboard() {
       rawStatus: p.status, // Add rawStatus for reliable filtering
       status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
       statusLabel: p.status_label || p.status,
-      statusColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
-      statusBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
-      badgeColor: p.status === 'published' || p.status === 'approved' ? '#15803D' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'),
-      badgeBg: p.status === 'published' || p.status === 'approved' ? '#DCFCE7' : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'),
+      statusColor: p.status === 'published' || p.status === 'approved'
+        ? '#15803D'
+        : (p.status === 'scheduled'
+          ? '#6D28D9'
+          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309')),
+      statusBg: p.status === 'published' || p.status === 'approved'
+        ? '#DCFCE7'
+        : (p.status === 'scheduled'
+          ? '#EDE9FE'
+          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7')),
+      badgeColor: p.status === 'published' || p.status === 'approved'
+        ? '#15803D'
+        : (p.status === 'scheduled'
+          ? '#6D28D9'
+          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309')),
+      badgeBg: p.status === 'published' || p.status === 'approved'
+        ? '#DCFCE7'
+        : (p.status === 'scheduled'
+          ? '#EDE9FE'
+          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7')),
       thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
         ? (() => {
             const getUrl = (m: any) => m?.url || m?.file_url || m?.file_path || null;
@@ -2754,22 +2774,29 @@ export default function RequestorDashboard() {
                       let vpaa = getStageStatus('vice_president');
                       let imc = getStageStatus('imc_qa');
 
+                      const isScheduled = selectedQueuePost.rawStatus === 'scheduled' ||
+                        (Boolean(selectedQueuePost.preferred_schedule_at) &&
+                         new Date(selectedQueuePost.preferred_schedule_at).getTime() > Date.now() &&
+                         selectedQueuePost.rawStatus !== 'published');
+
                       if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
                       if (vpaa === 'Rejected') { imc = 'Waiting'; }
-                      if (imc === 'Approved') { imc = 'Published'; }
+                      if (imc === 'Approved') {
+                        imc = isScheduled ? 'Scheduled' : 'Published';
+                      }
 
                       const getIcon = (state: string) => {
                         if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
-                        if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
+                        if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return { name: 'checkmark-circle', color: '#059669' };
                         return { name: 'time', color: Colors.textMuted };
                       };
                       const getColor = (state: string) => {
                         if (state === 'Rejected') return '#DC2626';
-                        if (state === 'Approved' || state === 'Published') return '#059669';
+                        if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
                         return Colors.textMuted;
                       };
                       const getLineColor = (state: string) => {
-                        if (state === 'Approved' || state === 'Published') return '#059669';
+                        if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
                         if (state === 'Rejected') return '#DC2626';
                         return Colors.border;
                       };
@@ -2989,7 +3016,7 @@ export default function RequestorDashboard() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.metaLabel}>Category</Text>
-                        <Text style={styles.metaVal}>{selectedQueuePost.category}</Text>
+                        <Text style={styles.metaVal}>{selectedQueuePost.other_category_name || selectedQueuePost.category}</Text>
                       </View>
                     </View>
 
@@ -3010,7 +3037,30 @@ export default function RequestorDashboard() {
                       </View>
                     </View>
 
-
+                    {selectedQueuePost.preferred_schedule_at ? (
+                      <View style={styles.metaRowGrid}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Requested to Publish On</Text>
+                          <Text style={styles.metaVal}>
+                            {(() => {
+                              try {
+                                const d = new Date(selectedQueuePost.preferred_schedule_at);
+                                if (isNaN(d.getTime())) return selectedQueuePost.preferred_schedule_at;
+                                const datePart = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                                let hours = d.getHours();
+                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                hours = hours % 12;
+                                hours = hours ? hours : 12;
+                                const minutes = d.getMinutes().toString().padStart(2, '0');
+                                return `${datePart} • ${hours}:${minutes} ${ampm}`;
+                              } catch {
+                                return selectedQueuePost.preferred_schedule_at;
+                              }
+                            })()}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
 
                     <View style={styles.metaRowGrid}>
                       <View style={{ flex: 1 }}>

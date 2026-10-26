@@ -66,6 +66,7 @@ class DashboardController extends Controller
                 'slug',
                 'caption_narrative',
                 'category_id',
+                'other_category_name',
                 'department_id',
                 'requestor_id',
                 'status',
@@ -262,13 +263,22 @@ class DashboardController extends Controller
             'title' => $post->title,
             'slug' => $post->slug,
             'caption_narrative' => $post->caption_narrative,
+            'other_category_name' => $post->other_category_name,
             'category' => $post->category ? [
                 'id' => $post->category->id,
-                'name' => $post->category->name,
+                'name' => ($post->other_category_name && in_array(strtolower(trim($post->category->name)), ['other', 'others'], true))
+                    ? $post->other_category_name
+                    : $post->category->name,
                 'slug' => $post->category->slug,
                 'color' => $post->category->color,
                 'icon' => $post->category->icon,
-            ] : null,
+            ] : ($post->other_category_name ? [
+                'id' => null,
+                'name' => $post->other_category_name,
+                'slug' => 'others',
+                'color' => '#64748B',
+                'icon' => 'folder-outline',
+            ] : null),
             'requestor' => $post->requestor ? [
                 'id' => $post->requestor->id,
                 'full_name' => $post->requestor->full_name,

@@ -227,7 +227,11 @@ export default function ImcQaDashboard() {
           ...p,
           id: p.id.toString(),
           title: p.title || 'Untitled',
-          category: p.category?.name || 'Category',
+          category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+            ? p.other_category_name
+            : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
+          other_category_name: p.other_category_name || null,
+          preferred_schedule_at: p.preferred_schedule_at || null,
           dept: p.requestor?.department || 'Department',
           requestedBy: p.requestor?.full_name || 'Unknown',
           requestedByRole: 'Requestor',
@@ -1005,22 +1009,30 @@ export default function ImcQaDashboard() {
                             let vpaa = getStageStatus('vice_president');
                             let imc = getStageStatus('imc_qa');
                             
+                            const isScheduled = selectedRequest.rawStatus === 'scheduled' ||
+                              selectedRequest.status === 'SCHEDULED' ||
+                              (Boolean(selectedRequest.preferred_schedule_at) &&
+                               new Date(selectedRequest.preferred_schedule_at).getTime() > Date.now() &&
+                               selectedRequest.status !== 'PUBLISHED');
+
                             if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
                             if (vpaa === 'Rejected') { imc = 'Waiting'; }
-                            if (imc === 'Approved') { imc = 'Published'; }
+                            if (imc === 'Approved') {
+                              imc = isScheduled ? 'Scheduled' : 'Published';
+                            }
 
                             const getIcon = (state: string) => {
                               if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
-                              if (state === 'Approved' || state === 'Published') return { name: 'checkmark-circle', color: '#059669' };
+                              if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return { name: 'checkmark-circle', color: '#059669' };
                               return { name: 'time', color: Colors.textMuted };
                             };
                             const getColor = (state: string) => {
                               if (state === 'Rejected') return '#DC2626';
-                              if (state === 'Approved' || state === 'Published') return '#059669';
+                              if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
                               return Colors.textMuted;
                             };
                             const getLineColor = (state: string) => {
-                              if (state === 'Approved' || state === 'Published') return '#059669';
+                              if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
                               if (state === 'Rejected') return '#DC2626';
                               return Colors.border;
                             };
@@ -1248,6 +1260,31 @@ export default function ImcQaDashboard() {
                         </Text>
                       </View>
                     </View>
+
+                    {selectedRequest.preferred_schedule_at ? (
+                      <View style={styles.metaRowGrid}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Requested to Publish On</Text>
+                          <Text style={styles.metaVal}>
+                            {(() => {
+                              try {
+                                const d = new Date(selectedRequest.preferred_schedule_at);
+                                if (isNaN(d.getTime())) return selectedRequest.preferred_schedule_at;
+                                const datePart = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                                let hours = d.getHours();
+                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                hours = hours % 12;
+                                hours = hours ? hours : 12;
+                                const minutes = d.getMinutes().toString().padStart(2, '0');
+                                return `${datePart} • ${hours}:${minutes} ${ampm}`;
+                              } catch {
+                                return selectedRequest.preferred_schedule_at;
+                              }
+                            })()}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
 
                     <View style={styles.metaRowGrid}>
                       <View style={{ flex: 1 }}>
