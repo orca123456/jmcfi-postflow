@@ -200,7 +200,8 @@ export const getRoleLabel = (role: string): string => {
     approver: 'Approver',
     admin: 'Administrator',
     // Legacy
-    office_head: 'Office Head',
+    office_head: 'Department Head',
+    department_head: 'Department Head',
     vice_president: 'Vice President',
     imc_qa_checker: 'IMC/QA Checker',
     it_publisher: 'IT Admin',

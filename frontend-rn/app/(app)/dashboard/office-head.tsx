@@ -452,7 +452,7 @@ export default function OfficeHeadDashboard() {
     setSelectedRequest(null);
 
     try {
-      await postsApi.returnRevision(reqId, { reason: 'Revision requested by Office Head' });
+      await postsApi.returnRevision(reqId, { reason: 'Revision requested by Department Head' });
       loadData(false);
       setTimeout(() => {
         alert(`Revision Requested for: "${reqTitle}"`);

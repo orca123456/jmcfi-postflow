@@ -236,7 +236,7 @@ class DashboardController extends Controller
                 'action' => match ($post->status) {
                     PostRequest::STATUS_PUBLISHED => 'published a post',
                     PostRequest::STATUS_APPROVED => 'approved a submission for',
-                    PostRequest::STATUS_PENDING_OFFICE_HEAD => 'submitted for office head review',
+                    PostRequest::STATUS_PENDING_OFFICE_HEAD => 'submitted for department head review',
                     PostRequest::STATUS_PENDING_VICE_PRESIDENT => 'forwarded to vice president for',
                     PostRequest::STATUS_PENDING_IMC_QA => 'submitted for IMC/QA review for',
                     PostRequest::STATUS_REJECTED => 'rejected a submission for',
@@ -516,7 +516,7 @@ class DashboardController extends Controller
                     $action = match ($post->status) {
                         PostRequest::STATUS_PUBLISHED => 'published a post',
                         PostRequest::STATUS_APPROVED => 'approved a submission for',
-                        PostRequest::STATUS_PENDING_OFFICE_HEAD => 'submitted for office head review',
+                        PostRequest::STATUS_PENDING_OFFICE_HEAD => 'submitted for department head review',
                         PostRequest::STATUS_PENDING_VICE_PRESIDENT => 'forwarded to vice president for',
                         PostRequest::STATUS_PENDING_PRESIDENT => 'forwarded to president for',
                         PostRequest::STATUS_PENDING_IMC_QA => 'submitted for IMC/QA review for',

@@ -175,7 +175,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'requestor' => 'Department Head / Programming Head',
-            'office_head' => 'Office Head',
+            'office_head' => 'Department Head',
             'vice_president' => 'Vice President',
             'president' => 'President',
             'imc_qa_checker' => 'IMC / QA Checker',

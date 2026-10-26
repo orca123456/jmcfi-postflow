@@ -41,7 +41,7 @@ class ApprovalWorkflow extends Model
     public static function stages(): array
     {
         return [
-            'office_head' => 'Office Head',
+            'office_head' => 'Department Head',
             'vice_president' => 'Vice President',
             'imc_qa' => 'IMC/QA Checker',
         ];

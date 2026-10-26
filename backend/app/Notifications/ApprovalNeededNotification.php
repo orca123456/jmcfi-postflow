@@ -127,12 +127,18 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         $stage = $this->forStage ?? $this->postRequest->currentApprovalStage()?->stage;
+        $label = match($stage) {
+            'office_head' => 'Department Head',
+            'vice_president' => 'Vice President',
+            'imc_qa' => 'IMC / QA',
+            default => 'Approval',
+        };
         return [
             'type'            => 'approval_needed',
             'post_request_id' => $this->postRequest->id,
             'post_title'      => $this->postRequest->title,
             'stage'           => $stage,
-            'message'         => "Approval needed for '{$this->postRequest->title}'",
+            'message'         => "{$label} approval needed for '{$this->postRequest->title}'",
         ];
     }
 }

@@ -111,7 +111,7 @@ class WorkflowService
     public function getWorkflowProgress(PostRequest $postRequest): array
     {
         $stages = [
-            'office_head' => 'Office Head',
+            'office_head' => 'Department Head',
             'vice_president' => 'Vice President',
             'imc_qa' => 'IMC/QA Checker',
         ];

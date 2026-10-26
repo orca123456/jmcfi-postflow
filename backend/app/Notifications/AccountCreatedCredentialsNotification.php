@@ -40,10 +40,16 @@ class AccountCreatedCredentialsNotification extends Notification implements Shou
         $rawRole = strtolower(trim($this->roleName ?? $this->user->roles->first()?->name ?? 'requestor'));
         $rawPos  = trim((string)($this->user->position ?? ''));
 
-        if (in_array($rawRole, ['requestor', 'content_requestor'], true)) {
+        if ($rawRole === 'office_head' || $rawRole === 'department_head' || strtolower($rawPos) === 'office head' || strtolower($rawPos) === 'department head') {
+            $designation = 'Department Head';
+        } elseif ($rawRole === 'vice_president' || strtolower($rawPos) === 'vice president') {
+            $designation = 'Vice President';
+        } elseif ($rawRole === 'imc_qa_checker' || strtolower($rawPos) === 'imc qa' || strtolower($rawPos) === 'imc / qa') {
+            $designation = 'IMC / QA Reviewer';
+        } elseif (in_array($rawRole, ['requestor', 'content_requestor'], true)) {
             $designation = 'Requestor';
-        } elseif (in_array($rawRole, ['approver', 'office_head', 'vice_president', 'imc_qa_checker'], true)) {
-            $designation = 'Approver';
+        } elseif (in_array($rawRole, ['approver'], true)) {
+            $designation = 'Department Head';
         } elseif (in_array($rawRole, ['it_admin', 'it_publisher', 'admin'], true)) {
             $designation = 'IT Administrator';
         } elseif (!empty($rawPos) && !str_contains(strtolower($rawPos), 'staff') && !str_contains(strtolower($rawPos), 'faculty')) {

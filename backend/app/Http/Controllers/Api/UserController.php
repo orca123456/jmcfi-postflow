@@ -64,7 +64,13 @@ class UserController extends Controller
                 'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
                 default => 'requestor',
             };
-            if ($category === 'approver') {
+            if ($role === 'office_head') {
+                $position = 'Department Head';
+            } elseif ($role === 'vice_president') {
+                $position = 'Vice President';
+            } elseif ($role === 'imc_qa_checker') {
+                $position = 'QA / Branding Checker';
+            } elseif ($category === 'approver') {
                 $position = 'Approver';
             } elseif ($category === 'admin') {
                 $position = 'IT Administrator';
@@ -149,7 +155,7 @@ class UserController extends Controller
                     str_contains(strtolower($dept ?? ''), 'president') || str_contains(strtolower($dept ?? ''), 'vpaa') || str_contains(strtolower($dept ?? ''), 'vice') => 'vice_president',
                     default => 'office_head',
                 },
-                'office_head', 'office head', 'department_head', 'dean' => 'office_head',
+                'office_head', 'office head', 'department_head', 'department head', 'dean' => 'office_head',
                 'vice_president', 'vice president', 'vp' => 'vice_president',
                 'imc_qa', 'imc_qa_checker', 'qa' => 'imc_qa_checker',
                 default => 'requestor',

@@ -67,7 +67,7 @@ class PostRequest extends Model
     {
         return [
             'draft' => 'Draft',
-            'pending_office_head' => 'Pending Office Head',
+            'pending_office_head' => 'Pending Department Head',
             'pending_vice_president' => 'Pending Vice President',
             'pending_president' => 'Pending President',
             'pending_imc_qa' => 'Pending IMC/QA',
@@ -85,7 +85,7 @@ class PostRequest extends Model
     public static function approvalStages(): array
     {
         return [
-            'office_head' => 'Office Head',
+            'office_head' => 'Department Head',
             'vice_president' => 'Vice President',
             'imc_qa' => 'IMC/QA Checker',
             'it_publisher' => 'IT Publisher',

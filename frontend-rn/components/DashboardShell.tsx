@@ -516,11 +516,13 @@ export function DashboardShell({
     if (primaryRole === 'imc_qa_checker' || roles.includes('imc_qa_checker') || dept.includes('institutional marketing') || dept.includes('imc')) {
       return 'IMC QA';
     }
-    if (primaryRole === 'office_head' || roles.includes('office_head')) {
-      return 'Office Head';
+    if (primaryRole === 'office_head' || roles.includes('office_head') || primaryRole === 'department_head' || roles.includes('department_head')) {
+      return 'Department Head';
     }
     if (primaryRole === 'approver' || roles.includes('approver')) {
-      return 'Approver';
+      if (dept.includes('vice president')) return 'Vice President';
+      if (dept.includes('institutional marketing') || dept.includes('imc')) return 'IMC QA';
+      return 'Department Head';
     }
     if (primaryRole === 'content_requestor' || primaryRole === 'requestor' || roles.includes('content_requestor') || roles.includes('requestor')) {
       return 'Requestor';
@@ -711,7 +713,13 @@ export function DashboardShell({
                 notifications.map((n) => {
                   const isRead = n.read;
                   const title = n.data?.title || n.data?.post_title || 'Notification';
-                  const message = n.data?.message || n.data?.reason || n.data?.remarks || 'Action updated';
+                  const rawMessage = n.data?.message || n.data?.reason || n.data?.remarks || 'Action updated';
+                  const message = rawMessage
+                    .replace(/at stage:\s*office_head/gi, 'by Department Head')
+                    .replace(/at stage:\s*vice_president/gi, 'by Vice President')
+                    .replace(/at stage:\s*imc_qa/gi, 'by IMC / QA')
+                    .replace(/\boffice_head\b/gi, 'Department Head')
+                    .replace(/\bOffice Head\b/gi, 'Department Head');
                   const timeAgo = n.created_at || 'Just now';
 
                   return (

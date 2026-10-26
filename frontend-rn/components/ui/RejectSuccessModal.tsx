@@ -5,7 +5,7 @@ import { useThemeStore } from '../../store/theme';
 
 export interface RejectSuccessModalProps {
   visible: boolean;
-  role: 'office_head' | 'vpaa' | 'vice_president' | 'imc_qa' | 'imc_qa_checker';
+  role: 'office_head' | 'vpaa' | 'vice_president' | 'imc_qa' | 'imc_qa_checker' | 'department_head';
   postTitle: string;
   onClose: () => void;
 }
@@ -21,8 +21,8 @@ export const RejectSuccessModal: React.FC<RejectSuccessModalProps> = ({
   if (!visible) return null;
 
   let roleLabel = 'the Reviewer';
-  if (role === 'office_head') {
-    roleLabel = 'the Office Head';
+  if (role === 'office_head' || role === 'department_head') {
+    roleLabel = 'the Department Head';
   } else if (role === 'vice_president' || role === 'vpaa') {
     roleLabel = 'the VPAA';
   } else if (role === 'imc_qa' || role === 'imc_qa_checker') {

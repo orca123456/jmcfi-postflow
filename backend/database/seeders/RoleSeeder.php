@@ -44,7 +44,7 @@ class RoleSeeder extends Seeder
             ],
             [
                 'name' => 'office_head',
-                'display_name' => 'Office Head',
+                'display_name' => 'Department Head',
                 'description' => 'Approves post requests from their own department (Stage 1).',
                 'permissions' => ['view_pending_posts', 'approve_post', 'reject_post', 'return_for_revision'],
             ],

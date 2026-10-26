@@ -2211,7 +2211,8 @@ export default function ITAdminDashboard() {
       // legacy
       case 'it_publisher': return { label: 'IT ADMIN', color: '#1E40AF', bgColor: '#DBEAFE' };
       case 'vice_president': return { label: 'VICE PRESIDENT', color: '#B45309', bgColor: '#FEF3C7' };
-      case 'office_head': return { label: 'OFFICE HEAD', color: '#92400E', bgColor: '#FEF3C7' };
+      case 'office_head':
+      case 'department_head': return { label: 'DEPARTMENT HEAD', color: '#92400E', bgColor: '#FEF3C7' };
       case 'imc_qa_checker': return { label: 'IMC / QA', color: '#6366F1', bgColor: '#E0E7FF' };
       default: return { label: role.toUpperCase(), color: Colors.textPrimary, bgColor: Colors.background };
     }
@@ -7258,7 +7259,7 @@ $response = curl_exec($ch);`}
 
                     {(() => {
                       const standardStages = [
-                        { key: 'office_head', label: 'Office Head' },
+                        { key: 'office_head', label: 'Department Head' },
                         { key: 'vice_president', label: 'Vice President' },
                         { key: 'imc_qa', label: 'IMC/QA Checker' },
                       ];

@@ -122,13 +122,20 @@ class PostApprovedNotification extends Notification implements ShouldQueue
 
     public function toArray(object $notifiable): array
     {
+        $stageLabel = match($this->approvedByStage) {
+            'office_head' => 'Department Head',
+            'vice_president' => 'Vice President',
+            'imc_qa' => 'IMC / QA',
+            default => $this->approvedByStage ? ucwords(str_replace('_', ' ', $this->approvedByStage)) : 'Department Head',
+        };
+
         return [
             'type'              => 'post_approved',
             'post_request_id'   => $this->postRequest->id,
             'post_title'        => $this->postRequest->title,
             'approved_by_stage' => $this->approvedByStage,
             'approver_name'     => $this->approverName,
-            'message'           => "Your post '{$this->postRequest->title}' has been approved at stage: {$this->approvedByStage}",
+            'message'           => "Your post '{$this->postRequest->title}' has been approved by {$stageLabel}",
         ];
     }
 }

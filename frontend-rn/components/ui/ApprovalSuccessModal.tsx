@@ -5,7 +5,7 @@ import { useThemeStore } from '../../store/theme';
 
 export interface ApprovalSuccessModalProps {
   visible: boolean;
-  role: 'office_head' | 'vpaa' | 'vice_president' | 'imc_qa' | 'imc_qa_checker';
+  role: 'office_head' | 'vpaa' | 'vice_president' | 'imc_qa' | 'imc_qa_checker' | 'department_head';
   postTitle: string;
   isScheduled?: boolean;
   onClose: () => void;
