@@ -1,0 +1,92 @@
+/* JMCFI PostFlow — production-style floating assistant */
+:root{--pf-indigo:#4b0082;--pf-grape:#6c3baa;--pf-lavender:#c9a0dc;--pf-yellow:#ffc94e;--pf-ink:#352444;--pf-soft:#f4eef9}
+.pf-assistant,.pf-assistant *{box-sizing:border-box}
+.pf-assistant{position:fixed;left:calc(100vw - 110px);top:calc(100dvh - 118px);z-index:2147482000;width:84px;height:96px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--pf-ink);user-select:none;-webkit-user-select:none;touch-action:none;isolation:isolate;--pf-tilt:0deg}
+.pf-launcher{position:relative;display:block;width:84px;height:96px;border:0;padding:0;margin:0;overflow:visible;border-radius:0;box-shadow:none;background:transparent;outline:none;cursor:grab;-webkit-tap-highlight-color:transparent;touch-action:none}
+.pf-launcher:active{cursor:grabbing}
+.pf-launcher:focus-visible{outline:2px solid var(--pf-grape);outline-offset:2px;border-radius:14px}
+.pf-bot{position:absolute;inset:0;filter:drop-shadow(0 8px 8px rgba(63,32,96,.18));transform-origin:50% 58%;animation:pf-float 3.8s ease-in-out infinite;transition:filter .22s ease,transform .22s ease}
+ .pf-sprite{width:100%;height:100%;position:absolute;inset:0;pointer-events:none;display:block;object-fit:contain;-webkit-user-drag:none}
+.pf-body-layer,.pf-cape-live{background-image:url("assets/bot-base.webp");background-repeat:no-repeat;background-position:center;background-size:contain}
+.pf-body-layer{z-index:1;clip-path:path("M 0 0 L 820 0 L 820 454 C 786 430 755 431 730 440 C 702 450 685 452 660 449 C 636 446 625 433 617 417 C 605 394 592 357 566 333 C 536 306 502 297 470 292 C 432 286 402 289 360 297 C 309 307 277 330 255 355 C 234 379 217 410 205 436 C 187 472 172 524 169 589 C 166 643 173 704 202 820 L 0 820 Z")}
+.pf-cape-live{z-index:0;clip-path:path("M 488 345 C 542 347 590 358 623 383 C 663 413 701 451 759 484 C 786 499 807 509 820 513 L 820 655 C 789 666 761 665 733 661 C 697 656 659 648 621 630 C 588 615 553 595 518 566 C 491 544 468 516 447 485 C 430 460 420 431 422 404 C 424 379 445 357 488 345 Z");transform-origin:53% 55%;transition:transform .22s cubic-bezier(.28,.08,.22,1);--pf-cape-shift:-2px;--pf-cape-stretch:1;--pf-cape-rot:0deg;--pf-cape-lift:0px;filter:saturate(1.05) contrast(1.02)}
+.pf-eye-blink{opacity:0;animation:pf-blink 6.2s linear infinite}
+.pf-mouth-sprite{z-index:2;opacity:0;transition:opacity .08s linear}
+.pf-wave-hand{z-index:3;transform-origin:19.6% 62.4%}
+.pf-launcher:hover .pf-wave-hand,.pf-launcher:focus-visible .pf-wave-hand,.pf-assistant.pf-wave .pf-wave-hand{animation:pf-wave 1.2s ease-in-out 1}
+.pf-launcher:hover .pf-bot,.pf-launcher:focus-visible .pf-bot{transform:translateY(-2px) scale(1.02);filter:drop-shadow(0 10px 12px rgba(63,32,96,.22))}
+
+/* animate the chatbot's real cape while dragging */
+.pf-flying .pf-cape-live{animation:pf-real-cape-wave 1.6s cubic-bezier(.33,0,.18,1) infinite alternate;transform:translateX(var(--pf-cape-shift)) translateY(var(--pf-cape-lift)) rotate(var(--pf-cape-rot)) scaleX(var(--pf-cape-stretch)) scaleY(1.002);filter:saturate(1.08) contrast(1.03)}
+.pf-flying .pf-bot{animation:none;transform:translateY(-3px) rotate(var(--pf-tilt)) scale(1.055);filter:drop-shadow(0 13px 11px rgba(63,32,96,.17))}
+.pf-flying .pf-wave-hand{animation:pf-flight-wave .42s ease-in-out infinite alternate}
+.pf-flying .pf-eye-blink{animation:pf-talk-blink 2.8s linear infinite}
+.pf-landing .pf-bot{animation:pf-land .5s cubic-bezier(.2,.9,.3,1.1) both}
+
+/* speech / greeting */
+.pf-greeting{position:absolute;top:17px;right:calc(100% + 10px);width:max-content;max-width:235px;padding:10px 13px;background:#fff;border:1px solid #ebe1f2;color:var(--pf-indigo);box-shadow:0 8px 24px rgba(75,0,130,.12);border-radius:13px;font-size:12.5px;font-weight:700;line-height:1.35;pointer-events:none;opacity:0;visibility:hidden;transform:translate(9px,4px) scale(.96);transition:opacity .18s ease,transform .22s ease,visibility .18s ease}
+.pf-greeting::after{content:'';position:absolute;top:50%;right:-6px;width:12px;height:12px;margin-top:-6px;background:#fff;border-right:1px solid #ebe1f2;border-top:1px solid #ebe1f2;transform:rotate(45deg)}
+.pf-launcher:hover + .pf-greeting,.pf-launcher:focus-visible + .pf-greeting,.pf-assistant.pf-active-greet .pf-greeting,.pf-assistant.pf-flying .pf-greeting{opacity:1;visibility:visible;transform:translate(0,0) scale(1)}
+.pf-assistant.pf-speaking .pf-greeting,.pf-assistant.pf-active-greet .pf-greeting{animation:pf-bubble-talk .75s ease-in-out infinite alternate}
+.pf-assistant.pf-speaking .pf-bot{animation:pf-talk-bob .9s ease-in-out infinite alternate}
+.pf-assistant.pf-speaking .pf-eye-blink{animation:pf-talk-blink 3s linear infinite}
+.pf-assistant.pf-speaking .pf-mouth-sprite{opacity:1}
+
+.pf-panel{position:absolute;right:0;bottom:calc(100% + 12px);width:min(352px,calc(100vw - 18px));height:min(492px,calc(100dvh - 20px));display:flex;flex-direction:column;background:#fff;border:1px solid #eadff2;border-radius:20px;box-shadow:0 22px 60px rgba(52,15,90,.16),0 5px 18px rgba(52,15,90,.05);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(10px) scale(.985);transform-origin:bottom right;overflow:hidden;transition:opacity .22s ease,visibility .22s ease,transform .28s cubic-bezier(.2,.72,.2,1)}
+.pf-open .pf-panel{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1)}
+.pf-head{display:flex;align-items:center;gap:10px;padding:15px 16px;border-bottom:1px solid #f2ebf7;background:linear-gradient(120deg,#fff 35%,#fbf8ff 100%)}
+.pf-avatar{width:42px;height:42px;object-fit:contain;flex:none}
+.pf-heading{min-width:0;flex:1}.pf-heading h2{margin:0 0 1px;font-size:15px;font-weight:750;color:var(--pf-indigo);letter-spacing:-.2px}.pf-heading p{margin:0;color:#8c759f;font-size:11px;display:flex;align-items:center;gap:7px}.pf-online{display:inline-block;width:8px;height:8px;border-radius:50%;background:#35c76d;box-shadow:0 0 0 3px rgba(53,199,109,.15)}
+.pf-close{width:31px;height:31px;display:grid;place-items:center;background:transparent;border:0;border-radius:9px;color:#8e7e9f;cursor:pointer;transition:background .15s,color .15s}.pf-close:hover{background:#f1e8f7;color:var(--pf-indigo)}.pf-close:focus-visible,.pf-send:focus-visible,.pf-choices button:focus-visible{outline:2px solid var(--pf-grape);outline-offset:2px}.pf-close svg,.pf-send svg{width:19px;height:19px;display:block}
+.pf-messages{overflow:auto;flex:1;display:flex;flex-direction:column;gap:11px;padding:18px 16px 16px;scroll-behavior:smooth}.pf-day{font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;text-align:center;color:#a591b2;margin-bottom:2px}
+.pf-bubble{max-width:88%;align-self:flex-start;background:#f5eefb;color:#4a355c;border-radius:16px 16px 16px 5px;padding:12px 14px;font-size:13px;line-height:1.58;white-space:pre-wrap;overflow-wrap:break-word;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+.pf-user{align-self:flex-end;background:var(--pf-indigo);color:#fff;border-radius:16px 16px 5px 16px}.pf-in{animation:pf-message-in .26s cubic-bezier(.2,.8,.2,1)}
+.pf-choices{display:flex;flex-wrap:wrap;gap:7px}.pf-choices button{font:inherit;font-size:11.5px;color:var(--pf-indigo);background:#fff;border:1px solid #decee9;border-radius:999px;padding:8px 11px;cursor:pointer;transition:background .18s,border-color .18s,transform .18s}.pf-choices button:hover{background:#f7effb;border-color:#c3a8d8;transform:translateY(-1px)}
+.pf-form{display:flex;align-items:center;gap:9px;padding:12px 13px 13px;border-top:1px solid #f1e9f7;background:#fff}.pf-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);border:0}.pf-input{flex:1;min-width:0;height:42px;border:1px solid #e7dff0;border-radius:13px;padding:0 13px;background:#fbf9fd;color:var(--pf-ink);font:400 12.5px/1.4 inherit;outline:none}.pf-input:focus{border-color:var(--pf-grape);background:#fff;box-shadow:0 0 0 3px rgba(108,59,170,.1)}.pf-input::placeholder{color:#a297ad}
+.pf-send{position:relative;display:grid;place-items:center;width:41px;height:41px;border:0;border-radius:13px;background:var(--pf-indigo);color:#fff;cursor:pointer;transition:transform .16s,background .16s;overflow:hidden}.pf-send:hover{background:var(--pf-grape);transform:translateY(-1px)}.pf-send:disabled{opacity:.75;cursor:default}
+.pf-send.pf-sending svg{animation:pf-sendflight .48s cubic-bezier(.35,.1,.2,1) 1}.pf-send.pf-sending::after{content:'';position:absolute;width:7px;height:7px;border-radius:50%;background:#fff;opacity:.9;animation:pf-star .5s ease-out 1}
+.pf-typing{display:inline-flex;align-items:center;gap:6px;min-height:42px}.pf-typing i{display:block;width:7px;height:7px;border-radius:50%;background:#b390d1;animation:pf-dot 1s ease-in-out infinite}.pf-typing i:nth-child(2){animation-delay:.15s}.pf-typing i:nth-child(3){animation-delay:.3s}
+
+.pf-align-left .pf-panel{left:0;right:auto;transform-origin:bottom left}.pf-below .pf-panel{bottom:auto;top:calc(100% + 10px);transform-origin:top right}.pf-align-left.pf-below .pf-panel{transform-origin:top left}
+
+@keyframes pf-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes pf-wave{0%,100%{transform:rotate(0deg)}15%{transform:rotate(-12deg)}35%{transform:rotate(11deg)}53%{transform:rotate(-7deg)}72%{transform:rotate(8deg)}86%{transform:rotate(-3deg)}}
+@keyframes pf-flight-wave{from{transform:rotate(-6deg)}to{transform:rotate(6deg)}}
+@keyframes pf-land{0%{transform:translateY(-5px) scale(1.04)}55%{transform:translateY(2px) scale(.985)}100%{transform:translateY(0) scale(1)}}
+@keyframes pf-real-cape-wave{0%{transform:translateX(var(--pf-cape-shift)) translateY(var(--pf-cape-lift)) rotate(calc(var(--pf-cape-rot) - 1deg)) scaleX(var(--pf-cape-stretch)) scaleY(1) skewX(-1.2deg)}28%{transform:translateX(calc(var(--pf-cape-shift) - 2px)) translateY(calc(var(--pf-cape-lift) - .5px)) rotate(calc(var(--pf-cape-rot) + 1.2deg)) scaleX(calc(var(--pf-cape-stretch) + .018)) scaleY(1.008) skewX(.4deg)}58%{transform:translateX(calc(var(--pf-cape-shift) - 4px)) translateY(calc(var(--pf-cape-lift) - 1.2px)) rotate(calc(var(--pf-cape-rot) + 2.8deg)) scaleX(calc(var(--pf-cape-stretch) + .034)) scaleY(1.018) skewX(1.6deg)}100%{transform:translateX(calc(var(--pf-cape-shift) - 6px)) translateY(calc(var(--pf-cape-lift) - 2.2px)) rotate(calc(var(--pf-cape-rot) + 4.6deg)) scaleX(calc(var(--pf-cape-stretch) + .05)) scaleY(1.03) skewX(2.7deg)}}
+@keyframes pf-blink{0%,4%,44%,48%,100%{opacity:0}2%,46%{opacity:1}}
+@keyframes pf-talk-blink{0%,5%,55%,60%,100%{opacity:0}2%,57%{opacity:1}}
+@keyframes pf-talk-bob{from{transform:translateY(-1px) rotate(-.55deg)}to{transform:translateY(1px) rotate(.55deg)}}
+
+@keyframes pf-bubble-talk{from{transform:translate(0,0) scale(1)}to{transform:translate(0,-1px) scale(1.015)}}
+@keyframes pf-message-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes pf-dot{0%,80%,100%{transform:translateY(0);opacity:.55}40%{transform:translateY(-3px);opacity:1}}
+@keyframes pf-sendflight{0%{transform:translate(0,0) scale(1);opacity:1}90%{transform:translate(-16px,-19px) scale(.65) rotate(-15deg);opacity:0}100%{opacity:0;transform:translate(0,0)}}
+@keyframes pf-star{0%{opacity:1;transform:translate(3px,9px) scale(.4)}100%{opacity:0;transform:translate(-28px,-30px) scale(1.5)}}
+
+@media(max-width:600px){.pf-assistant{width:78px;height:88px}.pf-launcher{width:78px;height:88px}.pf-greeting{font-size:11.5px;max-width:190px;padding:9px 11px}.pf-panel{width:min(340px,calc(100vw - 18px));height:min(480px,calc(100dvh - 20px))}}
+@media(prefers-reduced-motion:reduce){.pf-assistant *{animation:none!important;transition:none!important}.pf-eye-blink{opacity:0!important}}
+
+/* ── PostFlow app integration additions ───────────────────────────────── */
+.pf-bubble strong{font-weight:700;color:inherit}
+.pf-bubble code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;background:rgba(75,0,130,.08);padding:1px 5px;border-radius:5px}
+.pf-user code{background:rgba(255,255,255,.18)}
+.pf-role{display:inline-block;margin-left:2px;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#f1e8f7;color:var(--pf-grape)}
+/* dark mode */
+.pf-dark .pf-panel{background:#1c1530;border-color:#3a2d55;box-shadow:0 22px 60px rgba(0,0,0,.45)}
+.pf-dark .pf-head{background:linear-gradient(120deg,#1c1530 35%,#251b3d 100%);border-bottom-color:#33284a}
+.pf-dark .pf-heading h2{color:#e6d6f5}
+.pf-dark .pf-heading p{color:#a993c0}
+.pf-dark .pf-role{background:#33284a;color:#c9a0dc}
+.pf-dark .pf-close{color:#b9a6cc}.pf-dark .pf-close:hover{background:#2c2142;color:#fff}
+.pf-dark .pf-day{color:#8f7aa8}
+.pf-dark .pf-bubble{background:#2a1f40;color:#ece3f6}
+.pf-dark .pf-user{background:var(--pf-grape);color:#fff}
+.pf-dark .pf-bubble code{background:rgba(255,255,255,.1)}
+.pf-dark .pf-choices button{background:#221a36;border-color:#3f3160;color:#d9c3ee}
+.pf-dark .pf-choices button:hover{background:#2c2142;border-color:#6c3baa}
+.pf-dark .pf-form{background:#1c1530;border-top-color:#33284a}
+.pf-dark .pf-input{background:#251b3d;border-color:#3a2d55;color:#f1eafa}
+.pf-dark .pf-input:focus{background:#2a1f45;border-color:#9b6fd6}
+.pf-dark .pf-greeting{background:#251b3d;border-color:#3a2d55;color:#e6d6f5}
+.pf-dark .pf-greeting::after{background:#251b3d;border-color:#3a2d55}
