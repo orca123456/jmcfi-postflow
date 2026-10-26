@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Department;
 use App\Models\PostRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -24,46 +25,102 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $stage = $this->forStage ?? $this->postRequest->currentApprovalStage()?->stage;
+        $stage = $this->forStage ?? $this->postRequest->currentApprovalStage()?->stage ?? 'office_head';
 
-        $stageLabels = [
-            'office_head'     => 'Office Head Review',
-            'vice_president'  => 'Vice President Review',
-            'imc_qa'          => 'IMC / QA Final Review',
-        ];
+        $approverFirstName = $notifiable->first_name ?: $notifiable->full_name;
 
-        $stageMessages = [
-            'office_head'    => 'A new post request from your department has been submitted and requires your initial approval.',
-            'vice_president' => 'A post request has passed the Office Head review and now needs your Vice-President approval.',
-            'imc_qa'         => 'A post request has been approved by the VP and is now awaiting your final IMC/QA sign-off before publishing.',
-        ];
+        // Resolve Category
+        $categoryName = $this->postRequest->category?->name
+            ?? $this->postRequest->other_category_name
+            ?? 'Announcement';
 
-        $stageLabel   = $stageLabels[$stage]   ?? 'Review';
-        $stageMessage = $stageMessages[$stage] ?? 'A post request requires your action.';
+        // Resolve Target Platforms formatted
+        $rawPlatforms = $this->postRequest->target_platforms ?? ['facebook', 'instagram'];
+        if (is_string($rawPlatforms)) {
+            $rawPlatforms = json_decode($rawPlatforms, true) ?: [$rawPlatforms];
+        }
+        $targetPlatformsFormatted = !empty($rawPlatforms)
+            ? implode(', ', array_map(fn($p) => ucfirst(strtolower((string)$p)), (array)$rawPlatforms))
+            : 'Facebook, Instagram';
 
-        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
-        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
-        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
-        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+        // Resolve Requestor and Department
+        $requestor = $this->postRequest->requestor;
+        $requestorName = $requestor?->full_name ?? 'April Joy Domopoy';
+        $deptRaw = $requestor?->department;
+
+        $deptCode = $deptRaw ?: 'BSA';
+        $deptName = $deptRaw ?: 'Accountancy';
+
+        if ($deptRaw) {
+            $deptModel = Department::where('name', $deptRaw)->orWhere('display_name', $deptRaw)->first();
+            if ($deptModel) {
+                $deptCode = $deptModel->name;
+                $deptName = match($deptModel->name) {
+                    'BSA'   => 'Accountancy',
+                    'Psyc'  => 'Psychology',
+                    default => $deptModel->display_name ?: $deptModel->name,
+                };
+            }
+        }
+
+        // Configure Stage Specifics matching screenshots
+        switch ($stage) {
+            case 'office_head':
+                $greeting = $approverFirstName ? "Hello Department Head {$approverFirstName}," : "Hello Department Head,";
+                $bodyMessage = "A new post request from your department requires your review.";
+                $subject = "[JMCFI PostFlow] Action Required — Department Head Approval: {$this->postRequest->title}";
+                $tableDetails = [
+                    'Title'            => $this->postRequest->title,
+                    'Category'         => $categoryName,
+                    'Submitted by'     => "{$requestorName} ({$deptCode})",
+                    'Target Platforms' => $targetPlatformsFormatted,
+                ];
+                break;
+
+            case 'vice_president':
+                $greeting = "Hello Vice President,";
+                $bodyMessage = "A new post request has been forwarded for your approval.";
+                $subject = "[JMCFI PostFlow] Action Required — Vice President Approval: {$this->postRequest->title}";
+                $tableDetails = [
+                    'Title'            => $this->postRequest->title,
+                    'Category'         => $categoryName,
+                    'Submitted by'     => $requestorName,
+                    'Department'       => $deptName,
+                    'Target Platforms' => $targetPlatformsFormatted,
+                ];
+                break;
+
+            case 'imc_qa':
+            default:
+                $greeting = $approverFirstName ? "Hello IMC {$approverFirstName}," : "Hello IMC,";
+                $bodyMessage = "A new post request has been forwarded for your final approval.";
+                $subject = "[JMCFI PostFlow] Action Required — IMC Final Approval: {$this->postRequest->title}";
+                $tableDetails = [
+                    'Title'            => $this->postRequest->title,
+                    'Category'         => $categoryName,
+                    'Submitted by'     => $requestorName,
+                    'Department'       => $deptName,
+                    'Target Platforms' => $targetPlatformsFormatted,
+                ];
+                break;
+        }
+
+        $frontendUrl = config('app.frontend_url', 'http://localhost:8081');
+        $actionUrl = rtrim($frontendUrl, '/') . "/approver/posts/{$this->postRequest->id}";
 
         $viewData = [
-            'headerTitle'     => $tmplHeader,
-            'brandColor'      => $tmplColor,
-            'footerText'      => $tmplFooter,
-            'logoUrl'         => $tmplLogo,
-            'userName'        => $notifiable->first_name ?? $notifiable->full_name ?? 'Approver',
+            'statusBadge'     => 'ACTION REQUIRED — POST APPROVAL',
             'statusType'      => 'pending',
-            'statusLabel'     => "Action Required — {$stageLabel}",
-            'bodyMessage'     => $stageMessage,
-            'postTitle'       => $this->postRequest->title,
-            'reason'          => "Submitted by: {$this->postRequest->requestor?->full_name} ({$this->postRequest->requestor?->department})",
-            'targetPlatforms' => $this->postRequest->target_platforms ?? [],
-            'actionUrl'       => url(config('app.frontend_url', 'http://localhost:8081') . "/approver/posts/{$this->postRequest->id}"),
-            'buttonText'      => 'Review & Take Action'
+            'greeting'        => $greeting,
+            'bodyMessage'     => $bodyMessage,
+            'tableDetails'    => $tableDetails,
+            'actionUrl'       => $actionUrl,
+            'buttonText'      => 'Review & Take Action',
+            'footerText'      => '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
         ];
 
         return (new MailMessage)
-            ->subject("[JMCFI PostFlow] Action Required — {$stageLabel}: {$this->postRequest->title}")
+            ->subject($subject)
             ->view('emails.custom-template', $viewData);
     }
 

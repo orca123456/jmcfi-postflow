@@ -25,56 +25,102 @@ class PostApprovedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $tmplHeader = \App\Models\SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification';
-        $tmplColor  = \App\Models\SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000';
-        $tmplFooter = \App\Models\SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.';
-        $tmplLogo   = \App\Models\SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '';
+        // Resolve stage
+        $stage = $this->approvedByStage;
+        if (!$stage) {
+            $latestApproval = $this->postRequest->approvalWorkflows()
+                ->where('action', 'approved')
+                ->orderByDesc('stage_order')
+                ->first();
+            $stage = $latestApproval?->stage ?? 'office_head';
+            if (!$this->approverName && $latestApproval?->approver) {
+                $this->approverName = $latestApproval->approver->full_name;
+            }
+        }
 
-        $stageMessages = [
-            'office_head'    => "Your Office Head has approved your post request. It has now moved to the Vice-President for the next level of review.",
-            'vice_president' => "The Vice-President has approved your post request. It has now been forwarded to the IMC/QA team for their final review.",
-            'imc_qa'         => "Congratulations! The IMC/QA team has given the final approval for your post. It is now being published to the target platforms!",
+        // Requestor greeting
+        $requestorFirstName = $notifiable->first_name ?: $notifiable->full_name ?: 'Requestor';
+        $greeting = "Hello {$requestorFirstName},";
+
+        // Resolve Category
+        $categoryName = $this->postRequest->category?->name
+            ?? $this->postRequest->other_category_name
+            ?? 'Announcement';
+
+        // Resolve Target Platforms formatted
+        $rawPlatforms = $this->postRequest->target_platforms ?? ['facebook', 'instagram'];
+        if (is_string($rawPlatforms)) {
+            $rawPlatforms = json_decode($rawPlatforms, true) ?: [$rawPlatforms];
+        }
+        $targetPlatformsFormatted = !empty($rawPlatforms)
+            ? implode(', ', array_map(fn($p) => ucfirst(strtolower((string)$p)), (array)$rawPlatforms))
+            : 'Facebook, Instagram';
+
+        switch ($stage) {
+            case 'office_head':
+                $statusBadge = 'APPROVED — DEPARTMENT HEAD';
+                $bodyMessage = 'Your post request has been approved by the Department Head. It has been forwarded to the Vice President of Academic Affairs for the next review.';
+                $approvedByText = 'Department Head — ' . ($this->approverName ?: 'Ruel Arana');
+                $subject = "[JMCFI PostFlow] Approved by Department Head — {$this->postRequest->title}";
+                break;
+
+            case 'vice_president':
+                $statusBadge = 'APPROVED — VPAA';
+                $bodyMessage = 'Your post request has been approved by the Vice President of Academic Affairs. It has been forwarded to IMC for final review.';
+                $approvedByText = 'Vice President of Academic Affairs — ' . ($this->approverName ?: 'Elena Santos');
+                $subject = "[JMCFI PostFlow] Approved by Vice President — {$this->postRequest->title}";
+                break;
+
+            case 'imc_qa':
+                $statusBadge = 'APPROVED — IMC';
+                $bodyMessage = 'Your post request has received final approval from IMC and has been automatically published to its target platforms.';
+                $approvedByText = 'IMC — ' . ($this->approverName ?: 'Angela Cruz');
+                $subject = "[JMCFI PostFlow] Final Approval by IMC — {$this->postRequest->title}";
+                break;
+
+            default:
+                $statusBadge = 'APPROVED';
+                $bodyMessage = 'Your post request has been approved and has progressed in the review process.';
+                $approvedByText = $this->approverName ? "Approver — {$this->approverName}" : 'Approval Authority';
+                $subject = "[JMCFI PostFlow] Post Approved — {$this->postRequest->title}";
+                break;
+        }
+
+        $tableDetails = [
+            'Title'            => $this->postRequest->title,
+            'Approved by'      => $approvedByText,
+            'Category'         => $categoryName,
+            'Target Platforms' => $targetPlatformsFormatted,
         ];
 
-        $stageSubjects = [
-            'office_head'    => '[JMCFI PostFlow] ✅ Office Head Approved — Moving to VP Review',
-            'vice_president' => '[JMCFI PostFlow] ✅ VP Approved — Moving to IMC/QA Review',
-            'imc_qa'         => '[JMCFI PostFlow] 🎉 Fully Approved & Publishing Now!',
-        ];
-
-        $message = $stageMessages[$this->approvedByStage] ?? 'Your post request has been approved and is progressing to the next stage.';
-        $subject = $stageSubjects[$this->approvedByStage] ?? '[JMCFI PostFlow] ✅ Post Approved';
+        $frontendUrl = config('app.frontend_url', 'http://localhost:8081');
+        $actionUrl = rtrim($frontendUrl, '/') . "/requestor/posts/{$this->postRequest->id}";
 
         $viewData = [
-            'headerTitle'     => $tmplHeader,
-            'brandColor'      => $tmplColor,
-            'footerText'      => $tmplFooter,
-            'logoUrl'         => $tmplLogo,
-            'userName'        => $notifiable->first_name ?? $notifiable->full_name ?? 'User',
+            'statusBadge'     => $statusBadge,
             'statusType'      => 'approved',
-            'statusLabel'     => 'Post Approved',
-            'bodyMessage'     => $message,
-            'postTitle'       => $this->postRequest->title,
-            'reason'          => $this->approverName ? "Approved by: {$this->approverName}" : null,
-            'targetPlatforms' => $this->postRequest->target_platforms ?? [],
-            'actionUrl'       => url(config('app.frontend_url', 'http://localhost:8081') . "/requestor/posts/{$this->postRequest->id}"),
-            'buttonText'      => 'View Your Request'
+            'greeting'        => $greeting,
+            'bodyMessage'     => $bodyMessage,
+            'tableDetails'    => $tableDetails,
+            'actionUrl'       => $actionUrl,
+            'buttonText'      => 'View Your Request',
+            'footerText'      => '© 2026 Jose Maria College Foundation, Inc. All rights reserved.',
         ];
 
         return (new MailMessage)
-            ->subject("{$subject}: {$this->postRequest->title}")
+            ->subject($subject)
             ->view('emails.custom-template', $viewData);
     }
 
     public function toArray(object $notifiable): array
     {
         return [
-            'type'             => 'post_approved',
-            'post_request_id'  => $this->postRequest->id,
-            'post_title'       => $this->postRequest->title,
-            'approved_by_stage'=> $this->approvedByStage,
-            'approver_name'    => $this->approverName,
-            'message'          => "Your post '{$this->postRequest->title}' has been approved at stage: {$this->approvedByStage}",
+            'type'              => 'post_approved',
+            'post_request_id'   => $this->postRequest->id,
+            'post_title'        => $this->postRequest->title,
+            'approved_by_stage' => $this->approvedByStage,
+            'approver_name'     => $this->approverName,
+            'message'           => "Your post '{$this->postRequest->title}' has been approved at stage: {$this->approvedByStage}",
         ];
     }
 }
