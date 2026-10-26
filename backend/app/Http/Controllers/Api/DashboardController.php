@@ -581,39 +581,123 @@ class DashboardController extends Controller
                 }
             }
 
+            $prevQuery = PostRequest::query();
+            if ($period === 'this_month') {
+                $prevQuery->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
+            } elseif ($period === 'last_month') {
+                $prevQuery->whereBetween('created_at', [now()->subMonths(2)->startOfMonth(), now()->subMonths(2)->endOfMonth()]);
+            } elseif ($period === '3_months') {
+                $prevQuery->whereBetween('created_at', [now()->subMonths(6)->startOfDay(), now()->subMonths(3)->startOfDay()]);
+            } elseif ($period === 'this_year') {
+                $prevQuery->whereYear('created_at', now()->subYear()->year);
+            } elseif ($period === 'custom' && ($startDate || $endDate)) {
+                if ($startDate && $endDate) {
+                    $s = \Carbon\Carbon::parse($startDate);
+                    $e = \Carbon\Carbon::parse($endDate);
+                    $days = $s->diffInDays($e) + 1;
+                    $prevQuery->whereBetween('created_at', [$s->copy()->subDays($days)->startOfDay(), $s->copy()->subSecond()]);
+                } elseif ($startDate) {
+                    $prevQuery->where('created_at', '<', \Carbon\Carbon::parse($startDate)->startOfDay());
+                } elseif ($endDate) {
+                    $prevQuery->where('created_at', '<', \Carbon\Carbon::parse($endDate)->startOfDay());
+                }
+            } else {
+                $prevQuery->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
+            }
+
+            // Trend change calculation helper
+            $calcTrend = function ($current, $previous) {
+                if ($previous == 0) {
+                    if ($current == 0) {
+                        return ['change' => '0%', 'direction' => 'neutral', 'arrow' => ''];
+                    }
+                    return ['change' => '100%', 'direction' => 'increase', 'arrow' => '↑'];
+                }
+                $diff = $current - $previous;
+                $pct = round(($diff / $previous) * 100);
+                if ($pct > 0) {
+                    return ['change' => abs($pct) . '%', 'direction' => 'increase', 'arrow' => '↑'];
+                } elseif ($pct < 0) {
+                    return ['change' => abs($pct) . '%', 'direction' => 'decrease', 'arrow' => '↓'];
+                }
+                return ['change' => '0%', 'direction' => 'neutral', 'arrow' => ''];
+            };
+
             // ── Total Volume: single count ──
             $totalVolume = (clone $baseQuery)->count();
+            $prevTotalVolume = (clone $prevQuery)->count();
+            $submissionsTrend = $calcTrend($totalVolume, $prevTotalVolume);
 
-            // ── Active Users: count users with at least one post in period ──
-            $activeUsers = User::whereHas('postRequests', function ($q) use ($period, $startDate, $endDate) {
-                if ($period === 'this_month') {
-                    $q->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]);
-                } elseif ($period === 'last_month') {
-                    $q->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
-                } elseif ($period === '3_months') {
-                    $q->where('created_at', '>=', now()->subMonths(3)->startOfDay());
-                } elseif ($period === 'this_year') {
-                    $q->whereYear('created_at', now()->year);
-                } elseif ($period === 'custom' && ($startDate || $endDate)) {
-                    if ($startDate && $endDate) {
-                        $q->whereBetween('created_at', [
-                            \Carbon\Carbon::parse($startDate)->startOfDay(),
-                            \Carbon\Carbon::parse($endDate)->endOfDay()
-                        ]);
-                    } elseif ($startDate) {
-                        $q->where('created_at', '>=', \Carbon\Carbon::parse($startDate)->startOfDay());
-                    } elseif ($endDate) {
-                        $q->where('created_at', '<=', \Carbon\Carbon::parse($endDate)->endOfDay());
-                    }
-                }
-            })->count();
+            // ── Active Users: count distinct users with at least one post ──
+            $activeUsers = (clone $baseQuery)->whereNotNull('requestor_id')->distinct('requestor_id')->count('requestor_id');
+            $prevActiveUsers = (clone $prevQuery)->whereNotNull('requestor_id')->distinct('requestor_id')->count('requestor_id');
+            $activeUsersTrend = $calcTrend($activeUsers, $prevActiveUsers);
 
             // ── Compliance Rate ──
-            $approvedCount = (clone $baseQuery)->where('status', PostRequest::STATUS_APPROVED)->count();
-            $rejectedCount = (clone $baseQuery)->where('status', PostRequest::STATUS_REJECTED)->count();
-            $complianceRate = ($approvedCount + $rejectedCount) > 0
-                ? round(($approvedCount / ($approvedCount + $rejectedCount)) * 100, 1) . '%'
-                : '0%';
+            $approvedCount = (clone $baseQuery)->whereIn('status', [
+                PostRequest::STATUS_APPROVED,
+                PostRequest::STATUS_PUBLISHED,
+            ])->count();
+            $rejectedCount = (clone $baseQuery)->whereIn('status', [
+                PostRequest::STATUS_REJECTED,
+                PostRequest::STATUS_RETURNED_FOR_REVISION,
+                PostRequest::STATUS_PUBLISH_FAILED,
+            ])->count();
+            $compliancePct = $totalVolume > 0 ? round(($approvedCount / $totalVolume) * 100) : 0;
+            $prevApprovedCount = (clone $prevQuery)->whereIn('status', [
+                PostRequest::STATUS_APPROVED,
+                PostRequest::STATUS_PUBLISHED,
+            ])->count();
+            $prevCompliancePct = $prevTotalVolume > 0 ? round(($prevApprovedCount / $prevTotalVolume) * 100) : 0;
+            $complianceTrend = $calcTrend($compliancePct, $prevCompliancePct);
+            $complianceRateStr = $compliancePct . '%';
+
+            // ── Pending Reviews ──
+            $pendingStatuses = [
+                PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                PostRequest::STATUS_PENDING_VICE_PRESIDENT,
+                PostRequest::STATUS_PENDING_PRESIDENT,
+                PostRequest::STATUS_PENDING_IMC_QA,
+                PostRequest::STATUS_PUBLISHING,
+                PostRequest::STATUS_SCHEDULED,
+            ];
+            $pendingCount = (clone $baseQuery)->whereIn('status', $pendingStatuses)->count();
+            $prevPendingCount = (clone $prevQuery)->whereIn('status', $pendingStatuses)->count();
+            $pendingTrend = $calcTrend($pendingCount, $prevPendingCount);
+
+            // ── Submissions Status Breakdown ──
+            $publishedCount = (clone $baseQuery)->whereIn('status', [PostRequest::STATUS_PUBLISHED])->count();
+            $draftCount = (clone $baseQuery)->where('status', PostRequest::STATUS_DRAFT)->count();
+            $statusBreakdown = [
+                [
+                    'key'        => 'pending',
+                    'label'      => 'Pending Reviews',
+                    'count'      => $pendingCount,
+                    'percentage' => $totalVolume > 0 ? round(($pendingCount / $totalVolume) * 100) : 0,
+                    'color'      => '#F97316',
+                ],
+                [
+                    'key'        => 'rejected',
+                    'label'      => 'Rejected',
+                    'count'      => $rejectedCount,
+                    'percentage' => $totalVolume > 0 ? round(($rejectedCount / $totalVolume) * 100) : 0,
+                    'color'      => '#10B981',
+                ],
+                [
+                    'key'        => 'published',
+                    'label'      => 'Published',
+                    'count'      => $publishedCount,
+                    'percentage' => $totalVolume > 0 ? round(($publishedCount / $totalVolume) * 100) : 0,
+                    'color'      => '#3B82F6',
+                ],
+                [
+                    'key'        => 'draft',
+                    'label'      => 'Draft',
+                    'count'      => $draftCount,
+                    'percentage' => $totalVolume > 0 ? round(($draftCount / $totalVolume) * 100) : 0,
+                    'color'      => '#64748B',
+                ],
+            ];
 
             $avgVelocity = '4.2 hrs';
 
@@ -628,8 +712,7 @@ class DashboardController extends Controller
                     $deptCounts[$norm] = ($deptCounts[$norm] ?? 0) + 1;
                 }
             }
-            $colors = ['#1E40AF', '#047857', '#D97706', '#7C3AED', '#6B7280'];
-            $departmentBreakdown = $departments->map(function ($dept, $index) use ($deptCounts, $totalVolume, $colors) {
+            $departmentBreakdown = $departments->map(function ($dept) use ($deptCounts, $totalVolume) {
                 $deptName = $dept->display_name ?? $dept->name;
                 $normName = strtolower(trim($dept->name ?? ''));
                 $normDisp = strtolower(trim($dept->display_name ?? ''));
@@ -638,9 +721,9 @@ class DashboardController extends Controller
                     'name'       => $deptName,
                     'count'      => (int) $count,
                     'percentage' => $totalVolume > 0 ? round(((int) $count / $totalVolume) * 100) : 0,
-                    'barColor'   => $colors[$index % count($colors)],
+                    'barColor'   => '#7C3AED',
                 ];
-            });
+            })->sortByDesc('count')->values();
 
             // ── Platform Stats ──
             $driver = \Illuminate\Support\Facades\DB::getDriverName();
@@ -662,62 +745,66 @@ class DashboardController extends Controller
             $instagramCount = (int) ($platformRaw->instagram_count ?? 0);
             $websiteCount   = (int) ($platformRaw->website_count ?? 0);
 
+            $fbPercent  = $totalVolume > 0 ? round(($facebookCount / $totalVolume) * 100) : 0;
+            $igPercent  = $totalVolume > 0 ? round(($instagramCount / $totalVolume) * 100) : 0;
+            $webPercent = $totalVolume > 0 ? round(($websiteCount / $totalVolume) * 100) : 0;
+
             $platformStats = [
                 [
-                    'name'    => 'Facebook',
-                    'posts'   => $facebookCount . ' posts',
-                    'reach'   => '10K Reach',
-                    'icon'    => 'logo-facebook',
-                    'color'   => '#1877F2',
-                    'bgColor' => '#EFF6FF',
+                    'name'       => 'Facebook',
+                    'count'      => $facebookCount,
+                    'posts'      => $facebookCount . ' posts',
+                    'percentage' => $fbPercent,
+                    'reach'      => '10K Reach',
+                    'icon'       => 'logo-facebook',
+                    'color'      => '#1877F2',
+                    'ringColor'  => '#7C3AED',
+                    'bgColor'    => '#EFF6FF',
                 ],
                 [
-                    'name'    => 'Instagram',
-                    'posts'   => $instagramCount . ' posts',
-                    'reach'   => '5K Reach',
-                    'icon'    => 'logo-instagram',
-                    'color'   => '#E1306C',
-                    'bgColor' => '#FDF2F8',
+                    'name'       => 'Instagram',
+                    'count'      => $instagramCount,
+                    'posts'      => $instagramCount . ' posts',
+                    'percentage' => $igPercent,
+                    'reach'      => '5K Reach',
+                    'icon'       => 'logo-instagram',
+                    'color'      => '#E1306C',
+                    'ringColor'  => '#FB7185',
+                    'bgColor'    => '#FDF2F8',
                 ],
                 [
-                    'name'    => 'Website',
-                    'posts'   => $websiteCount . ' posts',
-                    'reach'   => '2K Reach',
-                    'icon'    => 'globe-outline',
-                    'color'   => '#059669',
-                    'bgColor' => '#ECFDF5',
+                    'name'       => 'Website',
+                    'count'      => $websiteCount,
+                    'posts'      => $websiteCount . ' posts',
+                    'percentage' => $webPercent,
+                    'reach'      => '2K Reach',
+                    'icon'       => 'globe-outline',
+                    'color'      => '#059669',
+                    'ringColor'  => '#E2E8F0',
+                    'bgColor'    => '#ECFDF5',
                 ],
             ];
 
-            // ── Content Published & Pending ──
-            $contentPublished = (clone $baseQuery)->where('status', PostRequest::STATUS_PUBLISHED)->count();
-            $pendingApproval  = (clone $baseQuery)->whereIn('status', [
-                PostRequest::STATUS_PENDING_OFFICE_HEAD,
-                PostRequest::STATUS_PENDING_VICE_PRESIDENT,
-                PostRequest::STATUS_PENDING_PRESIDENT,
-                PostRequest::STATUS_PENDING_IMC_QA,
-            ])->count();
-
-            // ── Monthly Data ──
+            // ── Monthly Data for Current Year (Spline Area Chart) ──
             $currentYear = (int) date('Y');
             $monthNames  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
             $postsByMonth = [];
             try {
                 $driver = \DB::getDriverName();
-                $monthQuery = (clone $baseQuery);
+                $yearQuery = PostRequest::query()->whereYear('created_at', $currentYear);
                 if ($driver === 'pgsql') {
-                    $rawMonth = $monthQuery->selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count')
+                    $rawMonth = $yearQuery->selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count')
                         ->groupByRaw('EXTRACT(MONTH FROM created_at)')
                         ->pluck('count', 'month')
                         ->toArray();
                 } elseif ($driver === 'sqlite') {
-                    $rawMonth = $monthQuery->selectRaw("cast(strftime('%m', created_at) as integer) as month, COUNT(*) as count")
+                    $rawMonth = $yearQuery->selectRaw("cast(strftime('%m', created_at) as integer) as month, COUNT(*) as count")
                         ->groupByRaw("strftime('%m', created_at)")
                         ->pluck('count', 'month')
                         ->toArray();
                 } else {
-                    $rawMonth = $monthQuery->selectRaw('MONTH(created_at) as month, COUNT(*) as count')
+                    $rawMonth = $yearQuery->selectRaw('MONTH(created_at) as month, COUNT(*) as count')
                         ->groupByRaw('MONTH(created_at)')
                         ->pluck('count', 'month')
                         ->toArray();
@@ -726,7 +813,7 @@ class DashboardController extends Controller
                     $postsByMonth[(int)$mKey] = (int)$mCount;
                 }
             } catch (\Throwable $e) {
-                $postsThisYear = (clone $baseQuery)->get(['created_at']);
+                $postsThisYear = PostRequest::query()->whereYear('created_at', $currentYear)->get(['created_at']);
                 foreach ($postsThisYear as $pr) {
                     if ($pr->created_at) {
                         $m = (int) $pr->created_at->format('n');
@@ -736,33 +823,70 @@ class DashboardController extends Controller
             }
 
             $monthsData = [];
+            $maxMonthCount = 0;
+            $peakMonthObj = ['month' => 'Jan', 'count' => 0, 'index' => 0];
+            $totalYearSubmissions = 0;
+
             foreach ($monthNames as $index => $month) {
                 $monthNum = $index + 1;
+                $count = (int) ($postsByMonth[$monthNum] ?? 0);
+                $totalYearSubmissions += $count;
+                if ($count > $maxMonthCount) {
+                    $maxMonthCount = $count;
+                    $peakMonthObj = [
+                        'month' => $month,
+                        'count' => $count,
+                        'index' => $index,
+                    ];
+                }
                 $monthsData[] = [
-                    'month' => $month,
-                    'posts' => (int) ($postsByMonth[$monthNum] ?? 0),
+                    'month'       => $month,
+                    'posts'       => $count,
+                    'submissions' => $count,
+                    'target'      => 10,
+                ];
+            }
+
+            // If all months 0, default peak to current month
+            if ($maxMonthCount === 0) {
+                $curM = (int) date('n') - 1;
+                $peakMonthObj = [
+                    'month' => $monthNames[$curM] ?? 'Jan',
+                    'count' => 0,
+                    'index' => $curM,
                 ];
             }
 
             // ── Platform Reach Percentages ──
             $totalPlatforms = $facebookCount + $instagramCount + $websiteCount;
             $platformReach = [
-                'facebook'  => $totalPlatforms > 0 ? round(($facebookCount / $totalPlatforms) * 100) : 0,
-                'instagram' => $totalPlatforms > 0 ? round(($instagramCount / $totalPlatforms) * 100) : 0,
-                'other'     => $totalPlatforms > 0 ? round(($websiteCount / $totalPlatforms) * 100) : 0,
+                'facebook'  => $fbPercent,
+                'instagram' => $igPercent,
+                'other'     => $webPercent,
             ];
 
             return [
-                'totalVolume'         => number_format($totalVolume),
-                'avgVelocity'         => $avgVelocity,
-                'complianceRate'      => $complianceRate,
-                'activeUsers'         => number_format($activeUsers),
-                'departmentBreakdown' => $departmentBreakdown,
-                'platformStats'       => $platformStats,
-                'contentPublished'    => number_format($contentPublished),
-                'pendingApproval'     => number_format($pendingApproval),
-                'monthsData'          => $monthsData,
-                'platformReach'       => $platformReach,
+                'totalVolume'          => (string) $totalVolume,
+                'totalVolumeNumber'    => $totalVolume,
+                'submissionsTrend'     => $submissionsTrend,
+                'avgVelocity'          => $avgVelocity,
+                'complianceRate'       => $complianceRateStr,
+                'compliancePct'        => $compliancePct,
+                'complianceTrend'      => $complianceTrend,
+                'activeUsers'          => (string) $activeUsers,
+                'activeUsersTrend'     => $activeUsersTrend,
+                'pendingApproval'      => (string) $pendingCount,
+                'pendingTrend'         => $pendingTrend,
+                'contentPublished'     => (string) $publishedCount,
+                'rejectedCount'        => $rejectedCount,
+                'draftCount'           => $draftCount,
+                'statusBreakdown'      => $statusBreakdown,
+                'departmentBreakdown'  => $departmentBreakdown,
+                'platformStats'        => $platformStats,
+                'monthsData'           => $monthsData,
+                'peakMonth'            => $peakMonthObj,
+                'totalYearSubmissions' => $totalYearSubmissions,
+                'platformReach'        => $platformReach,
             ];
         });
 
