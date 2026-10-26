@@ -1582,7 +1582,7 @@ export default function RequestorDashboard() {
                           <Ionicons name="shield-checkmark-outline" size={15} color={Colors.primary} style={{ marginRight: 6 }} />
                         )}
                         <Text style={[styles.checkPolicyBtnText, { color: Colors.primary, fontWeight: '700' }]}>
-                          {isCheckingPolicy ? 'Analyzing Policy...' : 'Check Policy Alignment'}
+                          {isCheckingPolicy ? 'AI Analyzing Policy...' : 'AI Check Policy Alignment'}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -3610,7 +3610,11 @@ export default function RequestorDashboard() {
         checks={complianceChecks}
         suggestedCaption={complianceSuggestedCaption}
         onApplySuggestedCaption={(text) => {
-          setCaption(text);
+          const sanitized = (text || '')
+            .replace(/\bJCMFI\b/gi, 'JMCFI')
+            .replace(/\bJCM\b/gi, 'JMC')
+            .replace(/jcm\.edu\.ph/gi, 'jmc.edu.ph');
+          setCaption(sanitized);
           setIsComplianceModalVisible(false);
           showToast('AI refined caption applied to post!', 'success', 'Caption Applied');
         }}

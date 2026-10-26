@@ -208,7 +208,7 @@ PROMPT;
                 $sections = [
                     [
                         'title' => '1. Purpose',
-                        'content' => 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
+                        'content' => 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jmc.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
                     ],
                     [
                         'title' => '2. Scope & Limitations',
@@ -262,6 +262,9 @@ PROMPT;
                         }
                     }
                 }
+                $policyRulesText = str_ireplace('jcm.edu.ph', 'jmc.edu.ph', $policyRulesText);
+                $policyRulesText = preg_replace('/\bJCMFI\b/i', 'JMCFI', $policyRulesText);
+                $policyRulesText = preg_replace('/\bJCM\b/i', 'JMC', $policyRulesText);
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to load dynamic policies for AI', ['error' => $e->getMessage()]);
@@ -271,6 +274,14 @@ PROMPT;
 You are an AI Content Compliance Assistant for Jose Maria College Foundation, Inc. (JMCFI).
 Your role is to analyze captions, narratives, and content materials for official institutional posts
 against the following criteria:
+
+CRITICAL INSTITUTIONAL NAMING & ACRONYM RULES (STRICT):
+- The official institution name is "Jose Maria College Foundation, Inc."
+- The official acronym is STRICTLY "JMC" or "JMCFI".
+- NEVER confuse or output "JCM" or "JCMFI". "JCM" is completely INCORRECT and forbidden.
+- Official institutional website: "jmc.edu.ph" (NEVER "jcm.edu.ph").
+- Official institutional email domain: "@jmc.edu.ph" (NEVER "@jcm.edu.ph").
+- If the draft caption or text contains "JCM" or "JCMFI", flag it as a critical branding error and correct it to "JMC" or "JMCFI" in the "suggested_improved_caption".
 
 1. ACCURACY & FACTUALITY - Verify factual claims, dates, names, statistics. Flag unverified claims.
 2. COMPLETENESS - Check if all required information is present (who, what, when, where, why, how).
@@ -335,6 +346,9 @@ PROMPT;
 
     private function parseComplianceResponse(string $content): array
     {
+        $content = preg_replace('/\bJCMFI\b/i', 'JMCFI', $content);
+        $content = preg_replace('/\bJCM\b/i', 'JMC', $content);
+        $content = preg_replace('/jcm\.edu\.ph/i', 'jmc.edu.ph', $content);
         $result = json_decode($content, true);
         $rules = [
             'overall_compliance_score' => 'required|numeric|between:0,100',

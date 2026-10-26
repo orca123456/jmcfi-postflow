@@ -97,6 +97,9 @@ class ChatbotController extends Controller
 
             $response = $this->client->complete($apiMessages);
             $reply = $response['content'];
+            $reply = preg_replace('/\bJCMFI\b/i', 'JMCFI', $reply);
+            $reply = preg_replace('/\bJCM\b/i', 'JMC', $reply);
+            $reply = preg_replace('/jcm\.edu\.ph/i', 'jmc.edu.ph', $reply);
 
             return response()->json([
                 'reply' => $reply

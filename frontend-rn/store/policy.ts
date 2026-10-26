@@ -55,7 +55,7 @@ const DEFAULT_SECTIONS: PolicySection[] = [
     icon: 'book-outline',
     bg: '#EFF6FF',
     color: '#0B2545',
-    content: 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jcm.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
+    content: 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jmc.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
   },
   {
     id: 'sec-2',
