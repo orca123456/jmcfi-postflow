@@ -207,35 +207,124 @@ PROMPT;
             if (!$sections || !is_array($sections)) {
                 $sections = [
                     [
+                        'id' => 'sec-1',
                         'title' => '1. Purpose',
-                        'content' => 'This policy governs all content published on the official Jose Maria College Foundation, Inc. website (jmc.edu.ph). It applies to all faculty, staff, students, and authorized contributors ("Posters"). The goal is to ensure a cohesive, safe, and professionally branded digital presence.',
+                        'content' => 'This policy establishes definitive publishing, visual branding, and editorial standards for all content displayed on the official Jose Maria College Foundation, Inc. (JMCFI) digital portals (jmc.edu.ph, subdomains, and official institutional social media channels). It applies to all faculty, administrative staff, academic departments, student organizations, and authorized contributors ("Posters"). The primary objective is to safeguard institutional reputation, ensure strict compliance with brand identity, uphold student privacy rights, and deliver accurate, cohesive, and professional public communications.',
                     ],
                     [
-                        'title' => '2. Scope & Limitations',
+                        'id' => 'sec-2',
+                        'title' => '2. Scope & Brand Guidelines',
                         'bullets' => [
-                            ['title' => 'Brand Integrity', 'desc' => 'All content must adhere to the official JMCFI Brand Guidelines (colors, logos, typography).'],
-                            ['title' => 'Platform Limitation', 'desc' => 'This policy applies exclusively to the official school domain and subdomains.'],
-                            ['title' => 'Editorial Control', 'desc' => 'The school reserves the right to edit, reject, or remove any content without prior notice.'],
-                            ['title' => 'Non-Compliance', 'desc' => 'Violation results in immediate removal from the platform and potential disciplinary action.'],
+                            [
+                                'title' => 'Official Brand Color Palette',
+                                'desc' => "Official digital and print layouts must strictly utilize the approved institutional color hierarchy: Indigo (#4B0082 / #312E81) for primary authority, formal headings, banners, and seals; Grape (#6F2DA8 / #7E22CE) for secondary section headers, badges, highlights, and callout borders; Wisteria (#C9A0DC / #DDD6FE) for accent card backgrounds, pill tags, and dividers. Clashing fluorescent tones or off-brand neon hues are strictly prohibited.",
+                            ],
+                            [
+                                'title' => 'Logo & Institutional Seal',
+                                'desc' => 'The official JMCFI circular seal must be displayed with its original aspect ratio (never stretched, skewed, or rotated). Maintain a clear buffer space of at least 24px around the seal. Use approved transparent PNG or SVG assets. The seal must never be recolored, obscured, or placed over busy photo backgrounds without a solid or semi-transparent backing.',
+                            ],
+                            [
+                                'title' => 'Typography & Readability',
+                                'desc' => 'All publication graphics and layouts must use approved institutional typography: clean sans-serif (Inter, Roboto, or Arial) for captions, body copy, and subtitles (minimum 12pt for digital readability); formal serif or bold weights for headlines. Ensure a minimum 4.5:1 WCAG AA contrast ratio against all background colors.',
+                            ],
+                            [
+                                'title' => 'Platform Scope & Editorial Control',
+                                'desc' => 'Applies across the central portal (jmc.edu.ph), subdomains, and official institutional social media feeds (Facebook, Instagram, YouTube, LinkedIn). JMCFI Institutional Marketing & Communications (IMC) and IT Administration reserve the right to review, edit, reject, or unpublish any submission without prior notice.',
+                            ],
+                            [
+                                'title' => 'Brand Compliance & Penalties',
+                                'desc' => 'Content that deviates from approved colors, distorts official emblems, or violates visual hierarchy will be immediately rejected at the QA stage. Continued submission of non-compliant graphics will result in the suspension of posting privileges.',
+                            ],
                         ],
                     ],
                     [
-                        'title' => '3. Acceptable Content',
+                        'id' => 'sec-3',
+                        'title' => '3. Acceptable Content & Visual Standards',
                         'bullets' => [
-                            ['title' => 'Academic & Professional', 'desc' => 'Content must support the school\'s mission, be factually accurate, and maintain an inclusive tone.'],
-                            ['title' => 'Visual Standards', 'desc' => 'Use approved templates, high-resolution media, and official school colors/logo only.'],
-                            ['title' => 'Consent (Minors Under 18)', 'desc' => 'Written parental/guardian consent is required.'],
-                            ['title' => 'Consent (Adults 18+)', 'desc' => 'Student\'s own signed consent is required.'],
+                            [
+                                'title' => 'Academic & Professional Merit',
+                                'desc' => "Content must directly support the school's educational mission, highlight verified student and faculty achievements, or disseminate official institutional announcements. The tone must remain respectful, factual, grammatically correct, and inclusive.",
+                            ],
+                            [
+                                'title' => 'High-Definition Media Standards',
+                                'desc' => 'Use high-resolution original media: minimum 1080×1080px for square social posts, 1920×1080px for landscape banners, and vector/300 DPI for printable PDF documents. Blurry photos, low-resolution screenshots, watermarked stock imagery, and heavily compressed graphics are strictly prohibited.',
+                            ],
+                            [
+                                'title' => 'Consent for Minors (Under 18)',
+                                'desc' => 'Any photograph, video footage, or identifiable academic work featuring students under 18 years of age requires a valid, signed Parental/Guardian Media Consent Waiver on file prior to submission.',
+                            ],
+                            [
+                                'title' => 'Consent for Adults (18+ & Staff)',
+                                'desc' => 'Students aged 18+ and institutional personnel featured as focal subjects in promotional or public campaigns must provide explicit written or signed media release authorization.',
+                            ],
                         ],
                     ],
                     [
+                        'id' => 'sec-4',
                         'title' => '4. Prohibited Content',
                         'bullets' => [
-                            ['title' => 'Academic Misconduct', 'desc' => 'Cheating guides, answer keys, or plagiarism.'],
-                            ['title' => 'Inappropriate Material', 'desc' => 'Bullying, hate speech, explicit content, or harassment.'],
-                            ['title' => 'Commercial/Political', 'desc' => 'Unauthorized ads, personal fundraising, or political endorsements.'],
-                            ['title' => 'Privacy Breach', 'desc' => 'Publishing student grades, private addresses, or administrative records.'],
+                            [
+                                'title' => 'Academic Misconduct & Cheating',
+                                'desc' => 'Publishing examination questionnaires, answer keys, test bank excerpts, unauthorized review manuals, or plagiarized academic material is strictly forbidden.',
+                            ],
+                            [
+                                'title' => 'Inappropriate Material & Harassment',
+                                'desc' => 'Zero tolerance for cyberbullying, hate speech, vulgarity, defamatory statements, sexually suggestive imagery, partisan politics, or religiously/racially offensive commentary.',
+                            ],
+                            [
+                                'title' => 'Commercial & Political Solicitation',
+                                'desc' => 'Unauthorized commercial advertising, personal fundraising, third-party product endorsements, paid sponsorships, or political campaigning are strictly prohibited.',
+                            ],
+                            [
+                                'title' => 'Data Privacy & Security Breaches',
+                                'desc' => 'Strict adherence to the Data Privacy Act of 2012. Never publish student grades, ID numbers, home addresses, phone numbers, personal email addresses, or confidential administrative records.',
+                            ],
                         ],
+                    ],
+                    [
+                        'id' => 'sec-5',
+                        'title' => '5. Copyright & Intellectual Property',
+                        'bullets' => [
+                            [
+                                'title' => 'Ownership & Licensing Rights',
+                                'desc' => 'Posters must own the full copyright or possess explicit written licensing permission for all uploaded photography, graphic illustrations, and audio tracks.',
+                            ],
+                            [
+                                'title' => 'Student & Faculty Research/Works',
+                                'desc' => 'Showcasing student capstone projects, artworks, photography, or academic research requires formal written consent and prominent creator attribution.',
+                            ],
+                            [
+                                'title' => 'Approved Media & Asset Libraries',
+                                'desc' => 'All media assets must be sourced from the official JMCFI Asset Library, verified royalty-free repositories, or properly attributed Creative Commons sources.',
+                            ],
+                        ],
+                    ],
+                    [
+                        'id' => 'sec-6',
+                        'title' => '6. Posting Process Flow',
+                        'steps' => [
+                            [
+                                'title' => '1. Content Creation & AI Check',
+                                'desc' => "Requestor creates the post request (Title, Caption, High-res Media) and utilizes 'AI Check Policy Alignment' to verify brand compliance.",
+                            ],
+                            [
+                                'title' => '2. Department Head Review',
+                                'desc' => 'The Department Head reviews the submission for factual accuracy, departmental relevance, and educational standards.',
+                            ],
+                            [
+                                'title' => '3. VP / Executive Sign-Off',
+                                'desc' => 'The Vice President evaluates strategic institutional alignment and overarching public relations impact.',
+                            ],
+                            [
+                                'title' => '4. Brand Clearance & IT Publishing',
+                                'desc' => 'IMC and IT QA conduct final brand clearance (verifying Indigo, Grape, Wisteria palette & seal integrity) and deploy to the live portal.',
+                            ],
+                        ],
+                    ],
+                    [
+                        'id' => 'sec-7',
+                        'title' => '7. Enforcement & Contact',
+                        'content' => "Policy violations are handled through a progressive disciplinary structure:\n• First Offense: Immediate content removal with formal written advisory.\n• Second Offense: 30-day suspension of posting rights with mandatory Brand & Policy Retraining.\n• Chronic / Egregious Violations: Permanent revocation of platform privileges and formal referral to the Disciplinary Board or Human Resources.",
                     ],
                 ];
             }
