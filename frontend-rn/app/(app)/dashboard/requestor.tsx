@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -609,6 +609,34 @@ export default function RequestorDashboard() {
     }
   }, [postsDataRes]);
 
+  const handleOpenPostById = useCallback(async (postId: string | number) => {
+    const postIdStr = String(postId);
+    const allPosts = [...mockRequests, ...mockQueuePosts, ...drafts, ...rejectedPosts];
+    const match = allPosts.find((r: any) => String(r.id) === postIdStr);
+    if (match) {
+      setSelectedQueuePost(match);
+      router.setParams({ postId: postIdStr });
+    } else {
+      try {
+        const res = await postsApi.get(Number(postIdStr));
+        const raw = res?.data?.data || res?.data;
+        if (raw) {
+          const mapped = mapPost(raw);
+          setSelectedQueuePost(mapped);
+          router.setParams({ postId: postIdStr });
+        }
+      } catch (e) {
+        console.error('Failed to load post details for notification', e);
+      }
+    }
+  }, [mockRequests, mockQueuePosts, drafts, rejectedPosts]);
+
+  useEffect(() => {
+    if (params.postId && !selectedQueuePost) {
+      handleOpenPostById(params.postId as string);
+    }
+  }, [params.postId, mockRequests.length, drafts.length, rejectedPosts.length]);
+
   const loadPosts = (showLoading = true) => {
     refetchPosts();
   };
@@ -1080,6 +1108,7 @@ export default function RequestorDashboard() {
       onTabChange={setActiveTab}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       userPhotoUrl={profilePhotoUrl}
+      onOpenPost={handleOpenPostById}
     >
       <Toast
         visible={toastVisible}
@@ -2727,7 +2756,10 @@ export default function RequestorDashboard() {
           animationType="fade"
           transparent={true}
           visible={true}
-          onRequestClose={() => setSelectedQueuePost(null)}
+          onRequestClose={() => {
+            setSelectedQueuePost(null);
+            router.setParams({ postId: '' });
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
@@ -3099,7 +3131,10 @@ export default function RequestorDashboard() {
               <View style={styles.modalFooterRow}>
                 <TouchableOpacity
                   style={styles.btnModalClose}
-                  onPress={() => setSelectedQueuePost(null)}
+                  onPress={() => {
+                    setSelectedQueuePost(null);
+                    router.setParams({ postId: '' });
+                  }}
                 >
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>

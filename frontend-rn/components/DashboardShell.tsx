@@ -33,6 +33,7 @@ interface DashboardShellProps {
   departmentLogo?: string;
   userPhotoUrl?: string | null;
   backgroundImage?: any;
+  onOpenPost?: (postId: string | number) => void;
 }
 
 export function DashboardShell({
@@ -44,6 +45,7 @@ export function DashboardShell({
   departmentLogo,
   userPhotoUrl,
   backgroundImage,
+  onOpenPost,
 }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -99,6 +101,33 @@ export function DashboardShell({
     } catch (e) {
       // ignore
     }
+  };
+
+  const handleNotificationClick = async (n: any) => {
+    try {
+      if (!n.read) {
+        handleMarkAsRead(n.id);
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    setIsNotificationDropdownOpen(false);
+
+    const postId = n.data?.post_request_id || n.data?.post_id || n.data?.id;
+    if (!postId) return;
+
+    if (onOpenPost) {
+      onOpenPost(postId);
+      return;
+    }
+
+    const currentRole = user?.roles?.[0] || user?.role || 'requestor';
+    const targetDashboard = getRoleDashboardPath(currentRole);
+    router.push({
+      pathname: targetDashboard as any,
+      params: { postId: String(postId) },
+    });
   };
 
   // Mobile drawer state
@@ -690,17 +719,19 @@ export function DashboardShell({
                       key={n.id}
                       style={[
                         styles.notifItem,
-                        !isRead && { backgroundColor: '#F0F9FF' },
+                        !isRead && { backgroundColor: isDarkMode ? '#1E293B' : '#F0F9FF' },
+                        Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : null,
                       ]}
-                      onPress={() => handleMarkAsRead(n.id)}
+                      onPress={() => handleNotificationClick(n)}
+                      activeOpacity={0.7}
                     >
                       <View
                         style={[
                           styles.notifIconCircle,
                           {
-                            backgroundColor: n.type?.includes('Approved')
+                            backgroundColor: (n.type?.includes('Approved') || n.data?.type === 'post_approved')
                               ? '#DCFCE7'
-                              : n.type?.includes('Rejected')
+                              : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
                               ? '#FEE2E2'
                               : '#EFF6FF',
                           },
@@ -708,25 +739,25 @@ export function DashboardShell({
                       >
                         <Ionicons
                           name={
-                            n.type?.includes('Approved')
+                            (n.type?.includes('Approved') || n.data?.type === 'post_approved')
                               ? 'checkmark-circle'
-                              : n.type?.includes('Rejected')
+                              : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
                               ? 'close-circle'
                               : 'information-circle'
                           }
                           size={18}
                           color={
-                            n.type?.includes('Approved')
+                            (n.type?.includes('Approved') || n.data?.type === 'post_approved')
                               ? '#16A34A'
-                              : n.type?.includes('Rejected')
+                              : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
                               ? '#DC2626'
                               : '#2563EB'
                           }
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.notifTitle, !isRead && { fontWeight: '700' }]}>{title}</Text>
-                        <Text style={styles.notifMessage} numberOfLines={2}>{message}</Text>
+                        <Text style={[styles.notifTitle, !isRead && { fontWeight: '700' }, isDarkMode && { color: '#F8FAFC' }]}>{title}</Text>
+                        <Text style={[styles.notifMessage, isDarkMode && { color: '#94A3B8' }]} numberOfLines={2}>{message}</Text>
                         <Text style={styles.notifTime}>{timeAgo}</Text>
                       </View>
                       {!isRead && <View style={styles.unreadDot} />}
