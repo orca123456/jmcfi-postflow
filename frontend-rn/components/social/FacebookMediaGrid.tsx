@@ -1,14 +1,15 @@
-import React from 'react';
-import { View, Image, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Image, Text, TouchableOpacity, StyleSheet, Platform, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
 import { resolveImageUrl } from '../../services/api';
 
 export const isImageMedia = (file: any): boolean => {
   if (!file) return false;
-  if (file.type === 'image' || file.mime_type?.startsWith('image/')) return true;
-  const name = (file.name || file.filename || file.original_filename || file.uri || file.url || file.file_path || '').toLowerCase();
-  return /\.(jpe?g|png|gif|webp)$/i.test(name.split('?')[0]);
+  const mimeType = String(file?.mimeType || file?.type || file?.file?.type || file?.mime_type || '').toLowerCase();
+  if (mimeType === 'image' || mimeType.startsWith('image/')) return true;
+  const name = String(file?.name || file?.filename || file?.original_name || file?.original_filename || file?.uri || file?.url || file?.file_path || '').toLowerCase();
+  return /\.(jpe?g|png|gif|webp|bmp|avif|heic|jfif)$/i.test(name.split('?')[0]);
 };
 
 export const getImageUrisFromMedia = (mediaList: any[]): string[] => {
@@ -31,6 +32,22 @@ export const FacebookMediaGrid: React.FC<FacebookMediaGridProps> = ({
   containerStyle,
 }) => {
   const validImages = images.filter((img) => typeof img === 'string' && img.trim().length > 0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || lightboxIndex === null) return;
+    const handleKeyDown = (e: any) => {
+      if (e.key === 'Escape') {
+        setLightboxIndex(null);
+      } else if (e.key === 'ArrowRight' && validImages.length > 1) {
+        setLightboxIndex((prev) => (prev !== null ? (prev + 1) % validImages.length : 0));
+      } else if (e.key === 'ArrowLeft' && validImages.length > 1) {
+        setLightboxIndex((prev) => (prev !== null ? (prev - 1 + validImages.length) % validImages.length : 0));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, validImages.length]);
 
   if (validImages.length === 0) {
     return (
@@ -41,85 +58,232 @@ export const FacebookMediaGrid: React.FC<FacebookMediaGridProps> = ({
     );
   }
 
+  const extraCount = Math.max(0, validImages.length - 5);
+
   const handlePress = (index: number) => {
-    if (onImagePress) {
-      onImagePress(validImages[index], index);
-    }
+    // If clicking the 5th tile when +N extra images exist, open directly to the 6th (+1) hidden image
+    const targetIndex = index === 4 && extraCount > 0 ? 5 : index;
+    setLightboxIndex(targetIndex);
+  };
+
+  const renderLightboxModal = () => {
+    if (lightboxIndex === null || !validImages[lightboxIndex]) return null;
+    const total = validImages.length;
+    const currentUri = validImages[lightboxIndex];
+
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={true}
+        onRequestClose={() => setLightboxIndex(null)}
+      >
+        <View style={styles.lightboxBackdrop}>
+          {/* Top Bar: Counter + Close Button */}
+          <View style={styles.lightboxHeader}>
+            <View style={styles.lightboxCounterPill}>
+              <Text style={styles.lightboxCounterText}>
+                {lightboxIndex + 1} / {total}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.lightboxCloseBtn, styles.pointerCursor]}
+              onPress={() => setLightboxIndex(null)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Main Image Area with Prev / Next Controls */}
+          <View style={styles.lightboxMainArea}>
+            {total > 1 && (
+              <TouchableOpacity
+                style={[styles.lightboxNavBtn, styles.lightboxPrevBtn, styles.pointerCursor]}
+                onPress={() => setLightboxIndex((lightboxIndex - 1 + total) % total)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+
+            <Image
+              source={{ uri: currentUri }}
+              style={styles.lightboxMainImage}
+              resizeMode="contain"
+            />
+
+            {total > 1 && (
+              <TouchableOpacity
+                style={[styles.lightboxNavBtn, styles.lightboxNextBtn, styles.pointerCursor]}
+                onPress={() => setLightboxIndex((lightboxIndex + 1) % total)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chevron-forward" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Bottom Thumbnail Strip for Multi-Photo Posts */}
+          {total > 1 && (
+            <View style={styles.lightboxThumbBar}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.lightboxThumbScroll}
+              >
+                {validImages.map((imgUri, idx) => {
+                  const isActive = idx === lightboxIndex;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => setLightboxIndex(idx)}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.lightboxThumbItem,
+                        isActive && styles.lightboxThumbItemActive,
+                        styles.pointerCursor,
+                      ]}
+                    >
+                      <Image source={{ uri: imgUri }} style={styles.fullImage} resizeMode="cover" />
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      </Modal>
+    );
   };
 
   // 1 Image: Full width, 4:3 aspect ratio
   if (validImages.length === 1) {
     return (
-      <View style={[styles.mainWrapper, containerStyle]}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(0)}
-          style={[styles.singleImageContainer, { cursor: 'pointer' as any }]}
-        >
-          <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-      </View>
+      <>
+        <View style={[styles.mainWrapper, containerStyle]}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handlePress(0)}
+            style={[styles.singleImageContainer, { cursor: 'pointer' as any }]}
+          >
+            <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
+          </TouchableOpacity>
+        </View>
+        {renderLightboxModal()}
+      </>
     );
   }
 
   // 2 Images: Side-by-side 50% split
   if (validImages.length === 2) {
     return (
-      <View style={[styles.mainWrapper, styles.fixedHeightContainer, containerStyle]}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(0)}
-          style={[styles.flexOne, styles.pointerCursor, { marginRight: 2 }]}
-        >
-          <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(1)}
-          style={[styles.flexOne, styles.pointerCursor, { marginLeft: 2 }]}
-        >
-          <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-      </View>
+      <>
+        <View style={[styles.mainWrapper, styles.fixedHeightContainer, containerStyle]}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handlePress(0)}
+            style={[styles.flexOne, styles.pointerCursor, { marginRight: 2 }]}
+          >
+            <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handlePress(1)}
+            style={[styles.flexOne, styles.pointerCursor, { marginLeft: 2 }]}
+          >
+            <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
+          </TouchableOpacity>
+        </View>
+        {renderLightboxModal()}
+      </>
     );
   }
 
   // 3 Images: 1 large left, 2 stacked right
   if (validImages.length === 3) {
     return (
-      <View style={[styles.mainWrapper, styles.fixedHeightContainer, containerStyle]}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(0)}
-          style={[styles.flexTwo, styles.pointerCursor, { marginRight: 2 }]}
-        >
-          <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-        <View style={[styles.flexOne, { marginLeft: 2, gap: 3 }]}>
+      <>
+        <View style={[styles.mainWrapper, styles.fixedHeightContainer, containerStyle]}>
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => handlePress(1)}
-            style={[styles.flexOne, styles.pointerCursor]}
+            onPress={() => handlePress(0)}
+            style={[styles.flexTwo, styles.pointerCursor, { marginRight: 2 }]}
           >
-            <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
+            <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
           </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handlePress(2)}
-            style={[styles.flexOne, styles.pointerCursor]}
-          >
-            <Image source={{ uri: validImages[2] }} style={styles.fullImage} resizeMode="cover" />
-          </TouchableOpacity>
+          <View style={[styles.flexOne, { marginLeft: 2, gap: 3 }]}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePress(1)}
+              style={[styles.flexOne, styles.pointerCursor]}
+            >
+              <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePress(2)}
+              style={[styles.flexOne, styles.pointerCursor]}
+            >
+              <Image source={{ uri: validImages[2] }} style={styles.fullImage} resizeMode="cover" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+        {renderLightboxModal()}
+      </>
     );
   }
 
   // 4 Images: 2x2 symmetrical grid
   if (validImages.length === 4) {
     return (
+      <>
+        <View style={[styles.mainWrapper, styles.tallHeightContainer, containerStyle, { gap: 3 }]}>
+          <View style={[styles.row, { gap: 3 }]}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePress(0)}
+              style={[styles.flexOne, styles.pointerCursor]}
+            >
+              <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePress(1)}
+              style={[styles.flexOne, styles.pointerCursor]}
+            >
+              <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.row, { gap: 3 }]}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePress(2)}
+              style={[styles.flexOne, styles.pointerCursor]}
+            >
+              <Image source={{ uri: validImages[2] }} style={styles.fullImage} resizeMode="cover" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePress(3)}
+              style={[styles.flexOne, styles.pointerCursor]}
+            >
+              <Image source={{ uri: validImages[3] }} style={styles.fullImage} resizeMode="cover" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        {renderLightboxModal()}
+      </>
+    );
+  }
+
+  // 5+ Images: 2 on top row, 3 on bottom row with +N badge overlay on the 5th image when > 5 images
+
+  return (
+    <>
       <View style={[styles.mainWrapper, styles.tallHeightContainer, containerStyle, { gap: 3 }]}>
-        <View style={[styles.row, { gap: 3 }]}>
+        {/* Top Row: 2 images */}
+        <View style={[styles.row, { flex: 1.2, gap: 3 }]}>
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => handlePress(0)}
@@ -135,7 +299,9 @@ export const FacebookMediaGrid: React.FC<FacebookMediaGridProps> = ({
             <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
           </TouchableOpacity>
         </View>
-        <View style={[styles.row, { gap: 3 }]}>
+
+        {/* Bottom Row: 3 images, 3rd has +N overlay when more than 5 images exist */}
+        <View style={[styles.row, { flex: 1, gap: 3 }]}>
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => handlePress(2)}
@@ -150,64 +316,22 @@ export const FacebookMediaGrid: React.FC<FacebookMediaGridProps> = ({
           >
             <Image source={{ uri: validImages[3] }} style={styles.fullImage} resizeMode="cover" />
           </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handlePress(4)}
+            style={[styles.flexOne, styles.pointerCursor, { position: 'relative' }]}
+          >
+            <Image source={{ uri: validImages[4] }} style={styles.fullImage} resizeMode="cover" />
+            {extraCount > 0 && (
+              <View style={styles.moreOverlay}>
+                <Text style={styles.moreOverlayText}>+{extraCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
-    );
-  }
-
-  // 5+ Images: 2 on top row, 3 on bottom row with +N badge overlay on the 5th image
-  const extraCount = validImages.length - 4;
-
-  return (
-    <View style={[styles.mainWrapper, styles.tallHeightContainer, containerStyle, { gap: 3 }]}>
-      {/* Top Row: 2 images */}
-      <View style={[styles.row, { flex: 1.2, gap: 3 }]}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(0)}
-          style={[styles.flexOne, styles.pointerCursor]}
-        >
-          <Image source={{ uri: validImages[0] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(1)}
-          style={[styles.flexOne, styles.pointerCursor]}
-        >
-          <Image source={{ uri: validImages[1] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Row: 3 images, 3rd has +N overlay */}
-      <View style={[styles.row, { flex: 1, gap: 3 }]}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(2)}
-          style={[styles.flexOne, styles.pointerCursor]}
-        >
-          <Image source={{ uri: validImages[2] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(3)}
-          style={[styles.flexOne, styles.pointerCursor]}
-        >
-          <Image source={{ uri: validImages[3] }} style={styles.fullImage} resizeMode="cover" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handlePress(4)}
-          style={[styles.flexOne, styles.pointerCursor, { position: 'relative' }]}
-        >
-          <Image source={{ uri: validImages[4] }} style={styles.fullImage} resizeMode="cover" />
-          {extraCount > 0 && (
-            <View style={styles.moreOverlay}>
-              <Text style={styles.moreOverlayText}>+{extraCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+      {renderLightboxModal()}
+    </>
   );
 };
 
@@ -283,5 +407,100 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     color: Colors.textMuted,
+  },
+  lightboxBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  lightboxHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    zIndex: 20,
+  },
+  lightboxCounterPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  lightboxCounterText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  lightboxCloseBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxMainArea: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    paddingHorizontal: 64,
+    marginVertical: 12,
+  },
+  lightboxMainImage: {
+    width: '100%',
+    height: '100%',
+  },
+  lightboxNavBtn: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -24,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 25,
+  },
+  lightboxPrevBtn: {
+    left: 16,
+  },
+  lightboxNextBtn: {
+    right: 16,
+  },
+  lightboxThumbBar: {
+    width: '100%',
+    maxHeight: 76,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightboxThumbScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  lightboxThumbItem: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    opacity: 0.6,
+  },
+  lightboxThumbItemActive: {
+    borderColor: '#FFFFFF',
+    opacity: 1,
   },
 });

@@ -680,18 +680,19 @@ export default function RequestorDashboard() {
   };
 
   const isImageFile = (file: any) => {
+    if (!file) return false;
     const mimeType = String(file?.mimeType || file?.type || file?.file?.type || file?.mime_type || '').toLowerCase();
-    if (mimeType.startsWith('image/')) return true;
+    if (mimeType === 'image' || mimeType.startsWith('image/')) return true;
 
-    const name = String(file?.name || file?.file?.name || file?.original_name || file?.original_filename || file?.uri || file?.url || '').toLowerCase();
-    return /\.(jpe?g|png|gif|webp)$/.test(name);
+    const name = String(file?.name || file?.file?.name || file?.original_name || file?.original_filename || file?.uri || file?.url || file?.file_path || '').toLowerCase();
+    return /\.(jpe?g|png|gif|webp|bmp|avif|heic|jfif)$/i.test(name.split('?')[0]);
   };
 
   const getImageUrisFromMedia = (mediaList: any[]): string[] => {
     if (!Array.isArray(mediaList)) return [];
     return mediaList
       .filter(isImageFile)
-      .map((m: any) => m?.uri || m?.url || m?.file_url || m?.file_path)
+      .map((m: any) => resolveImageUrl(m?.url || m?.file_url || m?.file_path || m?.uri) || m?.uri || m?.url || m?.file_url || m?.file_path)
       .filter((uri: any): uri is string => typeof uri === 'string' && uri.trim().length > 0);
   };
 
