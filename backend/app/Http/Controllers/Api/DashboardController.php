@@ -69,6 +69,7 @@ class DashboardController extends Controller
                 'other_category_name',
                 'department_id',
                 'requestor_id',
+                'program_head_id',
                 'status',
                 'target_platforms',
                 'preferred_schedule_at',
@@ -82,7 +83,7 @@ class DashboardController extends Controller
             ->with([
                 'category:id,name,slug,color,icon',
                 'department:id,first_name,middle_name,last_name,email,department',
-                'requestor:id,first_name,middle_name,last_name,email,department',
+                'requestor:id,first_name,middle_name,last_name,email,department,program_head_id',
                 'media:id,post_request_id,type,original_name,file_path,mime_type,file_size,is_featured,sort_order',
                 'approvalWorkflows:id,post_request_id,stage,approver_id,action,remarks,acted_at,stage_order',
                 'approvalWorkflows.approver:id,first_name,middle_name,last_name,email',
@@ -174,9 +175,20 @@ class DashboardController extends Controller
             });
         }
 
-        return $query->whereHas('requestor', function ($q) use ($user) {
-            $q->where('department', $user->department);
-        })->where('status', '!=', PostRequest::STATUS_DRAFT);
+        // Office head (Department / Program Head)
+        $userPhId = $user->getEffectiveProgramHeadId();
+
+        return $query->where('status', '!=', PostRequest::STATUS_DRAFT)
+            ->where(function ($q) use ($user, $userPhId) {
+                if ($userPhId) {
+                    $q->where('program_head_id', $userPhId)
+                      ->orWhereHas('requestor', fn($rq) => $rq->where('program_head_id', $userPhId))
+                      ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                } else {
+                    $q->whereHas('requestor', fn($rq) => $rq->where('department', $user->department))
+                      ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                }
+            });
     }
 
     private function buildStats(\Illuminate\Database\Eloquent\Builder $query, string $category, ?string $role): array
@@ -491,9 +503,18 @@ class DashboardController extends Controller
                         PostRequest::STATUS_RETURNED_FOR_REVISION,
                     ]);
                 } else { // office_head
-                    $query->whereHas('requestor', function ($q) use ($user) {
-                        $q->where('department', $user->department);
-                    })->whereNotIn('status', ['draft']);
+                    $userPhId = $user->getEffectiveProgramHeadId();
+                    $query->whereNotIn('status', ['draft'])
+                          ->where(function ($q) use ($user, $userPhId) {
+                              if ($userPhId) {
+                                  $q->where('program_head_id', $userPhId)
+                                    ->orWhereHas('requestor', fn($rq) => $rq->where('program_head_id', $userPhId))
+                                    ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                              } else {
+                                  $q->whereHas('requestor', fn($rq) => $rq->where('department', $user->department))
+                                    ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                              }
+                          });
                 }
             }
 

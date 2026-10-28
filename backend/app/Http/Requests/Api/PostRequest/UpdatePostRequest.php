@@ -19,6 +19,7 @@ class UpdatePostRequest extends FormRequest
             'category_id' => ['nullable', 'integer'],
             'other_category_name' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'string', 'max:255'],
+            'program_head_id' => ['nullable', 'integer', 'exists:program_heads,id'],
             'target_platforms' => ['nullable', 'array'],
             'target_platforms.*' => ['string'],
             'preferred_schedule_at' => ['nullable', 'date'],

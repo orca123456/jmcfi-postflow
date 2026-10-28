@@ -36,6 +36,7 @@ class PostRequest extends Model
         'other_category_name',
         'department_id',
         'requestor_id',
+        'program_head_id',
         'status',
         'target_platforms',
         'preferred_schedule_at',
@@ -105,6 +106,11 @@ class PostRequest extends Model
     public function requestor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requestor_id');
+    }
+
+    public function programHead(): BelongsTo
+    {
+        return $this->belongsTo(ProgramHead::class, 'program_head_id');
     }
 
     public function media(): HasMany
@@ -216,18 +222,41 @@ class PostRequest extends Model
             return false;
         }
 
-        if ($currentStage?->approver_id === $user->id) {
-            return true;
+        if ($currentStage?->approver_id) {
+            return $currentStage->approver_id === $user->id;
         }
 
         // Match the approval stage to the user's RAW role
         return match ($stageName) {
-            // Office Head approves stage 1 — must belong to the requestor's department (case-insensitive)
-            'office_head'    => $role === 'office_head' && strcasecmp(trim($user->department ?? ''), trim($this->requestor?->department ?? '')) === 0,
+            // Office Head approves stage 1
+            'office_head'    => $this->canOfficeHeadApprove($user),
             'vice_president' => $role === 'vice_president',
             'imc_qa'         => $role === 'imc_qa_checker',
             default          => false,
         };
+    }
+
+    public function canOfficeHeadApprove(User $user): bool
+    {
+        if ($user->workflowRole() !== 'office_head') {
+            return false;
+        }
+
+        $postPhId = $this->program_head_id ?? $this->requestor?->program_head_id;
+        $userPhId = $user->getEffectiveProgramHeadId();
+
+        // If this post/requestor has a specific program head assigned:
+        if ($postPhId) {
+            return $userPhId && (int) $userPhId === (int) $postPhId;
+        }
+
+        // If user is a specific program head but this post has no program head:
+        if ($userPhId) {
+            return false;
+        }
+
+        // General department head: department must match
+        return strcasecmp(trim($user->department ?? ''), trim($this->requestor?->department ?? '')) === 0;
     }
 
     public function getNextStage(): ?string

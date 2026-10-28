@@ -38,11 +38,57 @@ class ApprovalWorkflowService
     {
         try {
             if ($stage === 'office_head') {
-                // Office Head must belong to the requestor's department
-                $requestorDept = $postRequest?->requestor?->department;
+                $requestor = $postRequest?->requestor;
+                $programHeadId = $postRequest?->program_head_id ?? $requestor?->program_head_id;
+
+                if ($programHeadId) {
+                    // 1. Try finding by ProgramHead model's user_id
+                    $ph = \App\Models\ProgramHead::find($programHeadId);
+                    if ($ph && $ph->user_id) {
+                        $approver = User::role('office_head')->where('id', $ph->user_id)->where('status', 'active')->first();
+                        if ($approver) {
+                            return $approver;
+                        }
+                    }
+
+                    // 2. Try finding active office_head user with matching program_head_id
+                    $approver = User::role('office_head')
+                        ->where('program_head_id', $programHeadId)
+                        ->where('status', 'active')
+                        ->first();
+                    if ($approver) {
+                        return $approver;
+                    }
+
+                    // 3. Try finding by email from ProgramHead record
+                    if ($ph && !empty($ph->email)) {
+                        $approver = User::role('office_head')
+                            ->where('email', $ph->email)
+                            ->where('status', 'active')
+                            ->first();
+                        if ($approver) {
+                            return $approver;
+                        }
+                    }
+                }
+
+                // Fallback: Office Head must belong to the requestor's department
+                $requestorDept = $requestor?->department;
                 if (!$requestorDept) {
                     return null;
                 }
+
+                // Prefer an office head in the department who is not assigned to another program head
+                $unassignedHead = User::role('office_head')
+                    ->where('department', $requestorDept)
+                    ->whereNull('program_head_id')
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($unassignedHead) {
+                    return $unassignedHead;
+                }
+
                 return User::role('office_head')
                     ->where('department', $requestorDept)
                     ->where('status', 'active')

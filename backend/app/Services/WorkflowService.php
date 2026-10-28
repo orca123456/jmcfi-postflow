@@ -16,7 +16,7 @@ class WorkflowService
 {
     public function initializeWorkflow(PostRequest $postRequest): void
     {
-        $approver = $this->getApproverForStage('office_head');
+        $approver = $this->getApproverForStage('office_head', $postRequest);
         if ($approver) {
             ApprovalWorkflow::create([
                 'post_request_id' => $postRequest->id,
@@ -28,10 +28,29 @@ class WorkflowService
         }
     }
 
-    private function getApproverForStage(string $stage): ?User
+    private function getApproverForStage(string $stage, ?PostRequest $postRequest = null): ?User
     {
+        if ($stage === 'office_head') {
+            $requestor = $postRequest?->requestor;
+            $programHeadId = $postRequest?->program_head_id ?? $requestor?->program_head_id;
+
+            if ($programHeadId) {
+                $ph = \App\Models\ProgramHead::find($programHeadId);
+                if ($ph && $ph->user_id) {
+                    $approver = User::role('office_head')->where('id', $ph->user_id)->where('status', 'active')->first();
+                    if ($approver) return $approver;
+                }
+                $approver = User::role('office_head')->where('program_head_id', $programHeadId)->where('status', 'active')->first();
+                if ($approver) return $approver;
+            }
+
+            $requestorDept = $requestor?->department;
+            if (!$requestorDept) return null;
+
+            return User::role('office_head')->where('department', $requestorDept)->where('status', 'active')->first();
+        }
+
         $roleMap = [
-            'office_head' => 'office_head',
             'vice_president' => 'vice_president',
             'imc_qa' => 'imc_qa_checker',
         ];
@@ -39,7 +58,6 @@ class WorkflowService
         $role = $roleMap[$stage] ?? null;
         if (!$role) return null;
 
-        // Get first active user with this role
         return User::whereHas('roles', function ($query) use ($role) {
             $query->where('name', $role);
         })->where('status', 'active')->first();

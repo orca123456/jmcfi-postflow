@@ -101,6 +101,20 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsTo(ProgramHead::class, 'program_head_id');
     }
 
+    public function getEffectiveProgramHeadId(): ?int
+    {
+        if ($this->program_head_id) {
+            return (int) $this->program_head_id;
+        }
+
+        $phByUser = ProgramHead::where('user_id', $this->id)->first();
+        if ($phByUser) {
+            return (int) $phByUser->id;
+        }
+
+        return null;
+    }
+
     public function getAssignedProgramAttribute(): ?string
     {
         $ph = $this->relationLoaded('programHead') ? $this->programHead : $this->programHead()->first();

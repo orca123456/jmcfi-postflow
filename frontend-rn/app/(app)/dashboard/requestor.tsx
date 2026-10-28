@@ -743,6 +743,7 @@ export default function RequestorDashboard() {
         category_id: categoryId,
         other_category_name: category === 'Others' ? otherCategoryName : null,
         target_platforms: selectedPlatforms.length > 0 ? selectedPlatforms : undefined,
+        program_head_id: user?.program_head_id || undefined,
         is_draft: true,
       };
 
@@ -758,6 +759,7 @@ export default function RequestorDashboard() {
         formData.append('caption_narrative', payload.caption_narrative);
         if (payload.category_id) formData.append('category_id', String(payload.category_id));
         if (payload.other_category_name) formData.append('other_category_name', payload.other_category_name);
+        if (payload.program_head_id) formData.append('program_head_id', String(payload.program_head_id));
         if (payload.target_platforms) {
           payload.target_platforms.forEach((p: string) => {
             formData.append('target_platforms[]', p);
@@ -841,6 +843,7 @@ export default function RequestorDashboard() {
         category_id: categoryId,
         other_category_name: category === 'Others' ? otherCategoryName : null,
         target_platforms: selectedPlatforms,
+        program_head_id: user?.program_head_id || undefined,
         is_draft: false,
       };
 
@@ -869,6 +872,7 @@ export default function RequestorDashboard() {
         formData.append('caption_narrative', payload.caption_narrative);
         if (payload.category_id) formData.append('category_id', String(payload.category_id));
         if (payload.other_category_name) formData.append('other_category_name', payload.other_category_name);
+        if (payload.program_head_id) formData.append('program_head_id', String(payload.program_head_id));
         payload.target_platforms.forEach((p: string) => {
           formData.append('target_platforms[]', p);
         });

@@ -119,6 +119,8 @@ class PostRequestController extends Controller
                     }
                 }
 
+                $programHeadId = $request->input('program_head_id') ?: $request->user()->program_head_id;
+
                 $post = PostRequest::create([
                     'title' => $request->title,
                     'slug' => Str::slug($request->title) . '-' . Str::random(6),
@@ -127,6 +129,7 @@ class PostRequestController extends Controller
                     'other_category_name' => $request->other_category_name,
                     'department_id' => $request->user()->id,
                     'requestor_id' => $request->user()->id,
+                    'program_head_id' => $programHeadId,
                     'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
                     'target_platforms' => $request->target_platforms ?? [],
                     'preferred_schedule_at' => $request->preferred_schedule_at,
@@ -248,6 +251,7 @@ class PostRequestController extends Controller
                 'other_category_name' => $request->has('other_category_name') ? $request->other_category_name : $postRequest->other_category_name,
                 'target_platforms' => $request->target_platforms ?? $postRequest->target_platforms,
                 'preferred_schedule_at' => $request->preferred_schedule_at ?? $postRequest->preferred_schedule_at,
+                'program_head_id' => $request->has('program_head_id') ? $request->program_head_id : $postRequest->program_head_id,
             ]);
 
             // Handle media updates
@@ -932,10 +936,19 @@ class PostRequestController extends Controller
                       });
                 });
             } else {
-                // Department head (office_head): only posts from the same department
-                $query->whereHas('requestor', function ($q) use ($user) {
-                    $q->where('department', $user->department);
-                })->whereNotIn('status', ['draft']);
+                // Department head / Program head (office_head)
+                $userPhId = $user->getEffectiveProgramHeadId();
+                $query->whereNotIn('status', ['draft'])
+                      ->where(function ($q) use ($user, $userPhId) {
+                          if ($userPhId) {
+                              $q->where('program_head_id', $userPhId)
+                                ->orWhereHas('requestor', fn($rq) => $rq->where('program_head_id', $userPhId))
+                                ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                          } else {
+                              $q->whereHas('requestor', fn($rq) => $rq->where('department', $user->department))
+                                ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                          }
+                      });
             }
         } elseif ($category === 'admin') {
             // Admin sees everything — no filter
@@ -957,9 +970,17 @@ class PostRequestController extends Controller
         } elseif ($role === 'imc_qa_checker') {
             $query->where('status', PostRequest::STATUS_PENDING_IMC_QA);
         } else { // office_head
+            $userPhId = $user->getEffectiveProgramHeadId();
             $query->where('status', PostRequest::STATUS_PENDING_OFFICE_HEAD)
-                  ->whereHas('requestor', function ($q) use ($user) {
-                      $q->where('department', $user->department);
+                  ->where(function ($q) use ($user, $userPhId) {
+                      if ($userPhId) {
+                          $q->where('program_head_id', $userPhId)
+                            ->orWhereHas('requestor', fn($rq) => $rq->where('program_head_id', $userPhId))
+                            ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                      } else {
+                          $q->whereHas('requestor', fn($rq) => $rq->where('department', $user->department))
+                            ->orWhereHas('approvalWorkflows', fn($w) => $w->where('approver_id', $user->id));
+                      }
                   });
         }
     }

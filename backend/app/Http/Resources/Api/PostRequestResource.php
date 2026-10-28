@@ -34,8 +34,11 @@ class PostRequestResource extends JsonResource
                     'full_name' => $this->requestor->full_name,
                     'email' => $this->requestor->email,
                     'department' => $this->requestor->department,
+                    'program_head_id' => $this->requestor->program_head_id,
+                    'assigned_program' => $this->requestor->assigned_program,
                 ];
             }),
+            'program_head_id' => $this->program_head_id,
             'status' => $this->status,
             'status_label' => $this->status_label,
             'target_platforms' => $this->target_platforms ?? [],
