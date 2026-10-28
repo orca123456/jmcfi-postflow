@@ -42,4 +42,9 @@ class Department extends Model
 
         return Storage::disk($disk)->url($this->logo_path);
     }
+
+    public function programHeads(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProgramHead::class)->orderBy('order_index', 'asc');
+    }
 }

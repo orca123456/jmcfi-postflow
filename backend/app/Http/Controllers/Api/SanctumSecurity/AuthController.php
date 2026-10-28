@@ -77,7 +77,7 @@ class AuthController extends Controller
         ], $request);
 
         return response()->json([
-            'user' => new UserResource($user->load('roles')),
+            'user' => new UserResource($user->load(['roles', 'programHead'])),
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -312,7 +312,7 @@ class AuthController extends Controller
     public function user(Request $request): JsonResponse
     {
         return response()->json([
-            'user' => new UserResource($request->user()->load('roles')),
+            'user' => new UserResource($request->user()->load(['roles', 'programHead'])),
         ]);
     }
 

@@ -45,6 +45,7 @@ class UserController extends Controller
             'department' => 'nullable|string|max:255',
             'position' => 'nullable|string|max:255',
             'role' => 'required|string|exists:roles,name',
+            'program_head_id' => 'nullable|integer|exists:program_heads,id',
         ], [
             'first_name.required' => 'Please fill the Firstname.',
             'last_name.required' => 'Please fill the Lastname.',
@@ -54,7 +55,6 @@ class UserController extends Controller
             'role.required' => 'Please select the Role.',
         ]);
 
-        // Auto-set position based on role category (mirrors User::roleCategory)
         $dept = $validated['department'] ?? null;
         $role = $validated['role'];
         $position = $validated['position'] ?? null;
@@ -87,12 +87,20 @@ class UserController extends Controller
             'email' => strtolower(trim($validated['email'])),
             'password' => Hash::make(trim($validated['password'])),
             'department' => $dept,
+            'program_head_id' => $validated['program_head_id'] ?? null,
             'position' => $position,
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
 
         $user->syncRoles([$validated['role']]);
+
+        if (!empty($validated['program_head_id'])) {
+            $user->update(['program_head_id' => $validated['program_head_id']]);
+            if ($validated['role'] === 'office_head') {
+                \App\Models\ProgramHead::where('id', $validated['program_head_id'])->update(['user_id' => $user->id]);
+            }
+        }
 
         AuditLogService::log('USER_CREATED', 'Created institutional account: ' . $user->full_name, 'INFO', [
             'target_user_id' => $user->id,
@@ -109,7 +117,7 @@ class UserController extends Controller
         }
 
         return response()->json([
-            'data' => new UserResource($user->load('roles'))
+            'data' => new UserResource($user->load(['roles', 'programHead']))
         ], 201);
     }
 
@@ -296,6 +304,7 @@ class UserController extends Controller
             'role' => 'sometimes|string|exists:roles,name',
             'status' => 'sometimes|string|in:active,inactive',
             'password' => 'sometimes|string|confirmed',
+            'program_head_id' => 'nullable|integer|exists:program_heads,id',
         ], [
             'email.regex' => 'Only @jmc.edu.ph email addresses are allowed.',
         ]);
@@ -308,6 +317,13 @@ class UserController extends Controller
 
         if ($request->has('password')) {
             $user->password = $validated['password'];
+        }
+
+        if ($request->has('program_head_id')) {
+            $user->program_head_id = $request->input('program_head_id');
+            if ($user->hasRole('office_head') && $user->program_head_id) {
+                \App\Models\ProgramHead::where('id', $user->program_head_id)->update(['user_id' => $user->id]);
+            }
         }
 
         $user->save();
@@ -339,7 +355,7 @@ class UserController extends Controller
         ], $request);
 
         return response()->json([
-            'data' => new UserResource($user->load('roles'))
+            'data' => new UserResource($user->load(['roles', 'programHead']))
         ]);
     }
 

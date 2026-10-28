@@ -101,6 +101,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('departments/{department}/logo', [DepartmentController::class, 'uploadLogo'])->middleware('role:it_publisher,it_admin');
     Route::delete('departments/{department}/logo', [DepartmentController::class, 'removeLogo'])->middleware('role:it_publisher,it_admin');
 
+    // Program Heads
+    Route::get('program-heads', [App\Http\Controllers\Api\ProgramHeadController::class, 'index']);
+    Route::get('departments/{department}/program-heads', [App\Http\Controllers\Api\ProgramHeadController::class, 'byDepartment']);
+    Route::post('departments/{department}/program-heads', [App\Http\Controllers\Api\ProgramHeadController::class, 'store'])->middleware('role:it_publisher,it_admin');
+    Route::post('program-heads', [App\Http\Controllers\Api\ProgramHeadController::class, 'store'])->middleware('role:it_publisher,it_admin');
+    Route::put('program-heads/{programHead}', [App\Http\Controllers\Api\ProgramHeadController::class, 'update'])->middleware('role:it_publisher,it_admin');
+    Route::delete('program-heads/{programHead}', [App\Http\Controllers\Api\ProgramHeadController::class, 'destroy'])->middleware('role:it_publisher,it_admin');
+
     // Roles (reads open, writes admin only)
     Route::get('roles/list', [RoleController::class, 'index']);
     Route::post('roles/list', [RoleController::class, 'store'])->middleware('role:it_publisher,it_admin');

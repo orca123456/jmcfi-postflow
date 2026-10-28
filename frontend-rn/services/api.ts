@@ -176,6 +176,35 @@ export const departmentsApi = {
   removeLogo: (id: number) => api.delete(`/departments/${id}/logo`),
 };
 
+// ── Program Heads endpoints ─────────────────────────────────────────────────
+export interface ProgramHeadData {
+  id: number;
+  department_id: number;
+  user_id?: number | null;
+  name: string;
+  program_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  order_index: number;
+  order_label?: string;
+  is_active?: boolean;
+  department?: { id: number; name: string; display_name: string };
+  user?: { id: number; first_name: string; last_name: string; email: string };
+}
+
+export const programHeadsApi = {
+  list: (params?: { department_id?: number | string }) =>
+    api.get('/program-heads', { params }),
+  byDepartment: (deptId: number | string) =>
+    api.get(`/departments/${deptId}/program-heads`),
+  create: (data: Partial<ProgramHeadData>) =>
+    api.post('/program-heads', data),
+  update: (id: number | string, data: Partial<ProgramHeadData>) =>
+    api.put(`/program-heads/${id}`, data),
+  delete: (id: number | string) =>
+    api.delete(`/program-heads/${id}`),
+};
+
 // ── Chatbot endpoints ───────────────────────────────────────────────────────
 export const chatbotApi = {
   sendMessage: (messages: { role: string; content: string }[]) =>

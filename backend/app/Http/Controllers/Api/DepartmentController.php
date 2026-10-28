@@ -13,7 +13,7 @@ class DepartmentController extends Controller
 {
     public function index(): JsonResponse
     {
-        $departments = Department::orderBy('display_name')->get();
+        $departments = Department::with('programHeads')->orderBy('display_name')->get();
         return response()->json([
             'data' => $departments,
         ]);

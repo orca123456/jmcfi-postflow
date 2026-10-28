@@ -23,6 +23,14 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'photo_url' => $this->photo_url,
             'department_logo_url' => $this->department_logo_url,
+            'assigned_program' => $this->assigned_program,
+            'program_head' => $this->programHead ? [
+                'id' => $this->programHead->id,
+                'name' => $this->programHead->name,
+                'program_name' => $this->programHead->program_name,
+                'order_index' => $this->programHead->order_index,
+                'order_label' => $this->programHead->order_label,
+            ] : null,
             'roles' => $this->whenLoaded('roles', function () {
                 return $this->roles->pluck('name');
             }),

@@ -20,7 +20,7 @@ import { useThemeStore } from '../store/theme';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../constants/theme';
 import { resolveImageUrl } from '../services/api';
 import { ChatBot } from './ChatBot';
-import { departmentsApi, authApi, notificationsApi } from '../services/api';
+import { departmentsApi, authApi, notificationsApi, programHeadsApi } from '../services/api';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -31,6 +31,7 @@ interface DashboardShellProps {
   onTabChange?: (tab: string) => void;
   departmentName?: string;
   departmentLogo?: string;
+  assignedProgram?: string;
   userPhotoUrl?: string | null;
   backgroundImage?: any;
   onOpenPost?: (postId: string | number) => void;
@@ -43,6 +44,7 @@ export function DashboardShell({
   onTabChange,
   departmentName,
   departmentLogo,
+  assignedProgram: propAssignedProgram,
   userPhotoUrl,
   backgroundImage,
   onOpenPost,
@@ -189,28 +191,111 @@ export function DashboardShell({
     return () => clearTimeout(timer);
   }, [user?.department]);
 
-  // Auto-fetch user photo from API (in case it was uploaded after login)
+  // Live user profile and assigned program state
   const [apiUserPhoto, setApiUserPhoto] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (!user) return;
-    const timer = setTimeout(() => {
-      authApi.getUser().then(res => {
-        const userData = res.data?.user || res.data;
-        if (userData?.photo_url && userData.photo_url !== '') {
-          setApiUserPhoto(userData.photo_url);
-        }
-        if (userData?.department_logo_url) {
-          setAutoDeptLogo(userData.department_logo_url);
-          // Also update the global user object so it's cached in local storage for next time
-          useAuthStore.getState().setUser({ ...user, ...userData });
-        }
-      }).catch(() => {});
-    }, 6500); // Delay so it doesn't block dashboard init
-    return () => clearTimeout(timer);
+  const [liveAssignedProgram, setLiveAssignedProgram] = React.useState<string | null>(() => {
+    const u = user as any;
+    return u?.assigned_program || u?.program_head?.program_name || null;
+  });
+
+  const refreshProfile = React.useCallback(() => {
+    if (!user?.id) return;
+    authApi.getUser().then(res => {
+      const userData = res.data?.user || res.data;
+      if (!userData) return;
+      if (userData.photo_url) {
+        setApiUserPhoto(userData.photo_url);
+      }
+      if (userData.department_logo_url) {
+        setAutoDeptLogo(userData.department_logo_url);
+      }
+      const prog = userData.assigned_program || userData.program_head?.program_name || null;
+      if (prog) {
+        setLiveAssignedProgram(prog);
+      }
+      // Always sync the user object in the auth store
+      useAuthStore.getState().setUser({ ...useAuthStore.getState().user, ...userData });
+    }).catch(() => {});
   }, [user?.id]);
+
+  // Sync state if user in auth store changes
+  React.useEffect(() => {
+    const u = user as any;
+    const prog = u?.assigned_program || u?.program_head?.program_name || null;
+    if (prog) {
+      setLiveAssignedProgram(prog);
+    }
+  }, [user]);
+
+  // Refresh user data immediately on mount, on activeTab change, on window focus, and on interval
+  React.useEffect(() => {
+    refreshProfile();
+    const interval = setInterval(refreshProfile, 15000);
+    let handleFocus: (() => void) | null = null;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      handleFocus = () => refreshProfile();
+      window.addEventListener('focus', handleFocus);
+    }
+    return () => {
+      clearInterval(interval);
+      if (handleFocus && typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+      }
+    };
+  }, [refreshProfile, activeTab]);
+
+  // Fallback: Query department program heads to find active assignment for this user/department
+  React.useEffect(() => {
+    const deptName = user?.department;
+    if (!deptName) return;
+    departmentsApi.list().then(res => {
+      const depts = res.data?.data || [];
+      const match = depts.find((d: any) =>
+        d.display_name === deptName || d.name === deptName
+      );
+      if (match?.id) {
+        programHeadsApi.byDepartment(match.id).then(phRes => {
+          const heads = phRes.data?.data || [];
+          const myHead = heads.find((h: any) =>
+            (h.user_id && Number(h.user_id) === Number(user?.id)) ||
+            (h.email && user?.email && h.email.toLowerCase() === user.email.toLowerCase()) ||
+            (h.name && user?.name && h.name.toLowerCase() === user.name.toLowerCase()) ||
+            (h.name && user?.first_name && h.name.toLowerCase() === user.first_name.toLowerCase())
+          );
+          if (myHead?.program_name) {
+            setLiveAssignedProgram(myHead.program_name);
+          }
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+  }, [user?.department, user?.id, user?.email, user?.name, user?.first_name]);
 
   const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
   const finalDeptName = departmentName || user?.department || 'JMCFI';
+  const finalAssignedProgram = React.useMemo(() => {
+    if (propAssignedProgram && propAssignedProgram.trim()) {
+      return propAssignedProgram.trim();
+    }
+    if (liveAssignedProgram && liveAssignedProgram.trim()) {
+      return liveAssignedProgram.trim();
+    }
+    const u = user as any;
+    if (!u) return null;
+    if (u.assigned_program && typeof u.assigned_program === 'string' && u.assigned_program.trim()) {
+      return u.assigned_program.trim();
+    }
+    if (u.program_head?.program_name && typeof u.program_head.program_name === 'string' && u.program_head.program_name.trim()) {
+      return u.program_head.program_name.trim();
+    }
+    if (u.program_name && typeof u.program_name === 'string' && u.program_name.trim()) {
+      return u.program_name.trim();
+    }
+    if (u.position && typeof u.position === 'string' && u.position.includes('Program Head')) {
+      const extracted = u.position.replace(/Program Head/gi, '').trim();
+      if (extracted) return extracted;
+    }
+    return null;
+  }, [propAssignedProgram, liveAssignedProgram, user]);
   const photoFromUser = (user as any)?.photo_url;
   const rawPhoto = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
   const finalPhotoUrl = resolveImageUrl(rawPhoto);
@@ -906,7 +991,14 @@ export function DashboardShell({
                       outputRange: [0, 1]
                     })
                   }]}>
-                    <Text style={[styles.sidebarTitle, { textAlign: 'left' }]} numberOfLines={2} adjustsFontSizeToFit>{finalDeptName}</Text>
+                    <Text style={[styles.sidebarTitle, { textAlign: 'left' }]} numberOfLines={1}>{finalDeptName}</Text>
+                    {finalAssignedProgram ? (
+                      <View style={styles.sidebarProgramBadge}>
+                        <Text style={styles.sidebarProgramBadgeText} numberOfLines={1}>
+                          {finalAssignedProgram}
+                        </Text>
+                      </View>
+                    ) : null}
                   </Animated.View>
                 </View>
 
@@ -1007,7 +1099,14 @@ export function DashboardShell({
                 resizeMode="contain"
               />
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.mobileDrawerDeptName} numberOfLines={2}>{finalDeptName}</Text>
+                <Text style={styles.mobileDrawerDeptName} numberOfLines={1}>{finalDeptName}</Text>
+                {finalAssignedProgram ? (
+                  <View style={[styles.sidebarProgramBadge, { marginTop: 2, marginBottom: 2 }]}>
+                    <Text style={styles.sidebarProgramBadgeText} numberOfLines={1}>
+                      {finalAssignedProgram}
+                    </Text>
+                  </View>
+                ) : null}
                 <Text style={styles.mobileDrawerUserName}>{user?.name ?? 'User'}</Text>
               </View>
             </View>
@@ -1363,6 +1462,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.2,
     textAlignVertical: 'center',
+  },
+  sidebarProgramBadge: {
+    marginTop: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.38)',
+    alignSelf: 'flex-start',
+    maxWidth: 180,
+  },
+  sidebarProgramBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   sidebarDivider: {
     height: 1,

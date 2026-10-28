@@ -4,7 +4,7 @@
  * This dashboard merges admin oversight + publishing capabilities.
  * It re-uses the full admin panel implementation with the role rebadged as "IT Admin".
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,7 @@ import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { useAuthStore, getAvatarColors } from '../../../store/auth';
 import { Card } from '../../../components/ui/Card';
 import { useThemeStore } from '../../../store/theme';
-import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi, resolveImageUrl } from '../../../services/api';
+import { dashboardApi, postsApi, usersApi, departmentsApi, rolesApi, auditLogsApi, publishingApi, tokenSettingsApi, authApi, emailSettingsApi, apiTokensApi, resolveImageUrl, programHeadsApi, ProgramHeadData } from '../../../services/api';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
 import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
@@ -717,6 +717,266 @@ export default function ITAdminDashboard() {
   React.useEffect(() => {
     setNewUserPosition(autoPositionFor(newUserRole, newUserDepartment));
   }, [newUserRole, newUserDepartment]);
+
+  // ── Program Head Management State & Handlers ──
+  const [departmentProgramHeads, setDepartmentProgramHeads] = useState<ProgramHeadData[]>([]);
+  const [isLoadingProgramHeads, setIsLoadingProgramHeads] = useState(false);
+  const [isAddProgramHeadModalOpen, setIsAddProgramHeadModalOpen] = useState(false);
+  const [isEditProgramHeadModalOpen, setIsEditProgramHeadModalOpen] = useState(false);
+  const [editingProgramHead, setEditingProgramHead] = useState<ProgramHeadData | null>(null);
+  const [isDeleteProgramHeadModalOpen, setIsDeleteProgramHeadModalOpen] = useState(false);
+  const [deletingProgramHead, setDeletingProgramHead] = useState<ProgramHeadData | null>(null);
+  const [isSubmittingProgramHead, setIsSubmittingProgramHead] = useState(false);
+
+  // Form Fields
+  const [phFormName, setPhFormName] = useState('');
+  const [phFormProgramName, setPhFormProgramName] = useState('');
+  const [phFormEmail, setPhFormEmail] = useState('');
+  const [phFormPhone, setPhFormPhone] = useState('');
+  const [phFormOrderIndex, setPhFormOrderIndex] = useState(1);
+  const [phFormUserId, setPhFormUserId] = useState<number | null>(null);
+  const [phFormIsActive, setPhFormIsActive] = useState(true);
+  const [phFormErrors, setPhFormErrors] = useState<{ name?: string; program_name?: string }>({});
+
+  // Department & Program Head Dropdown States
+  const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+  const deptDropdownRef = useRef<any>(null);
+
+  const [isProgramHeadDropdownOpen, setIsProgramHeadDropdownOpen] = useState(false);
+  const [selectedProgramHeadId, setSelectedProgramHeadId] = useState<number | null>(null);
+  const programHeadDropdownRef = useRef<any>(null);
+
+  const selectedProgramHead = useMemo(() => {
+    if (!selectedProgramHeadId) return null;
+    return departmentProgramHeads.find(ph => ph.id === selectedProgramHeadId) || null;
+  }, [selectedProgramHeadId, departmentProgramHeads]);
+
+  useEffect(() => {
+    setSelectedProgramHeadId(null);
+    setIsProgramHeadDropdownOpen(false);
+  }, [newUserDepartment]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const handleClickOutside = (event: any) => {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(event.target)) {
+        setIsDeptDropdownOpen(false);
+      }
+      if (programHeadDropdownRef.current && !programHeadDropdownRef.current.contains(event.target)) {
+        setIsProgramHeadDropdownOpen(false);
+      }
+    };
+    if (isDeptDropdownOpen || isProgramHeadDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDeptDropdownOpen, isProgramHeadDropdownOpen]);
+
+  const getOrdinalLabel = (n: number) => {
+    const num = Math.max(1, Math.floor(n || 1));
+    const ends = ['th', 'st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th', 'th'];
+    if (num % 100 >= 11 && num % 100 <= 13) return `${num}th Program Head`;
+    return `${num}${ends[num % 10] || 'th'} Program Head`;
+  };
+
+  const getOrdinalBadgeStyle = (n: number) => {
+    switch (n) {
+      case 1:
+        return { bg: '#EEF2FF', text: '#4338CA', border: '#C7D2FE' };
+      case 2:
+        return { bg: '#F0FDF4', text: '#15803D', border: '#BBF7D0' };
+      case 3:
+        return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' };
+      case 4:
+        return { bg: '#F3E8FF', text: '#7E22CE', border: '#E9D5FF' };
+      default:
+        return { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' };
+    }
+  };
+
+  const loadProgramHeadsForSelectedDept = async (deptId: number) => {
+    if (!deptId) {
+      setDepartmentProgramHeads([]);
+      return;
+    }
+    setIsLoadingProgramHeads(true);
+    try {
+      const res = await programHeadsApi.byDepartment(deptId);
+      const heads = res.data?.data || [];
+      setDepartmentProgramHeads(heads);
+      setDepartmentsList(prev => prev.map(d => (d.id === deptId ? { ...d, program_heads: heads } : d)));
+    } catch (err) {
+      console.error('Failed to load program heads', err);
+    } finally {
+      setIsLoadingProgramHeads(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDepartment?.id) {
+      loadProgramHeadsForSelectedDept(selectedDepartment.id);
+    } else {
+      setDepartmentProgramHeads([]);
+    }
+  }, [selectedDepartment?.id]);
+
+  const assignedOrderIndices = useMemo(() => {
+    const list = selectedDepartment?.program_heads || departmentProgramHeads || [];
+    return new Set(list.map((ph: any) => Number(ph.order_index)));
+  }, [selectedDepartment?.program_heads, departmentProgramHeads]);
+
+  const handleOpenAddProgramHead = (targetDeptParam?: any) => {
+    const targetDept = targetDeptParam || selectedDepartment;
+    if (!targetDept) {
+      showToast('Please select a department first.', 'error');
+      return;
+    }
+    if (targetDept.display_name !== newUserDepartment) {
+      setNewUserDepartment(targetDept.display_name);
+    }
+    const heads = targetDept.program_heads || (targetDept.id === selectedDepartment?.id ? departmentProgramHeads : []);
+    const takenOrders = new Set(heads.map((p: any) => Number(p.order_index)));
+    let firstAvailable = 1;
+    for (let i = 1; i <= 8; i++) {
+      if (!takenOrders.has(i)) {
+        firstAvailable = i;
+        break;
+      }
+    }
+    setPhFormOrderIndex(firstAvailable);
+    setPhFormName('');
+    setPhFormProgramName('');
+    setPhFormEmail('');
+    setPhFormPhone('');
+    setPhFormUserId(null);
+    setPhFormIsActive(true);
+    setPhFormErrors({});
+    setIsAddProgramHeadModalOpen(true);
+  };
+
+  const handleSaveProgramHead = async () => {
+    const targetDept = selectedDepartment || departmentsList.find((d: any) => d.display_name === newUserDepartment);
+    if (!targetDept) {
+      showToast('No department selected.', 'error');
+      return;
+    }
+    const errs: Record<string, string> = {};
+    if (!phFormName.trim()) {
+      errs.name = 'Program Head name is required.';
+    }
+    if (!phFormProgramName.trim()) {
+      errs.program_name = 'Assigned Program / Major is required.';
+    }
+    if (Object.keys(errs).length > 0) {
+      setPhFormErrors(errs);
+      return;
+    }
+    if (assignedOrderIndices.has(phFormOrderIndex)) {
+      showToast(`${getOrdinalLabel(phFormOrderIndex)} is already assigned in ${targetDept.display_name}.`, 'error');
+      return;
+    }
+    setIsSubmittingProgramHead(true);
+    try {
+      await programHeadsApi.create({
+        department_id: targetDept.id,
+        name: phFormName.trim(),
+        program_name: phFormProgramName.trim(),
+        email: phFormEmail.trim() || null,
+        phone: phFormPhone.trim() || null,
+        order_index: phFormOrderIndex || 1,
+        user_id: phFormUserId,
+        is_active: phFormIsActive,
+      });
+      showToast(`${getOrdinalLabel(phFormOrderIndex)} assigned successfully!`, 'success');
+      setIsAddProgramHeadModalOpen(false);
+      await loadProgramHeadsForSelectedDept(targetDept.id);
+    } catch (e: any) {
+      const msg = e.response?.data?.message || e.message;
+      showToast('Failed to save program head: ' + msg, 'error');
+    } finally {
+      setIsSubmittingProgramHead(false);
+    }
+  };
+
+  const handleOpenEditProgramHead = (ph: ProgramHeadData) => {
+    setEditingProgramHead(ph);
+    setPhFormName(ph.name || '');
+    setPhFormProgramName(ph.program_name || '');
+    setPhFormEmail(ph.email || '');
+    setPhFormPhone(ph.phone || '');
+    setPhFormOrderIndex(ph.order_index || 1);
+    setPhFormUserId(ph.user_id || null);
+    setPhFormIsActive(ph.is_active ?? true);
+    setPhFormErrors({});
+    setIsEditProgramHeadModalOpen(true);
+  };
+
+  const handleUpdateProgramHead = async () => {
+    if (!editingProgramHead || !selectedDepartment) return;
+    const errs: Record<string, string> = {};
+    if (!phFormName.trim()) {
+      errs.name = 'Program Head name is required.';
+    }
+    if (!phFormProgramName.trim()) {
+      errs.program_name = 'Assigned Program / Major is required.';
+    }
+    if (Object.keys(errs).length > 0) {
+      setPhFormErrors(errs);
+      return;
+    }
+    if (phFormOrderIndex !== editingProgramHead.order_index && assignedOrderIndices.has(phFormOrderIndex)) {
+      showToast(`${getOrdinalLabel(phFormOrderIndex)} is already assigned to another program head.`, 'error');
+      return;
+    }
+    setIsSubmittingProgramHead(true);
+    try {
+      await programHeadsApi.update(editingProgramHead.id, {
+        name: phFormName.trim(),
+        program_name: phFormProgramName.trim(),
+        email: phFormEmail.trim() || null,
+        phone: phFormPhone.trim() || null,
+        order_index: phFormOrderIndex || 1,
+        user_id: phFormUserId,
+        is_active: phFormIsActive,
+      });
+      showToast('Program Head updated successfully!', 'success');
+      setIsEditProgramHeadModalOpen(false);
+      setEditingProgramHead(null);
+      await loadProgramHeadsForSelectedDept(selectedDepartment.id);
+    } catch (e: any) {
+      const msg = e.response?.data?.message || e.message;
+      showToast('Failed to update program head: ' + msg, 'error');
+    } finally {
+      setIsSubmittingProgramHead(false);
+    }
+  };
+
+  const handleOpenDeleteProgramHead = (ph: ProgramHeadData) => {
+    setDeletingProgramHead(ph);
+    setIsDeleteProgramHeadModalOpen(true);
+  };
+
+  const handleConfirmDeleteProgramHead = async () => {
+    if (!deletingProgramHead || !selectedDepartment) return;
+    setIsSubmittingProgramHead(true);
+    try {
+      await programHeadsApi.delete(deletingProgramHead.id);
+      showToast('Program Head removed.', 'success');
+      if (selectedProgramHeadId === deletingProgramHead.id) {
+        setSelectedProgramHeadId(null);
+      }
+      setIsDeleteProgramHeadModalOpen(false);
+      setDeletingProgramHead(null);
+      await loadProgramHeadsForSelectedDept(selectedDepartment.id);
+    } catch (e: any) {
+      const msg = e.response?.data?.message || e.message;
+      showToast('Failed to delete program head: ' + msg, 'error');
+    } finally {
+      setIsSubmittingProgramHead(false);
+    }
+  };
 
   // Inline add-role/department state
   const [addingRole, setAddingRole] = useState(false);
@@ -2034,9 +2294,19 @@ export default function ITAdminDashboard() {
         password: newUserPassword,
         role: granularRoleFor(newUserRole, newUserDepartment),
         department: newUserDepartment,
-        position: newUserPosition || undefined,
+        position: (selectedProgramHead?.program_name
+          ? (newUserRole === 'requestor' ? `${selectedProgramHead.program_name} Requestor` : `${selectedProgramHead.program_name} Program Head`)
+          : newUserPosition) || undefined,
+        program_head_id: selectedProgramHead?.id || undefined,
       });
       const u = res.data.data;
+      if (selectedProgramHead?.id && u?.id && newUserRole === 'office_head') {
+        try {
+          await programHeadsApi.update(selectedProgramHead.id, { user_id: u.id });
+        } catch (linkErr) {
+          console.warn('Could not link user_id to program head', linkErr);
+        }
+      }
       const newAccount = {
         ...u,
         role: u.roles && u.roles.length > 0 ? u.roles[0] : 'requestor',
@@ -2045,6 +2315,7 @@ export default function ITAdminDashboard() {
       const updatedUsers = [newAccount, ...users];
       setUsers(updatedUsers);
       setNewUserEmail(''); setNewUserPassword(''); setNewUserFirstName(''); setNewUserLastName('');
+      setSelectedProgramHeadId(null);
       setNewUserErrors({});
       showToast('Institutional account created! Login credentials emailed to user.', 'success');
     } catch (e: any) {
@@ -2737,8 +3008,8 @@ export default function ITAdminDashboard() {
 
       {/* ── USER MANAGEMENT TAB ── */}
       {activeTab === 'user-management' && (
-        <View style={styles.userTabContainer}>
-          <Card style={styles.userCard}>
+        <View style={[styles.userTabContainer, { position: 'relative', zIndex: (isDeptDropdownOpen || isProgramHeadDropdownOpen) ? 99999 : 1, overflow: 'visible' }]}>
+          <Card style={[styles.userCard, { position: 'relative', zIndex: (isDeptDropdownOpen || isProgramHeadDropdownOpen) ? 99999 : 1, overflow: 'visible' }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
               <Text style={[styles.sectionHeader, { marginBottom: 0 }]}>Create New Institutional Account</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -2913,10 +3184,17 @@ export default function ITAdminDashboard() {
                 )}
               </View>
             </View>
-            {/* Row 3: Role + Department */}
-            <View style={[styles.formRow, isTablet ? styles.formRowLayout : styles.formColumnLayout]}>
-              <View style={styles.formField}>
-                <Text style={[styles.formLabel, newUserErrors.role && { color: '#DC2626' }]} numberOfLines={1}>Role</Text>
+            {/* Row 3: Role (Left) + Department (Middle) + Program Head (Right) */}
+            <View style={[
+              styles.formRow,
+              isTablet ? styles.formRowLayout : styles.formColumnLayout,
+              { position: 'relative', zIndex: (isDeptDropdownOpen || isProgramHeadDropdownOpen) ? 99999 : 1 }
+            ]}>
+              {/* ── Column 1: Role ── */}
+              <View style={[styles.formField, { position: 'relative', zIndex: 1 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', height: 24, marginBottom: 4 }}>
+                  <Text style={[styles.formLabel, { marginBottom: 0 }, newUserErrors.role && { color: '#DC2626' }]} numberOfLines={1}>Role</Text>
+                </View>
                 <select
                   value={newUserRole}
                   onChange={(e: any) => {
@@ -2947,49 +3225,186 @@ export default function ITAdminDashboard() {
                   </View>
                 )}
               </View>
-              <View style={styles.formField}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
-                  <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 4 }, newUserErrors.department && { color: '#DC2626' }]} numberOfLines={1}>Department</Text>
+
+              {/* ── Column 2: Department ── */}
+              <View style={[styles.formField, { position: 'relative', zIndex: isDeptDropdownOpen ? 999999 : 10 }]}>
+                {/* Header: Label + Add/Delete buttons */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 24, marginBottom: 4 }}>
+                  <Text style={[styles.formLabel, { marginBottom: 0, flexShrink: 1, marginRight: 4 }, newUserErrors.department && { color: '#DC2626' }]} numberOfLines={1}>
+                    Department
+                  </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <TouchableOpacity
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: newUserRole === 'admin' ? '#F3F4F6' : '#EFF6FF', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: newUserRole === 'admin' ? 0.65 : 1 }}
+                      style={{
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                        backgroundColor: newUserRole === 'admin' ? '#F3F4F6' : '#EFF6FF',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 3,
+                        opacity: newUserRole === 'admin' ? 0.65 : 1
+                      }}
                       onPress={handleAddDepartment}
                       disabled={newUserRole === 'admin'}
                     >
                       <Ionicons name="add-circle-outline" size={14} color={newUserRole === 'admin' ? '#9CA3AF' : '#1E40AF'} />
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: newUserRole === 'admin' ? '#9CA3AF' : '#1E40AF' }}>Add</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: newUserRole === 'admin' ? '#9CA3AF' : '#1E40AF' }}>Add</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: selectedDepartment?.is_system || !newUserDepartment ? '#F3F4F6' : '#FEF2F2', flexDirection: 'row', alignItems: 'center', gap: 3, opacity: selectedDepartment?.is_system || !newUserDepartment ? 0.65 : 1 }}
+                      style={{
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                        backgroundColor: selectedDepartment?.is_system || !newUserDepartment ? '#F3F4F6' : '#FEF2F2',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 3,
+                        opacity: selectedDepartment?.is_system || !newUserDepartment ? 0.65 : 1
+                      }}
                       onPress={handleDeleteDepartment}
                       disabled={selectedDepartment?.is_system || !newUserDepartment}
                     >
                       <Ionicons name="trash-outline" size={14} color={selectedDepartment?.is_system || !newUserDepartment ? '#9CA3AF' : '#DC2626'} />
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: selectedDepartment?.is_system || !newUserDepartment ? '#9CA3AF' : '#DC2626' }}>Delete</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: selectedDepartment?.is_system || !newUserDepartment ? '#9CA3AF' : '#DC2626' }}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-                <select
-                  value={newUserDepartment}
-                  onChange={(e: any) => {
-                    setNewUserDepartment(e.target.value);
-                    if (newUserErrors.department) setNewUserErrors(prev => ({ ...prev, department: undefined }));
-                  }}
-                  style={{
-                    height: 38,
-                    fontSize: 13,
-                    borderRadius: 4,
-                    border: newUserErrors.department ? '1.5px solid #DC2626' : '1px solid #E5E7EB',
-                    backgroundColor: '#fff',
-                    color: '#1A1A2E',
-                    paddingLeft: 10,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    width: '100%'
-                  }}
-                >
-                  {filteredDepts.map((d: any) => <option key={d.id} value={d.display_name}>{d.display_name}</option>)}
-                </select>
+
+                {/* Department Dropdown Trigger */}
+                <View ref={deptDropdownRef} style={{ position: 'relative', zIndex: 999999 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsDeptDropdownOpen(!isDeptDropdownOpen);
+                      if (isProgramHeadDropdownOpen) setIsProgramHeadDropdownOpen(false);
+                    }}
+                    style={{
+                      height: 38,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: newUserErrors.department ? '#DC2626' : (isDeptDropdownOpen ? '#1E40AF' : '#E5E7EB'),
+                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      paddingHorizontal: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                    } as any}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: newUserDepartment ? Colors.textPrimary : '#94A3B8',
+                        fontWeight: newUserDepartment ? '500' : '400',
+                      }}
+                      numberOfLines={1}
+                    >
+                      {newUserDepartment || 'Select Department...'}
+                    </Text>
+                    <Ionicons
+                      name={isDeptDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                      size={15}
+                      color={Colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Department Dropdown Menu */}
+                  {isDeptDropdownOpen && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 42,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 16,
+                        elevation: 30,
+                        overflow: 'hidden',
+                        zIndex: 9999999,
+                      }}
+                    >
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                        style={{ maxHeight: 260 }}
+                      >
+                        {filteredDepts.map((d: any) => {
+                          const isSelected = d.display_name === newUserDepartment;
+                          const heads = d.program_heads || (d.id === selectedDepartment?.id ? departmentProgramHeads : []);
+                          const hasHeads = heads.length > 0;
+
+                          return (
+                            <TouchableOpacity
+                              key={d.id}
+                              onPress={() => {
+                                setNewUserDepartment(d.display_name);
+                                setIsDeptDropdownOpen(false);
+                                if (newUserErrors.department) {
+                                  setNewUserErrors(prev => ({ ...prev, department: undefined }));
+                                }
+                              }}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 10,
+                                backgroundColor: isSelected
+                                  ? (isDarkMode ? '#334155' : '#EFF6FF')
+                                  : 'transparent',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                borderBottomWidth: 1,
+                                borderBottomColor: isDarkMode ? '#334155' : '#F1F5F9',
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? '700' : '500',
+                                  color: isSelected ? '#1E40AF' : Colors.textPrimary,
+                                  flex: 1,
+                                }}
+                                numberOfLines={1}
+                              >
+                                {d.display_name}
+                              </Text>
+
+                              {hasHeads && (
+                                <View
+                                  style={{
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 1.5,
+                                    borderRadius: 10,
+                                    backgroundColor: isSelected ? '#1E40AF' : '#EEF2FF',
+                                    marginLeft: 8,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: '800',
+                                      color: isSelected ? '#FFFFFF' : '#4338CA',
+                                    }}
+                                  >
+                                    {heads.length} {heads.length === 1 ? 'Head' : 'Heads'}
+                                  </Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+
                 {newUserErrors.department && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
                     <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
@@ -2998,6 +3413,7 @@ export default function ITAdminDashboard() {
                     </Text>
                   </View>
                 )}
+
                 {addingDept && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     <TextInput
@@ -3022,6 +3438,363 @@ export default function ITAdminDashboard() {
                   </View>
                 )}
               </View>
+
+              {/* ── Right Column: Program Head ── */}
+              <View style={[styles.formField, { position: 'relative', zIndex: isProgramHeadDropdownOpen ? 999999 : 5 }]}>
+                {/* Header: Label + Add Prg.Head button */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 24, marginBottom: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.formLabel, { marginBottom: 0 }]} numberOfLines={1}>
+                      Program Head
+                    </Text>
+                    {departmentProgramHeads.length > 0 && (
+                      <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#1E40AF' }}>
+                          {departmentProgramHeads.length}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                      backgroundColor: (!selectedDepartment || newUserRole === 'requestor') ? '#F3F4F6' : '#EFF6FF',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      borderWidth: 1,
+                      borderColor: !selectedDepartment ? '#E5E7EB' : '#BFDBFE',
+                      opacity: !selectedDepartment ? 0.5 : 1,
+                      cursor: !selectedDepartment ? 'not-allowed' : 'pointer',
+                    } as any}
+                    onPress={() => {
+                      handleOpenAddProgramHead();
+                    }}
+                    disabled={!selectedDepartment}
+                  >
+                    <Ionicons name="school-outline" size={13} color={!selectedDepartment ? '#9CA3AF' : '#1E40AF'} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: !selectedDepartment ? '#9CA3AF' : '#1E40AF' }}>
+                      Add Prg.Head
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Program Head Dropdown Trigger */}
+                <View
+                  ref={programHeadDropdownRef}
+                  style={{
+                    position: 'relative',
+                    zIndex: 999999,
+                    cursor: !selectedDepartment ? 'not-allowed' : 'default',
+                  } as any}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!selectedDepartment) {
+                        showToast('Please select a department first.', 'error');
+                        return;
+                      }
+                      setIsProgramHeadDropdownOpen(!isProgramHeadDropdownOpen);
+                      if (isDeptDropdownOpen) setIsDeptDropdownOpen(false);
+                    }}
+                    disabled={!selectedDepartment}
+                    style={{
+                      height: 38,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: isProgramHeadDropdownOpen ? '#1E40AF' : '#E5E7EB',
+                      backgroundColor: !selectedDepartment
+                        ? (isDarkMode ? '#0F172A' : '#F8FAFC')
+                        : (isDarkMode ? '#1E293B' : '#FFFFFF'),
+                      paddingHorizontal: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      opacity: !selectedDepartment ? 0.65 : 1,
+                      cursor: !selectedDepartment ? 'not-allowed' : 'pointer',
+                    } as any}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                      {selectedProgramHead ? (
+                        <>
+                          <View
+                            style={{
+                              paddingHorizontal: 6,
+                              paddingVertical: 1,
+                              borderRadius: 4,
+                              backgroundColor: getOrdinalBadgeStyle(selectedProgramHead.order_index).bg,
+                              borderWidth: 1,
+                              borderColor: getOrdinalBadgeStyle(selectedProgramHead.order_index).border,
+                            }}
+                          >
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: getOrdinalBadgeStyle(selectedProgramHead.order_index).text }}>
+                              {getOrdinalLabel(selectedProgramHead.order_index).split(' ')[0]}
+                            </Text>
+                          </View>
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                              fontWeight: '600',
+                              flexShrink: 1,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {selectedProgramHead.name} ({selectedProgramHead.program_name || selectedDepartment?.display_name})
+                          </Text>
+                        </>
+                      ) : (
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: '#94A3B8',
+                            fontStyle: !selectedDepartment ? 'italic' : 'normal',
+                          }}
+                          numberOfLines={1}
+                        >
+                          {!selectedDepartment
+                            ? 'Select Department first...'
+                            : departmentProgramHeads.length > 0
+                            ? `Select Program Head (${departmentProgramHeads.length} available)`
+                            : 'No Program Head assigned (Optional)'}
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      {selectedProgramHead && (
+                        <TouchableOpacity
+                          onPress={(e: any) => {
+                            e.stopPropagation?.();
+                            setSelectedProgramHeadId(null);
+                          }}
+                          style={{ padding: 2 }}
+                        >
+                          <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                        </TouchableOpacity>
+                      )}
+                      <Ionicons
+                        name={isProgramHeadDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                        size={15}
+                        color={Colors.textSecondary}
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Program Head Dropdown Menu */}
+                  {isProgramHeadDropdownOpen && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 42,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.22,
+                        shadowRadius: 18,
+                        elevation: 35,
+                        overflow: 'hidden',
+                        zIndex: 9999999,
+                      }}
+                    >
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                        style={{ maxHeight: 280 }}
+                      >
+                        {departmentProgramHeads.length === 0 ? (
+                          <View style={{ padding: 18, alignItems: 'center' }}>
+                            <Ionicons name="school-outline" size={26} color="#94A3B8" style={{ marginBottom: 6 }} />
+                            <Text style={{ fontSize: 12, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 10, textAlign: 'center' }}>
+                              No program heads assigned yet for {selectedDepartment?.display_name || 'this department'}.
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setIsProgramHeadDropdownOpen(false);
+                                handleOpenAddProgramHead();
+                              }}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                                borderRadius: 6,
+                                backgroundColor: '#1E40AF',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <Ionicons name="add" size={14} color="#FFFFFF" />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Add Program Head</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View>
+                            {/* Option to clear / unselect */}
+                            <TouchableOpacity
+                              onPress={() => {
+                                setSelectedProgramHeadId(null);
+                                setIsProgramHeadDropdownOpen(false);
+                              }}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 9,
+                                borderBottomWidth: 1,
+                                borderBottomColor: isDarkMode ? '#334155' : '#F1F5F9',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                backgroundColor: selectedProgramHeadId === null ? (isDarkMode ? '#0F172A' : '#F8FAFC') : 'transparent',
+                              }}
+                            >
+                              <Text style={{ fontSize: 12, color: Colors.textSecondary, fontStyle: 'italic' }}>
+                                None (General Department Account)
+                              </Text>
+                              {selectedProgramHeadId === null && (
+                                <Ionicons name="checkmark" size={14} color="#1E40AF" />
+                              )}
+                            </TouchableOpacity>
+
+                            {departmentProgramHeads.map((ph: any, pIdx: number) => {
+                              const badgeStyle = getOrdinalBadgeStyle(ph.order_index);
+                              const ordinalLabel = ph.order_label || getOrdinalLabel(ph.order_index);
+                              const isSelected = selectedProgramHeadId === ph.id;
+                              const linkedUser = ph.user_id ? users.find((u: any) => Number(u.id) === Number(ph.user_id)) : null;
+                              const isOccupied = !!linkedUser;
+
+                              return (
+                                <View
+                                  key={ph.id || pIdx}
+                                  style={{
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 9,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: isDarkMode ? '#334155' : '#F1F5F9',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    backgroundColor: isSelected ? (isDarkMode ? '#334155' : '#EFF6FF') : 'transparent',
+                                    opacity: isOccupied ? 0.7 : 1,
+                                    gap: 8,
+                                  }}
+                                >
+                                  <TouchableOpacity
+                                    disabled={isOccupied}
+                                    onPress={() => {
+                                      setSelectedProgramHeadId(ph.id);
+                                      setIsProgramHeadDropdownOpen(false);
+                                    }}
+                                    style={{ flex: 1, cursor: isOccupied ? 'not-allowed' : 'pointer' } as any}
+                                  >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      <View
+                                        style={{
+                                          paddingHorizontal: 6,
+                                          paddingVertical: 1.5,
+                                          borderRadius: 6,
+                                          backgroundColor: badgeStyle.bg,
+                                          borderWidth: 1,
+                                          borderColor: badgeStyle.border,
+                                        }}
+                                      >
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: badgeStyle.text }}>
+                                          {ordinalLabel}
+                                        </Text>
+                                      </View>
+                                      <Text style={{ fontSize: 12, fontWeight: '700', color: isSelected ? '#1E40AF' : Colors.textPrimary }}>
+                                        {ph.program_name || selectedDepartment?.display_name}
+                                      </Text>
+                                      {isOccupied && (
+                                        <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' }}>
+                                          <Text style={{ fontSize: 9, fontWeight: '700', color: '#64748B' }}>
+                                            Assigned ({linkedUser.first_name} {linkedUser.last_name})
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                    {ph.name && (
+                                      <Text style={{ fontSize: 11, color: isSelected ? '#1E40AF' : Colors.textSecondary, marginTop: 2, marginLeft: 2, fontWeight: '500' }}>
+                                        {ph.name}
+                                      </Text>
+                                    )}
+                                    {ph.email && (
+                                      <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1, marginLeft: 2 }}>
+                                        {ph.email}
+                                      </Text>
+                                    )}
+                                  </TouchableOpacity>
+
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <TouchableOpacity
+                                      onPress={(e: any) => {
+                                        e.stopPropagation?.();
+                                        setIsProgramHeadDropdownOpen(false);
+                                        handleOpenEditProgramHead(ph);
+                                      }}
+                                      style={{
+                                        padding: 5,
+                                        borderRadius: 4,
+                                        backgroundColor: isDarkMode ? '#334155' : '#F1F5F9',
+                                      }}
+                                      accessibilityLabel="Edit Program Head"
+                                    >
+                                      <Ionicons name="pencil-outline" size={13} color={Colors.textPrimary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      onPress={(e: any) => {
+                                        e.stopPropagation?.();
+                                        setIsProgramHeadDropdownOpen(false);
+                                        handleOpenDeleteProgramHead(ph);
+                                      }}
+                                      style={{
+                                        padding: 5,
+                                        borderRadius: 4,
+                                        backgroundColor: '#FEE2E2',
+                                      }}
+                                      accessibilityLabel="Delete Program Head"
+                                    >
+                                      <Ionicons name="trash-outline" size={13} color="#DC2626" />
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              );
+                            })}
+
+                            {/* Dropdown footer: Add Another Program Head */}
+                            <TouchableOpacity
+                              onPress={() => {
+                                setIsProgramHeadDropdownOpen(false);
+                                handleOpenAddProgramHead();
+                              }}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 9,
+                                backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                              }}
+                            >
+                              <Ionicons name="add-circle-outline" size={14} color="#1E40AF" />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>
+                                Add Another Program Head
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              </View>
             </View>
             <TouchableOpacity style={styles.createBtn} onPress={handleCreateAccount}>
               <Ionicons name="person-add-outline" size={16} color="#fff" />
@@ -3030,7 +3803,7 @@ export default function ITAdminDashboard() {
           </Card>
 
           {/* Department Logos Section */}
-          <Card style={[styles.userCard, { marginBottom: Spacing.xl }]}>
+          <Card style={[styles.userCard, { marginBottom: Spacing.xl, position: 'relative', zIndex: 1 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <Text style={styles.sectionHeader}>Department Logos</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -3126,7 +3899,7 @@ export default function ITAdminDashboard() {
             </ScrollView>
           </Card>
 
-          <Card style={styles.userCard}>
+          <Card style={[styles.userCard, { position: 'relative', zIndex: 1 }]}>
             <View style={styles.userListHeader}>
               <Text style={styles.sectionHeader}>Institutional Accounts ({filteredUsers.length})</Text>
               <TextInput style={styles.searchInput} placeholder="Search by email..." value={userFilter} onChangeText={setUserFilter} />
@@ -3213,6 +3986,475 @@ export default function ITAdminDashboard() {
                     style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#DC2626', alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Yes, Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ── Add Program Head Modal ── */}
+          <Modal
+            visible={isAddProgramHeadModalOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => !isSubmittingProgramHead && setIsAddProgramHeadModalOpen(false)}
+          >
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <View style={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 14, padding: 22, width: '100%', maxWidth: 460, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="school" size={18} color="#1E40AF" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Add Program Head</Text>
+                      <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{selectedDepartment?.display_name || 'Department'}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setIsAddProgramHeadModalOpen(false)} disabled={isSubmittingProgramHead}>
+                    <Ionicons name="close" size={20} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Form Fields */}
+                <View style={{ gap: 12 }}>
+                  {/* Hierarchy Order */}
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                      Hierarchy Order <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                    <select
+                      value={phFormOrderIndex}
+                      onChange={(e: any) => setPhFormOrderIndex(Number(e.target.value))}
+                      style={{
+                        height: 38,
+                        fontSize: 13,
+                        borderRadius: 6,
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                        color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                        paddingLeft: 10,
+                        paddingRight: 10,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        width: '100%',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((ord) => {
+                        const isAssigned = assignedOrderIndices.has(ord);
+                        const assignedHead = (selectedDepartment?.program_heads || departmentProgramHeads || []).find((h: any) => Number(h.order_index) === ord);
+                        const label = getOrdinalLabel(ord);
+                        return (
+                          <option
+                            key={ord}
+                            value={ord}
+                            disabled={isAssigned}
+                            style={{
+                              color: isAssigned ? '#94A3B8' : (isDarkMode ? '#F8FAFC' : '#0F172A'),
+                              backgroundColor: isAssigned ? (isDarkMode ? '#1E293B' : '#F1F5F9') : undefined,
+                            }}
+                          >
+                            {label}{isAssigned ? ` (Already assigned${assignedHead?.name ? `: ${assignedHead.name}` : ''})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </View>
+
+                  {/* Name */}
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                      Program Head Name <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        height: 38,
+                        borderWidth: 1,
+                        borderColor: phFormErrors.name ? '#DC2626' : '#CBD5E1',
+                        borderRadius: 6,
+                        paddingHorizontal: 10,
+                        fontSize: 13,
+                        backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. Dr. John Doe, MIT"
+                      placeholderTextColor="#94A3B8"
+                      value={phFormName}
+                      onChangeText={(t) => {
+                        setPhFormName(t);
+                        if (phFormErrors.name) setPhFormErrors({});
+                      }}
+                    />
+                    {phFormErrors.name && (
+                      <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{phFormErrors.name}</Text>
+                    )}
+                  </View>
+
+                  {/* Assigned Program / Major */}
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                      Assigned Program / Major <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        height: 38,
+                        borderWidth: 1,
+                        borderColor: phFormErrors.program_name ? '#DC2626' : '#CBD5E1',
+                        borderRadius: 6,
+                        paddingHorizontal: 10,
+                        fontSize: 13,
+                        backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. BS Information Technology, BS Computer Science"
+                      placeholderTextColor="#94A3B8"
+                      value={phFormProgramName}
+                      onChangeText={(t) => {
+                        setPhFormProgramName(t);
+                        if (phFormErrors.program_name) {
+                          setPhFormErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.program_name;
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    {phFormErrors.program_name && (
+                      <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{phFormErrors.program_name}</Text>
+                    )}
+                  </View>
+
+                  {/* Email & Phone */}
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                        Email (Optional)
+                      </Text>
+                      <TextInput
+                        style={{
+                          height: 38,
+                          borderWidth: 1,
+                          borderColor: '#CBD5E1',
+                          borderRadius: 6,
+                          paddingHorizontal: 10,
+                          fontSize: 13,
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          color: Colors.textPrimary,
+                        }}
+                        placeholder="head@jmc.edu.ph"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={phFormEmail}
+                        onChangeText={setPhFormEmail}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                        Phone (Optional)
+                      </Text>
+                      <TextInput
+                        style={{
+                          height: 38,
+                          borderWidth: 1,
+                          borderColor: '#CBD5E1',
+                          borderRadius: 6,
+                          paddingHorizontal: 10,
+                          fontSize: 13,
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          color: Colors.textPrimary,
+                        }}
+                        placeholder="+63 9XX XXX XXXX"
+                        placeholderTextColor="#94A3B8"
+                        value={phFormPhone}
+                        onChangeText={setPhFormPhone}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Footer Buttons */}
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#E2E8F0' }}>
+                  <TouchableOpacity
+                    onPress={() => setIsAddProgramHeadModalOpen(false)}
+                    disabled={isSubmittingProgramHead}
+                    style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 6, backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleSaveProgramHead}
+                    disabled={isSubmittingProgramHead}
+                    style={{ paddingVertical: 8, paddingHorizontal: 18, borderRadius: 6, backgroundColor: '#1E40AF', opacity: isSubmittingProgramHead ? 0.7 : 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                  >
+                    {isSubmittingProgramHead && <ActivityIndicator size="small" color="#FFFFFF" />}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Save Program Head</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ── Edit Program Head Modal ── */}
+          <Modal
+            visible={isEditProgramHeadModalOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => !isSubmittingProgramHead && setIsEditProgramHeadModalOpen(false)}
+          >
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <View style={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 14, padding: 22, width: '100%', maxWidth: 460, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="create" size={18} color="#1E40AF" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary }}>Edit Program Head</Text>
+                      <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{selectedDepartment?.display_name || 'Department'}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setIsEditProgramHeadModalOpen(false)} disabled={isSubmittingProgramHead}>
+                    <Ionicons name="close" size={20} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Form Fields */}
+                <View style={{ gap: 12 }}>
+                  {/* Hierarchy Order */}
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                      Hierarchy Order <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                    <select
+                      value={phFormOrderIndex}
+                      onChange={(e: any) => setPhFormOrderIndex(Number(e.target.value))}
+                      style={{
+                        height: 38,
+                        fontSize: 13,
+                        borderRadius: 6,
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                        color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                        paddingLeft: 10,
+                        paddingRight: 10,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        width: '100%',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((ord) => {
+                        const isCurrent = editingProgramHead && Number(editingProgramHead.order_index) === ord;
+                        const isAssigned = assignedOrderIndices.has(ord) && !isCurrent;
+                        const assignedHead = (selectedDepartment?.program_heads || departmentProgramHeads || []).find((h: any) => Number(h.order_index) === ord);
+                        const label = getOrdinalLabel(ord);
+                        return (
+                          <option
+                            key={ord}
+                            value={ord}
+                            disabled={isAssigned}
+                            style={{
+                              color: isAssigned ? '#94A3B8' : (isDarkMode ? '#F8FAFC' : '#0F172A'),
+                              backgroundColor: isAssigned ? (isDarkMode ? '#1E293B' : '#F1F5F9') : undefined,
+                            }}
+                          >
+                            {label}{isAssigned ? ` (Already assigned${assignedHead?.name ? `: ${assignedHead.name}` : ''})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </View>
+
+                  {/* Name */}
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                      Program Head Name <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        height: 38,
+                        borderWidth: 1,
+                        borderColor: phFormErrors.name ? '#DC2626' : '#CBD5E1',
+                        borderRadius: 6,
+                        paddingHorizontal: 10,
+                        fontSize: 13,
+                        backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. Dr. John Doe, MIT"
+                      placeholderTextColor="#94A3B8"
+                      value={phFormName}
+                      onChangeText={(t) => {
+                        setPhFormName(t);
+                        if (phFormErrors.name) setPhFormErrors({});
+                      }}
+                    />
+                    {phFormErrors.name && (
+                      <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{phFormErrors.name}</Text>
+                    )}
+                  </View>
+
+                  {/* Assigned Program / Major */}
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                      Assigned Program / Major <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        height: 38,
+                        borderWidth: 1,
+                        borderColor: phFormErrors.program_name ? '#DC2626' : '#CBD5E1',
+                        borderRadius: 6,
+                        paddingHorizontal: 10,
+                        fontSize: 13,
+                        backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. BS Information Technology, BS Computer Science"
+                      placeholderTextColor="#94A3B8"
+                      value={phFormProgramName}
+                      onChangeText={(t) => {
+                        setPhFormProgramName(t);
+                        if (phFormErrors.program_name) {
+                          setPhFormErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.program_name;
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    {phFormErrors.program_name && (
+                      <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{phFormErrors.program_name}</Text>
+                    )}
+                  </View>
+
+                  {/* Email & Phone */}
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 4 }}>
+                        Email (Optional)
+                      </Text>
+                      <TextInput
+                        style={{
+                          height: 38,
+                          borderWidth: 1,
+                          borderColor: '#CBD5E1',
+                          borderRadius: 6,
+                          paddingHorizontal: 10,
+                          fontSize: 13,
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          color: Colors.textPrimary,
+                        }}
+                        placeholder="head@jmc.edu.ph"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={phFormEmail}
+                        onChangeText={setPhFormEmail}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.textPrimary, marginBottom: 5 }}>
+                        Phone (Optional)
+                      </Text>
+                      <TextInput
+                        style={{
+                          height: 38,
+                          borderWidth: 1,
+                          borderColor: '#CBD5E1',
+                          borderRadius: 6,
+                          paddingHorizontal: 10,
+                          fontSize: 13,
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          color: Colors.textPrimary,
+                        }}
+                        placeholder="+63 9XX XXX XXXX"
+                        placeholderTextColor="#94A3B8"
+                        value={phFormPhone}
+                        onChangeText={setPhFormPhone}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Active Toggle */}
+                  <TouchableOpacity
+                    onPress={() => setPhFormIsActive(!phFormIsActive)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}
+                  >
+                    <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: phFormIsActive ? '#1E40AF' : '#CBD5E1', backgroundColor: phFormIsActive ? '#1E40AF' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                      {phFormIsActive && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                    </View>
+                    <Text style={{ fontSize: 13, color: Colors.textPrimary, fontWeight: '500' }}>
+                      Active Status (Checked = Active, Unchecked = Inactive)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Footer Buttons */}
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#E2E8F0' }}>
+                  <TouchableOpacity
+                    onPress={() => setIsEditProgramHeadModalOpen(false)}
+                    disabled={isSubmittingProgramHead}
+                    style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 6, backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleUpdateProgramHead}
+                    disabled={isSubmittingProgramHead}
+                    style={{ paddingVertical: 8, paddingHorizontal: 18, borderRadius: 6, backgroundColor: '#1E40AF', opacity: isSubmittingProgramHead ? 0.7 : 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                  >
+                    {isSubmittingProgramHead && <ActivityIndicator size="small" color="#FFFFFF" />}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Update Program Head</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ── Delete Program Head Modal ── */}
+          <Modal
+            visible={isDeleteProgramHeadModalOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => !isSubmittingProgramHead && setIsDeleteProgramHeadModalOpen(false)}
+          >
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <View style={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 22, width: '100%', maxWidth: 360, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 }}>
+                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <Ionicons name="trash-outline" size={24} color="#DC2626" />
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 6 }}>Remove Program Head?</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSecondary, textAlign: 'center' }}>
+                    <Text>Are you sure you want to remove </Text>
+                    <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>{deletingProgramHead?.name}</Text>
+                    <Text> as </Text>
+                    <Text style={{ fontWeight: '600', color: '#1E40AF' }}>{deletingProgramHead?.order_label || getOrdinalLabel(deletingProgramHead?.order_index || 1)}</Text>
+                    <Text> from {selectedDepartment?.display_name || 'this department'}?</Text>
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setIsDeleteProgramHeadModalOpen(false)}
+                    disabled={isSubmittingProgramHead}
+                    style={{ flex: 1, paddingVertical: 9, borderRadius: 6, backgroundColor: isDarkMode ? '#334155' : Colors.background, alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleConfirmDeleteProgramHead}
+                    disabled={isSubmittingProgramHead}
+                    style={{ flex: 1, paddingVertical: 9, borderRadius: 6, backgroundColor: '#DC2626', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+                  >
+                    {isSubmittingProgramHead && <ActivityIndicator size="small" color="#FFFFFF" />}
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>Yes, Remove</Text>
                   </TouchableOpacity>
                 </View>
               </View>

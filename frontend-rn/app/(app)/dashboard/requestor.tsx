@@ -1106,6 +1106,7 @@ export default function RequestorDashboard() {
       title="Content Approval System"
       activeTab={activeTab as string}
       onTabChange={setActiveTab}
+      assignedProgram={(user as any)?.assigned_program || (user as any)?.program_head?.program_name}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       userPhotoUrl={profilePhotoUrl}
       onOpenPost={handleOpenPostById}

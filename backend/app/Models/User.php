@@ -22,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'phone',
         'department',
+        'program_head_id',
         'position',
         'status',
         'photo_path',
@@ -33,7 +34,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'remember_token',
     ];
 
-    protected $appends = ['full_name', 'photo_url', 'department_logo_url'];
+    protected $appends = ['full_name', 'photo_url', 'department_logo_url', 'assigned_program'];
 
     protected function casts(): array
     {
@@ -93,6 +94,54 @@ class User extends Authenticatable implements MustVerifyEmail
                                       ->orWhere('display_name', $this->department)
                                       ->first();
         return $dept ? $dept->logo_url : null;
+    }
+
+    public function programHead(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ProgramHead::class, 'program_head_id');
+    }
+
+    public function getAssignedProgramAttribute(): ?string
+    {
+        $ph = $this->relationLoaded('programHead') ? $this->programHead : $this->programHead()->first();
+        if ($ph && !empty($ph->program_name)) {
+            return $ph->program_name;
+        }
+
+        $phByUser = ProgramHead::where('user_id', $this->id)->first();
+        if ($phByUser && !empty($phByUser->program_name)) {
+            return $phByUser->program_name;
+        }
+
+        if ($this->department) {
+            $deptRecord = Department::where('display_name', $this->department)
+                ->orWhere('name', $this->department)
+                ->first();
+            if ($deptRecord) {
+                $deptPh = ProgramHead::where('department_id', $deptRecord->id)
+                    ->where(function ($q) {
+                        $q->where('user_id', $this->id)
+                          ->orWhere('email', $this->email)
+                          ->orWhere('name', $this->first_name)
+                          ->orWhere('name', $this->full_name);
+                    })->first();
+                if ($deptPh && !empty($deptPh->program_name)) {
+                    if (!$deptPh->user_id) {
+                        $deptPh->update(['user_id' => $this->id]);
+                    }
+                    return $deptPh->program_name;
+                }
+            }
+        }
+
+        if (!empty($this->position) && str_contains($this->position, 'Program Head')) {
+            $extracted = trim(str_replace('Program Head', '', $this->position));
+            if ($extracted !== '') {
+                return $extracted;
+            }
+        }
+
+        return null;
     }
 
     public function getDisplayNameAttribute(): string
