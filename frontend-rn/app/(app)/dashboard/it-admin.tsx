@@ -700,18 +700,29 @@ export default function ITAdminDashboard() {
     return departmentsList.find(d => d.display_name === newUserDepartment);
   }, [departmentsList, newUserDepartment]);
 
-  // Auto-reset department when role changes, and pick appropriate default
+  // Keep track of previous role so department only defaults when role changes
+  const prevUserRoleRef = React.useRef(newUserRole);
+
+  // Auto-reset department only when role changes to an incompatible role, or initially empty
   React.useEffect(() => {
-    const nextDepartment = filteredDepts[0]?.display_name || '';
-    if (filteredDepts.length > 0) {
-      setNewUserDepartment(nextDepartment);
-    } else {
-      // No departments left for this role (e.g. the last one was just deleted)
-      // — clear the stale selection so the dropdown doesn't show a removed one.
+    const roleChanged = prevUserRoleRef.current !== newUserRole;
+    prevUserRoleRef.current = newUserRole;
+
+    if (filteredDepts.length === 0) {
       setNewUserDepartment('');
+      setNewUserPosition('');
+      return;
     }
-    setNewUserPosition(autoPositionFor(newUserRole, nextDepartment));
-  }, [newUserRole, filteredDepts]);
+
+    const isCurrentAllowed = filteredDepts.some(d => d.display_name === newUserDepartment);
+
+    // Only switch to default if the role changed and the current department is invalid, or if empty
+    if ((roleChanged && !isCurrentAllowed) || !newUserDepartment) {
+      const nextDepartment = filteredDepts[0]?.display_name || '';
+      setNewUserDepartment(nextDepartment);
+      setNewUserPosition(autoPositionFor(newUserRole, nextDepartment));
+    }
+  }, [newUserRole, filteredDepts, newUserDepartment]);
 
   // Auto-fill position when department changes
   React.useEffect(() => {
@@ -806,7 +817,6 @@ export default function ITAdminDashboard() {
       const res = await programHeadsApi.byDepartment(deptId);
       const heads = res.data?.data || [];
       setDepartmentProgramHeads(heads);
-      setDepartmentsList(prev => prev.map(d => (d.id === deptId ? { ...d, program_heads: heads } : d)));
     } catch (err) {
       console.error('Failed to load program heads', err);
     } finally {

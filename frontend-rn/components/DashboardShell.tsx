@@ -213,8 +213,18 @@ export function DashboardShell({
       if (prog) {
         setLiveAssignedProgram(prog);
       }
-      // Always sync the user object in the auth store
-      useAuthStore.getState().setUser({ ...useAuthStore.getState().user, ...userData });
+      // Only update auth store if properties changed, preventing unnecessary component re-renders
+      const current = useAuthStore.getState().user as any;
+      if (
+        current?.photo_url !== userData.photo_url ||
+        current?.department_logo_url !== userData.department_logo_url ||
+        current?.assigned_program !== userData.assigned_program ||
+        current?.position !== userData.position ||
+        current?.department !== userData.department ||
+        current?.program_head?.program_name !== userData.program_head?.program_name
+      ) {
+        useAuthStore.getState().setUser({ ...current, ...userData });
+      }
     }).catch(() => {});
   }, [user?.id]);
 
@@ -244,8 +254,11 @@ export function DashboardShell({
     };
   }, [refreshProfile, activeTab]);
 
-  // Fallback: Query department program heads to find active assignment for this user/department
+  // Fallback: Query department program heads only if program assignment is not yet known
   React.useEffect(() => {
+    if (propAssignedProgram || liveAssignedProgram || (user as any)?.assigned_program || (user as any)?.program_head?.program_name) {
+      return;
+    }
     const deptName = user?.department;
     if (!deptName) return;
     departmentsApi.list().then(res => {
@@ -268,7 +281,7 @@ export function DashboardShell({
         }).catch(() => {});
       }
     }).catch(() => {});
-  }, [user?.department, user?.id, user?.email, user?.name, user?.first_name]);
+  }, [user?.department, user?.id, user?.email, user?.name, user?.first_name, propAssignedProgram, liveAssignedProgram]);
 
   const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
   const finalDeptName = departmentName || user?.department || 'JMCFI';
