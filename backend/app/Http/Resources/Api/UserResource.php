@@ -9,6 +9,8 @@ class UserResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $linkedProgramHead = $this->programHead ?: \App\Models\ProgramHead::where('user_id', $this->id)->first();
+
         return [
             'id' => $this->id,
             'employee_id' => $this->employee_id,
@@ -23,14 +25,14 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'photo_url' => $this->photo_url,
             'department_logo_url' => $this->department_logo_url,
-            'program_head_id' => $this->program_head_id,
-            'assigned_program' => $this->assigned_program,
-            'program_head' => $this->programHead ? [
-                'id' => $this->programHead->id,
-                'name' => $this->programHead->name,
-                'program_name' => $this->programHead->program_name,
-                'order_index' => $this->programHead->order_index,
-                'order_label' => $this->programHead->order_label,
+            'program_head_id' => $this->program_head_id ?: $linkedProgramHead?->id,
+            'assigned_program' => $this->assigned_program ?: $linkedProgramHead?->program_name,
+            'program_head' => $linkedProgramHead ? [
+                'id' => $linkedProgramHead->id,
+                'name' => $linkedProgramHead->name,
+                'program_name' => $linkedProgramHead->program_name,
+                'order_index' => $linkedProgramHead->order_index,
+                'order_label' => $linkedProgramHead->order_label,
             ] : null,
             'roles' => $this->whenLoaded('roles', function () {
                 return $this->roles->pluck('name');

@@ -24,7 +24,7 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         // For simple setup, we just return all users ordered by creation date
-        $users = User::with('roles')->orderBy('created_at', 'desc')->get();
+        $users = User::with(['roles', 'programHead'])->orderBy('created_at', 'desc')->get();
         return response()->json([
             'data' => UserResource::collection($users)
         ]);
@@ -320,8 +320,11 @@ class UserController extends Controller
         }
 
         if ($request->has('program_head_id')) {
-            $user->program_head_id = $request->input('program_head_id');
-            if ($user->hasRole('office_head') && $user->program_head_id) {
+            $user->program_head_id = $request->input('program_head_id') ? (int) $request->input('program_head_id') : null;
+            \App\Models\ProgramHead::where('user_id', $user->id)
+                ->when($user->program_head_id, fn($q) => $q->where('id', '!=', $user->program_head_id))
+                ->update(['user_id' => null]);
+            if (($user->hasRole('office_head') || $request->input('role') === 'office_head') && $user->program_head_id) {
                 \App\Models\ProgramHead::where('id', $user->program_head_id)->update(['user_id' => $user->id]);
             }
         }

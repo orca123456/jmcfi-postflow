@@ -1469,6 +1469,8 @@ export default function ITAdminDashboard() {
   const [profilePhone, setProfilePhone] = useState('');
   const [profilePosition, setProfilePosition] = useState('');
   const [profileDepartment, setProfileDepartment] = useState('');
+  const [profileProgramHeadId, setProfileProgramHeadId] = useState<string>('');
+  const [profileDeptPrograms, setProfileDeptPrograms] = useState<ProgramHeadData[]>([]);
   const [profileRole, setProfileRole] = useState('');
   const [profileOriginalRole, setProfileOriginalRole] = useState('');
   const [profileStatus, setProfileStatus] = useState('active');
@@ -1506,6 +1508,47 @@ export default function ITAdminDashboard() {
     if (!selectedUser || !profileRole || !profileDepartment) return;
     setProfilePosition(autoPositionFor(profileRole, profileDepartment));
   }, [profileRole, profileDepartment, selectedUser]);
+
+  const profileSelectedDeptObj = React.useMemo(() => {
+    if (!profileDepartment) return null;
+    const norm = normalizeDepartmentName(profileDepartment);
+    return departmentsList.find((d: any) =>
+      normalizeDepartmentName(d.display_name) === norm || normalizeDepartmentName(d.name) === norm
+    ) || null;
+  }, [profileDepartment, departmentsList]);
+
+  React.useEffect(() => {
+    if (!selectedUser || !profileSelectedDeptObj?.id) {
+      setProfileDeptPrograms([]);
+      return;
+    }
+    const embedded = Array.isArray(profileSelectedDeptObj.program_heads)
+      ? profileSelectedDeptObj.program_heads
+      : [];
+    setProfileDeptPrograms(embedded);
+
+    let cancelled = false;
+    programHeadsApi.byDepartment(profileSelectedDeptObj.id).then(res => {
+      if (cancelled) return;
+      const heads = res.data?.data || [];
+      setProfileDeptPrograms(heads);
+      setProfileProgramHeadId(prev => {
+        if (prev && heads.some((h: any) => String(h.id) === String(prev))) {
+          return prev;
+        }
+        const matchByUser = heads.find((h: any) =>
+          String(h.id) === String(selectedUser?.program_head_id || selectedUser?.program_head?.id || '') ||
+          String(h.user_id || '') === String(selectedUser?.id || '') ||
+          (selectedUser?.assigned_program && String(h.program_name || '').toLowerCase() === String(selectedUser.assigned_program).toLowerCase())
+        );
+        return matchByUser ? String(matchByUser.id) : '';
+      });
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser?.id, profileSelectedDeptObj?.id]);
 
   // ── Profile Photo State ──
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
@@ -2381,6 +2424,8 @@ export default function ITAdminDashboard() {
     setProfilePhone(u.phone || '');
     setProfilePosition(u.position || '');
     setProfileDepartment(u.department || '');
+    const initPhId = u.program_head_id || u.program_head?.id || '';
+    setProfileProgramHeadId(initPhId ? String(initPhId) : '');
     setProfileRole(roleCategoryOf(u.role || 'requestor'));
     setProfileOriginalRole(u.role || 'requestor');
     setProfileStatus(u.status || 'active');
@@ -2432,7 +2477,11 @@ export default function ITAdminDashboard() {
       };
       if (profileMiddleName) payload.middle_name = profileMiddleName;
       if (profilePhone) payload.phone = profilePhone;
-      payload.position = autoPositionFor(profileRole, profileDepartment);
+      const selectedProfileProgram = profileDeptPrograms.find((ph: any) => String(ph.id) === String(profileProgramHeadId));
+      payload.program_head_id = selectedProfileProgram ? Number(selectedProfileProgram.id) : null;
+      payload.position = selectedProfileProgram?.program_name
+        ? (profileRole === 'requestor' ? `${selectedProfileProgram.program_name} Requestor` : `${selectedProfileProgram.program_name} Program Head`)
+        : autoPositionFor(profileRole, profileDepartment);
 
       if (profilePassword) {
         if (profilePassword !== profilePasswordConfirmation) {
@@ -2456,6 +2505,11 @@ export default function ITAdminDashboard() {
         role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
         status: updatedUser.status,
         photo_url: updatedUser.photo_url,
+        position: updatedUser.position,
+        program_head_id: updatedUser.program_head_id,
+        assigned_program: updatedUser.assigned_program,
+        program_head: updatedUser.program_head,
+        photo_url: updatedUser.photo_url,
       } : u);
       setUsers(updatedList);
       showToast('Profile updated successfully!', 'success');
@@ -2471,6 +2525,9 @@ export default function ITAdminDashboard() {
           department: updatedUser.department,
           role: updatedUser.roles && updatedUser.roles.length > 0 ? updatedUser.roles[0] : updatedUser.role,
           photo_url: updatedUser.photo_url,
+          program_head_id: updatedUser.program_head_id,
+          assigned_program: updatedUser.assigned_program,
+          program_head: updatedUser.program_head,
         });
       }
 
@@ -4973,6 +5030,7 @@ export default function ITAdminDashboard() {
                               value={profileDepartment}
                               onChange={(e: any) => {
                                 setProfileDepartment(e.target.value);
+                                setProfileProgramHeadId('');
                                 if (profileErrors.department) setProfileErrors(prev => ({ ...prev, department: undefined }));
                               }}
                               style={{
@@ -4988,6 +5046,25 @@ export default function ITAdminDashboard() {
                                 <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>{profileErrors.department}</Text>
                               </View>
                             )}
+                          </View>
+                        </View>
+                        <View style={styles.wideFieldRow}>
+                          <View style={styles.wideFieldFull}>
+                            <Text style={styles.wideFieldLabel}>Program</Text>
+                            <select
+                              value={profileProgramHeadId}
+                              onChange={(e: any) => setProfileProgramHeadId(e.target.value)}
+                              style={styles.wideFieldSelect}
+                            >
+                              <option value="">
+                                {profileDeptPrograms.length > 0 ? 'Select Program / Major' : 'No programs assigned to this department'}
+                              </option>
+                              {profileDeptPrograms.map((ph: any) => (
+                                <option key={ph.id} value={String(ph.id)}>
+                                  {ph.program_name || ph.name}
+                                </option>
+                              ))}
+                            </select>
                           </View>
                         </View>
                       </View>
