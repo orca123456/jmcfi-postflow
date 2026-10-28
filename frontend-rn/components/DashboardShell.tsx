@@ -210,14 +210,13 @@ export function DashboardShell({
         setAutoDeptLogo(userData.department_logo_url);
       }
       const prog = userData.assigned_program || userData.program_head?.program_name || null;
-      if (prog) {
-        setLiveAssignedProgram(prog);
-      }
+      setLiveAssignedProgram(prog);
       // Only update auth store if properties changed, preventing unnecessary component re-renders
       const current = useAuthStore.getState().user as any;
       if (
         current?.photo_url !== userData.photo_url ||
         current?.department_logo_url !== userData.department_logo_url ||
+        current?.program_head_id !== userData.program_head_id ||
         current?.assigned_program !== userData.assigned_program ||
         current?.position !== userData.position ||
         current?.department !== userData.department ||
@@ -270,6 +269,7 @@ export function DashboardShell({
         programHeadsApi.byDepartment(match.id).then(phRes => {
           const heads = phRes.data?.data || [];
           const myHead = heads.find((h: any) =>
+            ((user as any)?.program_head_id && Number(h.id) === Number((user as any).program_head_id)) ||
             (h.user_id && Number(h.user_id) === Number(user?.id)) ||
             (h.email && user?.email && h.email.toLowerCase() === user.email.toLowerCase()) ||
             (h.name && user?.name && h.name.toLowerCase() === user.name.toLowerCase()) ||
@@ -286,11 +286,11 @@ export function DashboardShell({
   const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
   const finalDeptName = departmentName || user?.department || 'JMCFI';
   const finalAssignedProgram = React.useMemo(() => {
-    if (propAssignedProgram && propAssignedProgram.trim()) {
-      return propAssignedProgram.trim();
-    }
     if (liveAssignedProgram && liveAssignedProgram.trim()) {
       return liveAssignedProgram.trim();
+    }
+    if (propAssignedProgram && propAssignedProgram.trim()) {
+      return propAssignedProgram.trim();
     }
     const u = user as any;
     if (!u) return null;
@@ -1004,18 +1004,29 @@ export function DashboardShell({
                       outputRange: [0, 1]
                     })
                   }]}>
-                    <Text style={[styles.sidebarTitle, { textAlign: 'left' }]} numberOfLines={1}>{finalDeptName}</Text>
-                    {finalAssignedProgram ? (
-                      <View style={styles.sidebarProgramBadge}>
-                        <Text style={styles.sidebarProgramBadgeText} numberOfLines={1}>
-                          {finalAssignedProgram}
-                        </Text>
-                      </View>
-                    ) : null}
+                    <Text style={styles.sidebarTitle} numberOfLines={2}>{finalDeptName}</Text>
                   </Animated.View>
                 </View>
 
-                <View style={styles.sidebarDivider} />
+                <View style={[styles.sidebarDivider, finalAssignedProgram ? { marginBottom: 8 } : null]} />
+
+                {finalAssignedProgram ? (
+                  <Animated.View
+                    style={[
+                      styles.sidebarProgramSubtitleContainer,
+                      {
+                        opacity: sidebarWidthAnim.interpolate({
+                          inputRange: [MIN_WIDTH, MIN_WIDTH + 50, MAX_WIDTH],
+                          outputRange: [0, 0, 1],
+                        }),
+                      },
+                    ]}
+                  >
+                    <Text style={styles.sidebarProgramSubtitleText} numberOfLines={2}>
+                      {finalAssignedProgram}
+                    </Text>
+                  </Animated.View>
+                ) : null}
 
                 <View style={styles.sidebarNav}>
                   {sidebarNavItems.map((item, idx) => (
@@ -1111,20 +1122,20 @@ export function DashboardShell({
                 style={{ width: 44, height: 44, borderRadius: 22 }}
                 resizeMode="contain"
               />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.mobileDrawerDeptName} numberOfLines={1}>{finalDeptName}</Text>
-                {finalAssignedProgram ? (
-                  <View style={[styles.sidebarProgramBadge, { marginTop: 2, marginBottom: 2 }]}>
-                    <Text style={styles.sidebarProgramBadgeText} numberOfLines={1}>
-                      {finalAssignedProgram}
-                    </Text>
-                  </View>
-                ) : null}
-                <Text style={styles.mobileDrawerUserName}>{user?.name ?? 'User'}</Text>
+              <View style={{ flex: 1, marginLeft: 12, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={[styles.mobileDrawerDeptName, { textAlign: 'center' }]} numberOfLines={2}>{finalDeptName}</Text>
               </View>
             </View>
 
-            <View style={styles.mobileDrawerDivider} />
+            <View style={[styles.mobileDrawerDivider, finalAssignedProgram ? { marginBottom: 8 } : null]} />
+
+            {finalAssignedProgram ? (
+              <View style={styles.sidebarProgramSubtitleContainer}>
+                <Text style={styles.sidebarProgramSubtitleText} numberOfLines={2}>
+                  {finalAssignedProgram}
+                </Text>
+              </View>
+            ) : null}
 
             {/* Nav Items */}
             <ScrollView style={styles.mobileDrawerNavList} showsVerticalScrollIndicator={false}>
@@ -1467,35 +1478,35 @@ const styles = StyleSheet.create({
   sidebarHeader: {
     flex: 1, // Fill remaining space
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    paddingRight: 4,
   },
   sidebarTitle: {
-    fontSize: 14, // Explicitly not too big
+    fontSize: 14.5,
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 0.2,
+    textAlign: 'center',
     textAlignVertical: 'center',
+    lineHeight: 19,
   },
-  sidebarProgramBadge: {
-    marginTop: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.38)',
-    alignSelf: 'flex-start',
-    maxWidth: 180,
+  sidebarProgramSubtitleContainer: {
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sidebarProgramBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+  sidebarProgramSubtitleText: {
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 15,
+    letterSpacing: 0.15,
   },
   sidebarDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
     marginBottom: Spacing.md,
     marginTop: 4,
     marginHorizontal: Spacing.md,

@@ -23,6 +23,7 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'photo_url' => $this->photo_url,
             'department_logo_url' => $this->department_logo_url,
+            'program_head_id' => $this->program_head_id,
             'assigned_program' => $this->assigned_program,
             'program_head' => $this->programHead ? [
                 'id' => $this->programHead->id,
