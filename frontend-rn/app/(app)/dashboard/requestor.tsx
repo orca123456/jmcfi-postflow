@@ -2847,7 +2847,10 @@ export default function RequestorDashboard() {
                             <>
                               <View style={{ alignItems: 'center', flex: 1.2 }}>
                                 <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
-                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
+                                <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                  <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
+                                </View>
+                                <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                               </View>
 
                               <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
@@ -2856,24 +2859,30 @@ export default function RequestorDashboard() {
 
                           <View style={{ alignItems: 'center', flex: 1.2 }}>
                             <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
-                            <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
+                            <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Dept Head</Text>
+                            </View>
+                            <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{deptHead}</Text>
                           </View>
 
                           <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
 
                           <View style={{ alignItems: 'center', flex: 1.2 }}>
                             <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
-                            <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
+                            <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>VPAA</Text>
+                            </View>
+                            <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{vpaa}</Text>
                           </View>
 
                           <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
 
                           <View style={{ alignItems: 'center', flex: 1.2 }}>
                             <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Integrated Marketing Communications</Text>
-                            <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
+                            <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                              <Text style={{ fontSize: 10, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 12 }}>Integrated Marketing Communications</Text>
+                            </View>
+                            <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imc}</Text>
                           </View>
 
                         </View>
@@ -3215,8 +3224,10 @@ export default function RequestorDashboard() {
                         {/* Step 0: Submitted */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Submitted</Text>
-                          <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase' }}>{submitted}</Text>
+                          <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
+                          </View>
+                          <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                         </View>
 
                         <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
@@ -3224,8 +3235,10 @@ export default function RequestorDashboard() {
                         {/* Step 1: Dept Head */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Dept Head</Text>
-                          <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase' }}>{deptHead}</Text>
+                          <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Dept Head</Text>
+                          </View>
+                          <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{deptHead}</Text>
                         </View>
 
                         <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
@@ -3233,8 +3246,10 @@ export default function RequestorDashboard() {
                         {/* Step 2: VPAA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>VPAA</Text>
-                          <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase' }}>{vpaa}</Text>
+                          <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>VPAA</Text>
+                          </View>
+                          <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{vpaa}</Text>
                         </View>
 
                         <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
@@ -3242,8 +3257,10 @@ export default function RequestorDashboard() {
                         {/* Step 3: IMC/QA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Integrated Marketing Communications</Text>
-                          <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
+                          <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                            <Text style={{ fontSize: 10, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 12 }}>Integrated Marketing Communications</Text>
+                          </View>
+                          <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imc}</Text>
                         </View>
 
                       </View>
