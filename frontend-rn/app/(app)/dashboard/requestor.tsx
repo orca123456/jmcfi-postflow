@@ -1817,6 +1817,7 @@ export default function RequestorDashboard() {
                       </Text>
                     </TouchableOpacity>
 
+                    {/* TEMPORARILY REMOVED: Supporting Docs upload zone (can be restored easily)
                     <TouchableOpacity
                       style={[
                         styles.uploadZone,
@@ -1872,6 +1873,7 @@ export default function RequestorDashboard() {
                           : 'PDFs, briefs, or reference materials'}
                       </Text>
                     </TouchableOpacity>
+                    */}
                   </View>
 
                   {mediaFiles.length > 0 && (
