@@ -56,7 +56,15 @@ class UserController extends Controller
         ]);
 
         $dept = $validated['department'] ?? null;
+        $deptLower = strtolower($dept ?? '');
         $role = $validated['role'];
+        if ($role === 'approver' || $role === 'office_head') {
+            if (str_contains($deptLower, 'marketing') || str_contains($deptLower, 'imc')) {
+                $role = 'imc_qa_checker';
+            } elseif (str_contains($deptLower, 'vice') || str_contains($deptLower, 'vpaa') || str_contains($deptLower, 'academic affairs')) {
+                $role = 'vice_president';
+            }
+        }
         $position = $validated['position'] ?? null;
         if (!$position || str_contains(strtolower($position), 'staff') || str_contains(strtolower($position), 'faculty')) {
             $category = match ($role) {
@@ -332,7 +340,12 @@ class UserController extends Controller
         $user->save();
 
         if ($request->has('role')) {
-            $user->syncRoles([$validated['role']]);
+            $roleToSync = $validated['role'];
+            $deptLower = strtolower($user->department ?? $request->input('department', ''));
+            if (($roleToSync === 'approver' || $roleToSync === 'office_head') && (str_contains($deptLower, 'marketing') || str_contains($deptLower, 'imc'))) {
+                $roleToSync = 'imc_qa_checker';
+            }
+            $user->syncRoles([$roleToSync]);
             if (!$request->has('position')) {
                 $category = match ($validated['role']) {
                     'it_publisher', 'it_admin' => 'admin',

@@ -241,7 +241,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'office_head' => 'Department Head',
             'vice_president' => 'Vice President',
             'president' => 'President',
-            'imc_qa_checker' => 'IMC / QA Checker',
+            'imc_qa_checker' => 'Integrated Marketing Communications',
             'it_publisher' => 'IT Publisher / System Operator',
             'admin' => 'Administrator',
         ];

@@ -2872,7 +2872,7 @@ export default function RequestorDashboard() {
 
                           <View style={{ alignItems: 'center', flex: 1.2 }}>
                             <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
+                            <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Integrated Marketing Communications</Text>
                             <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
                           </View>
 
@@ -3242,7 +3242,7 @@ export default function RequestorDashboard() {
                         {/* Step 3: IMC/QA */}
                         <View style={{ alignItems: 'center', flex: 1 }}>
                           <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>IMC / QA</Text>
+                          <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, marginTop: 6, height: 28 }}>Integrated Marketing Communications</Text>
                           <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase' }}>{imc}</Text>
                         </View>
 

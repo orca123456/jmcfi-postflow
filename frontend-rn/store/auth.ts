@@ -203,7 +203,7 @@ export const getRoleLabel = (role: string): string => {
     office_head: 'Department Head',
     department_head: 'Department Head',
     vice_president: 'Vice President',
-    imc_qa_checker: 'IMC/QA Checker',
+    imc_qa_checker: 'Integrated Marketing Communications',
     it_publisher: 'IT Admin',
   };
   return labels[role] ?? role;

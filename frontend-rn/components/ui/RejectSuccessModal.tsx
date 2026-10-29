@@ -26,7 +26,7 @@ export const RejectSuccessModal: React.FC<RejectSuccessModalProps> = ({
   } else if (role === 'vice_president' || role === 'vpaa') {
     roleLabel = 'the VPAA';
   } else if (role === 'imc_qa' || role === 'imc_qa_checker') {
-    roleLabel = 'IMC / QA';
+    roleLabel = 'Integrated Marketing Communications';
   }
 
   const title = 'Request Rejected';

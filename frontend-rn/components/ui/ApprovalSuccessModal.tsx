@@ -33,7 +33,7 @@ export const ApprovalSuccessModal: React.FC<ApprovalSuccessModalProps> = ({
   } else if (role === 'vice_president' || role === 'vpaa') {
     title = 'Request Approved';
     subtitle1 = `“${postTitle}” was approved successfully.`;
-    subtitle2 = 'Forwarded to IMC / QA for final review.';
+    subtitle2 = 'Forwarded to Integrated Marketing Communications for final review.';
   } else if (role === 'imc_qa' || role === 'imc_qa_checker') {
     if (isScheduled) {
       title = 'Approved & Scheduled';

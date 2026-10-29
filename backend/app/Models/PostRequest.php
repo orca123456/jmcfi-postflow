@@ -71,7 +71,7 @@ class PostRequest extends Model
             'pending_office_head' => 'Pending Department Head',
             'pending_vice_president' => 'Pending Vice President',
             'pending_president' => 'Pending President',
-            'pending_imc_qa' => 'Pending IMC/QA',
+            'pending_imc_qa' => 'Pending Integrated Marketing Communications',
             'approved' => 'Approved',
             'rejected' => 'Rejected',
             'returned_for_revision' => 'Returned for Revision',
@@ -88,7 +88,7 @@ class PostRequest extends Model
         return [
             'office_head' => 'Department Head',
             'vice_president' => 'Vice President',
-            'imc_qa' => 'IMC/QA Checker',
+            'imc_qa' => 'Integrated Marketing Communications',
             'it_publisher' => 'IT Publisher',
         ];
     }

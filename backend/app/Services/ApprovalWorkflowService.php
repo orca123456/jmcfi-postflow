@@ -108,9 +108,31 @@ class ApprovalWorkflowService
                 return null;
             }
 
-            return User::role($roleName)
+            $approver = User::role($roleName)
                 ->where('status', 'active')
                 ->first();
+
+            if ($approver) {
+                return $approver;
+            }
+
+            // Fallback for stage imc_qa: match active user by Integrated Marketing Communications department
+            if ($stage === 'imc_qa') {
+                $approver = User::where('status', 'active')
+                    ->where(function ($q) {
+                        $q->where('department', 'ILIKE', '%Integrated Marketing%')
+                          ->orWhere('department', 'ILIKE', '%Institutional Marketing%')
+                          ->orWhere('department', 'ILIKE', '%Marketing Communication%')
+                          ->orWhere('department', 'ILIKE', '%IMC%');
+                    })
+                    ->first();
+
+                if ($approver && !$approver->hasRole('imc_qa_checker')) {
+                    $approver->assignRole('imc_qa_checker');
+                }
+            }
+
+            return $approver;
         } catch (\Exception $e) {
             Log::warning("Failed to get approver for stage: {$stage}. Error: " . $e->getMessage());
             return null;

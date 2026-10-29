@@ -92,7 +92,8 @@ const STATIC_DEPARTMENTS = {
   admin: 'Information Technology Office',
   vicePresident: 'Vice President of Academic Affairs',
   vicePresidentLegacy: 'Vice President for Academic Affairs',
-  imc: 'Institutional Marketing Communication',
+  imc: 'Integrated Marketing Communications',
+  imcLegacy: 'Institutional Marketing Communication',
 };
 
 const normalizeDepartmentName = (department?: string): string =>
@@ -107,8 +108,15 @@ const isVicePresidentDepartment = (department: string): boolean => {
     || normalized === normalizeDepartmentName(STATIC_DEPARTMENTS.vicePresidentLegacy);
 };
 
-const isImcDepartment = (department: string): boolean =>
-  normalizeDepartmentName(department) === normalizeDepartmentName(STATIC_DEPARTMENTS.imc);
+const isImcDepartment = (department: string): boolean => {
+  const norm = normalizeDepartmentName(department);
+  return norm.includes('integrated marketing') ||
+         norm.includes('institutional marketing') ||
+         norm.includes('marketing communication') ||
+         norm === 'imc' ||
+         norm === 'imc/qa' ||
+         norm === 'imc / qa';
+};
 
 const isStaticSystemDepartment = (department: any): boolean => {
   const names = [department?.display_name, department?.name];
@@ -2553,7 +2561,7 @@ export default function ITAdminDashboard() {
       case 'vice_president': return { label: 'VICE PRESIDENT', color: '#B45309', bgColor: '#FEF3C7' };
       case 'office_head':
       case 'department_head': return { label: 'DEPARTMENT HEAD', color: '#92400E', bgColor: '#FEF3C7' };
-      case 'imc_qa_checker': return { label: 'IMC / QA', color: '#6366F1', bgColor: '#E0E7FF' };
+      case 'imc_qa_checker': return { label: 'INTEGRATED MARKETING COMMUNICATIONS', color: '#6366F1', bgColor: '#E0E7FF' };
       default: return { label: role.toUpperCase(), color: Colors.textPrimary, bgColor: Colors.background };
     }
   };
@@ -8777,7 +8785,7 @@ $response = curl_exec($ch);`}
                       const standardStages = [
                         { key: 'office_head', label: 'Department Head' },
                         { key: 'vice_president', label: 'Vice President' },
-                        { key: 'imc_qa', label: 'IMC/QA Checker' },
+                        { key: 'imc_qa', label: 'Integrated Marketing Communications' },
                       ];
 
                       const workflows = previewPost?.rawPost?.approval_workflows || [];

@@ -815,7 +815,7 @@ export function DashboardShell({
                   const message = rawMessage
                     .replace(/at stage:\s*office_head/gi, 'by Department Head')
                     .replace(/at stage:\s*vice_president/gi, 'by Vice President')
-                    .replace(/at stage:\s*imc_qa/gi, 'by IMC / QA')
+                    .replace(/at stage:\s*imc_qa/gi, 'by Integrated Marketing Communications')
                     .replace(/\boffice_head\b/gi, 'Department Head')
                     .replace(/\bOffice Head\b/gi, 'Department Head');
                   const timeAgo = n.created_at || 'Just now';
