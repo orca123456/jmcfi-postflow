@@ -7,6 +7,7 @@ interface RichTextEditorProps {
   onChange: (text: string) => void;
   placeholder?: string;
   minHeight?: number;
+  hideExtraActions?: boolean;
 }
 
 const TOOLBAR_STYLE = `
@@ -25,6 +26,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange,
   placeholder = 'Start typing...',
   minHeight = 150,
+  hideExtraActions = false,
 }) => {
   const editorRef = useRef<any>(null);
   const isInternalChange = useRef(false);
@@ -106,32 +108,36 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             {label}
           </button>
         ))}
-        {/* @ts-ignore */}
-        <div style={{ width: 1, height: 20, background: Colors.border, margin: '0 4px' }} />
-        {[
-          { cmd: 'insertUnorderedList', label: '≡', title: 'Bullet List' },
-          { cmd: 'insertOrderedList', label: '⊟', title: 'Ordered List' },
-        ].map(({ cmd, label, title }) => (
-          // @ts-ignore
-          <button
-            key={cmd}
-            title={title}
-            onMouseDown={(e: any) => { e.preventDefault(); execFormat(cmd); }}
-            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 16, color: Colors.textPrimary }}
-          >
-            {label}
-          </button>
-        ))}
-        {/* @ts-ignore */}
-        <div style={{ width: 1, height: 20, background: Colors.border, margin: '0 4px' }} />
-        {/* @ts-ignore */}
-        <button
-          title="Remove Formatting"
-          onMouseDown={(e: any) => { e.preventDefault(); execFormat('removeFormat'); }}
-          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 12, color: Colors.textSecondary }}
-        >
-          ✕
-        </button>
+        {!hideExtraActions && (
+          <>
+            {/* @ts-ignore */}
+            <div style={{ width: 1, height: 20, background: Colors.border, margin: '0 4px' }} />
+            {[
+              { cmd: 'insertUnorderedList', label: '≡', title: 'Bullet List' },
+              { cmd: 'insertOrderedList', label: '⊟', title: 'Ordered List' },
+            ].map(({ cmd, label, title }) => (
+              // @ts-ignore
+              <button
+                key={cmd}
+                title={title}
+                onMouseDown={(e: any) => { e.preventDefault(); execFormat(cmd); }}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 16, color: Colors.textPrimary }}
+              >
+                {label}
+              </button>
+            ))}
+            {/* @ts-ignore */}
+            <div style={{ width: 1, height: 20, background: Colors.border, margin: '0 4px' }} />
+            {/* @ts-ignore */}
+            <button
+              title="Remove Formatting"
+              onMouseDown={(e: any) => { e.preventDefault(); execFormat('removeFormat'); }}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontSize: 12, color: Colors.textSecondary }}
+            >
+              ✕
+            </button>
+          </>
+        )}
       </div>
       {/* @ts-ignore */}
       <div

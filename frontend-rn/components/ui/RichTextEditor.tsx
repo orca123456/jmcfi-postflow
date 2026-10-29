@@ -7,9 +7,16 @@ interface RichTextEditorProps {
   onChange: (text: string) => void;
   placeholder?: string;
   minHeight?: number;
+  hideExtraActions?: boolean;
 }
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder = 'Start typing...', minHeight = 150 }) => {
+export const RichTextEditor: React.FC<RichTextEditorProps> = ({
+  value,
+  onChange,
+  placeholder = 'Start typing...',
+  minHeight = 150,
+  hideExtraActions = false,
+}) => {
   const richText = useRef<RichEditor>(null);
 
   const applyFont = (fontName: string) => {
@@ -20,16 +27,20 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange,
     <View style={[styles.container, { minHeight }]}>
       <RichToolbar
         editor={richText}
-        actions={[
-          actions.setBold,
-          actions.setItalic,
-          actions.setUnderline,
-          actions.insertBulletsList,
-          actions.insertOrderedList,
-          actions.insertLink,
-          actions.undo,
-          actions.redo,
-        ]}
+        actions={
+          hideExtraActions
+            ? [actions.setBold, actions.setItalic, actions.setUnderline]
+            : [
+                actions.setBold,
+                actions.setItalic,
+                actions.setUnderline,
+                actions.insertBulletsList,
+                actions.insertOrderedList,
+                actions.insertLink,
+                actions.undo,
+                actions.redo,
+              ]
+        }
         iconTint="#4B5563"
         selectedIconTint="#7C3AED"
         disabledIconTint="#9CA3AF"

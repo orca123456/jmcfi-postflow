@@ -1595,6 +1595,7 @@ export default function RequestorDashboard() {
                         }}
                         placeholder="Write your post caption here. Ensure it follows the university's brand voice and tonal guidelines..."
                         minHeight={250}
+                        hideExtraActions
                       />
                     </View>
                     <View style={styles.textAreaFooter}>
