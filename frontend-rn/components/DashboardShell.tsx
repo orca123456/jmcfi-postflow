@@ -611,15 +611,15 @@ export function DashboardShell({
     if (primaryRole === 'vice_president' || roles.includes('vice_president') || dept.includes('vice president')) {
       return 'Vice President';
     }
-    if (primaryRole === 'imc_qa_checker' || roles.includes('imc_qa_checker') || dept.includes('institutional marketing') || dept.includes('imc')) {
-      return 'IMC QA';
+    if (primaryRole === 'imc_qa_checker' || roles.includes('imc_qa_checker') || dept.includes('integrated marketing') || dept.includes('institutional marketing') || dept.includes('imc')) {
+      return 'Integrated Marketing Communications';
     }
     if (primaryRole === 'office_head' || roles.includes('office_head') || primaryRole === 'department_head' || roles.includes('department_head')) {
       return 'Department Head';
     }
     if (primaryRole === 'approver' || roles.includes('approver')) {
       if (dept.includes('vice president')) return 'Vice President';
-      if (dept.includes('institutional marketing') || dept.includes('imc')) return 'IMC QA';
+      if (dept.includes('integrated marketing') || dept.includes('institutional marketing') || dept.includes('imc')) return 'Integrated Marketing Communications';
       return 'Department Head';
     }
     if (primaryRole === 'content_requestor' || primaryRole === 'requestor' || roles.includes('content_requestor') || roles.includes('requestor')) {

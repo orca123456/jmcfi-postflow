@@ -223,7 +223,16 @@ class PostRequest extends Model
         }
 
         if ($currentStage?->approver_id) {
-            return $currentStage->approver_id === $user->id;
+            if ($currentStage->approver_id === $user->id) {
+                return true;
+            }
+            if ($stageName === 'imc_qa' && $role === 'imc_qa_checker') {
+                return true;
+            }
+            if ($stageName === 'vice_president' && $role === 'vice_president') {
+                return true;
+            }
+            return false;
         }
 
         // Match the approval stage to the user's RAW role

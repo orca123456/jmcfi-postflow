@@ -58,11 +58,17 @@ const resolveRawRole = (user: any): string => {
   const rawRole = (user?.roles && user.roles[0]) || user?.role || 'requestor';
   const department = (user?.department || '').toLowerCase();
 
-  if (rawRole === 'office_head' && department.includes('vice president')) {
+  if (rawRole === 'vice_president' || department.includes('vice president')) {
     return 'vice_president';
   }
 
-  if (rawRole === 'office_head' && department.includes('institutional marketing communication')) {
+  if (
+    rawRole === 'imc_qa_checker' ||
+    department.includes('integrated marketing') ||
+    department.includes('institutional marketing') ||
+    department.includes('marketing communication') ||
+    department.includes('imc')
+  ) {
     return 'imc_qa_checker';
   }
 

@@ -219,11 +219,20 @@ class User extends Authenticatable implements MustVerifyEmail
         $role = $this->getRoleNames()->first();
         $department = strtolower($this->department ?? '');
 
-        if ($role === 'office_head' && str_contains($department, 'vice president')) {
+        if ($role === 'it_admin' || $role === 'admin') {
+            return $role;
+        }
+
+        if (str_contains($department, 'vice president') || str_contains($department, 'vpaa')) {
             return 'vice_president';
         }
 
-        if ($role === 'office_head' && str_contains($department, 'institutional marketing communication')) {
+        if (
+            str_contains($department, 'integrated marketing')
+            || str_contains($department, 'institutional marketing')
+            || str_contains($department, 'marketing communication')
+            || str_contains($department, 'imc')
+        ) {
             return 'imc_qa_checker';
         }
 

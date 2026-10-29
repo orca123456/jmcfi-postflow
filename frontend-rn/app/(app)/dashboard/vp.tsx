@@ -197,7 +197,11 @@ export default function VPDashboard() {
       const rawRole = ((user as any)?.roles && (user as any).roles[0]) || user?.role;
       const department = (user?.department || '').toLowerCase();
       const isVicePresident = rawRole === 'vice_president' || department.includes('vice president');
-      const isImcQa = rawRole === 'imc_qa_checker' || department.includes('institutional marketing communication');
+      const isImcQa = rawRole === 'imc_qa_checker' ||
+        department.includes('integrated marketing') ||
+        department.includes('institutional marketing') ||
+        department.includes('marketing communication') ||
+        department.includes('imc');
 
       if (isVicePresident) {
         pendingStatuses = ['PENDING_VICE_PRESIDENT'];

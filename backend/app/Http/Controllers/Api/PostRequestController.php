@@ -417,7 +417,11 @@ class PostRequestController extends Controller
                 if ($currentStage->stage === 'office_head' && str_contains(strtolower($user->department ?? ''), 'vice president')) {
                     return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
                 }
-                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && str_contains(strtolower($user->department ?? ''), 'institutional marketing communication')) {
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && (
+                    str_contains(strtolower($user->department ?? ''), 'integrated marketing')
+                    || str_contains(strtolower($user->department ?? ''), 'institutional marketing')
+                    || str_contains(strtolower($user->department ?? ''), 'imc')
+                )) {
                     $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
                     return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
                 }
@@ -557,7 +561,11 @@ class PostRequestController extends Controller
                 if ($currentStage->stage === 'office_head' && str_contains(strtolower($user->department ?? ''), 'vice president')) {
                     return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
                 }
-                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && str_contains(strtolower($user->department ?? ''), 'institutional marketing communication')) {
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && (
+                    str_contains(strtolower($user->department ?? ''), 'integrated marketing')
+                    || str_contains(strtolower($user->department ?? ''), 'institutional marketing')
+                    || str_contains(strtolower($user->department ?? ''), 'imc')
+                )) {
                     $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
                     return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
                 }
@@ -640,7 +648,11 @@ class PostRequestController extends Controller
                 if ($currentStage->stage === 'office_head' && str_contains(strtolower($user->department ?? ''), 'vice president')) {
                     return response()->json(['message' => 'Post is still waiting for Department Head approval.'], 403);
                 }
-                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && str_contains(strtolower($user->department ?? ''), 'institutional marketing communication')) {
+                if (in_array($currentStage->stage, ['office_head', 'vice_president']) && (
+                    str_contains(strtolower($user->department ?? ''), 'integrated marketing')
+                    || str_contains(strtolower($user->department ?? ''), 'institutional marketing')
+                    || str_contains(strtolower($user->department ?? ''), 'imc')
+                )) {
                     $stageName = $currentStage->stage === 'office_head' ? 'Department Head' : 'VPAA';
                     return response()->json(['message' => "Post is still waiting for {$stageName} approval."], 403);
                 }

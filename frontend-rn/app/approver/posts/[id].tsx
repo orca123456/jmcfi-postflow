@@ -37,7 +37,13 @@ export default function ApproverPostRedirectScreen() {
 
     if (rawRole === 'vice_president' || dept.includes('vice president')) {
       targetDashboard = '/dashboard/vp';
-    } else if (rawRole === 'imc_qa_checker' || dept.includes('institutional marketing communication')) {
+    } else if (
+      rawRole === 'imc_qa_checker' ||
+      dept.includes('integrated marketing') ||
+      dept.includes('institutional marketing') ||
+      dept.includes('marketing communication') ||
+      dept.includes('imc')
+    ) {
       targetDashboard = '/dashboard/imc-qa';
     } else if (rawRole === 'it_publisher' || rawRole === 'it_admin' || rawRole === 'admin') {
       targetDashboard = '/dashboard/it-admin';

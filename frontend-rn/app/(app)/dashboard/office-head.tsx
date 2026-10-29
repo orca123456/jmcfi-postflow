@@ -297,7 +297,11 @@ export default function OfficeHeadDashboard() {
         const rawRole = ((user as any)?.roles && (user as any).roles[0]) || user?.role;
         const department = (user?.department || '').toLowerCase();
         const isVicePresident = rawRole === 'vice_president' || department.includes('vice president');
-        const isImcQa = rawRole === 'imc_qa_checker' || department.includes('institutional marketing communication');
+        const isImcQa = rawRole === 'imc_qa_checker' ||
+          department.includes('integrated marketing') ||
+          department.includes('institutional marketing') ||
+          department.includes('marketing communication') ||
+          department.includes('imc');
 
         if (isVicePresident) {
           pendingStatuses = ['PENDING_VICE_PRESIDENT'];
@@ -522,7 +526,11 @@ export default function OfficeHeadDashboard() {
   const viewerRawRole = ((user as any)?.roles && (user as any).roles[0]) || user?.role;
   const viewerDepartment = (user?.department || '').toLowerCase();
   const viewerIsVicePresident = viewerRawRole === 'vice_president' || viewerDepartment.includes('vice president');
-  const viewerIsImcQa = viewerRawRole === 'imc_qa_checker' || viewerDepartment.includes('institutional marketing communication');
+  const viewerIsImcQa = viewerRawRole === 'imc_qa_checker' ||
+    viewerDepartment.includes('integrated marketing') ||
+    viewerDepartment.includes('institutional marketing') ||
+    viewerDepartment.includes('marketing communication') ||
+    viewerDepartment.includes('imc');
 
   let userPosition = 'Department Head';
   if (viewerIsVicePresident) {

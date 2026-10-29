@@ -35,8 +35,17 @@ class UserResource extends JsonResource
                 'order_label' => $linkedProgramHead->order_label,
             ] : null,
             'roles' => $this->whenLoaded('roles', function () {
-                return $this->roles->pluck('name');
+                $roles = $this->roles->pluck('name')->toArray();
+                $wfRole = $this->workflowRole();
+                if ($wfRole && !in_array($wfRole, $roles, true)) {
+                    array_unshift($roles, $wfRole);
+                }
+                return $roles;
+            }, function () {
+                $wfRole = $this->workflowRole();
+                return $wfRole ? [$wfRole] : [];
             }),
+            'role' => $this->workflowRole(),
             'permissions' => $this->whenLoaded('permissions', function () {
                 return $this->getAllPermissions()->pluck('name');
             }),
