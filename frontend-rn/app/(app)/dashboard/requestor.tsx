@@ -31,7 +31,7 @@ import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
-import { optimizeImageForUpload } from '../../../utils/imageOptimizer';
+import { optimizeImageForUpload, getImageDimensions, fitImageForInstagram, isImageFile } from '../../../utils/imageOptimizer';
 import { FacebookMediaGrid } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { useThemeStore } from '../../../store/theme';
@@ -700,7 +700,19 @@ export default function RequestorDashboard() {
 
   const getFileBlob = async (item: any, isMedia = false): Promise<any> => {
     // If it's media (images/photos), run client-side optimization first
-    const targetItem = isMedia ? await optimizeImageForUpload(item) : item;
+    let targetItem = isMedia ? await optimizeImageForUpload(item) : item;
+
+    // If Instagram is selected, automatically ensure image complies with Instagram's 4:5 to 1.91:1 aspect ratio and JPEG format
+    if (isMedia && platforms.instagram && isImageFile(targetItem)) {
+      try {
+        const dims = await getImageDimensions(targetItem);
+        if (!dims.isQualified) {
+          targetItem = await fitImageForInstagram(targetItem, 'auto');
+        }
+      } catch (err) {
+        console.warn('Instagram auto-fit check error:', err);
+      }
+    }
 
     if (Platform.OS === 'web') {
       if (targetItem instanceof File || targetItem instanceof Blob) {
@@ -1004,6 +1016,61 @@ export default function RequestorDashboard() {
 
   const togglePlatform = (key: 'facebook' | 'instagram' | 'portal') => {
     setPlatforms(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const processSelectedFiles = async (rawFiles: any[]) => {
+    try {
+      const processed = await Promise.all(
+        rawFiles.map(async (f: any) => {
+          const dims = await getImageDimensions(f);
+          return {
+            ...f,
+            width: dims.width,
+            height: dims.height,
+            aspectRatio: dims.ratio,
+            isInstagramQualified: dims.isQualified,
+          };
+        })
+      );
+      setMediaFiles(processed);
+    } catch {
+      setMediaFiles(rawFiles);
+    }
+  };
+
+  const handleAutoFitAllForInstagram = async () => {
+    if (mediaFiles.length === 0) return;
+    try {
+      const updated = await Promise.all(
+        mediaFiles.map(async (file: any) => {
+          const dims = await getImageDimensions(file);
+          if (!dims.isQualified) {
+            return await fitImageForInstagram(file, 'auto');
+          }
+          return file;
+        })
+      );
+      setMediaFiles(updated);
+      showToast('All photos fitted to Instagram aspect ratio (4:5 to 1.91:1)!', 'success');
+    } catch (e: any) {
+      showToast('Failed to auto-fit photos: ' + (e.message || 'Error'), 'error');
+    }
+  };
+
+  const handleAutoFitSingle = async (idx: number, mode: 'auto' | 'square' | 'portrait' = 'auto') => {
+    const file = mediaFiles[idx];
+    if (!file) return;
+    try {
+      const fitted = await fitImageForInstagram(file, mode);
+      setMediaFiles(prev => {
+        const copy = [...prev];
+        copy[idx] = fitted;
+        return copy;
+      });
+      showToast('Photo fitted to Instagram aspect ratio!', 'success');
+    } catch (e: any) {
+      showToast('Failed to auto-fit photo: ' + (e.message || 'Error'), 'error');
+    }
   };
 
   const isLargeScreen = width > 1024;
@@ -1551,7 +1618,14 @@ export default function RequestorDashboard() {
                         <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
                           <Ionicons name="logo-instagram" size={18} color="#E1306C" />
                         </View>
-                        <Text style={styles.platformNameText}>Instagram</Text>
+                        <View>
+                          <Text style={styles.platformNameText}>Instagram</Text>
+                          {platforms.instagram && (
+                            <Text style={{ fontSize: 10, color: '#E1306C', marginTop: 1 }}>
+                              Photo ratio filtered to 4:5 – 1.91:1
+                            </Text>
+                          )}
+                        </View>
                       </View>
                       <View style={[styles.checkboxOutline, platforms.instagram && styles.checkboxChecked]}>
                         {platforms.instagram && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
@@ -1762,7 +1836,7 @@ export default function RequestorDashboard() {
                             !/\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(a.name || '')
                           );
                           if (validImages.length > 0) {
-                            setMediaFiles(validImages);
+                            processSelectedFiles(validImages);
                           }
                         }
                       } catch (e) {
@@ -1792,7 +1866,7 @@ export default function RequestorDashboard() {
                                 size: f.size,
                                 file: f,
                               }));
-                              setMediaFiles(files);
+                              processSelectedFiles(files);
                             }
                           };
                           input.click();
@@ -1878,6 +1952,63 @@ export default function RequestorDashboard() {
 
                   {mediaFiles.length > 0 && (
                     <View style={{ marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                      {platforms.instagram && mediaFiles.some((f: any) => f.isInstagramQualified === false) && (
+                        <View style={{
+                          backgroundColor: '#FEF3C7',
+                          borderColor: '#F59E0B',
+                          borderWidth: 1,
+                          borderRadius: 8,
+                          padding: 10,
+                          marginBottom: 10,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Ionicons name="logo-instagram" size={18} color="#E1306C" />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E' }}>
+                                Instagram Photo Filter Warning
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#B45309' }}>
+                                Instagram requires photos between 4:5 portrait and 1.91:1 landscape. Photos outside this range will fail on Instagram unless auto-fitted with white padding.
+                              </Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            onPress={handleAutoFitAllForInstagram}
+                            style={{
+                              backgroundColor: '#E1306C',
+                              paddingHorizontal: 12,
+                              paddingVertical: 7,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>Auto-Fit All</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {platforms.instagram && !mediaFiles.some((f: any) => f.isInstagramQualified === false) && (
+                        <View style={{
+                          backgroundColor: '#ECFDF5',
+                          borderColor: '#A7F3D0',
+                          borderWidth: 1,
+                          borderRadius: 8,
+                          padding: 8,
+                          marginBottom: 10,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}>
+                          <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                          <Text style={{ fontSize: 11, color: '#065F46', fontWeight: '600' }}>
+                            Instagram Photo Filter: All photos qualify for Instagram (4:5 to 1.91:1 ratio).
+                          </Text>
+                        </View>
+                      )}
+
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="globe-outline" size={16} color="#21759B" />
@@ -1893,13 +2024,15 @@ export default function RequestorDashboard() {
                         {mediaFiles.map((file: any, idx: number) => {
                           const isSelected = featuredMediaIndex === idx;
                           const isImg = file.mimeType ? file.mimeType.startsWith('image/') : true;
+                          const isIgUnqualified = file.isInstagramQualified === false;
+
                           return (
                             <TouchableOpacity
                               key={idx}
                               onPress={() => setFeaturedMediaIndex(idx)}
                               activeOpacity={0.8}
                               style={{
-                                width: 110,
+                                width: 114,
                                 borderRadius: 8,
                                 borderWidth: isSelected ? 2 : 1,
                                 borderColor: isSelected ? '#21759B' : Colors.border,
@@ -1914,6 +2047,30 @@ export default function RequestorDashboard() {
                                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>Website</Text>
                                 </View>
                               )}
+                              {platforms.instagram && (
+                                <TouchableOpacity
+                                  onPress={() => isIgUnqualified && handleAutoFitSingle(idx)}
+                                  activeOpacity={isIgUnqualified ? 0.7 : 1}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 4,
+                                    left: 4,
+                                    zIndex: 5,
+                                    backgroundColor: isIgUnqualified ? '#D97706' : '#059669',
+                                    borderRadius: 6,
+                                    paddingHorizontal: 4,
+                                    paddingVertical: 2,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                  }}
+                                >
+                                  <Ionicons name="logo-instagram" size={9} color="#FFF" />
+                                  <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>
+                                    {isIgUnqualified ? 'Fit 4:5' : 'IG OK'}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
                               <View style={{ width: '100%', height: 64, borderRadius: 6, overflow: 'hidden', backgroundColor: '#E5E7EB', marginBottom: 4, justifyContent: 'center', alignItems: 'center' }}>
                                 {file.uri && isImg ? (
                                   <Image source={{ uri: file.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -1924,6 +2081,11 @@ export default function RequestorDashboard() {
                               <Text numberOfLines={1} style={{ fontSize: 11, color: isSelected ? '#21759B' : Colors.textSecondary, fontWeight: isSelected ? '700' : '400', textAlign: 'center' }}>
                                 {file.name || `Image #${idx + 1}`}
                               </Text>
+                              {platforms.instagram && file.aspectRatio && (
+                                <Text style={{ fontSize: 9, color: isIgUnqualified ? '#D97706' : '#059669', fontWeight: '600' }}>
+                                  Ratio: {file.aspectRatio}:1
+                                </Text>
+                              )}
                             </TouchableOpacity>
                           );
                         })}

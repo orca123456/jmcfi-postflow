@@ -180,3 +180,236 @@ export async function optimizeImageForUpload(
     return item?.file || item;
   }
 }
+
+export interface InstagramRatioInfo {
+  isQualified: boolean;
+  aspectRatio: number;
+  width: number;
+  height: number;
+  statusText: string;
+  badgeColor: string;
+  badgeBg: string;
+}
+
+/**
+ * Checks if dimensions comply with Instagram Graph API requirements:
+ * Aspect ratio must be between 4:5 (0.80) and 1.91:1 (1.91).
+ */
+export function checkInstagramPhotoRatio(width: number, height: number): InstagramRatioInfo {
+  if (!width || !height) {
+    return {
+      isQualified: true,
+      aspectRatio: 1,
+      width: 0,
+      height: 0,
+      statusText: 'IG Ready',
+      badgeColor: '#059669',
+      badgeBg: '#ECFDF5',
+    };
+  }
+
+  const ratio = Number((width / height).toFixed(2));
+  if (ratio < 0.79) {
+    return {
+      isQualified: false,
+      aspectRatio: ratio,
+      width,
+      height,
+      statusText: `Too tall for IG (${ratio}:1, min 4:5)`,
+      badgeColor: '#D97706',
+      badgeBg: '#FEF3C7',
+    };
+  }
+
+  if (ratio > 1.92) {
+    return {
+      isQualified: false,
+      aspectRatio: ratio,
+      width,
+      height,
+      statusText: `Too wide for IG (${ratio}:1, max 1.91:1)`,
+      badgeColor: '#D97706',
+      badgeBg: '#FEF3C7',
+    };
+  }
+
+  const label = ratio >= 0.95 && ratio <= 1.05 ? 'Square 1:1' : ratio < 1 ? 'Portrait 4:5' : 'Landscape';
+  return {
+    isQualified: true,
+    aspectRatio: ratio,
+    width,
+    height,
+    statusText: `✓ IG Ready (${label})`,
+    badgeColor: '#059669',
+    badgeBg: '#ECFDF5',
+  };
+}
+
+/**
+ * Measures an image's natural dimensions and Instagram ratio compliance on client-side.
+ */
+export async function getImageDimensions(item: any): Promise<{ width: number; height: number; ratio: number; isQualified: boolean }> {
+  if (Platform.OS !== 'web' || !item) {
+    return { width: 0, height: 0, ratio: 1, isQualified: true };
+  }
+
+  try {
+    let sourceUrl = '';
+    let shouldRevoke = false;
+
+    if (item instanceof File || item instanceof Blob) {
+      sourceUrl = URL.createObjectURL(item);
+      shouldRevoke = true;
+    } else if (item?.file instanceof File || item?.file instanceof Blob) {
+      sourceUrl = URL.createObjectURL(item.file);
+      shouldRevoke = true;
+    } else if (typeof item?.uri === 'string') {
+      sourceUrl = item.uri;
+    }
+
+    if (!sourceUrl) {
+      return { width: 0, height: 0, ratio: 1, isQualified: true };
+    }
+
+    return await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        if (shouldRevoke) URL.revokeObjectURL(sourceUrl);
+        const w = img.naturalWidth || img.width || 1;
+        const h = img.naturalHeight || img.height || 1;
+        const ratio = Number((w / h).toFixed(2));
+        const isQualified = ratio >= 0.79 && ratio <= 1.92;
+        resolve({ width: w, height: h, ratio, isQualified });
+      };
+      img.onerror = () => {
+        if (shouldRevoke) URL.revokeObjectURL(sourceUrl);
+        resolve({ width: 0, height: 0, ratio: 1, isQualified: true });
+      };
+      img.src = sourceUrl;
+    });
+  } catch {
+    return { width: 0, height: 0, ratio: 1, isQualified: true };
+  }
+}
+
+/**
+ * Auto-fits any image into an Instagram-compliant 4:5 portrait or 1:1 square canvas
+ * with high quality JPEG output so publishing to Instagram will never fail.
+ */
+export async function fitImageForInstagram(
+  item: any,
+  mode: 'auto' | 'square' | 'portrait' = 'auto'
+): Promise<any> {
+  if (Platform.OS !== 'web' || !item) return item;
+
+  try {
+    let rawFileOrBlob: Blob | File | null = null;
+    let fileName = 'instagram_photo.jpg';
+
+    if (item instanceof File || item instanceof Blob) {
+      rawFileOrBlob = item;
+      fileName = (item as File).name || 'instagram_photo.jpg';
+    } else if (item?.file instanceof File || item?.file instanceof Blob) {
+      rawFileOrBlob = item.file;
+      fileName = item.file.name || item.name || 'instagram_photo.jpg';
+    } else if (typeof item?.uri === 'string' && (item.uri.startsWith('blob:') || item.uri.startsWith('data:'))) {
+      const res = await fetch(item.uri);
+      rawFileOrBlob = await res.blob();
+      fileName = item.name || 'instagram_photo.jpg';
+    }
+
+    if (!rawFileOrBlob) return item;
+
+    // Decode image
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      const url = URL.createObjectURL(rawFileOrBlob!);
+      el.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(el);
+      };
+      el.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+      el.src = url;
+    });
+
+    const srcW = img.naturalWidth || img.width;
+    const srcH = img.naturalHeight || img.height;
+    if (!srcW || !srcH) return item;
+
+    const currentRatio = srcW / srcH;
+
+    // Determine target canvas dimensions
+    let targetW = srcW;
+    let targetH = srcH;
+
+    if (mode === 'square') {
+      const maxDim = Math.max(srcW, srcH);
+      targetW = maxDim;
+      targetH = maxDim;
+    } else if (mode === 'portrait' || (mode === 'auto' && currentRatio < 0.80)) {
+      targetH = srcH;
+      targetW = Math.round(srcH * 0.80);
+    } else if (mode === 'auto' && currentRatio > 1.91) {
+      targetW = srcW;
+      targetH = Math.round(srcW / 1.91);
+    }
+
+    // Downscale if exceeds 1920
+    const maxDim = 1920;
+    if (targetW > maxDim || targetH > maxDim) {
+      const downScale = Math.min(maxDim / targetW, maxDim / targetH);
+      targetW = Math.round(targetW * downScale);
+      targetH = Math.round(targetH * downScale);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return item;
+
+    // Clean white backdrop
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, targetW, targetH);
+
+    // Center original image inside compliant canvas
+    const fitScale = Math.min(targetW / srcW, targetH / srcH);
+    const drawW = Math.round(srcW * fitScale);
+    const drawH = Math.round(srcH * fitScale);
+    const drawX = Math.round((targetW - drawW) / 2);
+    const drawY = Math.round((targetH - drawH) / 2);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.90);
+    });
+
+    if (!blob) return item;
+
+    const cleanBaseName = fileName.replace(/\.[^/.]+$/, '');
+    const outputName = `${cleanBaseName}_ig.jpg`;
+    const newFile = new File([blob], outputName, { type: 'image/jpeg', lastModified: Date.now() });
+
+    return {
+      uri: URL.createObjectURL(newFile),
+      name: outputName,
+      mimeType: 'image/jpeg',
+      type: 'image/jpeg',
+      size: newFile.size,
+      file: newFile,
+      width: targetW,
+      height: targetH,
+      aspectRatio: Number((targetW / targetH).toFixed(2)),
+      isInstagramQualified: true,
+    };
+  } catch (e) {
+    console.warn('fitImageForInstagram failed:', e);
+    return item;
+  }
+}

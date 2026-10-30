@@ -64,6 +64,36 @@ Route::get('/instagram-media/{media}.jpg', function (PostMedia $media) {
         abort(404);
     }
 
+    $srcWidth = imagesx($image);
+    $srcHeight = imagesy($image);
+    $ratio = $srcWidth / max(1, $srcHeight);
+
+    // Instagram Graph API strictly requires aspect ratios between 4:5 (0.80) and 1.91:1 (1.91).
+    // If the image is outside this range, pad with a clean white canvas so publishing never fails.
+    if ($ratio < 0.80) {
+        // Too tall (e.g. 9:16 portrait or vertical flyer): pad width to 4:5
+        $targetHeight = $srcHeight;
+        $targetWidth = (int) ceil($srcHeight * 0.80);
+        $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+        $white = imagecolorallocate($canvas, 255, 255, 255);
+        imagefill($canvas, 0, 0, $white);
+        $dstX = (int) floor(($targetWidth - $srcWidth) / 2);
+        imagecopy($canvas, $image, $dstX, 0, 0, 0, $srcWidth, $srcHeight);
+        imagedestroy($image);
+        $image = $canvas;
+    } elseif ($ratio > 1.91) {
+        // Too wide (e.g. panoramic or banner): pad height to 1.91:1
+        $targetWidth = $srcWidth;
+        $targetHeight = (int) ceil($srcWidth / 1.91);
+        $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+        $white = imagecolorallocate($canvas, 255, 255, 255);
+        imagefill($canvas, 0, 0, $white);
+        $dstY = (int) floor(($targetHeight - $srcHeight) / 2);
+        imagecopy($canvas, $image, 0, $dstY, 0, 0, $srcWidth, $srcHeight);
+        imagedestroy($image);
+        $image = $canvas;
+    }
+
     ob_start();
     imagejpeg($image, null, 92);
     imagedestroy($image);
