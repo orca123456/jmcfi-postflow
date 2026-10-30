@@ -130,6 +130,10 @@ export const dashboardApi = {
 };
 
 // ── Publishing endpoints ───────────────────────────────────────────────────
+export const platformApi = {
+  getAvailability: () => api.get('/platform-availability'),
+};
+
 export const publishingApi = {
   list: () => api.get('/publishing'),
   schedule: (id: number, data: object) => api.post(`/publishing/${id}/schedule`, data),

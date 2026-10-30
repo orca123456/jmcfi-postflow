@@ -13,6 +13,22 @@ use RuntimeException;
 
 class WordPressPublishingService
 {
+    /**
+     * Check if WordPress publishing credentials and URL are configured.
+     */
+    public function isConfigured(): bool
+    {
+        $settings = SystemSetting::whereIn('key', [
+            'wordpress_url', 'wordpress_username', 'wordpress_app_password',
+        ])->pluck('value', 'key');
+
+        $url = trim((string) ($settings['wordpress_url'] ?? ''));
+        $username = trim((string) ($settings['wordpress_username'] ?? ''));
+        $password = trim((string) ($settings['wordpress_app_password'] ?? ''));
+
+        return $url !== '' && $username !== '' && $password !== '';
+    }
+
     public function publishPost(PostRequest $post, ?PostMedia $media = null): array
     {
         $settings = SystemSetting::whereIn('key', [

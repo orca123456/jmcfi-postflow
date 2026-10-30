@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Policy Settings (update admin only)
     Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);
+    Route::get('platform-availability', [TokenSettingController::class, 'getPlatformAvailability']);
     Route::post('policy-settings', [PolicySettingController::class, 'updateSettings'])->middleware('role:it_publisher,it_admin');
 
     // Token Settings (Admin only)

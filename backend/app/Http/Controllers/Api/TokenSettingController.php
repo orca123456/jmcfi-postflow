@@ -17,6 +17,46 @@ class TokenSettingController extends Controller
     /**
      * Get all platform tokens (masked).
      */
+    /**
+     * Get platform availability and configuration status for all roles (including Requestor).
+     */
+    public function getPlatformAvailability(): JsonResponse
+    {
+        $keys = [
+            'facebook_page_id', 'facebook_access_token', 'facebook_credentials_verified',
+            'instagram_business_account_id', 'instagram_access_token', 'instagram_credentials_verified',
+            'wordpress_url', 'wordpress_username', 'wordpress_app_password', 'wordpress_credentials_verified',
+        ];
+
+        $settings = SystemSetting::whereIn('key', $keys)->pluck('value', 'key');
+
+        $fbConfigured = !empty(trim((string) ($settings->get('facebook_page_id') ?? ''))) 
+            && !empty(trim((string) ($settings->get('facebook_access_token') ?? '')));
+        $igConfigured = !empty(trim((string) ($settings->get('instagram_business_account_id') ?? ''))) 
+            && !empty(trim((string) ($settings->get('instagram_access_token') ?? '')));
+        $wpConfigured = !empty(trim((string) ($settings->get('wordpress_url') ?? ''))) 
+            && !empty(trim((string) ($settings->get('wordpress_username') ?? ''))) 
+            && !empty(trim((string) ($settings->get('wordpress_app_password') ?? '')));
+
+        return response()->json([
+            'facebook' => [
+                'name' => 'Facebook',
+                'configured' => $fbConfigured,
+                'verified' => $settings->get('facebook_credentials_verified') === '1',
+            ],
+            'instagram' => [
+                'name' => 'Instagram',
+                'configured' => $igConfigured,
+                'verified' => $settings->get('instagram_credentials_verified') === '1',
+            ],
+            'wordpress' => [
+                'name' => 'Website (WordPress)',
+                'configured' => $wpConfigured,
+                'verified' => $settings->get('wordpress_credentials_verified') === '1',
+            ],
+        ]);
+    }
+
     public function getTokens(): JsonResponse
     {
         $keys = [

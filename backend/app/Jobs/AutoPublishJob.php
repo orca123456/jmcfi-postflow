@@ -128,10 +128,17 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             }
 
             if (in_array('wordpress', $lowerPlatforms, true) && !in_array('wordpress', $completed, true)) {
-                try {
-                    $publishResults['wordpress'] = $wordpressService->publishPost($this->postRequest, $media);
-                } catch (Exception $e) {
-                    $publishErrors['wordpress'] = $e->getMessage();
+                if (!$wordpressService->isConfigured()) {
+                    $publishErrors['wordpress'] = 'Website (WordPress) is not configured in Platform Tokens (application password or URL missing). Automatic publishing skipped.';
+                    Log::warning("AutoPublishJob: Post ID {$this->postRequest->id} skipped WordPress because credentials are not configured.");
+                } else {
+                    try {
+                        $publishResults['wordpress'] = $wordpressService->publishPost($this->postRequest, $media);
+                        Log::info("AutoPublishJob: Successfully published to WordPress for post ID {$this->postRequest->id}");
+                    } catch (Exception $e) {
+                        $publishErrors['wordpress'] = $e->getMessage();
+                        Log::error('AutoPublishJob: Publish to WordPress failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -140,7 +147,11 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             }
             $this->recordPublishingResults($publishResults, $publishErrors);
 
-            if ($publishErrors !== [] || ($publishResults === [] && $completed === [])) {
+            $successfulPlatforms = array_merge($completed, array_keys($publishResults));
+
+            // If no target platform succeeded at all, mark as publish failed.
+            // If at least one platform succeeded (e.g. Facebook/Instagram while WordPress was unconfigured), consider the post published.
+            if (empty($successfulPlatforms)) {
                 $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
                 throw new Exception($this->formatPublishErrors($publishErrors));
             }

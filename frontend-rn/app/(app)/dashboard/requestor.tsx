@@ -25,7 +25,7 @@ import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { Toast } from '../../../components/ui/Toast';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
-import { postsApi, authApi, dashboardApi, categoriesApi, resolveImageUrl } from '../../../services/api';
+import { postsApi, authApi, dashboardApi, categoriesApi, platformApi, resolveImageUrl } from '../../../services/api';
 import { useQuery } from '@tanstack/react-query';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
@@ -91,6 +91,11 @@ export default function RequestorDashboard() {
     instagram: false,
     portal: false,
   });
+  const [platformAvailability, setPlatformAvailability] = useState<{
+    facebook?: { configured: boolean; verified: boolean };
+    instagram?: { configured: boolean; verified: boolean };
+    wordpress?: { configured: boolean; verified: boolean };
+  }>({});
   const [publishDate, setPublishDate] = useState('');
   const [publishTime, setPublishTime] = useState('');
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
@@ -358,6 +363,17 @@ export default function RequestorDashboard() {
     setActiveTab('request');
     alert(`Created new request form pre-filled with data from "${post.title}". Please revise according to approver comments.`);
   };
+
+  // Fetch platform configuration availability on mount
+  useEffect(() => {
+    platformApi.getAvailability()
+      .then((res: any) => {
+        if (res.data) {
+          setPlatformAvailability(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch categories from API on mount
   useEffect(() => {
@@ -840,6 +856,23 @@ export default function RequestorDashboard() {
     }
 
     const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
+    const hasAnyConfiguredPlatform = selectedPlatforms.some((k) => {
+      if (k === 'portal' || k === 'website' || k === 'wordpress') {
+        return platformAvailability.wordpress?.configured !== false;
+      }
+      if (k === 'facebook') {
+        return platformAvailability.facebook?.configured !== false;
+      }
+      if (k === 'instagram') {
+        return platformAvailability.instagram?.configured !== false;
+      }
+      return true;
+    });
+
+    if (selectedPlatforms.length > 0 && !hasAnyConfiguredPlatform) {
+      alert('None of the selected platforms are currently configured in Platform Tokens. Please select at least one configured channel (such as Facebook or Instagram), or contact IT Admin.');
+      return;
+    }
     if (selectedPlatforms.length === 0) {
       alert('Please select at least one target platform before submitting.');
       return;
@@ -1015,6 +1048,9 @@ export default function RequestorDashboard() {
   };
 
   const togglePlatform = (key: 'facebook' | 'instagram' | 'portal') => {
+    if (key === 'portal' && !platforms.portal && platformAvailability.wordpress && platformAvailability.wordpress.configured === false) {
+      alert('Notice: Website (WordPress) is currently not configured in Admin Platform Tokens.\n\nYour post will publish to your active social platforms (Facebook/Instagram), and Website publishing will be safely skipped until WordPress credentials are saved.');
+    }
     setPlatforms(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -1618,7 +1654,25 @@ export default function RequestorDashboard() {
                         <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
                           <Ionicons name="logo-facebook" size={18} color="#1877F2" />
                         </View>
-                        <Text style={styles.platformNameText}>Facebook</Text>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={styles.platformNameText}>Facebook</Text>
+                            {platformAvailability.facebook?.configured === false ? (
+                              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                              </View>
+                            ) : platformAvailability.facebook?.configured === true ? (
+                              <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                                <Text style={{ fontSize: 9.5, color: '#065F46', fontWeight: '700' }}>Ready</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          {platformAvailability.facebook?.configured === false && (
+                            <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
+                              Facebook Page Token not configured in Admin.
+                            </Text>
+                          )}
+                        </View>
                       </View>
                       <View style={[styles.checkboxOutline, platforms.facebook && styles.checkboxChecked]}>
                         {platforms.facebook && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
@@ -1630,11 +1684,27 @@ export default function RequestorDashboard() {
                         <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
                           <Ionicons name="logo-instagram" size={18} color="#E1306C" />
                         </View>
-                        <View>
-                          <Text style={styles.platformNameText}>Instagram</Text>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={styles.platformNameText}>Instagram</Text>
+                            {platformAvailability.instagram?.configured === false ? (
+                              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                              </View>
+                            ) : platformAvailability.instagram?.configured === true ? (
+                              <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                                <Text style={{ fontSize: 9.5, color: '#065F46', fontWeight: '700' }}>Ready</Text>
+                              </View>
+                            ) : null}
+                          </View>
                           {platforms.instagram && (
                             <Text style={{ fontSize: 10, color: '#E1306C', marginTop: 1 }}>
                               Photo ratio filtered to 4:5 – 1.91:1
+                            </Text>
+                          )}
+                          {platformAvailability.instagram?.configured === false && (
+                            <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
+                              Instagram Token not configured in Admin.
                             </Text>
                           )}
                         </View>
@@ -1644,12 +1714,39 @@ export default function RequestorDashboard() {
                       </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('portal')}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.platformRow,
+                        platformAvailability.wordpress && platformAvailability.wordpress.configured === false && {
+                          backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.08)' : '#FFFBEB',
+                          borderColor: '#FDE68A',
+                        }
+                      ]} 
+                      onPress={() => togglePlatform('portal')}
+                    >
                       <View style={styles.platformLeft}>
                         <View style={[styles.platformIconBg, { backgroundColor: '#ECFDF5' }]}>
                           <Ionicons name="globe-outline" size={18} color="#059669" />
                         </View>
-                        <Text style={styles.platformNameText}>Website</Text>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={styles.platformNameText}>Website</Text>
+                            {platformAvailability.wordpress?.configured === false ? (
+                              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                              </View>
+                            ) : platformAvailability.wordpress?.configured === true ? (
+                              <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                                <Text style={{ fontSize: 9.5, color: '#065F46', fontWeight: '700' }}>Ready</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          {platformAvailability.wordpress?.configured === false && (
+                            <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
+                              Requires WordPress API / credentials setup in Admin Platform Tokens.
+                            </Text>
+                          )}
+                        </View>
                       </View>
                       <View style={[styles.checkboxOutline, platforms.portal && styles.checkboxChecked]}>
                         {platforms.portal && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
