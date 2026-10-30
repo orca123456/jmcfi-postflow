@@ -1073,6 +1073,18 @@ export default function RequestorDashboard() {
     }
   };
 
+  const handleRemoveMediaFile = (indexToRemove: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== indexToRemove));
+    setFeaturedMediaIndex(prevIndex => {
+      if (prevIndex === indexToRemove) {
+        return 0;
+      } else if (prevIndex > indexToRemove) {
+        return prevIndex - 1;
+      }
+      return prevIndex;
+    });
+  };
+
   const isLargeScreen = width > 1024;
   const isTablet = width > 768;
 
@@ -2009,18 +2021,40 @@ export default function RequestorDashboard() {
                         </View>
                       )}
 
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="globe-outline" size={16} color="#21759B" />
                           <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>
                             Website Featured Image Choice
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                          {mediaFiles.length === 1 ? '1 image attached' : `${mediaFiles.length} images attached — tap to select 1 for Website`}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                            {mediaFiles.length === 1 ? '1 image attached' : `${mediaFiles.length} images attached — tap to select 1 for Website`}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setMediaFiles([]);
+                              setFeaturedMediaIndex(0);
+                            }}
+                            activeOpacity={0.7}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 3,
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 4,
+                              backgroundColor: '#FEE2E2',
+                              cursor: 'pointer' as any,
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={11} color="#DC2626" />
+                            <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '600' }}>Clear All</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 6, paddingHorizontal: 2 }}>
                         {mediaFiles.map((file: any, idx: number) => {
                           const isSelected = featuredMediaIndex === idx;
                           const isImg = file.mimeType ? file.mimeType.startsWith('image/') : true;
@@ -2042,8 +2076,40 @@ export default function RequestorDashboard() {
                                 position: 'relative',
                               }}
                             >
+                              {/* Close / Delete Icon */}
+                              <TouchableOpacity
+                                onPress={(e: any) => {
+                                  e?.stopPropagation?.();
+                                  handleRemoveMediaFile(idx);
+                                }}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                style={{
+                                  position: 'absolute',
+                                  top: -6,
+                                  right: -6,
+                                  zIndex: 20,
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: 11,
+                                  backgroundColor: '#DC2626',
+                                  borderWidth: 2,
+                                  borderColor: '#FFFFFF',
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                  shadowColor: '#000',
+                                  shadowOffset: { width: 0, height: 1 },
+                                  shadowOpacity: 0.25,
+                                  shadowRadius: 2,
+                                  elevation: 5,
+                                  cursor: 'pointer' as any,
+                                }}
+                              >
+                                <Ionicons name="close" size={12} color="#FFFFFF" />
+                              </TouchableOpacity>
+
                               {isSelected && (
-                                <View style={{ position: 'absolute', top: 4, right: 4, zIndex: 5, backgroundColor: '#21759B', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 }}>
+                                <View style={{ position: 'absolute', top: 4, right: 18, zIndex: 5, backgroundColor: '#21759B', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 }}>
                                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFF' }}>Website</Text>
                                 </View>
                               )}
