@@ -586,8 +586,16 @@ export function DashboardShell({
   }, [isDarkMode]);
 
   const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
+    try {
+      setIsProfileDropdownOpen(false);
+      closeMobileDrawer();
+      await logout();
+    } catch (_) {}
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.href = '/(auth)/login';
+    } else {
+      router.replace('/(auth)/login');
+    }
   };
 
   const isDesktop = width > 768;
@@ -898,7 +906,7 @@ export function DashboardShell({
             <View style={[styles.dropdownDivider, isDarkMode && { backgroundColor: '#334155' }]} />
             
             {/* Menu items */}
-            <ScrollView style={styles.dropdownItemsList}>
+            <ScrollView style={styles.dropdownItemsList} keyboardShouldPersistTaps="handled">
               {userRole === 'it_publisher' && (
                 <TouchableOpacity 
                   style={styles.dropdownItem} 
@@ -953,11 +961,12 @@ export function DashboardShell({
 
               <TouchableOpacity 
                 style={styles.dropdownItem} 
-                onPress={() => { setIsProfileDropdownOpen(false); handleLogout(); }}
+                onPress={handleLogout}
+                activeOpacity={0.7}
               >
-                <Ionicons name="log-out-outline" size={18} color={isDarkMode ? '#94A3B8' : '#4B5563'} />
+                <Ionicons name="log-out-outline" size={18} color={isDarkMode ? '#F87171' : '#DC2626'} />
                 <View style={styles.itemTextContainer}>
-                  <Text style={styles.itemTitle}>Sign out</Text>
+                  <Text style={[styles.itemTitle, { color: isDarkMode ? '#FCA5A5' : '#DC2626' }]}>Sign out</Text>
                 </View>
               </TouchableOpacity>
             </ScrollView>
@@ -1068,6 +1077,7 @@ export function DashboardShell({
                       </Animated.View>
                     </AnimatedTouchable>
                   ))}
+
                 </View>
               </View>
 
@@ -1166,6 +1176,7 @@ export function DashboardShell({
                   </Text>
                 </TouchableOpacity>
               ))}
+
             </ScrollView>
           </Animated.View>
         </View>

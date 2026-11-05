@@ -28,17 +28,17 @@ const ALL_DASHBOARDS = [
   '/dashboard/it-admin',
 ];
 
-// Raw DB role -> the ONLY dashboard that role is allowed to open.
+// Raw DB role -> the dashboards that role is allowed to open.
 const ROLE_PATHS: Record<string, string[]> = {
-  it_publisher: ['/dashboard/it-admin'],
-  it_admin: ['/dashboard/it-admin'],
+  it_publisher: ['/dashboard/it-admin', '/dashboard/requestor', '/dashboard/office-head', '/dashboard/vp', '/dashboard/imc-qa'],
+  it_admin: ['/dashboard/it-admin', '/dashboard/requestor', '/dashboard/office-head', '/dashboard/vp', '/dashboard/imc-qa'],
   office_head: ['/dashboard/office-head'],
   vice_president: ['/dashboard/vp'],
   imc_qa_checker: ['/dashboard/imc-qa'],
   content_requestor: ['/dashboard/requestor'],
   requestor: ['/dashboard/requestor'],
-  admin: ['/dashboard/it-admin'],
-  approver: ['/dashboard/requestor'],
+  admin: ['/dashboard/it-admin', '/dashboard/requestor', '/dashboard/office-head', '/dashboard/vp', '/dashboard/imc-qa'],
+  approver: ['/dashboard/requestor', '/dashboard/office-head'],
 };
 
 // Raw role -> the dashboard the role is redirected to when unauthorized
@@ -86,7 +86,11 @@ export default function AppLayout() {
 
     // Not logged in -> go to login
     if (!user) {
-      router.replace('/(auth)/login');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.replace('/(auth)/login');
+      } else {
+        router.replace('/(auth)/login');
+      }
       return;
     }
 

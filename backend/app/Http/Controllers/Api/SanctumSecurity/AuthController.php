@@ -298,11 +298,16 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        AuditLogService::logForUser($request->user(), 'LOGOUT', 'User logged out: ' . $request->user()->full_name, 'INFO', [
-            'email' => $request->user()->email,
-        ], $request);
+        $user = $request->user();
+        if ($user) {
+            AuditLogService::logForUser($user, 'LOGOUT', 'User logged out: ' . ($user->full_name ?? $user->email), 'INFO', [
+                'email' => $user->email,
+            ], $request);
 
-        $request->user()->currentAccessToken()->delete();
+            if (method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+                $user->currentAccessToken()->delete();
+            }
+        }
 
         return response()->json([
             'message' => 'Successfully logged out',

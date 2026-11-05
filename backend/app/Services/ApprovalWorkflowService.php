@@ -14,11 +14,13 @@ class ApprovalWorkflowService
 {
     public function initializeWorkflow(PostRequest $postRequest): void
     {
-        $stages = [
-            ['stage' => 'office_head', 'order' => 1],
-            ['stage' => 'vice_president', 'order' => 2],
-            ['stage' => 'imc_qa', 'order' => 3],
-        ];
+        $stages = $postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC
+            ? [['stage' => 'imc_qa', 'order' => 1]]
+            : [
+                ['stage' => 'office_head', 'order' => 1],
+                ['stage' => 'vice_president', 'order' => 2],
+                ['stage' => 'imc_qa', 'order' => 3],
+            ];
 
         foreach ($stages as $index => $stage) {
             $approver = $this->getApproverForStage($stage['stage'], $postRequest);

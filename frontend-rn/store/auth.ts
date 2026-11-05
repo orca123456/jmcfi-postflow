@@ -16,6 +16,9 @@ export interface AuthUser {
   position?: string;
   photo_url?: string;
   department_logo_url?: string;
+  program_head_id?: number | null;
+  assigned_program?: string | null;
+  program_head?: any;
 }
 
 interface AuthStore {
@@ -127,9 +130,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: async () => {
-    try {
-      await authApi.logout();
-    } catch (_) {}
+    // 1. Fire-and-forget server logout (never blocks UI or hangs on network delay)
+    authApi.logout().catch(() => {});
+
+    // 2. Clear credentials immediately
     await storage.remove('auth_token');
     await storage.remove('auth_user');
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -142,6 +146,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           .forEach(k => sessionStorage.removeItem(k));
       } catch (_) {}
     }
+
+    // 3. Clear auth state immediately
     set({ user: null, token: null, isInitialized: true });
   },
 

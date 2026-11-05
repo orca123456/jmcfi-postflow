@@ -25,6 +25,7 @@ class StorePostRequest extends FormRequest
             'target_platforms.*' => ['string', 'in:facebook,instagram,portal,wordpress,website,wp'],
             'preferred_schedule_at' => ['nullable', 'date'],
             'is_draft' => ['boolean'],
+            'routing_type' => ['nullable', 'string', 'in:standard,direct_imc'],
         ];
 
         if ($this->hasFile('media')) {
@@ -64,8 +65,9 @@ class StorePostRequest extends FormRequest
 
             $hasMedia = $this->hasFile('media');
             $hasDocs = $this->hasFile('supporting_docs');
+            $isDirectImc = $this->input('routing_type') === 'direct_imc';
 
-            if (!$hasMedia && !$hasDocs) {
+            if (!$isDirectImc && !$hasMedia && !$hasDocs) {
                 $validator->errors()->add('media', 'Please attach at least one photo or media file before submitting.');
             }
         });

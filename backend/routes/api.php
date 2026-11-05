@@ -80,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Publishing (Strictly IT Admin & IT Publisher only)
     Route::post('publishing/{post}/schedule', [App\Http\Controllers\Api\PublishingController::class, 'schedule'])->middleware('role:it_publisher,it_admin');
     Route::post('publishing/{post}/publish', [App\Http\Controllers\Api\PublishingController::class, 'publish'])->middleware('role:it_publisher,it_admin');
+    Route::post('posts/{postRequest}/admin-bypass-approve', [App\Http\Controllers\Api\PostRequestController::class, 'adminBypassApprove'])->middleware('role:it_publisher,it_admin');
 
     // Policy Settings (update admin only)
     Route::get('policy-settings', [PolicySettingController::class, 'getSettings']);

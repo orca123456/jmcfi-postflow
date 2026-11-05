@@ -31,8 +31,10 @@ class PublishingController extends Controller
             ], 403);
         }
 
-        // 2. Validate that the post is ready to be published (must be approved or scheduled)
-        if (!in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED, PostRequest::STATUS_PUBLISH_FAILED])) {
+        $bypassApprovals = $request->boolean('bypass_approvals', false) || $request->input('bypass') == true;
+
+        // 2. Validate that the post is ready to be published (must be approved or scheduled), unless Admin is bypassing approvals
+        if (!$bypassApprovals && !in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED, PostRequest::STATUS_PUBLISH_FAILED])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Post cannot be published. Current status is ' . $post->status
@@ -53,9 +55,37 @@ class PublishingController extends Controller
             DB::beginTransaction();
             Cache::forget('post_publish_failed_alert_sent_' . $post->id);
 
+            // If bypassing pending approvals, mark all required workflow stages as approved by Administrator
+            if ($bypassApprovals) {
+                $stages = $post->routing_type === PostRequest::ROUTING_DIRECT_IMC
+                    ? ['imc_qa']
+                    : ['office_head', 'vice_president', 'imc_qa'];
+
+                foreach ($stages as $stage) {
+                    $wf = $post->approvalWorkflows()->firstOrNew(['stage' => $stage]);
+                    $wf->action = 'approved';
+                    $wf->approver_id = $user->id;
+                    $wf->remarks = $request->input('remarks', 'Bypassed and approved directly by Administrator');
+                    $wf->acted_at = now();
+                    $wf->save();
+                }
+
+                \App\Services\AuditLogService::log(
+                    'ADMIN_APPROVAL_BYPASS',
+                    "Administrator {$user->full_name} bypassed all approvals and published post \"{$post->title}\".",
+                    'WARNING',
+                    [
+                        'post_id' => $post->id,
+                        'user_id' => $user->id,
+                        'stages' => $stages,
+                    ]
+                );
+
+            }
+
             $platforms = is_string($post->target_platforms) ? json_decode($post->target_platforms, true) : $post->target_platforms;
-            if (!is_array($platforms)) {
-                $platforms = [];
+            if (!is_array($platforms) || empty($platforms)) {
+                $platforms = ['facebook'];
             }
             $lowerPlatforms = array_map('strtolower', $platforms);
 

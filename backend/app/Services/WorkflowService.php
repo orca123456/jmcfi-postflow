@@ -16,11 +16,12 @@ class WorkflowService
 {
     public function initializeWorkflow(PostRequest $postRequest): void
     {
-        $approver = $this->getApproverForStage('office_head', $postRequest);
+        $targetStage = $postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC ? 'imc_qa' : 'office_head';
+        $approver = $this->getApproverForStage($targetStage, $postRequest);
         if ($approver) {
             ApprovalWorkflow::create([
                 'post_request_id' => $postRequest->id,
-                'stage' => 'office_head',
+                'stage' => $targetStage,
                 'approver_id' => $approver->id,
                 'action' => 'pending',
                 'stage_order' => 1,
@@ -150,11 +151,15 @@ class WorkflowService
 
     public function getWorkflowProgress(PostRequest $postRequest): array
     {
-        $stages = [
-            'office_head' => 'Department Head',
-            'vice_president' => 'Vice President',
-            'imc_qa' => 'IMC/QA Checker',
-        ];
+        $stages = $postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC
+            ? [
+                'imc_qa' => 'IMC/QA Checker',
+            ]
+            : [
+                'office_head' => 'Department Head',
+                'vice_president' => 'Vice President',
+                'imc_qa' => 'IMC/QA Checker',
+            ];
 
         $progress = [];
         foreach ($stages as $key => $label) {

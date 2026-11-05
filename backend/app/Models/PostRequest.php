@@ -28,6 +28,9 @@ class PostRequest extends Model
     public const STATUS_PUBLISH_FAILED = 'publish_failed';
     public const STATUS_ARCHIVED = 'archived';
 
+    public const ROUTING_STANDARD = 'standard';
+    public const ROUTING_DIRECT_IMC = 'direct_imc';
+
     protected $fillable = [
         'title',
         'slug',
@@ -38,6 +41,7 @@ class PostRequest extends Model
         'requestor_id',
         'program_head_id',
         'status',
+        'routing_type',
         'target_platforms',
         'preferred_schedule_at',
         'published_at',
@@ -130,10 +134,16 @@ class PostRequest extends Model
 
     public function currentApprovalStage(): ?ApprovalWorkflow
     {
-        // Use the eager-loaded collection to avoid N+1 queries
-        return $this->approvalWorkflows
+        if ($this->relationLoaded('approvalWorkflows')) {
+            return $this->approvalWorkflows
+                ->where('action', 'pending')
+                ->sortBy('stage_order')
+                ->first();
+        }
+
+        return $this->approvalWorkflows()
             ->where('action', 'pending')
-            ->sortBy('stage_order')
+            ->orderBy('stage_order')
             ->first();
     }
 
@@ -185,6 +195,11 @@ class PostRequest extends Model
 
     public function canBeEditedBy(User $user): bool
     {
+        // IMC QA Checker can edit if the post is pending IMC QA review
+        if ($this->status === self::STATUS_PENDING_IMC_QA && $user->workflowRole() === 'imc_qa_checker') {
+            return true;
+        }
+
         if ($this->status !== 'draft' && $this->status !== 'returned_for_revision') {
             return false;
         }
@@ -270,6 +285,11 @@ class PostRequest extends Model
 
     public function getNextStage(): ?string
     {
+        if ($this->routing_type === self::ROUTING_DIRECT_IMC) {
+            // Direct IMC requests have only one approval stage (imc_qa). Once approved, no further stages.
+            return null;
+        }
+
         $stages = array_keys(self::approvalStages());
         $currentStageName = $this->currentApprovalStage()?->stage;
         

@@ -120,6 +120,11 @@ class PostRequestController extends Controller
                 }
 
                 $programHeadId = $request->input('program_head_id') ?: $request->user()->program_head_id;
+                $routingType = $request->input('routing_type', PostRequest::ROUTING_STANDARD);
+                $isDirectImc = $routingType === PostRequest::ROUTING_DIRECT_IMC;
+                $initialStatus = $request->is_draft 
+                    ? PostRequest::STATUS_DRAFT 
+                    : ($isDirectImc ? PostRequest::STATUS_PENDING_IMC_QA : PostRequest::STATUS_PENDING_OFFICE_HEAD);
 
                 $post = PostRequest::create([
                     'title' => $request->title,
@@ -130,7 +135,8 @@ class PostRequestController extends Controller
                     'department_id' => $request->user()->id,
                     'requestor_id' => $request->user()->id,
                     'program_head_id' => $programHeadId,
-                    'status' => $request->is_draft ? PostRequest::STATUS_DRAFT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                    'status' => $initialStatus,
+                    'routing_type' => $routingType,
                     'target_platforms' => $request->target_platforms ?? [],
                     'preferred_schedule_at' => $request->preferred_schedule_at,
                     'revision_count' => 0,
@@ -357,8 +363,11 @@ class PostRequestController extends Controller
         }
 
         return DB::transaction(function () use ($postRequest) {
+            $isDirectImc = $postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC;
+            $newStatus = $isDirectImc ? PostRequest::STATUS_PENDING_IMC_QA : PostRequest::STATUS_PENDING_OFFICE_HEAD;
+
             $postRequest->update([
-                'status' => PostRequest::STATUS_PENDING_OFFICE_HEAD,
+                'status' => $newStatus,
             ]);
 
             $this->workflowService->initializeWorkflow($postRequest);
@@ -407,6 +416,48 @@ class PostRequestController extends Controller
         }
     }
 
+    public function adminBypassApprove(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->hasAnyRole(['it_publisher', 'it_admin'])) {
+            return response()->json(['message' => 'Unauthorized. Only IT Admin can bypass approvals.'], 403);
+        }
+
+        return DB::transaction(function () use ($request, $postRequest, $user) {
+            $stages = $postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC
+                ? ['imc_qa']
+                : ['office_head', 'vice_president', 'imc_qa'];
+
+            foreach ($stages as $stage) {
+                $wf = $postRequest->approvalWorkflows()->firstOrNew(['stage' => $stage]);
+                $wf->action = 'approved';
+                $wf->approver_id = $user->id;
+                $wf->remarks = $request->input('remarks', 'Bypassed and approved directly by Administrator');
+                $wf->acted_at = now();
+                $wf->save();
+            }
+
+            $oldStatus = $postRequest->status;
+            $postRequest->update([
+                'status' => PostRequest::STATUS_APPROVED,
+            ]);
+
+            $this->recordAuditTrail(
+                $postRequest,
+                'ADMIN_BYPASS_APPROVAL',
+                $user,
+                'Bypassed all approval tiers directly to Approved status.'
+            );
+
+            $this->clearDashboardCache();
+
+            return response()->json([
+                'message' => 'Post approvals bypassed successfully. Post is now approved.',
+                'data' => new PostRequestResource($postRequest->load(['category', 'requestor', 'media', 'approvalWorkflows.approver'])),
+            ]);
+        });
+    }
+
     public function approve(Request $request, PostRequest $postRequest): JsonResponse
     {
         $user = $request->user();
@@ -449,6 +500,30 @@ class PostRequestController extends Controller
                         'action' => 'pending',
                         'stage_order' => $postRequest->approvalWorkflows()->count() + 1,
                     ]);
+                }
+            }
+
+            // Apply any edits submitted by reviewer (e.g. from [Edit & Approve])
+            $updateData = [];
+            if ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative))) {
+                $updateData['caption_narrative'] = $request->caption_narrative;
+            }
+            if ($request->has('title') && !empty(trim((string) $request->title))) {
+                $updateData['title'] = $request->title;
+            }
+            if (!empty($updateData)) {
+                $postRequest->update($updateData);
+            }
+
+            // Handle replacement media file if uploaded during approval
+            if ($request->hasFile('media')) {
+                $file = $request->file('media');
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    $path = $file->store('post-media/' . $postRequest->id, $disk);
+                    $mime = $file->getMimeType() ?: 'image/jpeg';
+                    $postRequest->media()->delete();
+                    $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), 0, true);
                 }
             }
 
@@ -1084,16 +1159,22 @@ class PostRequestController extends Controller
 
     private function recordAuditTrail(PostRequest $post, string $event, \App\Models\User $user, ?string $remarks = null): void
     {
-        $post->auditTrails()->create([
-            'user_id' => $user->id,
-            'event' => $event,
-            'from_status' => $post->getOriginal('status'),
-            'to_status' => $post->status,
-            'remarks' => $remarks,
-            'metadata' => [
-                'user_role' => $user->getRoleNames()->first(),
-            ],
-        ]);
+        try {
+            \App\Services\AuditLogService::log(
+                $event,
+                $remarks ?? "Post event {$event} performed by {$user->full_name}",
+                'INFO',
+                [
+                    'post_id' => $post->id,
+                    'user_id' => $user->id,
+                    'user_role' => $user->getRoleNames()->first(),
+                    'from_status' => $post->getOriginal('status'),
+                    'to_status' => $post->status,
+                ]
+            );
+        } catch (\Throwable $e) {
+            // Silently ignore if audit logging encounters an issue
+        }
     }
 
     /**

@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +31,7 @@ import { InstagramMediaCarousel } from '../../../components/social/InstagramMedi
 import { useQuery } from '@tanstack/react-query';
 import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 import { RejectSuccessModal } from '../../../components/ui/RejectSuccessModal';
+import { ImcApprovalModule } from '../../../components/imc/ImcApprovalModule';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -49,6 +51,9 @@ export default function ImcQaDashboard() {
   // Tab State: 'dashboard' | 'approved' | 'rejected' | 'policy-rules'
   const params = useLocalSearchParams();
   const [activeTab, _setActiveTab] = useState(params.tab || 'dashboard');
+  const [approvalViewMode, setApprovalViewMode] = useState<'modern' | 'classic'>(
+    params.view === 'modern' ? 'modern' : 'classic'
+  );
 
   useEffect(() => {
     if (params.tab && params.tab !== activeTab) {
@@ -58,8 +63,13 @@ export default function ImcQaDashboard() {
 
   const setActiveTab = (tab: string) => {
     _setActiveTab(tab);
-    router.setParams({ tab });
+    setApprovalViewMode('classic');
+    setTargetModernPostId('');
+    router.setParams({ tab, view: 'classic' });
   };
+
+  // Target post ID to open in modern approval board
+  const [targetModernPostId, setTargetModernPostId] = useState<string>('');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,6 +145,47 @@ export default function ImcQaDashboard() {
         reader.readAsDataURL(f);
       };
       input.click();
+    }
+  };
+
+  const handleDownloadImage = async (url?: string, filename?: string) => {
+    if (!url) return;
+    try {
+      const fullUrl = resolveImageUrl(url) || url;
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        try {
+          const resp = await fetch(fullUrl, { mode: 'cors' });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename || 'attachment.png';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(blobUrl);
+            }, 100);
+            return;
+          }
+        } catch {
+          // Fallback
+        }
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = fullUrl;
+        a.download = filename || 'attachment.png';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 100);
+      } else {
+        Linking.openURL(fullUrl);
+      }
+    } catch (err) {
+      console.log('Error downloading attachment:', err);
     }
   };
 
@@ -230,6 +281,7 @@ export default function ImcQaDashboard() {
         return {
           ...p,
           id: p.id.toString(),
+          routing_type: p.routing_type || (p as any).routingType || 'standard',
           title: p.title || 'Untitled',
           category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
             ? p.other_category_name
@@ -327,6 +379,7 @@ export default function ImcQaDashboard() {
           setSelectedRequest({
             ...raw,
             id: raw.id.toString(),
+            routing_type: raw.routing_type || (raw as any).routingType || 'standard',
             title: raw.title || 'Untitled',
             category: (raw.other_category_name && ['other', 'others'].includes(String(raw.category?.name || raw.category || '').toLowerCase()))
               ? raw.other_category_name
@@ -524,6 +577,22 @@ export default function ImcQaDashboard() {
 
   const renderActionBadge = (req: any) => {
     if (activeTab === 'dashboard' || (activeTab === 'all' && isPendingStatus(req.status))) {
+      const isDirectImc = String(req.routing_type || req.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
+      if (isDirectImc) {
+        return (
+          <TouchableOpacity
+            style={styles.btnEditRequestRow}
+            onPress={() => {
+              setTargetModernPostId(String(req.id));
+              setApprovalViewMode('modern');
+            }}
+          >
+            <Ionicons name="create-outline" size={13} color="#6D28D9" style={{ marginRight: 4 }} />
+            <Text style={styles.btnEditRequestRowText}>Edit Request</Text>
+          </TouchableOpacity>
+        );
+      }
+
       return (
         <>
           <TouchableOpacity
@@ -593,18 +662,53 @@ export default function ImcQaDashboard() {
       userPhotoUrl={profilePhotoUrl}
       onOpenPost={handleOpenPostById}
     >
-      {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && (
+      {/* ----------------- MODERN APPROVAL BOARD (ONLY FOR PENDING REQUESTS) ----------------- */}
+      {activeTab === 'dashboard' && approvalViewMode === 'modern' && (
+        <ImcApprovalModule
+          initialTab="Pending"
+          initialSelectedId={targetModernPostId}
+          onSwitchToClassic={() => {
+            setApprovalViewMode('classic');
+            setTargetModernPostId('');
+            router.setParams({ view: 'classic' });
+          }}
+        />
+      )}
+
+      {/* ----------------- CLASSIC IMC DASHBOARD (PENDING / APPROVED / REJECTED) ----------------- */}
+      {((activeTab === 'dashboard' && approvalViewMode === 'classic') ||
+        activeTab === 'approved' ||
+        activeTab === 'rejected' ||
+        activeTab === 'all') && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
             <View style={styles.dashboardHeaderRow}>
-              <View>
+              <View style={{ flex: 1, minWidth: 260 }}>
                 <Text style={styles.greetingTitle}>Welcome, {greetingUserName}! 👋</Text>
                 <Text style={styles.greetingSubtitle}>
                   Institutional compliance status, brand checker boards, and active quality review queues.
                 </Text>
               </View>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#FFC72C',
+                  borderRadius: 4,
+                  paddingHorizontal: 16,
+                  height: 38,
+                }}
+                onPress={() => {
+                  setApprovalViewMode('modern');
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="sparkles" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
+                <Text style={{ color: Colors.textPrimary, fontWeight: 'bold', fontSize: 13 }}>
+                  Modern Approval Board
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -673,15 +777,17 @@ export default function ImcQaDashboard() {
           <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
             {/* Table Control Header */}
             <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
-              <Text style={styles.tableTitle}>
-                {activeTab === 'dashboard'
-                  ? 'Requests Awaiting QA Review'
-                  : activeTab === 'approved'
-                    ? 'Approved Requests'
-                    : activeTab === 'rejected'
-                      ? 'Rejected Requests'
-                      : 'All Requests'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={styles.tableTitle}>
+                  {activeTab === 'dashboard'
+                    ? 'Requests Awaiting QA Review'
+                    : activeTab === 'approved'
+                      ? 'Approved Requests'
+                      : activeTab === 'rejected'
+                        ? 'Rejected Requests'
+                        : 'All Requests'}
+                </Text>
+              </View>
 
               <View style={[styles.tableControlsRight, { flexDirection: isTablet ? 'row' : 'column', alignItems: isTablet ? 'center' : 'stretch', gap: 8, zIndex: 100 }]}>
                 {/* Filters Row: Date Filter + Department Filter Side-by-Side */}
@@ -1029,11 +1135,12 @@ export default function ImcQaDashboard() {
                   </View>
                 )}
                     
-                {activeTab === 'pending' && (
+                {(activeTab === 'dashboard' || activeTab === 'all' || activeTab === 'pending') && (
                   <View style={{ marginBottom: 16 }}>
                     <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
                           {(() => {
+                            const isDirectImc = String(selectedRequest.routing_type || selectedRequest.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
                             const workflows = selectedRequest.approval_workflows || [];
                             const getStageStatus = (stageName: string) => {
                               const entry = workflows.find((w: any) => w.stage === stageName);
@@ -1043,10 +1150,6 @@ export default function ImcQaDashboard() {
                               }
                               return 'Pending';
                             };
-
-                            let deptHead = getStageStatus('office_head');
-                            let vpaa = getStageStatus('vice_president');
-                            let imc = getStageStatus('imc_qa');
                             
                             const isScheduled = selectedRequest.rawStatus === 'scheduled' ||
                               selectedRequest.status === 'SCHEDULED' ||
@@ -1054,11 +1157,7 @@ export default function ImcQaDashboard() {
                                new Date(selectedRequest.preferred_schedule_at).getTime() > Date.now() &&
                                selectedRequest.status !== 'PUBLISHED');
 
-                            if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
-                            if (vpaa === 'Rejected') { imc = 'Waiting'; }
-                            if (imc === 'Approved') {
-                              imc = isScheduled ? 'Scheduled' : 'Published';
-                            }
+                            const isPublished = selectedRequest.status === 'PUBLISHED' || selectedRequest.rawStatus === 'published';
 
                             const getIcon = (state: string) => {
                               if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
@@ -1075,6 +1174,62 @@ export default function ImcQaDashboard() {
                               if (state === 'Rejected') return '#DC2626';
                               return Colors.border;
                             };
+
+                            if (isDirectImc) {
+                              const requestState = 'Approved';
+                              let imcState = getStageStatus('imc_qa');
+                              if (selectedRequest.status === 'PENDING_IMC_QA' || selectedRequest.rawStatus === 'pending_imc_qa') imcState = 'Pending';
+                              if (selectedRequest.status === 'REJECTED' || selectedRequest.rawStatus === 'rejected') imcState = 'Rejected';
+                              if (selectedRequest.status === 'RETURNED_FOR_REVISION') imcState = 'Rejected';
+                              if (['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(selectedRequest.status)) imcState = 'Approved';
+
+                              let publishState = 'Waiting';
+                              if (isPublished) publishState = 'Published';
+                              else if (isScheduled) publishState = 'Scheduled';
+                              else if (imcState === 'Approved') publishState = 'Pending';
+
+                              return (
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
+                                  <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                    <Ionicons name={getIcon(requestState).name as any} color={getIcon(requestState).color} size={22} />
+                                    <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                      <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Request</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 10, color: getColor(requestState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>Submitted</Text>
+                                  </View>
+
+                                  <View style={{ height: 2, backgroundColor: getLineColor(requestState), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                                  <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                    <Ionicons name={getIcon(imcState).name as any} color={getIcon(imcState).color} size={22} />
+                                    <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                      <Text style={{ fontSize: 10, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 12 }}>IMC Review</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 10, color: getColor(imcState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imcState}</Text>
+                                  </View>
+
+                                  <View style={{ height: 2, backgroundColor: getLineColor(imcState), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                                  <View style={{ alignItems: 'center', flex: 1.2 }}>
+                                    <Ionicons name={getIcon(publishState).name as any} color={getIcon(publishState).color} size={22} />
+                                    <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                      <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Publish</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 10, color: getColor(publishState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{publishState}</Text>
+                                  </View>
+                                </View>
+                              );
+                            }
+
+                            let deptHead = getStageStatus('office_head');
+                            let vpaa = getStageStatus('vice_president');
+                            let imc = getStageStatus('imc_qa');
+
+                            if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
+                            if (vpaa === 'Rejected') { imc = 'Waiting'; }
+                            if (imc === 'Approved') {
+                              imc = isScheduled ? 'Scheduled' : 'Published';
+                            }
 
                             return (
                               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
@@ -1374,6 +1529,25 @@ export default function ImcQaDashboard() {
                           <Text style={styles.attachmentName}>{selectedRequest.attachment}</Text>
                           <Text style={styles.attachmentSize}>{selectedRequest.attachmentSize}</Text>
                         </View>
+                        {Boolean(selectedRequest.thumbnailUrl) && (
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: '#EFF6FF',
+                              borderWidth: 1,
+                              borderColor: '#BFDBFE',
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 6,
+                              marginLeft: 8,
+                            }}
+                            onPress={() => handleDownloadImage(selectedRequest.thumbnailUrl, selectedRequest.attachment || `${selectedRequest.title || 'media'}.png`)}
+                          >
+                            <Ionicons name="download-outline" size={14} color="#1E40AF" style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>Download</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
                   </View>
@@ -1392,22 +1566,45 @@ export default function ImcQaDashboard() {
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>
 
-                {activeTab === 'dashboard' && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.btnModalApprove}
-                      onPress={() => handleApprove(selectedRequest)}
-                    >
-                      <Text style={styles.btnModalApproveText}>Approve</Text>
-                    </TouchableOpacity>
+                {(activeTab === 'dashboard' || isPendingStatus(selectedRequest.status)) && (
+                  (() => {
+                    const isDirectImc = String(selectedRequest.routing_type || selectedRequest.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
+                    if (isDirectImc) {
+                      return (
+                        <TouchableOpacity
+                          style={styles.btnModalEditRequest}
+                          onPress={() => {
+                            const targetId = String(selectedRequest.id);
+                            setSelectedRequest(null);
+                            router.setParams({ postId: '' });
+                            setTargetModernPostId(targetId);
+                            setApprovalViewMode('modern');
+                          }}
+                        >
+                          <Ionicons name="create-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.btnModalEditRequestText}>Edit Request</Text>
+                        </TouchableOpacity>
+                      );
+                    }
 
-                    <TouchableOpacity
-                      style={styles.btnModalReject}
-                      onPress={() => handleRejectClick(selectedRequest)}
-                    >
-                      <Text style={styles.btnModalRejectText}>Reject</Text>
-                    </TouchableOpacity>
-                  </>
+                    return (
+                      <>
+                        <TouchableOpacity
+                          style={styles.btnModalApprove}
+                          onPress={() => handleApprove(selectedRequest)}
+                        >
+                          <Text style={styles.btnModalApproveText}>Approve</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.btnModalReject}
+                          onPress={() => handleRejectClick(selectedRequest)}
+                        >
+                          <Text style={styles.btnModalRejectText}>Reject</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  })()
                 )}
               </View>
             </View>
@@ -1484,12 +1681,21 @@ export default function ImcQaDashboard() {
           onRequestClose={() => setFullScreenImage(null)}
         >
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
-              onPress={() => setFullScreenImage(null)}
-            >
-              <Ionicons name="close" size={32} color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#6D28D9', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 }}
+                onPress={() => handleDownloadImage(fullScreenImage, `${selectedRequest?.title || 'media'}.png`)}
+              >
+                <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>Download</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ padding: 4 }}
+                onPress={() => setFullScreenImage(null)}
+              >
+                <Ionicons name="close" size={32} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
             <Image
               source={{ uri: fullScreenImage }}
               style={{ width: '90%', height: '90%' }}
@@ -1811,6 +2017,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: FontWeight.medium,
     color: Colors.textPrimary,
+  },
+  btnEditRequestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    backgroundColor: '#F5F3FF',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  btnEditRequestRowText: {
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: '#6D28D9',
   },
   btnApproveRow: {
     flexDirection: 'row',
@@ -2190,6 +2411,21 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs + 1,
     fontWeight: FontWeight.bold,
     color: '#B45309',
+  },
+  btnModalEditRequest: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#6D28D9',
+    borderWidth: 1,
+    borderColor: '#5B21B6',
+  },
+  btnModalEditRequestText: {
+    fontSize: FontSize.xs + 1,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
   },
   btnModalApprove: {
     paddingHorizontal: 16,

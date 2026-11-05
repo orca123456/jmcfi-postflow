@@ -107,12 +107,25 @@ export const postsApi = {
   update: (id: number, data: object) => api.put(`/posts/${id}`, data),
   delete: (id: number) => api.delete(`/posts/${id}`),
   submit: (id: number) => api.post(`/posts/${id}/submit`),
-  approve: (id: number, data: object) => api.post(`/posts/${id}/approve`, data),
-  reject: (id: number, data: object) => api.post(`/posts/${id}/reject`, data),
-  returnRevision: (id: number, data: object) => api.post(`/posts/${id}/return-revision`, data),
+  approve: (id: number, data: object = {}) => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    return api.post(`/posts/${id}/approve`, data, isFormData ? {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    } : undefined);
+  },
+  reject: (id: number, data: any = {}) => {
+    const reason = data?.rejection_reason || data?.reason || data?.remarks || 'Content request rejected.';
+    return api.post(`/posts/${id}/reject`, {
+      ...data,
+      rejection_reason: reason,
+      reason: reason,
+    });
+  },
+  returnRevision: (id: number, data: object = {}) => api.post(`/posts/${id}/return-revision`, data),
   aiCheck: (id: number) => api.post(`/posts/${id}/ai-check`),
   aiCheckDraft: (data: object) => api.post(`/posts/ai-check-draft`, data),
   setFeaturedMedia: (id: number, mediaId: number) => api.post(`/posts/${id}/featured-media`, { media_id: mediaId }),
+  adminBypassApprove: (id: number, data: object = {}) => api.post(`/posts/${id}/admin-bypass-approve`, data),
 };
 
 
@@ -137,7 +150,7 @@ export const platformApi = {
 export const publishingApi = {
   list: () => api.get('/publishing'),
   schedule: (id: number, data: object) => api.post(`/publishing/${id}/schedule`, data),
-  publish: (id: number) => api.post(`/publishing/${id}/publish`),
+  publish: (id: number, data: object = {}) => api.post(`/publishing/${id}/publish`, data),
   cancel: (id: number) => api.post(`/publishing/${id}/cancel`),
 };
 

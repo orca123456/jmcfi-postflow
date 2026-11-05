@@ -35,6 +35,7 @@ import { optimizeImageForUpload, getImageDimensions, fitImageForInstagram, isIma
 import { FacebookMediaGrid } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { useThemeStore } from '../../../store/theme';
+import { ModernRequestorDashboard } from '../../../components/requestor/ModernRequestorDashboard';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -49,19 +50,40 @@ export default function RequestorDashboard() {
     fetchPolicy();
   }, []);
 
-  // Tab State: 'dashboard' | 'post-requests' | 'approval-queue' | 'analytics' | 'policy-rules'
+  // Tab State: 'dashboard' | 'post-requests' | 'approval-queue' | 'analytics' | 'policy-rules' | 'modern-workspace'
   const params = useLocalSearchParams();
-  const [activeTab, _setActiveTab] = useState(params.tab || 'dashboard');
+  const [dashboardViewMode, setDashboardViewMode] = useState<'classic' | 'modern'>(
+    params.tab === 'modern-workspace' || params.tab === 'direct-imc' || params.view === 'modern' ? 'modern' : 'classic'
+  );
+  const [activeTab, _setActiveTab] = useState(
+    params.tab === 'modern-workspace' || params.tab === 'direct-imc' || params.view === 'modern'
+      ? 'modern-workspace'
+      : (params.tab || 'dashboard')
+  );
 
   useEffect(() => {
-    if (params.tab && params.tab !== activeTab) {
+    if (params.tab === 'modern-workspace' || params.tab === 'direct-imc' || params.view === 'modern') {
+      setDashboardViewMode('modern');
+      _setActiveTab('modern-workspace');
+    } else if (params.view === 'classic') {
+      setDashboardViewMode('classic');
+      if (params.tab && params.tab !== activeTab) {
+        _setActiveTab(params.tab as string);
+      }
+    } else if (params.tab && params.tab !== activeTab) {
       _setActiveTab(params.tab as string);
     }
-  }, [params.tab]);
+  }, [params.tab, params.view]);
 
   const setActiveTab = (tab: string) => {
     _setActiveTab(tab);
-    router.setParams({ tab });
+    if (tab === 'modern-workspace' || tab === 'direct-imc') {
+      setDashboardViewMode('modern');
+      router.setParams({ tab: 'modern-workspace', view: 'modern' });
+    } else {
+      setDashboardViewMode('classic');
+      router.setParams({ tab, view: 'classic' });
+    }
   };
 
   // Form State (New Request)
@@ -523,7 +545,7 @@ export default function RequestorDashboard() {
 
   const { data: postsDataRes, isLoading: isInitLoading, refetch: refetchPosts } = useQuery({
     queryKey: ['requestor-posts'],
-    queryFn: () => postsApi.list({ per_page: 15 }),
+    queryFn: () => postsApi.list({ per_page: 50 }),
     staleTime: 5000,
     refetchOnWindowFocus: true,
     refetchInterval: 5000,
@@ -599,13 +621,32 @@ export default function RequestorDashboard() {
       rejectedDate: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '',
       rejectionReason: p.rejection_reason || 'No reason provided.',
       nextAction: 'Pending review.',
-      steps: [
-        { label: 'Submitted', state: 'completed' },
-        { label: 'Dept Head', state: ['pending_office_head'].includes(p.status) ? 'active' : 'completed' },
-        { label: 'Vice President', state: p.status === 'pending_vice_president' ? 'active' : 'upcoming' },
-        { label: 'IMC QA', state: ['pending_imc_qa'].includes(p.status) ? 'active' : 'upcoming' },
-        { label: 'Publisher', state: ['approved', 'scheduled', 'published'].includes(p.status) ? 'active' : 'upcoming' },
-      ],
+      routing_type: p.routing_type || 'standard',
+      steps: p.routing_type === 'direct_imc'
+        ? [
+            { label: 'Request', state: 'completed' },
+            {
+              label: 'IMC',
+              state: p.status === 'pending_imc_qa'
+                ? 'active'
+                : (p.status === 'returned_for_revision'
+                  ? 'revision'
+                  : (['approved', 'scheduled', 'published'].includes(p.status) ? 'completed' : 'upcoming')),
+            },
+            {
+              label: 'Publish',
+              state: ['approved', 'scheduled', 'published'].includes(p.status)
+                ? (p.status === 'approved' ? 'active' : 'completed')
+                : 'upcoming',
+            },
+          ]
+        : [
+            { label: 'Submitted', state: 'completed' },
+            { label: 'Dept Head', state: ['pending_office_head'].includes(p.status) ? 'active' : 'completed' },
+            { label: 'Vice President', state: p.status === 'pending_vice_president' ? 'active' : 'upcoming' },
+            { label: 'IMC QA', state: ['pending_imc_qa'].includes(p.status) ? 'active' : 'upcoming' },
+            { label: 'Publisher', state: ['approved', 'scheduled', 'published'].includes(p.status) ? 'active' : 'upcoming' },
+          ],
       comments: [],
       rejectedBy,
       media: p.media || [],
@@ -617,11 +658,13 @@ export default function RequestorDashboard() {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
       const mapped = posts.map(mapPost);
-      const filtered = mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
+      // Classic dashboard lists should only contain classic/standard requests (not direct IMC requests)
+      const isClassic = (p: any) => String(p.routing_type || p.routingType || 'standard').toLowerCase() !== 'direct_imc';
+      const filtered = mapped.filter((p: any) => isClassic(p) && p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
       setMockRequests(filtered);
       setMockQueuePosts(filtered);
-      setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
-      setRejectedPosts(mapped.filter((p: any) => p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision'));
+      setDrafts(mapped.filter((p: any) => isClassic(p) && p.rawStatus === 'draft'));
+      setRejectedPosts(mapped.filter((p: any) => isClassic(p) && (p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision')));
     }
   }, [postsDataRes]);
 
@@ -856,23 +899,6 @@ export default function RequestorDashboard() {
     }
 
     const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
-    const hasAnyConfiguredPlatform = selectedPlatforms.some((k) => {
-      if (k === 'portal' || k === 'website' || k === 'wordpress') {
-        return platformAvailability.wordpress?.configured !== false;
-      }
-      if (k === 'facebook') {
-        return platformAvailability.facebook?.configured !== false;
-      }
-      if (k === 'instagram') {
-        return platformAvailability.instagram?.configured !== false;
-      }
-      return true;
-    });
-
-    if (selectedPlatforms.length > 0 && !hasAnyConfiguredPlatform) {
-      alert('None of the selected platforms are currently configured in Platform Tokens. Please select at least one configured channel (such as Facebook or Instagram), or contact IT Admin.');
-      return;
-    }
     if (selectedPlatforms.length === 0) {
       alert('Please select at least one target platform before submitting.');
       return;
@@ -1048,9 +1074,6 @@ export default function RequestorDashboard() {
   };
 
   const togglePlatform = (key: 'facebook' | 'instagram' | 'portal') => {
-    if (key === 'portal' && !platforms.portal && platformAvailability.wordpress && platformAvailability.wordpress.configured === false) {
-      alert('Notice: Website (WordPress) is currently not configured in Admin Platform Tokens.\n\nYour post will publish to your active social platforms (Facebook/Instagram), and Website publishing will be safely skipped until WordPress credentials are saved.');
-    }
     setPlatforms(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -1159,8 +1182,41 @@ export default function RequestorDashboard() {
     );
   };
 
-  const getMockSteps = (status: string) => {
+  const getMockSteps = (status: string, routingType: string = 'standard') => {
     const s = status ? status.toLowerCase() : '';
+
+    if (routingType === 'direct_imc') {
+      if (s === 'approved' || s === 'published' || s === 'scheduled') {
+        return [
+          { label: 'Request', state: 'completed' },
+          { label: 'IMC', state: 'completed' },
+          { label: 'Publish', state: s === 'approved' ? 'active' : 'completed' },
+        ];
+      } else if (s === 'pending_imc_qa' || s.includes('pending')) {
+        return [
+          { label: 'Request', state: 'completed' },
+          { label: 'IMC', state: 'active' },
+          { label: 'Publish', state: 'upcoming' },
+        ];
+      } else if (s === 'returned_for_revision' || s === 'rejected') {
+        return [
+          { label: 'Request', state: 'completed' },
+          { label: 'IMC', state: 'revision' },
+          { label: 'Publish', state: 'upcoming' },
+        ];
+      } else if (s === 'draft') {
+        return [
+          { label: 'Draft', state: 'active' },
+          { label: 'IMC', state: 'upcoming' },
+          { label: 'Publish', state: 'upcoming' },
+        ];
+      }
+      return [
+        { label: 'Request', state: 'completed' },
+        { label: 'IMC', state: 'active' },
+        { label: 'Publish', state: 'upcoming' },
+      ];
+    }
 
     if (s === 'approved' || s === 'published' || s === 'scheduled') {
       return [
@@ -1239,8 +1295,26 @@ export default function RequestorDashboard() {
         onHide={() => setToastVisible(false)}
         onDismiss={() => setToastVisible(false)}
       />
+      {/* ----------------- MODERN DIRECT-TO-IMC WORKSPACE TAB ----------------- */}
+      {(dashboardViewMode === 'modern' || activeTab === 'modern-workspace' || activeTab === 'direct-imc') && (
+        <ModernRequestorDashboard
+          allRawPosts={postsDataRes?.data?.data}
+          onSwitchToClassic={() => {
+            setDashboardViewMode('classic');
+            setActiveTab('post-requests');
+          }}
+          onBackToDashboard={() => {
+            setDashboardViewMode('classic');
+            setActiveTab('dashboard');
+          }}
+          onRequestSubmitted={() => {
+            loadPosts();
+          }}
+        />
+      )}
+
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && dashboardViewMode !== 'modern' && (
         <View style={styles.dashboardContainer}>
           <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
             <View>
@@ -1249,13 +1323,29 @@ export default function RequestorDashboard() {
                 Here is an overview of your department's content activity for this semester.
               </Text>
             </View>
-            <TouchableOpacity
-              style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
-              onPress={() => setActiveTab('post-requests')}
-            >
-              <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-              <Text style={styles.createRequestBtnGoldText}>Create New Request</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <TouchableOpacity
+                style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
+                onPress={() => {
+                  setDashboardViewMode('modern');
+                  setActiveTab('modern-workspace');
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="paper-plane" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
+                <Text style={styles.createRequestBtnGoldText}>
+                  Create request to IMC
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
+                onPress={() => setActiveTab('post-requests')}
+              >
+                <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
+                <Text style={styles.createRequestBtnGoldText}>Create New Request</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Metrics Row */}
@@ -1661,11 +1751,11 @@ export default function RequestorDashboard() {
                               <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
                                 <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
                               </View>
-                            ) : platformAvailability.facebook?.configured === true ? (
+                            ) : (
                               <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
                                 <Text style={{ fontSize: 9.5, color: '#065F46', fontWeight: '700' }}>Ready</Text>
                               </View>
-                            ) : null}
+                            )}
                           </View>
                           {platformAvailability.facebook?.configured === false && (
                             <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
@@ -1691,17 +1781,12 @@ export default function RequestorDashboard() {
                               <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
                                 <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
                               </View>
-                            ) : platformAvailability.instagram?.configured === true ? (
+                            ) : (
                               <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
                                 <Text style={{ fontSize: 9.5, color: '#065F46', fontWeight: '700' }}>Ready</Text>
                               </View>
-                            ) : null}
+                            )}
                           </View>
-                          {platforms.instagram && (
-                            <Text style={{ fontSize: 10, color: '#E1306C', marginTop: 1 }}>
-                              Photo ratio filtered to 4:5 – 1.91:1
-                            </Text>
-                          )}
                           {platformAvailability.instagram?.configured === false && (
                             <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
                               Instagram Token not configured in Admin.
@@ -1717,7 +1802,7 @@ export default function RequestorDashboard() {
                     <TouchableOpacity 
                       style={[
                         styles.platformRow,
-                        platformAvailability.wordpress && platformAvailability.wordpress.configured === false && {
+                        (platformAvailability.wordpress?.configured !== true) && {
                           backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.08)' : '#FFFBEB',
                           borderColor: '#FDE68A',
                         }
@@ -1731,18 +1816,18 @@ export default function RequestorDashboard() {
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <Text style={styles.platformNameText}>Website</Text>
-                            {platformAvailability.wordpress?.configured === false ? (
-                              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
-                                <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
-                              </View>
-                            ) : platformAvailability.wordpress?.configured === true ? (
+                            {platformAvailability.wordpress?.configured === true ? (
                               <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
                                 <Text style={{ fontSize: 9.5, color: '#065F46', fontWeight: '700' }}>Ready</Text>
                               </View>
-                            ) : null}
+                            ) : (
+                              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                                <Text style={{ fontSize: 9.5, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                              </View>
+                            )}
                           </View>
-                          {platformAvailability.wordpress?.configured === false && (
-                            <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
+                          {platformAvailability.wordpress?.configured !== true && (
+                            <Text style={{ fontSize: 10, color: '#D97706', marginTop: 2 }}>
                               Requires WordPress API / credentials setup in Admin Platform Tokens.
                             </Text>
                           )}
@@ -3076,13 +3161,7 @@ export default function RequestorDashboard() {
         </View>
       )}
 
-      {/* Other Placeholder tabs */}
-      {activeTab !== 'dashboard' && activeTab !== 'request' && activeTab !== 'post-requests' && activeTab !== 'approval-queue' && activeTab !== 'account-settings' && activeTab !== 'analytics' && activeTab !== 'policy-rules' && activeTab !== 'draft' && activeTab !== 'drafts' && activeTab !== 'rejected' && activeTab !== 'rejected-requests' && (
-        <Card style={styles.formCard}>
-          <Text style={styles.cardTitle}>{(activeTab as string).replace(/-/g, ' ').toUpperCase()}</Text>
-          <Text style={styles.mainPageSubtitle}>This section is currently under development.</Text>
-        </Card>
-      )}
+
 
       {/* Review Comments Modal */}
       {selectedQueuePost && (
@@ -3125,6 +3204,7 @@ export default function RequestorDashboard() {
                   <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
                     {(() => {
+                      const isDirectImc = selectedQueuePost.routing_type === 'direct_imc' || selectedQueuePost.rawPost?.routing_type === 'direct_imc';
                       const workflows = selectedQueuePost.approval_workflows || [];
                       const getStageStatus = (stageName: string) => {
                         const entry = workflows.find((w: any) => w.stage === stageName);
@@ -3135,21 +3215,12 @@ export default function RequestorDashboard() {
                         return 'Pending';
                       };
 
-                      let submitted = 'Approved'; // Always approved since it exists
-                      let deptHead = getStageStatus('office_head');
-                      let vpaa = getStageStatus('vice_president');
-                      let imc = getStageStatus('imc_qa');
-
                       const isScheduled = selectedQueuePost.rawStatus === 'scheduled' ||
                         (Boolean(selectedQueuePost.preferred_schedule_at) &&
                          new Date(selectedQueuePost.preferred_schedule_at).getTime() > Date.now() &&
                          selectedQueuePost.rawStatus !== 'published');
 
-                      if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
-                      if (vpaa === 'Rejected') { imc = 'Waiting'; }
-                      if (imc === 'Approved') {
-                        imc = isScheduled ? 'Scheduled' : 'Published';
-                      }
+                      const isPublished = selectedQueuePost.rawStatus === 'published';
 
                       const getIcon = (state: string) => {
                         if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
@@ -3167,49 +3238,122 @@ export default function RequestorDashboard() {
                         return Colors.border;
                       };
 
+                      // Direct to IMC: 3 Steps (Request -> IMC -> Publish)
+                      if (isDirectImc) {
+                        const requestState = 'Approved'; // Submitted
+                        let imcState = getStageStatus('imc_qa');
+                        if (selectedQueuePost.rawStatus === 'pending_imc_qa') imcState = 'Pending';
+                        if (selectedQueuePost.rawStatus === 'rejected') imcState = 'Rejected';
+                        if (selectedQueuePost.rawStatus === 'returned_for_revision') imcState = 'Rejected';
+                        if (['approved', 'scheduled', 'published'].includes(selectedQueuePost.rawStatus)) imcState = 'Approved';
+
+                        let publishState = 'Waiting';
+                        if (isPublished) publishState = 'Published';
+                        else if (isScheduled) publishState = 'Scheduled';
+                        else if (imcState === 'Approved') publishState = 'Pending';
+
+                        return (
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
+                            {/* Step 1: Request */}
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(requestState).name as any} color={getIcon(requestState).color} size={22} />
+                              <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Request</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: getColor(requestState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>Submitted</Text>
+                            </View>
+
+                            <View style={{ height: 2, backgroundColor: getLineColor(requestState), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                            {/* Step 2: IMC */}
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(imcState).name as any} color={getIcon(imcState).color} size={22} />
+                              <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>IMC Review</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: getColor(imcState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imcState}</Text>
+                            </View>
+
+                            <View style={{ height: 2, backgroundColor: getLineColor(imcState), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                            {/* Step 3: Publish */}
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(publishState).name as any} color={getIcon(publishState).color} size={22} />
+                              <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Publish</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: getColor(publishState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{publishState}</Text>
+                            </View>
+                          </View>
+                        );
+                      }
+
+                      // Standard Hierarchy Flow: Submitted -> Dept Head -> VPAA -> IMC -> Publish
+                      let submitted = 'Approved';
+                      let deptHead = getStageStatus('office_head');
+                      let vpaa = getStageStatus('vice_president');
+                      let imc = getStageStatus('imc_qa');
+
+                      if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
+                      if (vpaa === 'Rejected') { imc = 'Waiting'; }
+
+                      let publishState = 'Waiting';
+                      if (isPublished) publishState = 'Published';
+                      else if (isScheduled) publishState = 'Scheduled';
+                      else if (imc === 'Approved') publishState = 'Pending';
+
                       return (
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
-
                           {selectedQueuePost.rawStatus !== 'rejected' && selectedQueuePost.rawStatus !== 'returned_for_revision' && (
                             <>
-                              <View style={{ alignItems: 'center', flex: 1.2 }}>
-                                <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={22} />
-                                <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                              <View style={{ alignItems: 'center', flex: 1 }}>
+                                <Ionicons name={getIcon(submitted).name as any} color={getIcon(submitted).color} size={20} />
+                                <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                                   <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
                                 </View>
                                 <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                               </View>
 
-                              <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+                              <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
                             </>
                           )}
 
-                          <View style={{ alignItems: 'center', flex: 1.2 }}>
-                            <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                            <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                          <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={20} />
+                            <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                               <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Dept Head</Text>
                             </View>
                             <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{deptHead}</Text>
                           </View>
 
-                          <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+                          <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
 
-                          <View style={{ alignItems: 'center', flex: 1.2 }}>
-                            <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                            <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                          <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={20} />
+                            <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                               <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>VPAA</Text>
                             </View>
                             <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{vpaa}</Text>
                           </View>
 
-                          <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+                          <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
 
-                          <View style={{ alignItems: 'center', flex: 1.2 }}>
-                            <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                            <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
-                              <Text style={{ fontSize: 10, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 12 }}>Integrated Marketing Communications</Text>
+                          <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={20} />
+                            <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>IMC</Text>
                             </View>
                             <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imc}</Text>
+                          </View>
+
+                          <View style={{ height: 2, backgroundColor: getLineColor(imc), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
+
+                          <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Ionicons name={getIcon(publishState).name as any} color={getIcon(publishState).color} size={20} />
+                            <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                              <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Publish</Text>
+                            </View>
+                            <Text style={{ fontSize: 10, color: getColor(publishState), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{publishState}</Text>
                           </View>
 
                         </View>

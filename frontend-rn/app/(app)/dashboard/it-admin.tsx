@@ -444,6 +444,7 @@ export default function ITAdminDashboard() {
     const mappedTable = posts.map((p: any) => ({
       id: p.id.toString(),
       title: p.title || 'Untitled',
+      routing_type: p.routing_type || (p as any).routingType || 'standard',
       department: typeof p.requestor?.department === 'string' ? p.requestor.department : (p.requestor?.department?.name || p.requestor?.department?.display_name || 'Unknown'),
       requestedBy: p.requestor?.full_name || 'Unknown',
       category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
@@ -2051,6 +2052,39 @@ export default function ITAdminDashboard() {
     }
   };
 
+  const [bypassingPostId, setBypassingPostId] = useState<string | number | null>(null);
+
+  const handleBypassPublish = async (id: string | number) => {
+    setBypassingPostId(id);
+    try {
+      const res = await publishingApi.publish(Number(id), { bypass_approvals: true });
+      const hasWarnings = res.data?.data?.errors && Object.keys(res.data.data.errors).length > 0;
+      showToast(res.data?.message || 'Approvals bypassed and post published successfully!', hasWarnings ? 'warning' : 'success');
+      setPreviewPost(null);
+      await refetchInitData();
+      loadPostsData();
+    } catch (error: any) {
+      showToast('Bypass & Post failed: ' + (error.response?.data?.message || error.message), 'error');
+    } finally {
+      setBypassingPostId(null);
+    }
+  };
+
+  const handleBypassApprove = async (id: string | number) => {
+    setBypassingPostId(id);
+    try {
+      const res = await postsApi.adminBypassApprove(Number(id));
+      showToast(res.data?.message || 'Approvals bypassed successfully! Post is now Approved.', 'success');
+      setPreviewPost(null);
+      await refetchInitData();
+      loadPostsData();
+    } catch (error: any) {
+      showToast('Bypass failed: ' + (error.response?.data?.message || error.message), 'error');
+    } finally {
+      setBypassingPostId(null);
+    }
+  };
+
   const handleSetFeaturedMedia = async (postId: number, mediaId: number) => {
     try {
       if (previewPost && previewPost.rawPost && previewPost.rawPost.media) {
@@ -2517,7 +2551,6 @@ export default function ITAdminDashboard() {
         program_head_id: updatedUser.program_head_id,
         assigned_program: updatedUser.assigned_program,
         program_head: updatedUser.program_head,
-        photo_url: updatedUser.photo_url,
       } : u);
       setUsers(updatedList);
       showToast('Profile updated successfully!', 'success');
@@ -8782,11 +8815,17 @@ $response = curl_exec($ch);`}
                     </Text>
 
                     {(() => {
-                      const standardStages = [
-                        { key: 'office_head', label: 'Department Head' },
-                        { key: 'vice_president', label: 'Vice President' },
-                        { key: 'imc_qa', label: 'Integrated Marketing Communications' },
-                      ];
+                      const isDirectImc = String(previewPost?.routing_type || previewPost?.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
+
+                      const standardStages = isDirectImc
+                        ? [
+                            { key: 'imc_qa', label: 'Integrated Marketing Communications' },
+                          ]
+                        : [
+                            { key: 'office_head', label: 'Department Head' },
+                            { key: 'vice_president', label: 'Vice President' },
+                            { key: 'imc_qa', label: 'Integrated Marketing Communications' },
+                          ];
 
                       const workflows = previewPost?.rawPost?.approval_workflows || [];
 
@@ -8802,12 +8841,14 @@ $response = curl_exec($ch);`}
                         const isRejected = found ? (found.action === 'rejected' || found.action === 'returned' || found.action === 'returned_for_revision') : false;
 
                         // Dynamic approver from database; fallback only if no approver record exists
-                        const approverName = found?.approver?.full_name
-                          || (isApproved ? 'Assigned Approver' : 'Awaiting Review');
+                        const isBypassed = Boolean(found?.remarks && found.remarks.toLowerCase().includes('bypassed'));
+                        const approverName = isBypassed
+                          ? `${found?.approver?.full_name || 'Admin'} (Bypassed)`
+                          : (found?.approver?.full_name || (isApproved ? 'Assigned Approver' : 'Awaiting Review'));
                         const actionDate = found?.acted_at
                           ? new Date(found.acted_at).toLocaleDateString()
                           : (isApproved && previewPost?.requestedOn ? previewPost.requestedOn : '—');
-                        const statusLabel = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending';
+                        const statusLabel = isBypassed ? 'Bypassed' : (isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending');
 
                         return {
                           label: stage.label,
@@ -8877,6 +8918,34 @@ $response = curl_exec($ch);`}
               <TouchableOpacity onPress={() => setPreviewPost(null)} style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#FFFFFF' }}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.textPrimary }}>Close</Text>
               </TouchableOpacity>
+
+              {/* When post is still pending approvers, provide Admin Bypass & Post button */}
+              {!canPublishStatus(previewPost?.rawStatus) && previewPost?.rawStatus !== 'published' && (
+                <TouchableOpacity
+                  disabled={bypassingPostId === previewPost?.id || publishingPostId === previewPost?.id}
+                  onPress={() => handleBypassPublish(previewPost.id)}
+                  style={{
+                    paddingHorizontal: 18,
+                    paddingVertical: 9,
+                    borderRadius: 8,
+                    backgroundColor: '#7C3AED',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: (bypassingPostId === previewPost?.id || publishingPostId === previewPost?.id) ? 0.6 : 1,
+                    shadowColor: '#7C3AED',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                    {(bypassingPostId === previewPost?.id || publishingPostId === previewPost?.id) ? 'Posting...' : 'Bypass & Post'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {canPublishStatus(previewPost?.rawStatus) && (
                 <TouchableOpacity
                   disabled={publishingPostId === previewPost?.id}
