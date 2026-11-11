@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, StyleSheet, Platform } from 'react-native';
 import { useLoadingBar } from '../../store/loadingBar';
 
@@ -6,9 +6,11 @@ export const TopLoadingBar: React.FC = () => {
   const { progress, visible } = useLoadingBar();
   const animatedWidth = useRef(new Animated.Value(0)).current;
   const animatedOpacity = useRef(new Animated.Value(0)).current;
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     if (visible) {
+      setIsMounted(true);
       Animated.timing(animatedOpacity, {
         toValue: 1,
         duration: 120,
@@ -17,7 +19,7 @@ export const TopLoadingBar: React.FC = () => {
 
       Animated.timing(animatedWidth, {
         toValue: progress,
-        duration: progress === 100 ? 160 : 220,
+        duration: progress === 100 ? 150 : 200,
         useNativeDriver: false,
       }).start();
     } else {
@@ -26,10 +28,15 @@ export const TopLoadingBar: React.FC = () => {
         duration: 250,
         useNativeDriver: false,
       }).start(() => {
+        setIsMounted(false);
         animatedWidth.setValue(0);
       });
     }
   }, [progress, visible, animatedOpacity, animatedWidth]);
+
+  if (!isMounted && !visible) {
+    return null;
+  }
 
   const widthPercent = animatedWidth.interpolate({
     inputRange: [0, 100],
@@ -74,7 +81,6 @@ const styles = StyleSheet.create({
   bar: {
     height: '100%',
     backgroundColor: '#FFC72C', // JMC Gold
-    // Web enhanced gradients and glow
     ...(Platform.OS === 'web'
       ? {
           backgroundImage: 'linear-gradient(90deg, #FFC72C 0%, #F59E0B 50%, #FFD15C 100%)',
@@ -96,4 +102,3 @@ const styles = StyleSheet.create({
       : {}),
   },
 });
-

@@ -33,8 +33,8 @@ export const resolveImageUrl = (url?: string | null): string | null => {
   return `${hostBase}${cleanPath}`;
 };
 
-const API_BASE_URL = Platform.OS === 'web' && process.env.NODE_ENV === 'production' 
-  ? '/api' 
+const API_BASE_URL = Platform.OS === 'web' && process.env.NODE_ENV === 'production'
+  ? '/api'
   : (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api');
 
 const api = axios.create({
@@ -46,9 +46,18 @@ const api = axios.create({
   timeout: 60000,
 });
 
-// Attach Bearer token to every request and trigger top loading bar.
+// Attach Bearer token to every request; only trigger top loading bar for user mutations, never silent background polling
 api.interceptors.request.use(async (config) => {
-  topLoadingBar.start();
+  const method = (config.method || 'get').toLowerCase();
+  const isMutation = ['post', 'put', 'patch', 'delete'].includes(method);
+  const isExplicit = (config as any).showLoadingBar === true;
+  const isSilent = (config as any).silent === true || config.headers?.['X-Silent-Poll'];
+
+  if ((isMutation || isExplicit) && !isSilent) {
+    (config as any)._triggeredLoadingBar = true;
+    topLoadingBar.start();
+  }
+
   const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -61,11 +70,15 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
-    topLoadingBar.finish();
+    if ((response.config as any)?._triggeredLoadingBar) {
+      topLoadingBar.finish();
+    }
     return response;
   },
   (error) => {
-    topLoadingBar.finish();
+    if (error.config && (error.config as any)._triggeredLoadingBar) {
+      topLoadingBar.finish();
+    }
     if (error.response?.status === 401) {
       if (Platform.OS === 'web') {
         sessionStorage.removeItem('auth_token');
