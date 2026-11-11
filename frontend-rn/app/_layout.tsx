@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth';
 import { useFonts, Kameron_400Regular, Kameron_700Bold } from '@expo-google-fonts/kameron';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CustomAlertProvider } from '../components/CustomAlert';
+import { TopLoadingBar } from '../components/ui/TopLoadingBar';
 
 export default function RootLayout() {
   const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
@@ -49,6 +50,7 @@ export default function RootLayout() {
 
   return (
     <CustomAlertProvider>
+      <TopLoadingBar />
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />

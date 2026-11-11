@@ -21,8 +21,24 @@ import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../constant
 import { resolveImageUrl } from '../services/api';
 import { ChatBot } from './ChatBot';
 import { departmentsApi, authApi, notificationsApi, programHeadsApi } from '../services/api';
+import { topLoadingBar } from '../store/loadingBar';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+interface SidebarSubItem {
+  id: string;
+  label: string;
+  icon: any;
+  active: boolean;
+}
+
+interface SidebarNavItem {
+  id: string;
+  label: string;
+  icon: any;
+  active: boolean;
+  subItems?: SidebarSubItem[];
+}
 
 interface DashboardShellProps {
   title: string;
@@ -131,6 +147,33 @@ export function DashboardShell({
       params: { postId: String(postId) },
     });
   };
+
+  // Expandable sidebar submenus (default closed)
+  const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({});
+
+  const toggleSubMenu = React.useCallback((menuId: string) => {
+    setExpandedMenus((prev) => ({
+      ...prev,
+      [menuId]: !prev[menuId],
+    }));
+  }, []);
+
+  React.useEffect(() => {
+    if (
+      activeTab === 'publishing-requests' ||
+      activeTab === 'published-posts'
+    ) {
+      setExpandedMenus((prev) => ({ ...prev, 'publication-management': true }));
+    }
+  }, [activeTab]);
+
+  const handleTabPress = React.useCallback((tabId: string) => {
+    if (onTabChange) {
+      topLoadingBar.start();
+      onTabChange(tabId);
+      setTimeout(() => topLoadingBar.finish(), 300);
+    }
+  }, [onTabChange]);
 
   // Mobile drawer state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = React.useState(false);
@@ -319,7 +362,7 @@ export function DashboardShell({
   }, [finalPhotoUrl]);
 
   const MIN_WIDTH = 64;
-  const MAX_WIDTH = 260;
+  const MAX_WIDTH = 275;
   const sidebarWidthAnim = React.useRef(new Animated.Value(MIN_WIDTH)).current;
 
   const openSidebar = React.useCallback(() => {
@@ -637,7 +680,7 @@ export function DashboardShell({
     return getRoleLabel(primaryRole) || 'User';
   }, [user]);
 
-  const getSidebarNavItems = () => {
+  const getSidebarNavItems = (): SidebarNavItem[] => {
     if (userRole === 'requestor') {
       const active = activeTab ?? 'dashboard';
       return [
@@ -645,6 +688,42 @@ export function DashboardShell({
         { id: 'request', label: 'Create Request', icon: 'document-text-outline' as const, active: active === 'request' || active === 'post-requests' || active === 'modern-workspace' || active === 'direct-imc' },
         { id: 'draft', label: 'Draft', icon: 'create-outline' as const, active: active === 'draft' },
         { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
+        { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
+      ];
+    }
+
+    const isImcUser =
+      roleBadgeLabel === 'Integrated Marketing Communications' ||
+      pathname?.includes('imc-qa') ||
+      (departmentName || '').toLowerCase().includes('integrated marketing') ||
+      (departmentName || '').toLowerCase().includes('imc');
+
+    if (isImcUser) {
+      const active = activeTab ?? 'dashboard';
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
+        { id: 'approved', label: 'Approved', icon: 'checkmark-circle-outline' as const, active: active === 'approved' },
+        { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
+        {
+          id: 'publication-management',
+          label: 'Publication Management',
+          icon: 'folder-outline' as const,
+          active: active === 'publication-management' || active === 'publishing-requests' || active === 'published-posts',
+          subItems: [
+            {
+              id: 'publishing-requests',
+              label: 'Publishing Requests',
+              icon: 'mail-outline' as const,
+              active: active === 'publishing-requests' || active === 'publication-management',
+            },
+            {
+              id: 'published-posts',
+              label: 'Published Posts',
+              icon: 'paper-plane-outline' as const,
+              active: active === 'published-posts',
+            },
+          ],
+        },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
     }
@@ -1038,45 +1117,116 @@ export function DashboardShell({
                 ) : null}
 
                 <View style={styles.sidebarNav}>
-                  {sidebarNavItems.map((item, idx) => (
-                    <AnimatedTouchable
-                      key={idx}
-                      style={[
-                        styles.sidebarNavItem,
-                        item.active && styles.sidebarNavItemActivePurple,
-                        {
-                          width: sidebarWidthAnim.interpolate({
-                            inputRange: [MIN_WIDTH, MAX_WIDTH],
-                            outputRange: [48, MAX_WIDTH - 16]
-                          })
-                        }
-                      ]}
-                      onPress={() => {
-                        if (onTabChange) onTabChange(item.id);
-                        if (sidebarOpenedByHover) closeSidebar();
-                      }}
-                    >
-                      <View style={styles.sidebarNavIconWrapper}>
-                        <Ionicons name={item.icon} size={22} color="#FFFFFF" />
-                      </View>
-                      <Animated.View style={{ 
-                        opacity: sidebarWidthAnim.interpolate({
-                          inputRange: [MIN_WIDTH, MAX_WIDTH],
-                          outputRange: [0, 1]
-                        }) 
-                      }}>
-                        <Text
+                  {sidebarNavItems.map((item, idx) => {
+                    const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
+                    const isExpanded = hasSubItems ? (expandedMenus[item.id] ?? true) : false;
+
+                    return (
+                      <View key={item.id || idx}>
+                        <AnimatedTouchable
                           style={[
-                            styles.sidebarNavLabel,
-                            item.active && styles.sidebarNavLabelActivePurple,
+                            styles.sidebarNavItem,
+                            (!hasSubItems && item.active) && styles.sidebarNavItemActivePurple,
+                            {
+                              width: sidebarWidthAnim.interpolate({
+                                inputRange: [MIN_WIDTH, MAX_WIDTH],
+                                outputRange: [48, MAX_WIDTH - 16]
+                              })
+                            }
                           ]}
-                          numberOfLines={1}
+                          onPress={() => {
+                            if (hasSubItems) {
+                              if (!isSidebarOpen) {
+                                openSidebar();
+                                setExpandedMenus((prev) => ({ ...prev, [item.id]: true }));
+                              } else {
+                                toggleSubMenu(item.id);
+                              }
+                            } else {
+                              handleTabPress(item.id);
+                              if (sidebarOpenedByHover) closeSidebar();
+                            }
+                          }}
                         >
-                          {item.label}
-                        </Text>
-                      </Animated.View>
-                    </AnimatedTouchable>
-                  ))}
+                          <View style={styles.sidebarNavIconWrapper}>
+                            <Ionicons name={item.icon} size={22} color="#FFFFFF" />
+                          </View>
+                          <Animated.View style={{ 
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingRight: 8,
+                            opacity: sidebarWidthAnim.interpolate({
+                              inputRange: [MIN_WIDTH, MAX_WIDTH],
+                              outputRange: [0, 1]
+                            }) 
+                          }}>
+                            <Text
+                              style={[
+                                styles.sidebarNavLabel,
+                                item.active && styles.sidebarNavLabelActivePurple,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {item.label}
+                            </Text>
+                            {hasSubItems && (
+                              <Ionicons
+                                name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                size={15}
+                                color="rgba(255, 255, 255, 0.85)"
+                                style={{ marginLeft: 4 }}
+                              />
+                            )}
+                          </Animated.View>
+                        </AnimatedTouchable>
+
+                        {/* Sub-items dropdown */}
+                        {hasSubItems && isExpanded && (isSidebarOpen || sidebarOpenedByHover) && (
+                          <Animated.View
+                            style={{
+                              paddingLeft: 10,
+                              paddingTop: 2,
+                              paddingBottom: 4,
+                              opacity: sidebarWidthAnim.interpolate({
+                                inputRange: [MIN_WIDTH, MIN_WIDTH + 45, MAX_WIDTH],
+                                outputRange: [0, 0, 1],
+                              }),
+                            }}
+                          >
+                            {item.subItems!.map((sub: any) => (
+                              <TouchableOpacity
+                                key={sub.id}
+                                style={[
+                                  styles.sidebarSubNavItem,
+                                  sub.active && styles.sidebarSubNavItemActive,
+                                ]}
+                                onPress={() => {
+                                  handleTabPress(sub.id);
+                                  if (sidebarOpenedByHover) closeSidebar();
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <View style={styles.sidebarSubNavIconWrapper}>
+                                  <Ionicons name={sub.icon} size={18} color="#FFFFFF" />
+                                </View>
+                                <Text
+                                  style={[
+                                    styles.sidebarSubNavLabel,
+                                    sub.active && styles.sidebarSubNavLabelActive,
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {sub.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </Animated.View>
+                        )}
+                      </View>
+                    );
+                  })}
 
                 </View>
               </View>
@@ -1149,33 +1299,85 @@ export function DashboardShell({
 
             {/* Nav Items */}
             <ScrollView style={styles.mobileDrawerNavList} showsVerticalScrollIndicator={false}>
-              {sidebarNavItems.map((item, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[
-                    styles.mobileDrawerNavItem,
-                    item.active && styles.mobileDrawerNavItemActive,
-                  ]}
-                  onPress={() => {
-                    if (onTabChange) onTabChange(item.id);
-                    closeMobileDrawer();
-                  }}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={22}
-                    color={item.active ? '#FFC72C' : '#FFFFFF'}
-                  />
-                  <Text
-                    style={[
-                      styles.mobileDrawerNavLabel,
-                      item.active && styles.mobileDrawerNavLabelActive,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {sidebarNavItems.map((item, idx) => {
+                const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
+                const isExpanded = hasSubItems ? (expandedMenus[item.id] ?? true) : false;
+
+                return (
+                  <View key={item.id || idx}>
+                    <TouchableOpacity
+                      style={[
+                        styles.mobileDrawerNavItem,
+                        (!hasSubItems && item.active) && styles.mobileDrawerNavItemActive,
+                      ]}
+                      onPress={() => {
+                        if (hasSubItems) {
+                          toggleSubMenu(item.id);
+                        } else {
+                          handleTabPress(item.id);
+                          closeMobileDrawer();
+                        }
+                      }}
+                    >
+                      <Ionicons
+                        name={item.icon}
+                        size={22}
+                        color={item.active ? '#FFC72C' : '#FFFFFF'}
+                      />
+                      <Text
+                        style={[
+                          styles.mobileDrawerNavLabel,
+                          item.active && styles.mobileDrawerNavLabelActive,
+                          { flex: 1 },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                      {hasSubItems && (
+                        <Ionicons
+                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                          size={18}
+                          color="rgba(255, 255, 255, 0.7)"
+                        />
+                      )}
+                    </TouchableOpacity>
+
+                    {hasSubItems && isExpanded && (
+                      <View style={{ paddingLeft: 18, marginBottom: 6 }}>
+                        {item.subItems!.map((sub: any) => (
+                          <TouchableOpacity
+                            key={sub.id}
+                            style={[
+                              styles.mobileDrawerNavItem,
+                              { paddingVertical: 10, paddingHorizontal: 12 },
+                              sub.active && { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+                            ]}
+                            onPress={() => {
+                              handleTabPress(sub.id);
+                              closeMobileDrawer();
+                            }}
+                          >
+                            <Ionicons
+                              name={sub.icon}
+                              size={18}
+                              color="#FFFFFF"
+                            />
+                            <Text
+                              style={[
+                                styles.mobileDrawerNavLabel,
+                                { fontSize: 14 },
+                                sub.active && { fontWeight: '700', color: '#FFFFFF' },
+                              ]}
+                            >
+                              {sub.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
 
             </ScrollView>
           </Animated.View>
@@ -1535,8 +1737,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sidebarNavIconWrapper: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1544,13 +1746,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.18)', // Lighter purple pill fill for active tab
   },
   sidebarNavLabel: {
-    fontSize: FontSize.md,
+    fontSize: 14.5,
     color: '#FFFFFF',
     fontWeight: FontWeight.medium,
+    letterSpacing: 0.1,
   },
   sidebarNavLabelActivePurple: {
     color: '#FFFFFF',
     fontWeight: FontWeight.bold,
+  },
+  sidebarSubNavItem: {
+    height: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 21,
+    paddingLeft: 8,
+    marginVertical: 2,
+    overflow: 'hidden',
+  },
+  sidebarSubNavItemActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  sidebarSubNavIconWrapper: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  sidebarSubNavLabel: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontWeight: '500' as const,
+  },
+  sidebarSubNavLabelActive: {
+    color: '#FFFFFF',
+    fontWeight: '700' as const,
   },
   sidebarFooter: {
     paddingVertical: Spacing.md,

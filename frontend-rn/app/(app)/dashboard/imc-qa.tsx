@@ -32,6 +32,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 import { RejectSuccessModal } from '../../../components/ui/RejectSuccessModal';
 import { ImcApprovalModule } from '../../../components/imc/ImcApprovalModule';
+import { ImcPublishingRequests } from '../../../components/imc/ImcPublishingRequests';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -575,6 +576,33 @@ export default function ImcQaDashboard() {
   const isPendingStatus = (status: string) => status === 'PENDING_IMC_QA';
   const isApprovedStatus = (status: string) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(status);
 
+  // Dedicated data collections for Publication Management
+  const publishingRequestsList = React.useMemo(() => {
+    const directPending = requestsList.filter((r: any) =>
+      String(r.routing_type || r.rawPost?.routing_type || '').toLowerCase() === 'direct_imc'
+    );
+    if (directPending.length > 0) return directPending;
+    return requestsList;
+  }, [requestsList]);
+
+  const publishedPostsList = React.useMemo(() => {
+    return approvedRequests.filter((r: any) =>
+      ['PUBLISHED', 'SCHEDULED'].includes(String(r.status || '').toUpperCase()) ||
+      ['published', 'scheduled'].includes(String(r.rawStatus || '').toLowerCase())
+    );
+  }, [approvedRequests]);
+
+  const handleReviewFromPublishingRequests = (req: any) => {
+    const isDirectImc = String(req.routing_type || req.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
+    if (isDirectImc) {
+      setTargetModernPostId(String(req.id));
+      setApprovalViewMode('modern');
+      _setActiveTab('dashboard');
+    } else {
+      setSelectedRequest(req);
+    }
+  };
+
   const renderActionBadge = (req: any) => {
     if (activeTab === 'dashboard' || (activeTab === 'all' && isPendingStatus(req.status))) {
       const isDirectImc = String(req.routing_type || req.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
@@ -980,6 +1008,26 @@ export default function ImcQaDashboard() {
             />
           </Card>
         </View>
+      )}
+
+      {/* ----------------- PUBLICATION MANAGEMENT / PUBLISHING REQUESTS TAB ----------------- */}
+      {(activeTab === 'publishing-requests' || activeTab === 'publication-management') && (
+        <ImcPublishingRequests
+          requests={publishingRequestsList}
+          onReviewRequest={handleReviewFromPublishingRequests}
+          departments={departmentOptions}
+          mode="requests"
+        />
+      )}
+
+      {/* ----------------- PUBLISHED POSTS TAB ----------------- */}
+      {activeTab === 'published-posts' && (
+        <ImcPublishingRequests
+          requests={publishedPostsList}
+          onReviewRequest={handleReviewFromPublishingRequests}
+          departments={departmentOptions}
+          mode="published"
+        />
       )}
 
       {/* ----------------- POLICY RULES TAB ----------------- */}

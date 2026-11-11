@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { topLoadingBar } from '../store/loadingBar';
 
 // For web, use sessionStorage fallback since SecureStore is native-only
 const getToken = async (): Promise<string | null> => {
@@ -45,20 +46,26 @@ const api = axios.create({
   timeout: 60000,
 });
 
-// Attach Bearer token to every request.
+// Attach Bearer token to every request and trigger top loading bar.
 api.interceptors.request.use(async (config) => {
+  topLoadingBar.start();
   const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
+}, (error) => {
+  topLoadingBar.finish();
+  return Promise.reject(error);
 });
 
 api.interceptors.response.use(
   (response) => {
+    topLoadingBar.finish();
     return response;
   },
   (error) => {
+    topLoadingBar.finish();
     if (error.response?.status === 401) {
       if (Platform.OS === 'web') {
         sessionStorage.removeItem('auth_token');
