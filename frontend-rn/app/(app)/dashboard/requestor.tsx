@@ -1331,20 +1331,6 @@ export default function RequestorDashboard() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <TouchableOpacity
                 style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
-                onPress={() => {
-                  setDashboardViewMode('modern');
-                  setActiveTab('modern-workspace');
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="paper-plane" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={styles.createRequestBtnGoldText}>
-                  Create request to IMC
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
                 onPress={() => setActiveTab('request')}
               >
                 <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
