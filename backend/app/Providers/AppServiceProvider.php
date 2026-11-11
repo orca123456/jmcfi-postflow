@@ -72,36 +72,36 @@ class AppServiceProvider extends ServiceProvider
         // Apply system-wide runtime mail configuration for all system notifications
         try {
             if (Schema::hasTable('system_settings')) {
-                $mailer   = SystemSetting::where('key', 'mail_mailer')->value('value')   ?? 'smtp';
-                $host     = SystemSetting::where('key', 'mail_host')->value('value')     ?? 'smtp.gmail.com';
-                $port     = SystemSetting::where('key', 'mail_port')->value('value')     ?? '587';
-                $username = SystemSetting::where('key', 'mail_username')->value('value') ?? '';
-                $password = SystemSetting::where('key', 'mail_password')->value('value') ?? '';
-                $encrypt  = SystemSetting::where('key', 'mail_encryption')->value('value') ?? 'tls';
-                $from     = SystemSetting::where('key', 'mail_from_address')->value('value') ?? 'postflow@jmc.edu.ph';
-                $name     = SystemSetting::where('key', 'mail_from_name')->value('value')    ?? 'JMCFI PostFlow';
+                $customMailer = SystemSetting::where('key', 'mail_mailer')->value('value');
+                $host         = SystemSetting::where('key', 'mail_host')->value('value')     ?? 'smtp.gmail.com';
+                $port         = SystemSetting::where('key', 'mail_port')->value('value')     ?? '587';
+                $username     = SystemSetting::where('key', 'mail_username')->value('value') ?? '';
+                $password     = SystemSetting::where('key', 'mail_password')->value('value') ?? '';
+                $encrypt      = SystemSetting::where('key', 'mail_encryption')->value('value') ?? 'tls';
+                $from         = SystemSetting::where('key', 'mail_from_address')->value('value') ?? 'postflow@jmc.edu.ph';
+                $name         = SystemSetting::where('key', 'mail_from_name')->value('value')    ?? 'JMCFI PostFlow';
 
                 $cleanPassword = str_replace(' ', '', $password);
                 $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
                 $isResend   = str_contains(strtolower($host), 'resend')   || str_starts_with($cleanPassword, 're_');
 
-                if ($isSendGrid) {
+                if ($isSendGrid && !empty($cleanPassword)) {
                     Config::set('mail.default', 'sendgrid');
                     Config::set('mail.mailers.sendgrid.transport', 'sendgrid');
                     Config::set('mail.mailers.sendgrid.key', $cleanPassword);
-                } elseif ($isResend) {
+                } elseif ($isResend && !empty($cleanPassword)) {
                     Config::set('mail.default', 'resend');
                     Config::set('mail.mailers.resend.transport', 'resend');
                     Config::set('mail.mailers.resend.key', $cleanPassword);
-                } else {
-                    Config::set('mail.default', $mailer);
+                } elseif (!empty($username) && !empty($cleanPassword)) {
+                    Config::set('mail.default', $customMailer ?: 'smtp');
                     Config::set('mail.mailers.smtp.transport', 'smtp');
                     Config::set('mail.mailers.smtp.host', $host);
                     Config::set('mail.mailers.smtp.port', (int) $port);
                     Config::set('mail.mailers.smtp.username', $username);
                     Config::set('mail.mailers.smtp.password', $cleanPassword);
                     Config::set('mail.mailers.smtp.encryption', $encrypt ?: null);
-                    Config::set('mail.mailers.smtp.timeout', 12);
+                    Config::set('mail.mailers.smtp.timeout', 5);
                     Config::set('mail.mailers.smtp.stream', [
                         'ssl' => [
                             'allow_self_signed' => true,
@@ -109,6 +109,9 @@ class AppServiceProvider extends ServiceProvider
                             'verify_peer_name' => false,
                         ],
                     ]);
+                } else {
+                    // Fall back to environment default (e.g. log in dev) so unauthenticated SMTP does not hang
+                    Config::set('mail.default', env('MAIL_MAILER', 'log'));
                 }
 
                 Config::set('mail.from.address', $from ?: 'postflow@jmc.edu.ph');

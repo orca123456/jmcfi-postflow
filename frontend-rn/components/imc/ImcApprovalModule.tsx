@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import { PaginationControl } from '../ui/PaginationControl';
 
 export interface ImcRequestItem {
   id: string;
@@ -178,6 +179,26 @@ export const ImcApprovalModule: React.FC<ImcApprovalModuleProps> = ({
       return matchSearch && matchFilter;
     });
   }, [requests, searchQuery, activeFilter]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeFilter]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / itemsPerPage));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredRequests.length, itemsPerPage, currentPage]);
+
+  const paginatedRequests = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredRequests.slice(start, start + itemsPerPage);
+  }, [filteredRequests, currentPage, itemsPerPage]);
 
   const handleDecision = async (type: 'Approve' | 'Edit & Approve' | 'Reject') => {
     if (!selectedRequest) return;
@@ -489,7 +510,7 @@ export const ImcApprovalModule: React.FC<ImcApprovalModuleProps> = ({
                 <Text style={styles.emptySubtitle}>Adjust your search or filter criteria</Text>
               </View>
             ) : (
-              filteredRequests.map((item) => {
+              paginatedRequests.map((item) => {
                 const isSelected = selectedRequestId === item.id;
                 return (
                   <TouchableOpacity
@@ -614,6 +635,22 @@ export const ImcApprovalModule: React.FC<ImcApprovalModuleProps> = ({
               })
             )}
           </ScrollView>
+
+          {filteredRequests.length > 0 && (
+            <View style={styles.paginationCard}>
+              <PaginationControl
+                currentPage={currentPage}
+                totalItems={filteredRequests.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={(val) => {
+                  setItemsPerPage(val);
+                  setCurrentPage(1);
+                }}
+                itemName="requests"
+              />
+            </View>
+          )}
         </View>
 
         {/* ================= RIGHT COLUMN: CONTENT REQUEST DETAILS PANEL ================= */}
@@ -1233,6 +1270,14 @@ const styles = StyleSheet.create({
   cardsScrollContent: {
     paddingBottom: 24,
     gap: 14,
+  },
+  paginationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 10,
+    overflow: 'hidden',
   },
   requestCard: {
     flexDirection: 'row',

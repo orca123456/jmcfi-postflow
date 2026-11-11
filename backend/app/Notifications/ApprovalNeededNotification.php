@@ -20,7 +20,14 @@ class ApprovalNeededNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        $channels = ['database'];
+        $defaultMailer = config('mail.default');
+        if (in_array($defaultMailer, ['log', 'array', 'sendgrid', 'resend'])) {
+            $channels[] = 'mail';
+        } elseif ($defaultMailer === 'smtp' && !empty(config('mail.mailers.smtp.username')) && !empty(config('mail.mailers.smtp.password'))) {
+            $channels[] = 'mail';
+        }
+        return $channels;
     }
 
     public function toMail(object $notifiable): MailMessage

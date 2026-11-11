@@ -36,6 +36,7 @@ import { FacebookMediaGrid } from '../../../components/social/FacebookMediaGrid'
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { useThemeStore } from '../../../store/theme';
 import { ModernRequestorDashboard } from '../../../components/requestor/ModernRequestorDashboard';
+import { RequestTypeSelector } from '../../../components/requestor/RequestTypeSelector';
 
 export default function RequestorDashboard() {
   const router = useRouter();
@@ -340,7 +341,7 @@ export default function RequestorDashboard() {
     setPlatforms(parsePlatforms(draft.platforms));
     setEditingPostHasImage(Array.isArray(draft.media) && draft.media.some(isImageFile));
     if (draft.publishDate) setPublishDate(draft.publishDate);
-    setActiveTab('request');
+    setActiveTab('post-requests');
     alert(`Draft "${draft.title}" loaded into request form. You can now edit and submit!`);
   };
 
@@ -382,7 +383,7 @@ export default function RequestorDashboard() {
     setCaption(post.caption_narrative || post.caption || '');
     setPlatforms(parsePlatforms(post.platforms));
     setEditingPostHasImage(false);
-    setActiveTab('request');
+    setActiveTab('post-requests');
     alert(`Created new request form pre-filled with data from "${post.title}". Please revise according to approver comments.`);
   };
 
@@ -1303,6 +1304,10 @@ export default function RequestorDashboard() {
             setDashboardViewMode('classic');
             setActiveTab('post-requests');
           }}
+          onChangeRequestType={() => {
+            setDashboardViewMode('classic');
+            setActiveTab('request');
+          }}
           onBackToDashboard={() => {
             setDashboardViewMode('classic');
             setActiveTab('dashboard');
@@ -1340,7 +1345,7 @@ export default function RequestorDashboard() {
 
               <TouchableOpacity
                 style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
-                onPress={() => setActiveTab('post-requests')}
+                onPress={() => setActiveTab('request')}
               >
                 <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
                 <Text style={styles.createRequestBtnGoldText}>Create New Request</Text>
@@ -1550,20 +1555,53 @@ export default function RequestorDashboard() {
         </View>
       )}
 
-      {/* ----------------- CREATE NEW REQUEST TAB ----------------- */}
-      {(activeTab === 'post-requests' || activeTab === 'request') && (
+      {/* ----------------- REQUEST TYPE SELECTOR TAB ----------------- */}
+      {activeTab === 'request' && dashboardViewMode !== 'modern' && (
+        <RequestTypeSelector
+          onSelectType={(type) => {
+            if (type === 'standard') {
+              setDashboardViewMode('classic');
+              setActiveTab('post-requests');
+            } else {
+              setDashboardViewMode('modern');
+              setActiveTab('modern-workspace');
+            }
+          }}
+          onBackToDashboard={() => {
+            setActiveTab('dashboard');
+          }}
+        />
+      )}
+
+      {/* ----------------- CREATE NEW REQUEST TAB (STANDARD WORKFLOW FORM) ----------------- */}
+      {activeTab === 'post-requests' && dashboardViewMode !== 'modern' && (
         <View style={styles.formContainer}>
           <View style={styles.topActionRow}>
             <View style={styles.breadcrumbColumn}>
-              <Text style={styles.breadcrumbText}>
-                POST REQUESTS <Text style={{ color: Colors.textMuted }}>&gt;</Text> NEW REQUEST
-              </Text>
+              <TouchableOpacity
+                onPress={() => setActiveTab('request')}
+                activeOpacity={0.7}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}
+              >
+                <Ionicons name="arrow-back" size={13} color="#581C87" />
+                <Text style={[styles.breadcrumbText, { color: '#581C87' }]}>
+                  POST REQUESTS <Text style={{ color: Colors.textMuted }}>/</Text> NEW REQUEST
+                </Text>
+              </TouchableOpacity>
               <Text style={styles.mainPageTitle}>Create New Content Request</Text>
               <Text style={styles.mainPageSubtitle}>
                 Submit your content for review by the departmental approval committee.
               </Text>
             </View>
             <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.draftButton, { borderColor: '#581C87' }]}
+                onPress={() => setActiveTab('request')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="swap-horizontal" size={15} color="#581C87" style={{ marginRight: 6 }} />
+                <Text style={[styles.draftButtonText, { color: '#581C87' }]}>Change Request Type</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.draftButton, (isSavingDraft || isSubmittingRequest) && styles.actionButtonDisabled]}
                 onPress={handleSaveDraft}
