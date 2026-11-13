@@ -195,6 +195,11 @@ class PostRequest extends Model
 
     public function canBeEditedBy(User $user): bool
     {
+        $isAdmin = $user->roleCategory() === 'admin' || $user->hasAnyRole(['it_admin', 'it_publisher', 'admin']);
+        if ($isAdmin) {
+            return true;
+        }
+
         // IMC QA Checker can edit if the post is pending IMC QA review
         if ($this->status === self::STATUS_PENDING_IMC_QA && $user->workflowRole() === 'imc_qa_checker') {
             return true;
@@ -203,7 +208,7 @@ class PostRequest extends Model
         if ($this->status !== 'draft' && $this->status !== 'returned_for_revision') {
             return false;
         }
-        return $this->requestor_id === $user->id || $user->hasRole('admin');
+        return $this->requestor_id === $user->id;
     }
 
     public function canBeApprovedBy(User $user): bool

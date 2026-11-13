@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   activePageButton: {
-    backgroundColor: '#3b0764',
+    backgroundColor: '#4C007C',
   },
   pageText: {
     color: '#4b5563',

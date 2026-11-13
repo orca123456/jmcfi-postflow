@@ -297,7 +297,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
     const isFb = lp === 'facebook';
     const isIg = lp === 'instagram';
     const iconName = isFb ? 'logo-facebook' : isIg ? 'logo-instagram' : 'globe-outline';
-    const iconColor = isFb ? '#1877F2' : isIg ? '#E4405F' : '#2E0854';
+    const iconColor = isFb ? '#1877F2' : isIg ? '#E4405F' : '#4C007C';
     const label = isFb ? 'Facebook' : isIg ? 'Instagram' : 'Website';
     return (
       <View key={`${plat}-${idx}`} style={styles.platformChip}>
@@ -316,15 +316,19 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
         <View style={styles.modalCard}>
           {/* ── Top Header ── */}
           <View style={styles.header}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={styles.headerIconBadge}>
-                <Ionicons name="document-text-outline" size={18} color="#FFC72C" />
+                <View style={styles.headerIconInner}>
+                  <Ionicons name="newspaper" size={14} color="#4C007C" />
+                </View>
+                <View style={styles.headerIconCornerBadge}>
+                  <Ionicons name="checkmark-sharp" size={9} color="#FFC72C" />
+                </View>
               </View>
               <Text style={styles.headerTitle}>Publication Review</Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
-              <Ionicons name="close" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.closeBtnText}>Close</Text>
+              <Ionicons name="close" size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -641,7 +645,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                     const active = previewPlatform === plat;
                     const iconName =
                       plat === 'facebook' ? 'logo-facebook' : plat === 'instagram' ? 'logo-instagram' : 'globe-outline';
-                    const activeColor = plat === 'facebook' ? '#1877F2' : plat === 'instagram' ? '#E4405F' : '#2E0854';
+                    const activeColor = plat === 'facebook' ? '#1877F2' : plat === 'instagram' ? '#E4405F' : '#4C007C';
                     const label = plat === 'facebook' ? 'Facebook' : plat === 'instagram' ? 'Instagram' : 'Website';
                     return (
                       <TouchableOpacity
@@ -796,8 +800,8 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
           </ScrollView>
 
           {/* ── Sticky Footer ── */}
-          <View style={styles.footer}>
-            {isPending ? (
+          {isPending && (
+            <View style={styles.footer}>
               <View style={styles.footerActions}>
                 <TouchableOpacity
                   style={styles.rejectBtn}
@@ -820,14 +824,8 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                   )}
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.footerActions}>
-                <TouchableOpacity style={styles.rejectBtn} onPress={onClose} activeOpacity={0.8}>
-                  <Text style={styles.rejectBtnText}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -856,7 +854,7 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   header: {
-    backgroundColor: '#2E0854',
+    backgroundColor: '#4C007C',
     paddingHorizontal: 24,
     paddingVertical: 15,
     flexDirection: 'row',
@@ -864,10 +862,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 199, 44, 0.16)',
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 199, 44, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  headerIconInner: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: '#FFC72C',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconCornerBadge: {
+    position: 'absolute',
+    bottom: -3,
+    right: -3,
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: '#4C007C',
+    borderWidth: 1.5,
+    borderColor: '#FFC72C',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -878,19 +900,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   closeBtn: {
-    flexDirection: 'row',
+    width: 34,
+    height: 34,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.28)',
     borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  closeBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
   },
   bodyScroll: {
     flex: 1,
@@ -1025,7 +1042,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   thumbBoxActive: {
-    borderColor: '#2E0854',
+    borderColor: '#4C007C',
   },
   thumbImg: {
     width: '100%',
@@ -1176,7 +1193,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   browseBtn: {
-    backgroundColor: '#2E0854',
+    backgroundColor: '#4C007C',
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 7,
@@ -1206,7 +1223,7 @@ const styles = StyleSheet.create({
   useOriginalsText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#2E0854',
+    color: '#4C007C',
   },
   replacementGrid: {
     flexDirection: 'row',

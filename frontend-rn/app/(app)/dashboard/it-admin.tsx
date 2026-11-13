@@ -427,46 +427,67 @@ export default function ITAdminDashboard() {
   }, [initDataRes]);
 
   // ── Process posts into the three component state arrays ──
-  function processPostsData(posts: any[]) {
-    const mappedAll = posts.map((p: any) => ({
-      id: p.id.toString(),
-      title: p.title || 'Untitled',
-      author: p.requestor?.first_name + ' ' + p.requestor?.last_name,
-      department: p.department?.name || 'Unknown',
-      timeAgo: new Date(p.created_at).toLocaleDateString(),
-      status: p.status.toLowerCase(),
-      statusLabel: p.status.toUpperCase().replace(/_/g, ' '),
-      reviewer: p.status,
-      platforms: p.platforms ? Object.keys(p.platforms).filter(k => p.platforms[k]).map(k => k.toUpperCase()) : [],
-    }));
-    setAllMockPosts(mappedAll);
+  const mapSinglePostToTableRow = React.useCallback((p: any) => {
+    const checklist = p?.imc_branding_checklist || null;
+    const effectiveMedia = (checklist?.has_replacement_media && Array.isArray(checklist?.final_media) && checklist.final_media.length > 0)
+      ? checklist.final_media
+      : (Array.isArray(p?.media) ? p.media : []);
+    const deptName = typeof p.requestor?.department === 'string'
+      ? p.requestor.department
+      : (p.requestor?.department?.display_name || p.requestor?.department?.name || p.department?.display_name || p.department?.name || 'Unknown');
+    const requestorName = p.requestor?.full_name
+      || [p.requestor?.first_name, p.requestor?.last_name].filter(Boolean).join(' ').trim()
+      || 'Unknown';
+    const normalizedPlatforms = Array.isArray(p.target_platforms)
+      ? p.target_platforms.map((t: any) => typeof t === 'string' ? t.toLowerCase() : String(t || '').toLowerCase()).filter(Boolean)
+      : (Array.isArray(p.platforms)
+          ? p.platforms.map((pl: any) => typeof pl === 'string' ? pl.toLowerCase() : String(pl?.platform || '').toLowerCase()).filter(Boolean)
+          : []);
+    const featuredImage = Array.isArray(effectiveMedia)
+      ? (effectiveMedia.find((m: any) => m?.is_featured && (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')))?.url
+         || effectiveMedia.find((m: any) => m?.is_featured)?.url
+         || effectiveMedia.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url
+         || effectiveMedia[0]?.url
+         || null)
+      : null;
 
-    const mappedTable = posts.map((p: any) => ({
+    return {
       id: p.id.toString(),
       title: p.title || 'Untitled',
       routing_type: p.routing_type || (p as any).routingType || 'standard',
-      department: typeof p.requestor?.department === 'string' ? p.requestor.department : (p.requestor?.department?.name || p.requestor?.department?.display_name || 'Unknown'),
-      requestedBy: p.requestor?.full_name || 'Unknown',
+      imc_branding_checklist: checklist,
+      refined_caption: checklist?.refined_caption || null,
+      original_caption: checklist?.original_caption || null,
+      media: effectiveMedia,
+      department: deptName,
+      requestedBy: requestorName,
+      author: requestorName,
       category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
         ? p.other_category_name
         : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'General')),
       other_category_name: p.other_category_name || null,
       preferred_schedule_at: p.preferred_schedule_at || null,
       status: p.status_label || p.status,
-      rawStatus: p.status,
-      platforms: Array.isArray(p.target_platforms) ? p.target_platforms.map((t: string) => typeof t === 'string' ? t.toLowerCase() : '') : [],
-      requestedOn: new Date(p.created_at).toLocaleDateString(),
-      requestedTime: new Date(p.created_at).toLocaleTimeString(),
-      rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : '',
-      image: Array.isArray(p.media)
-        ? (p.media.find((m: any) => m?.is_featured && (m?.type === 'image' || String(m?.mime_type || '').startsWith('image/')))?.url
-           || p.media.find((m: any) => m?.is_featured)?.url
-           || p.media.find((m: any) => m?.type === 'image' || String(m?.mime_type || '').startsWith('image/'))?.url
-           || p.media[0]?.url
-           || null)
-        : null,
+      statusLabel: (p.status || '').toUpperCase().replace(/_/g, ' '),
+      rawStatus: p.status || 'draft',
+      reviewer: p.status,
+      platforms: normalizedPlatforms,
+      requestedOn: p.created_at ? new Date(p.created_at).toLocaleDateString() : '',
+      requestedTime: p.created_at ? new Date(p.created_at).toLocaleTimeString() : '',
+      timeAgo: p.created_at ? new Date(p.created_at).toLocaleDateString() : '',
+      rawDate: p.created_at ? new Date(p.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      image: featuredImage,
       rawPost: p,
+    };
+  }, []);
+
+  function processPostsData(posts: any[]) {
+    const mappedTable = posts.map(mapSinglePostToTableRow);
+    const mappedAll = mappedTable.map((row: any) => ({
+      ...row,
+      status: (row.rawStatus || '').toLowerCase(),
     }));
+    setAllMockPosts(mappedAll);
     setMockTablePosts(mappedTable);
   }
 
@@ -2395,7 +2416,7 @@ export default function ITAdminDashboard() {
         program_head_id: selectedProgramHead?.id || undefined,
       });
       const u = res.data.data;
-      if (selectedProgramHead?.id && u?.id && newUserRole === 'office_head') {
+      if (selectedProgramHead?.id && u?.id && granularRoleFor(newUserRole, newUserDepartment) === 'office_head') {
         try {
           await programHeadsApi.update(selectedProgramHead.id, { user_id: u.id });
         } catch (linkErr) {
@@ -2689,11 +2710,45 @@ export default function ITAdminDashboard() {
     };
   }, [mockTablePosts]);
 
+  const handleOpenPostById = React.useCallback(async (postId: string | number) => {
+    const targetId = String(postId);
+    const localMatch = mockTablePosts.find((p: any) => String(p.id) === targetId);
+    if (localMatch) {
+      const firstPlat = localMatch.platforms?.[0];
+      if (firstPlat === 'instagram' || firstPlat === 'ig') setPreviewPlatformTab('instagram');
+      else if (firstPlat === 'wordpress' || firstPlat === 'website' || firstPlat === 'portal') setPreviewPlatformTab('wordpress');
+      else setPreviewPlatformTab('facebook');
+      setPreviewPost(localMatch);
+      return;
+    }
+    try {
+      const res = await postsApi.get(Number(postId));
+      const postObj = res.data?.data || res.data;
+      if (postObj) {
+        const mapped = mapSinglePostToTableRow(postObj);
+        const firstPlat = mapped.platforms?.[0];
+        if (firstPlat === 'instagram' || firstPlat === 'ig') setPreviewPlatformTab('instagram');
+        else if (firstPlat === 'wordpress' || firstPlat === 'website' || firstPlat === 'portal') setPreviewPlatformTab('wordpress');
+        else setPreviewPlatformTab('facebook');
+        setPreviewPost(mapped);
+      }
+    } catch (e) {
+      console.warn('Could not open post by id', postId, e);
+    }
+  }, [mockTablePosts, mapSinglePostToTableRow]);
+
+  useEffect(() => {
+    if (params.postId) {
+      handleOpenPostById(String(params.postId));
+    }
+  }, [params.postId, handleOpenPostById]);
+
   return (
     <DashboardShell
       title="IT Admin Panel"
       activeTab={activeTab as string}
       onTabChange={handleTabChange}
+      onOpenPost={handleOpenPostById}
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       departmentName={user?.department}
       userPhotoUrl={profilePhotoUrl}
@@ -8570,11 +8625,24 @@ $response = curl_exec($ch);`}
                 {/* ── LEFT COLUMN: Social Media Preview Card ── */}
                 <View style={{ flex: isTablet ? 1.05 : undefined, width: isTablet ? undefined : '100%' }}>
                   {(() => {
-                    const rawList = previewPost?.rawPost?.media || previewPost?.media || [];
+                    const checklist = previewPost?.imc_branding_checklist || previewPost?.rawPost?.imc_branding_checklist;
+                    const hasReplacementMedia = Boolean(
+                      checklist?.has_replacement_media &&
+                      Array.isArray(checklist?.final_media) &&
+                      checklist.final_media.length > 0
+                    );
+                    const rawList = hasReplacementMedia
+                      ? checklist.final_media
+                      : (previewPost?.media?.length ? previewPost.media : (previewPost?.rawPost?.media || []));
                     const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
                     const previewPostImages = validList.length > 0
                       ? validList
                       : (previewPost?.image ? [resolveImageUrl(previewPost.image) || previewPost.image] : []);
+
+                    const refinedCaption = checklist?.refined_caption;
+                    const originalCaption = checklist?.original_caption;
+                    const effectiveCaption = refinedCaption || previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title || '';
+                    const isCaptionRefined = Boolean(refinedCaption && originalCaption && refinedCaption.trim() !== originalCaption.trim());
 
                     return (
                       <>
@@ -8610,10 +8678,10 @@ $response = curl_exec($ch);`}
                             </View>
 
                             {/* FB Caption / Narrative */}
-                            {(previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title) ? (
+                            {effectiveCaption ? (
                               <View style={{ paddingHorizontal: 14, paddingBottom: 14, paddingTop: 2 }}>
                                 <FormattedText style={{ fontSize: 13.5, color: '#1E293B', lineHeight: 20 }}>
-                                  {previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title}
+                                  {effectiveCaption}
                                 </FormattedText>
                               </View>
                             ) : null}
@@ -8651,7 +8719,7 @@ $response = curl_exec($ch);`}
                             )}
                             <View style={{ padding: 12 }}>
                               <FormattedText style={{ fontSize: 13, color: '#262626', lineHeight: 18 }}>
-                                {'<b>jmc_official </b>' + (previewPost?.rawPost?.caption_narrative || previewPost?.title || '')}
+                                {'<b>jmc_official </b>' + effectiveCaption}
                               </FormattedText>
                             </View>
                           </View>
@@ -8668,13 +8736,24 @@ $response = curl_exec($ch);`}
                             <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
                               By {previewPost?.requestedBy || 'JMCFI Admin'} • {previewPost?.department || 'News'} • {previewPost?.requestedOn}
                             </Text>
-                            {previewPost?.image && (
-                              <TouchableOpacity onPress={() => setFullScreenImage(previewPost.image)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
-                                <Image source={{ uri: previewPost.image }} resizeMode="cover" style={{ width: '100%', height: 220, borderRadius: 8, backgroundColor: '#F3F4F6' }} />
+                            {(previewPostImages[0] || previewPost?.image) && (
+                              <TouchableOpacity onPress={() => setFullScreenImage(previewPostImages[0] || previewPost.image)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
+                                <Image source={{ uri: previewPostImages[0] || previewPost.image }} resizeMode="cover" style={{ width: '100%', height: 220, borderRadius: 8, backgroundColor: '#F3F4F6' }} />
                               </TouchableOpacity>
                             )}
                             <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 20 }}>
-                              {previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || 'No article content provided.'}
+                              {effectiveCaption || 'No article content provided.'}
+                            </FormattedText>
+                          </View>
+                        )}
+
+                        {isCaptionRefined && (
+                          <View style={{ marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginBottom: 4 }}>
+                              Original Requestor Caption (Before IMC Refinement)
+                            </Text>
+                            <FormattedText style={{ fontSize: 12.5, color: '#475569', lineHeight: 18 }}>
+                              {originalCaption}
                             </FormattedText>
                           </View>
                         )}
@@ -8751,31 +8830,35 @@ $response = curl_exec($ch);`}
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={{ fontSize: 13, color: '#64748B', width: 110, fontWeight: '500' }}>Platforms</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => setPreviewPlatformTab('facebook')}
-                          style={{
-                            padding: 2,
-                            borderRadius: 4,
-                            borderWidth: previewPlatformTab === 'facebook' ? 1.5 : 0,
-                            borderColor: '#1877F2',
-                          }}
-                        >
-                          <Ionicons name="logo-facebook" size={20} color="#1877F2" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => setPreviewPlatformTab('instagram')}
-                          style={{
-                            padding: 2,
-                            borderRadius: 4,
-                            borderWidth: previewPlatformTab === 'instagram' ? 1.5 : 0,
-                            borderColor: '#E1306C',
-                          }}
-                        >
-                          <Ionicons name="logo-instagram" size={20} color="#E1306C" />
-                        </TouchableOpacity>
-                        {(previewPost?.platforms?.includes('website') || previewPost?.platforms?.includes('portal') || previewPost?.platforms?.includes('wordpress')) && (
+                        {previewPost?.platforms?.some((pl: string) => ['facebook', 'fb'].includes(String(pl).toLowerCase())) && (
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => setPreviewPlatformTab('facebook')}
+                            style={{
+                              padding: 2,
+                              borderRadius: 4,
+                              borderWidth: previewPlatformTab === 'facebook' ? 1.5 : 0,
+                              borderColor: '#1877F2',
+                            }}
+                          >
+                            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+                          </TouchableOpacity>
+                        )}
+                        {previewPost?.platforms?.some((pl: string) => ['instagram', 'ig'].includes(String(pl).toLowerCase())) && (
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => setPreviewPlatformTab('instagram')}
+                            style={{
+                              padding: 2,
+                              borderRadius: 4,
+                              borderWidth: previewPlatformTab === 'instagram' ? 1.5 : 0,
+                              borderColor: '#E1306C',
+                            }}
+                          >
+                            <Ionicons name="logo-instagram" size={20} color="#E1306C" />
+                          </TouchableOpacity>
+                        )}
+                        {previewPost?.platforms?.some((pl: string) => ['website', 'portal', 'wordpress', 'wp'].includes(String(pl).toLowerCase())) && (
                           <TouchableOpacity
                             activeOpacity={0.7}
                             onPress={() => setPreviewPlatformTab('wordpress')}
@@ -8837,7 +8920,7 @@ $response = curl_exec($ch);`}
 
                         const isApproved = found
                           ? (found.action === 'approved' || found.action === 'published')
-                          : (['published', 'approved'].includes(previewPost?.rawStatus));
+                          : (['published', 'approved', 'scheduled', 'publishing'].includes(previewPost?.rawStatus));
                         const isRejected = found ? (found.action === 'rejected' || found.action === 'returned' || found.action === 'returned_for_revision') : false;
 
                         // Dynamic approver from database; fallback only if no approver record exists

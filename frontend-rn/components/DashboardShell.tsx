@@ -702,8 +702,6 @@ export function DashboardShell({
       const active = activeTab ?? 'dashboard';
       return [
         { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
-        { id: 'approved', label: 'Approved', icon: 'checkmark-circle-outline' as const, active: active === 'approved' },
-        { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
         {
           id: 'publication-management',
           label: 'Publication Management',
@@ -724,6 +722,8 @@ export function DashboardShell({
             },
           ],
         },
+        { id: 'approved', label: 'Approved', icon: 'checkmark-circle-outline' as const, active: active === 'approved' },
+        { id: 'rejected', label: 'Rejected', icon: 'close-circle-outline' as const, active: active === 'rejected' },
         { id: 'policy-rules', label: 'Policy Rules', icon: 'book-outline' as const, active: active === 'policy-rules' },
       ];
     }
@@ -986,7 +986,7 @@ export function DashboardShell({
             
             {/* Menu items */}
             <ScrollView style={styles.dropdownItemsList} keyboardShouldPersistTaps="handled">
-              {userRole === 'it_publisher' && (
+              {(userRole === 'admin' || userRole === 'it_publisher' || userRole === 'it_admin') && (
                 <TouchableOpacity 
                   style={styles.dropdownItem} 
                   onPress={() => { setIsProfileDropdownOpen(false); if (onTabChange) onTabChange('user-management'); }}

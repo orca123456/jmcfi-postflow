@@ -24,7 +24,7 @@ class PublishingController extends Controller
         $user = $request->user();
 
         // 1. Validate that the user is the publisher (IT Admin)
-        if (!$user->hasAnyRole(['it_publisher', 'it_admin'])) {
+        if ($user->roleCategory() !== 'admin' && !$user->hasAnyRole(['it_publisher', 'it_admin', 'admin'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Only IT Admin can publish.'
@@ -61,12 +61,13 @@ class PublishingController extends Controller
                     ? ['imc_qa']
                     : ['office_head', 'vice_president', 'imc_qa'];
 
-                foreach ($stages as $stage) {
+                foreach ($stages as $index => $stage) {
                     $wf = $post->approvalWorkflows()->firstOrNew(['stage' => $stage]);
                     $wf->action = 'approved';
                     $wf->approver_id = $user->id;
                     $wf->remarks = $request->input('remarks', 'Bypassed and approved directly by Administrator');
                     $wf->acted_at = now();
+                    $wf->stage_order = $wf->stage_order ?: ($index + 1);
                     $wf->save();
                 }
 
@@ -168,7 +169,7 @@ class PublishingController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->hasRole('it_publisher')) {
+        if ($user->roleCategory() !== 'admin' && !$user->hasAnyRole(['it_publisher', 'it_admin', 'admin'])) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 

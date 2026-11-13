@@ -316,20 +316,33 @@ class PostRequestController extends Controller
 
     public function destroy(PostRequest $postRequest): JsonResponse
     {
-        if (!$postRequest->canBeEditedBy(request()->user())) {
+        $user = request()->user();
+        $isAdmin = $user && ($user->roleCategory() === 'admin' || $user->hasAnyRole(['it_admin', 'it_publisher', 'admin']));
+
+        if (!$isAdmin && !$postRequest->canBeEditedBy($user)) {
             return response()->json(['message' => 'Cannot delete this post'], 403);
         }
 
-        // Delete media files
+        // Delete media files from storage
         foreach ($postRequest->media as $media) {
             $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
             Storage::disk($disk)->delete($media->file_path);
         }
 
-        $postRequest->delete();
+        $postId = $postRequest->id;
+        $postTitle = $postRequest->title;
 
-        AuditLogService::log('CONTENT_DELETED', 'Deleted content request: ' . $postRequest->title, 'WARNING', [
-            'post_id' => $postRequest->id,
+        DB::transaction(function () use ($postRequest) {
+            $postRequest->approvalWorkflows()->delete();
+            $postRequest->publishingRecords()->delete();
+            $postRequest->aiComplianceCheck()->delete();
+            $postRequest->policyViolations()->delete();
+            $postRequest->media()->delete();
+            $postRequest->delete();
+        });
+
+        AuditLogService::log('CONTENT_DELETED', 'Deleted content request: ' . $postTitle, 'WARNING', [
+            'post_id' => $postId,
         ]);
 
         $this->clearDashboardCache();
@@ -419,7 +432,7 @@ class PostRequestController extends Controller
     public function adminBypassApprove(Request $request, PostRequest $postRequest): JsonResponse
     {
         $user = $request->user();
-        if (!$user->hasAnyRole(['it_publisher', 'it_admin'])) {
+        if ($user->roleCategory() !== 'admin' && !$user->hasAnyRole(['it_publisher', 'it_admin', 'admin'])) {
             return response()->json(['message' => 'Unauthorized. Only IT Admin can bypass approvals.'], 403);
         }
 
@@ -428,12 +441,13 @@ class PostRequestController extends Controller
                 ? ['imc_qa']
                 : ['office_head', 'vice_president', 'imc_qa'];
 
-            foreach ($stages as $stage) {
+            foreach ($stages as $index => $stage) {
                 $wf = $postRequest->approvalWorkflows()->firstOrNew(['stage' => $stage]);
                 $wf->action = 'approved';
                 $wf->approver_id = $user->id;
                 $wf->remarks = $request->input('remarks', 'Bypassed and approved directly by Administrator');
                 $wf->acted_at = now();
+                $wf->stage_order = $wf->stage_order ?: ($index + 1);
                 $wf->save();
             }
 

@@ -101,11 +101,11 @@ class UserController extends Controller
             'email_verified_at' => now(),
         ]);
 
-        $user->syncRoles([$validated['role']]);
+        $user->syncRoles([$role]);
 
         if (!empty($validated['program_head_id'])) {
             $user->update(['program_head_id' => $validated['program_head_id']]);
-            if ($validated['role'] === 'office_head') {
+            if ($role === 'office_head') {
                 \App\Models\ProgramHead::where('id', $validated['program_head_id'])->update(['user_id' => $user->id]);
             }
         }
@@ -113,13 +113,13 @@ class UserController extends Controller
         AuditLogService::log('USER_CREATED', 'Created institutional account: ' . $user->full_name, 'INFO', [
             'target_user_id' => $user->id,
             'email' => $user->email,
-            'role' => $validated['role'],
+            'role' => $role,
             'department' => $dept,
         ], $request);
 
         // Send Welcome & Credentials Email to the user's institutional inbox
         try {
-            $user->notify(new AccountCreatedCredentialsNotification($user, $validated['password'], $validated['role']));
+            $user->notify(new AccountCreatedCredentialsNotification($user, $validated['password'], $role));
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("Failed to dispatch welcome email to {$user->email}: " . $e->getMessage());
         }
@@ -344,10 +344,12 @@ class UserController extends Controller
             $deptLower = strtolower($user->department ?? $request->input('department', ''));
             if (($roleToSync === 'approver' || $roleToSync === 'office_head') && (str_contains($deptLower, 'marketing') || str_contains($deptLower, 'imc'))) {
                 $roleToSync = 'imc_qa_checker';
+            } elseif (($roleToSync === 'approver' || $roleToSync === 'office_head') && (str_contains($deptLower, 'vice') || str_contains($deptLower, 'vpaa') || str_contains($deptLower, 'academic affairs'))) {
+                $roleToSync = 'vice_president';
             }
             $user->syncRoles([$roleToSync]);
             if (!$request->has('position')) {
-                $category = match ($validated['role']) {
+                $category = match ($roleToSync) {
                     'it_publisher', 'it_admin' => 'admin',
                     'office_head', 'vice_president', 'imc_qa_checker' => 'approver',
                     default => 'requestor',
