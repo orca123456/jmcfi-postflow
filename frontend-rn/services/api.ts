@@ -58,6 +58,18 @@ api.interceptors.request.use(async (config) => {
     topLoadingBar.start();
   }
 
+  // Deleting Content-Type for FormData lets the runtime (browser / React Native)
+  // auto-assign 'multipart/form-data; boundary=----WebKitFormBoundary...' with the correct boundary!
+  const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+  if (isFormData && config.headers) {
+    delete config.headers['Content-Type'];
+    delete (config.headers as any)['content-type'];
+    if (typeof (config.headers as any).delete === 'function') {
+      (config.headers as any).delete('Content-Type');
+      (config.headers as any).delete('content-type');
+    }
+  }
+
   const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -101,9 +113,7 @@ export const authApi = {
   uploadPhoto: (file: File) => {
     const form = new FormData();
     form.append('photo', file);
-    return api.post('/auth/profile-photo', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post('/auth/profile-photo', form);
   },
   removePhoto: () => api.delete('/auth/profile-photo'),
 };
@@ -113,13 +123,11 @@ export const postsApi = {
   list: (params?: object) => api.get('/posts', { params }),
   create: (data: object) => api.post('/posts', data),
   createWithFiles: (formData: FormData, onUploadProgress?: (progressEvent: any) => void) => api.post('/posts', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress,
   }),
   updateWithFiles: (id: number, formData: FormData, onUploadProgress?: (progressEvent: any) => void) => {
     formData.append('_method', 'PUT');
     return api.post(`/posts/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress,
     });
   },
@@ -128,10 +136,7 @@ export const postsApi = {
   delete: (id: number) => api.delete(`/posts/${id}`),
   submit: (id: number) => api.post(`/posts/${id}/submit`),
   approve: (id: number, data: object = {}) => {
-    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
-    return api.post(`/posts/${id}/approve`, data, isFormData ? {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    } : undefined);
+    return api.post(`/posts/${id}/approve`, data);
   },
   reject: (id: number, data: any = {}) => {
     const reason = data?.rejection_reason || data?.reason || data?.remarks || 'Content request rejected.';
@@ -206,9 +211,7 @@ export const departmentsApi = {
   uploadLogo: (id: number, file: File) => {
     const form = new FormData();
     form.append('logo', file);
-    return api.post(`/departments/${id}/logo`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post(`/departments/${id}/logo`, form);
   },
   removeLogo: (id: number) => api.delete(`/departments/${id}/logo`),
 };
@@ -294,9 +297,7 @@ export const emailSettingsApi = {
   uploadLogo: (file: File) => {
     const form = new FormData();
     form.append('logo', file);
-    return api.post('/email-settings/logo', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post('/email-settings/logo', form);
   },
   removeLogo: () => api.delete('/email-settings/logo'),
 };

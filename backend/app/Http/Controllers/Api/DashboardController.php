@@ -72,6 +72,7 @@ class DashboardController extends Controller
                 'program_head_id',
                 'status',
                 'routing_type',
+                'imc_branding_checklist',
                 'target_platforms',
                 'preferred_schedule_at',
                 'published_at',
@@ -90,7 +91,7 @@ class DashboardController extends Controller
                 'approvalWorkflows.approver:id,first_name,middle_name,last_name,email',
             ])
             ->orderByDesc('updated_at')
-            ->limit(15)
+            ->limit(100)
             ->get();
 
         $stats = [];
@@ -120,7 +121,7 @@ class DashboardController extends Controller
                 'meta' => [
                     'current_page' => 1,
                     'last_page' => 1,
-                    'per_page' => 15,
+                    'per_page' => 100,
                     'total' => $posts->count(),
                 ],
             ],
@@ -300,6 +301,7 @@ class DashboardController extends Controller
             ] : null,
             'status' => $post->status,
             'routing_type' => $post->routing_type ?? 'standard',
+            'imc_branding_checklist' => $post->imc_branding_checklist ?? null,
             'status_label' => $statusLabels[$post->status] ?? $post->status,
             'target_platforms' => $post->target_platforms ?? [],
             'preferred_schedule_at' => $post->preferred_schedule_at?->toISOString(),

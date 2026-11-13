@@ -503,6 +503,20 @@ class PostRequestController extends Controller
                 }
             }
 
+            // Preserve original requestor submission snapshot before applying reviewer edits/replacements
+            $existingChecklist = is_array($postRequest->imc_branding_checklist) ? $postRequest->imc_branding_checklist : [];
+            $originalCaption = $existingChecklist['original_caption'] ?? $postRequest->caption_narrative;
+            $originalMedia = $existingChecklist['original_media'] ?? $postRequest->media->map(fn ($m) => [
+                'id' => $m->id,
+                'type' => $m->type,
+                'original_filename' => $m->original_name,
+                'file_path' => $m->file_path,
+                'url' => $m->url,
+                'mime_type' => $m->mime_type,
+                'size' => $m->file_size,
+            ])->values()->all();
+            $hasReplacementMedia = $existingChecklist['has_replacement_media'] ?? false;
+
             // Apply any edits submitted by reviewer (e.g. from [Edit & Approve])
             $updateData = [];
             if ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative))) {
@@ -515,17 +529,49 @@ class PostRequestController extends Controller
                 $postRequest->update($updateData);
             }
 
-            // Handle replacement media file if uploaded during approval
+            // Handle replacement media file(s) if uploaded during approval
             if ($request->hasFile('media')) {
-                $file = $request->file('media');
-                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                $files = $request->file('media');
+                $files = is_array($files) ? $files : [$files];
+                $validFiles = array_values(array_filter($files, fn($f) => $f instanceof \Illuminate\Http\UploadedFile));
+                if (!empty($validFiles)) {
+                    $hasReplacementMedia = true;
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-                    $path = $file->store('post-media/' . $postRequest->id, $disk);
-                    $mime = $file->getMimeType() ?: 'image/jpeg';
                     $postRequest->media()->delete();
-                    $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), 0, true);
+                    foreach ($validFiles as $index => $file) {
+                        $path = $file->store('post-media/' . $postRequest->id, $disk);
+                        $mime = $file->getMimeType() ?: 'image/jpeg';
+                        $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), $index, $index === 0);
+                    }
+                    $postRequest->load('media');
                 }
             }
+
+            $refinedCaption = ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative)))
+                ? $request->caption_narrative
+                : ($existingChecklist['refined_caption'] ?? $postRequest->caption_narrative);
+
+            $finalMedia = $hasReplacementMedia
+                ? $postRequest->media()->get()->map(fn ($m) => [
+                    'id' => $m->id,
+                    'type' => $m->type,
+                    'original_filename' => $m->original_name,
+                    'file_path' => $m->file_path,
+                    'url' => $m->url,
+                    'mime_type' => $m->mime_type,
+                    'size' => $m->file_size,
+                ])->values()->all()
+                : ($existingChecklist['final_media'] ?? []);
+
+            $postRequest->update([
+                'imc_branding_checklist' => array_merge($existingChecklist, [
+                    'original_caption' => $originalCaption,
+                    'refined_caption' => $refinedCaption,
+                    'original_media' => $originalMedia,
+                    'has_replacement_media' => $hasReplacementMedia,
+                    'final_media' => $finalMedia,
+                ]),
+            ]);
 
             $nextStage = $postRequest->getNextStage();
             $approvedStageName = $currentStage?->stage;

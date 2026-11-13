@@ -31,8 +31,8 @@ import { InstagramMediaCarousel } from '../../../components/social/InstagramMedi
 import { useQuery } from '@tanstack/react-query';
 import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 import { RejectSuccessModal } from '../../../components/ui/RejectSuccessModal';
-import { ImcApprovalModule } from '../../../components/imc/ImcApprovalModule';
 import { ImcPublishingRequests } from '../../../components/imc/ImcPublishingRequests';
+import { PublicationReviewModal } from '../../../components/imc/PublicationReviewModal';
 
 export default function ImcQaDashboard() {
   const router = useRouter();
@@ -51,26 +51,13 @@ export default function ImcQaDashboard() {
 
   // Tab State: 'dashboard' | 'approved' | 'rejected' | 'policy-rules'
   const params = useLocalSearchParams();
-  const [activeTab, _setActiveTab] = useState(params.tab || 'dashboard');
-  const [approvalViewMode, setApprovalViewMode] = useState<'modern' | 'classic'>(
-    params.view === 'modern' ? 'modern' : 'classic'
-  );
+  const [activeTab, setActiveTab] = useState(params.tab || 'dashboard');
 
   useEffect(() => {
     if (params.tab && params.tab !== activeTab) {
-      _setActiveTab(params.tab as string);
+      setActiveTab(params.tab as string);
     }
   }, [params.tab]);
-
-  const setActiveTab = (tab: string) => {
-    _setActiveTab(tab);
-    setApprovalViewMode('classic');
-    setTargetModernPostId('');
-    router.setParams({ tab, view: 'classic' });
-  };
-
-  // Target post ID to open in modern approval board
-  const [targetModernPostId, setTargetModernPostId] = useState<string>('');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,6 +82,7 @@ export default function ImcQaDashboard() {
 
   // Modal / Selected Request Preview State
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [publicationReviewRequest, setPublicationReviewRequest] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -359,8 +347,21 @@ export default function ImcQaDashboard() {
     const postIdStr = String(postId);
     const allPosts = [...requestsList, ...approvedRequests, ...rejectedRequests];
     const match = allPosts.find((r: any) => String(r.id) === postIdStr);
+    const openAppropriateModal = (postObj: any) => {
+      const isDirectImc =
+        String(postObj?.routing_type || postObj?.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
+      if (isDirectImc || activeTab === 'publishing-requests' || activeTab === 'published-posts') {
+        setSelectedRequest(null);
+        setPublicationReviewRequest(postObj);
+      } else {
+        setPublicationReviewRequest(null);
+        setSelectedRequest(postObj);
+        setModalPlatformTab('facebook');
+      }
+    };
+
     if (match) {
-      setSelectedRequest(match);
+      openAppropriateModal(match);
       router.setParams({ postId: postIdStr });
     } else {
       postsApi.get(Number(postIdStr)).then((res: any) => {
@@ -377,7 +378,7 @@ export default function ImcQaDashboard() {
               rejectedBy = `${approverTitle}, ${rejectionLog.approver.full_name}`;
             }
           }
-          setSelectedRequest({
+          openAppropriateModal({
             ...raw,
             id: raw.id.toString(),
             routing_type: raw.routing_type || (raw as any).routingType || 'standard',
@@ -416,10 +417,10 @@ export default function ImcQaDashboard() {
         }
       }).catch(() => {});
     }
-  }, [requestsList, approvedRequests, rejectedRequests]);
+  }, [requestsList, approvedRequests, rejectedRequests, activeTab]);
 
   useEffect(() => {
-    if (params.postId && !selectedRequest) {
+    if (params.postId && !selectedRequest && !publicationReviewRequest) {
       handleOpenPostById(params.postId as string);
     }
   }, [params.postId, requestsList.length, approvedRequests.length, rejectedRequests.length]);
@@ -447,6 +448,7 @@ export default function ImcQaDashboard() {
     setOptimisticallyRemovedIds(prev => [...prev, reqId]);
     setApprovedRequests(prev => [{ ...req, status: isScheduled ? 'SCHEDULED' : 'PUBLISHED' }, ...prev]);
     setSelectedRequest(null);
+    setPublicationReviewRequest(null);
     router.setParams({ postId: '' });
 
     try {
@@ -483,6 +485,7 @@ export default function ImcQaDashboard() {
     setIsRejectModalVisible(false);
     setRequestToReject(null);
     setSelectedRequest(null);
+    setPublicationReviewRequest(null);
     router.setParams({ postId: '' });
 
     try {
@@ -504,6 +507,7 @@ export default function ImcQaDashboard() {
     setOptimisticallyRemovedIds(prev => [...prev, reqId]);
     setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
     setSelectedRequest(null);
+    setPublicationReviewRequest(null);
     router.setParams({ postId: '' });
 
     try {
@@ -518,11 +522,27 @@ export default function ImcQaDashboard() {
     }
   };
 
+  const isDirectImcRequest = (r: any) =>
+    String(r?.routing_type || r?.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
+
+  const oldFlowPending = React.useMemo(
+    () => requestsList.filter((r: any) => !isDirectImcRequest(r)),
+    [requestsList]
+  );
+  const oldFlowApproved = React.useMemo(
+    () => approvedRequests.filter((r: any) => !isDirectImcRequest(r)),
+    [approvedRequests]
+  );
+  const oldFlowRejected = React.useMemo(
+    () => rejectedRequests.filter((r: any) => !isDirectImcRequest(r)),
+    [rejectedRequests]
+  );
+
   const getRequestsForTab = () => {
-    if (activeTab === 'approved') return approvedRequests;
-    if (activeTab === 'rejected') return rejectedRequests;
-    if (activeTab === 'all') return [...requestsList, ...approvedRequests, ...rejectedRequests];
-    return requestsList;
+    if (activeTab === 'approved') return oldFlowApproved;
+    if (activeTab === 'rejected') return oldFlowRejected;
+    if (activeTab === 'all') return [...oldFlowPending, ...oldFlowApproved, ...oldFlowRejected];
+    return oldFlowPending;
   };
 
   const filteredRequests = getRequestsForTab().filter((req) => {
@@ -565,62 +585,112 @@ export default function ImcQaDashboard() {
   const paginatedRequests = filteredRequests.slice((postsPage - 1) * postsPerPage, postsPage * postsPerPage);
 
   const computedStats = React.useMemo(() => ({
-    pending: requestsList.length,
-    approved: approvedRequests.length,
-    rejected: rejectedRequests.length,
-    total: requestsList.length + approvedRequests.length + rejectedRequests.length
-  }), [requestsList, approvedRequests, rejectedRequests]);
+    pending: oldFlowPending.length,
+    approved: oldFlowApproved.length,
+    rejected: oldFlowRejected.length,
+    total: oldFlowPending.length + oldFlowApproved.length + oldFlowRejected.length
+  }), [oldFlowPending, oldFlowApproved, oldFlowRejected]);
 
   const isLargeScreen = width > 1024;
 
-  const isPendingStatus = (status: string) => status === 'PENDING_IMC_QA';
+  const isPendingStatus = (status: string) => {
+    const s = String(status || '').toLowerCase();
+    return s === 'pending_imc_qa' || s === 'pending' || s === 'pending_qa';
+  };
   const isApprovedStatus = (status: string) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(status);
 
-  // Dedicated data collections for Publication Management
+  // Dedicated data collections for Publication Management (Direct IMC flow only)
   const publishingRequestsList = React.useMemo(() => {
-    const directPending = requestsList.filter((r: any) =>
-      String(r.routing_type || r.rawPost?.routing_type || '').toLowerCase() === 'direct_imc'
-    );
-    if (directPending.length > 0) return directPending;
-    return requestsList;
+    return requestsList.filter((r: any) => isDirectImcRequest(r));
   }, [requestsList]);
 
   const publishedPostsList = React.useMemo(() => {
     return approvedRequests.filter((r: any) =>
-      ['PUBLISHED', 'SCHEDULED'].includes(String(r.status || '').toUpperCase()) ||
-      ['published', 'scheduled'].includes(String(r.rawStatus || '').toLowerCase())
+      isDirectImcRequest(r) &&
+      (['APPROVED', 'PUBLISHED', 'SCHEDULED'].includes(String(r.status || '').toUpperCase()) ||
+      ['approved', 'published', 'scheduled'].includes(String(r.rawStatus || '').toLowerCase()))
     );
   }, [approvedRequests]);
 
   const handleReviewFromPublishingRequests = (req: any) => {
-    const isDirectImc = String(req.routing_type || req.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
-    if (isDirectImc) {
-      setTargetModernPostId(String(req.id));
-      setApprovalViewMode('modern');
-      _setActiveTab('dashboard');
-    } else {
-      setSelectedRequest(req);
+    setSelectedRequest(null);
+    setPublicationReviewRequest(req);
+  };
+
+  const handlePublishFromModal = async (
+    req: any,
+    payload: { finalCaption: string; replacementFiles: any[] }
+  ) => {
+    const reqId = req.id;
+    const isScheduled =
+      req.rawStatus === 'scheduled' ||
+      (Boolean(req.preferred_schedule_at) &&
+        new Date(req.preferred_schedule_at).getTime() > Date.now());
+
+    let requestBody: any = { caption_narrative: payload.finalCaption };
+    if (payload.replacementFiles && payload.replacementFiles.length > 0) {
+      const formData = new FormData();
+      formData.append('caption_narrative', payload.finalCaption);
+      for (const item of payload.replacementFiles) {
+        if (Platform.OS === 'web') {
+          if (item.file instanceof File || item.file instanceof Blob) {
+            formData.append('media[]', item.file, item.name || 'edited.jpg');
+          } else if (
+            typeof item.uri === 'string' &&
+            (item.uri.startsWith('blob:') || item.uri.startsWith('data:'))
+          ) {
+            const fetchRes = await fetch(item.uri);
+            const blob = await fetchRes.blob();
+            const fileObj = new File([blob], item.name || 'edited.jpg', {
+              type: item.mimeType || blob.type || 'image/jpeg',
+            });
+            formData.append('media[]', fileObj, item.name || 'edited.jpg');
+          }
+        } else {
+          formData.append('media[]', {
+            uri: item.uri,
+            name: item.name || 'edited.jpg',
+            type: item.mimeType || 'image/jpeg',
+          } as any);
+        }
+      }
+      requestBody = formData;
+    }
+
+    setRequestsList((prev) => prev.filter((r) => r.id !== reqId));
+    setOptimisticallyRemovedIds((prev) => [...prev, reqId]);
+    setApprovedRequests((prev) => [
+      {
+        ...req,
+        caption: payload.finalCaption,
+        status: isScheduled ? 'SCHEDULED' : 'PUBLISHED',
+        imc_branding_checklist: {
+          ...(req.imc_branding_checklist || {}),
+          original_caption:
+            req.imc_branding_checklist?.original_caption || req.caption || req.caption_narrative,
+          refined_caption: payload.finalCaption,
+          original_media: req.imc_branding_checklist?.original_media || req.media || [],
+          has_replacement_media: Boolean(payload.replacementFiles && payload.replacementFiles.length > 0),
+        },
+      },
+      ...prev,
+    ]);
+    setSelectedRequest(null);
+    setPublicationReviewRequest(null);
+    router.setParams({ postId: '' });
+
+    try {
+      await postsApi.approve(reqId, requestBody);
+      loadData(false);
+      setApprovalSuccessPost({ ...req, isScheduled });
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to publish request.');
+      loadData(false);
     }
   };
 
   const renderActionBadge = (req: any) => {
     if (activeTab === 'dashboard' || (activeTab === 'all' && isPendingStatus(req.status))) {
-      const isDirectImc = String(req.routing_type || req.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
-      if (isDirectImc) {
-        return (
-          <TouchableOpacity
-            style={styles.btnEditRequestRow}
-            onPress={() => {
-              setTargetModernPostId(String(req.id));
-              setApprovalViewMode('modern');
-            }}
-          >
-            <Ionicons name="create-outline" size={13} color="#6D28D9" style={{ marginRight: 4 }} />
-            <Text style={styles.btnEditRequestRowText}>Edit Request</Text>
-          </TouchableOpacity>
-        );
-      }
-
       return (
         <>
           <TouchableOpacity
@@ -690,24 +760,8 @@ export default function ImcQaDashboard() {
       userPhotoUrl={profilePhotoUrl}
       onOpenPost={handleOpenPostById}
     >
-      {/* ----------------- MODERN APPROVAL BOARD (ONLY FOR PENDING REQUESTS) ----------------- */}
-      {activeTab === 'dashboard' && approvalViewMode === 'modern' && (
-        <ImcApprovalModule
-          initialTab="Pending"
-          initialSelectedId={targetModernPostId}
-          onSwitchToClassic={() => {
-            setApprovalViewMode('classic');
-            setTargetModernPostId('');
-            router.setParams({ view: 'classic' });
-          }}
-        />
-      )}
-
-      {/* ----------------- CLASSIC IMC DASHBOARD (PENDING / APPROVED / REJECTED) ----------------- */}
-      {((activeTab === 'dashboard' && approvalViewMode === 'classic') ||
-        activeTab === 'approved' ||
-        activeTab === 'rejected' ||
-        activeTab === 'all') && (
+      {/* ----------------- IMC DASHBOARD (PENDING / APPROVED / REJECTED) ----------------- */}
+      {['dashboard', 'approved', 'rejected', 'all'].includes(String(activeTab)) && (
         <View style={styles.dashboardContainer}>
           {/* Header Row with Greeting */}
           {activeTab === 'dashboard' && (
@@ -718,30 +772,11 @@ export default function ImcQaDashboard() {
                   Institutional compliance status, brand checker boards, and active quality review queues.
                 </Text>
               </View>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: '#FFC72C',
-                  borderRadius: 4,
-                  paddingHorizontal: 16,
-                  height: 38,
-                }}
-                onPress={() => {
-                  setApprovalViewMode('modern');
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="sparkles" size={16} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={{ color: Colors.textPrimary, fontWeight: 'bold', fontSize: 13 }}>
-                  Modern Approval Board
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
 
           {/* Metric Summary Cards Row (2x2 on Mobile) */}
-          {['dashboard', 'approved', 'rejected', 'all'].includes(activeTab) && (
+          {['dashboard', 'approved', 'rejected', 'all'].includes(String(activeTab)) && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
               {/* Card 1: For Quality Review */}
               <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
@@ -932,6 +967,7 @@ export default function ImcQaDashboard() {
                     style={styles.tableRow}
                     activeOpacity={0.7}
                     onPress={() => {
+                      setPublicationReviewRequest(null);
                       setSelectedRequest(req);
                       setModalPlatformTab('facebook');
                     }}
@@ -1142,6 +1178,22 @@ export default function ImcQaDashboard() {
           />
         </View>
       )}
+
+      {/* ----------------- PUBLICATION REVIEW FLOATING WINDOW ----------------- */}
+      <PublicationReviewModal
+        visible={Boolean(publicationReviewRequest)}
+        request={publicationReviewRequest}
+        onClose={() => {
+          setPublicationReviewRequest(null);
+          router.setParams({ postId: '' });
+        }}
+        onPublish={handlePublishFromModal}
+        onReject={(req) => {
+          setPublicationReviewRequest(null);
+          handleRejectClick(req);
+        }}
+        onOpenFullScreenImage={(url) => setFullScreenImage(url)}
+      />
 
       {/* ----------------- CONTENT REQUEST PREVIEW MODAL ----------------- */}
       {selectedRequest && (
@@ -1614,45 +1666,22 @@ export default function ImcQaDashboard() {
                   <Text style={styles.btnModalCloseText}>Close</Text>
                 </TouchableOpacity>
 
-                {(activeTab === 'dashboard' || isPendingStatus(selectedRequest.status)) && (
-                  (() => {
-                    const isDirectImc = String(selectedRequest.routing_type || selectedRequest.rawPost?.routing_type || '').toLowerCase() === 'direct_imc';
-                    if (isDirectImc) {
-                      return (
-                        <TouchableOpacity
-                          style={styles.btnModalEditRequest}
-                          onPress={() => {
-                            const targetId = String(selectedRequest.id);
-                            setSelectedRequest(null);
-                            router.setParams({ postId: '' });
-                            setTargetModernPostId(targetId);
-                            setApprovalViewMode('modern');
-                          }}
-                        >
-                          <Ionicons name="create-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                          <Text style={styles.btnModalEditRequestText}>Edit Request</Text>
-                        </TouchableOpacity>
-                      );
-                    }
+                {(activeTab === 'dashboard' || isPendingStatus(selectedRequest.status || selectedRequest.rawStatus)) && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.btnModalApprove}
+                      onPress={() => handleApprove(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalApproveText}>Approve</Text>
+                    </TouchableOpacity>
 
-                    return (
-                      <>
-                        <TouchableOpacity
-                          style={styles.btnModalApprove}
-                          onPress={() => handleApprove(selectedRequest)}
-                        >
-                          <Text style={styles.btnModalApproveText}>Approve</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.btnModalReject}
-                          onPress={() => handleRejectClick(selectedRequest)}
-                        >
-                          <Text style={styles.btnModalRejectText}>Reject</Text>
-                        </TouchableOpacity>
-                      </>
-                    );
-                  })()
+                    <TouchableOpacity
+                      style={styles.btnModalReject}
+                      onPress={() => handleRejectClick(selectedRequest)}
+                    >
+                      <Text style={styles.btnModalRejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
               </View>
             </View>
@@ -1732,7 +1761,7 @@ export default function ImcQaDashboard() {
             <View style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#6D28D9', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 }}
-                onPress={() => handleDownloadImage(fullScreenImage, `${selectedRequest?.title || 'media'}.png`)}
+                onPress={() => handleDownloadImage(fullScreenImage, `${(selectedRequest || publicationReviewRequest)?.title || 'media'}.png`)}
               >
                 <Ionicons name="download-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>Download</Text>

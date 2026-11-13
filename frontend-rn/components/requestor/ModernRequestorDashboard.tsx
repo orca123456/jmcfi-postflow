@@ -27,6 +27,7 @@ import { PaginationControl } from '../ui/PaginationControl';
 import { FacebookMediaGrid } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
 import { FormattedText } from '../ui/FormattedText';
+import { RichTextEditor } from '../ui/RichTextEditor';
 
 interface ModernRequestorDashboardProps {
   onSwitchToClassic: () => void;
@@ -148,9 +149,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     instagram: boolean;
     website: boolean;
   }>({
-    facebook: true,
-    instagram: true,
-    website: true,
+    facebook: false,
+    instagram: false,
+    website: false,
   });
   const [isOptimizingImages, setIsOptimizingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -164,6 +165,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
   // Website Featured Image Selection & Drag-to-Scroll State
   const [featuredMediaIndex, setFeaturedMediaIndex] = useState(0);
   const [modalViewFeaturedIndex, setModalViewFeaturedIndex] = useState(0);
+  const [modalPreviewCarouselIndex, setModalPreviewCarouselIndex] = useState(0);
 
   const featuredScrollRef = useRef<ScrollView>(null);
   const isDraggingFeatured = useRef(false);
@@ -339,6 +341,17 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
   useEffect(() => {
     if (selectedPost) {
+      setModalPreviewCarouselIndex(0);
+      const platforms = (selectedPost.targetPlatforms || []).map((p) => String(p).toLowerCase());
+      if (platforms.includes('facebook')) {
+        setModalPlatformTab('facebook');
+      } else if (platforms.includes('instagram')) {
+        setModalPlatformTab('instagram');
+      } else if (platforms.includes('website')) {
+        setModalPlatformTab('website');
+      } else {
+        setModalPlatformTab('facebook');
+      }
       const rawMedia = selectedPost.media || selectedPost.rawPost?.media;
       if (Array.isArray(rawMedia) && rawMedia.length > 0) {
         const featIdx = rawMedia.findIndex((m: any) => m?.is_featured);
@@ -437,7 +450,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -599,7 +612,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       alert('Please enter a content title.');
       return;
     }
-    if (!formCaption.trim()) {
+    if (!formCaption.replace(/<[^>]*>/g, '').trim()) {
       alert('Please provide a caption/narrative for the content.');
       return;
     }
@@ -618,7 +631,11 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       if (targetPlatforms.facebook) selectedPlatforms.push('facebook');
       if (targetPlatforms.instagram) selectedPlatforms.push('instagram');
       if (targetPlatforms.website) selectedPlatforms.push('website');
-      if (selectedPlatforms.length === 0) selectedPlatforms.push('facebook');
+
+      if (selectedPlatforms.length === 0) {
+        alert('Please select at least one target platform before submitting.');
+        return;
+      }
 
       if (attachedFiles.length > 0) {
         const formData = new FormData();
@@ -703,6 +720,11 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       setFormTitle('');
       setFormCaption('');
       setAttachedFiles([]);
+      setTargetPlatforms({
+        facebook: false,
+        instagram: false,
+        website: false,
+      });
       setFeaturedMediaIndex(0);
       if (!isDesktop) {
         setIsSidePanelOpen(false);
@@ -824,12 +846,12 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
       {/* ================= MAIN SPLIT CONTENT ================= */}
       <View style={[styles.splitLayout, !isDesktop && styles.splitLayoutStacked]}>
-        {/* LEFT COLUMN: CONTENT REQUESTS LIST */}
+        {/* COLUMN: CONTENT REQUESTS LIST (Rendered on Right via row-reverse) */}
         <View
           style={[
             styles.leftSection,
             { flex: 1, width: '100%' },
-            isDesktop && isSidePanelOpen && { flex: 1.3 },
+            isDesktop && isSidePanelOpen && { flex: 1 },
           ]}
         >
           {/* Header Row: Title, Search, Filter */}
@@ -1024,6 +1046,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 currentPage={currentPage}
                 totalItems={filteredRequests.length}
                 itemsPerPage={itemsPerPage}
+                pageSizeOptions={[5, 10, 15, 20]}
                 onPageChange={setCurrentPage}
                 onItemsPerPageChange={(val) => {
                   setItemsPerPage(val);
@@ -1035,15 +1058,12 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
           )}
         </View>
 
-        {/* RIGHT COLUMN: CREATE CONTENT REQUEST PANEL */}
+        {/* COLUMN: CREATE CONTENT REQUEST PANEL (Rendered on Left via row-reverse) */}
         {isSidePanelOpen && (
           <View style={[styles.rightSection, isDesktop && { flex: 1 }]}>
             {/* Panel Purple Header */}
             <View style={styles.panelHeaderPurple}>
               <View style={styles.panelHeaderLeft}>
-                <View style={styles.panelPlusCircle}>
-                  <Ionicons name="add" size={16} color="#FFFFFF" />
-                </View>
                 <Text style={styles.panelHeaderTitle}>Create Content Request</Text>
               </View>
 
@@ -1058,111 +1078,141 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
             {/* Panel Form Body */}
             <View style={styles.panelFormScrollContent}>
-              {/* STEP 1: WHAT */}
-              <View style={styles.formGroup}>
-                <View style={styles.stepHeaderRow}>
-                  <View style={styles.stepBadge}>
-                    <Text style={styles.stepBadgeText}>1</Text>
+              {/* SECTION: BASIC INFORMATION */}
+              <View style={styles.redesignedSectionCard}>
+                <View style={styles.redesignedSectionHeader}>
+                  <View style={styles.redesignedHeaderIconBox}>
+                    <Ionicons name="document-text-outline" size={18} color="#334155" />
                   </View>
-                  <Text style={styles.stepTitle}>What</Text>
+                  <Text style={styles.redesignedSectionTitle}>Basic Information</Text>
                 </View>
 
-                <TextInput
-                  style={styles.formTextInput}
-                  placeholder="Enter request title..."
-                  placeholderTextColor="#9CA3AF"
-                  value={formTitle}
-                  onChangeText={setFormTitle}
-                />
-              </View>
-
-              {/* STEP 2: WHEN */}
-              <View style={styles.formGroup}>
-                <View style={styles.stepHeaderRow}>
-                  <View style={styles.stepBadge}>
-                    <Text style={styles.stepBadgeText}>2</Text>
-                  </View>
-                  <Text style={styles.stepTitle}>When</Text>
-                </View>
-
-                <View style={styles.whenRow}>
-                  <View style={[styles.formInputWithIcon, { flex: 1, marginRight: 8 }]}>
-                    <Ionicons name="calendar-outline" size={16} color="#6B7280" style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={styles.innerTextInput}
-                      placeholder="Select Date"
-                      placeholderTextColor="#9CA3AF"
-                      value={formDate}
-                      onChangeText={setFormDate}
-                    />
-                  </View>
-
-                  <View style={[styles.formInputWithIcon, { flex: 1 }]}>
-                    <Ionicons name="time-outline" size={16} color="#6B7280" style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={styles.innerTextInput}
-                      placeholder="Select Time"
-                      placeholderTextColor="#9CA3AF"
-                      value={formTime}
-                      onChangeText={setFormTime}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* STEP 3: WHO */}
-              <View style={styles.formGroup}>
-                <View style={styles.stepHeaderRow}>
-                  <View style={styles.stepBadge}>
-                    <Text style={styles.stepBadgeText}>3</Text>
-                  </View>
-                  <Text style={styles.stepTitle}>Who</Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.formInputWithIcon}
-                  onPress={() => setIsDeptDropdownOpen((prev) => !prev)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="people-outline" size={16} color="#6B7280" style={{ marginRight: 8 }} />
-                  <Text style={styles.dropdownSelectedText} numberOfLines={1}>
-                    {formDepartment || 'Select Department / Organization'}
+                <View style={styles.redesignedFieldGroup}>
+                  <Text style={styles.redesignedFieldLabel}>
+                    REQUEST TITLE <Text style={{ color: '#EF4444' }}>*</Text>
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color="#6B7280" />
-                </TouchableOpacity>
+                  <TextInput
+                    style={styles.redesignedTextInput}
+                    placeholder="e.g., Campus Event Announcement"
+                    placeholderTextColor="#94A3B8"
+                    value={formTitle}
+                    onChangeText={setFormTitle}
+                  />
+                </View>
 
-                {isDeptDropdownOpen && (
-                  <View style={styles.dropdownPickerBox}>
-                    {departmentsList.map((dept) => (
-                      <TouchableOpacity
-                        key={dept}
-                        style={styles.dropdownPickerItem}
-                        onPress={() => {
-                          setFormDepartment(dept);
-                          setIsDeptDropdownOpen(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownPickerItemText,
-                            formDepartment === dept && { color: '#6D28D9', fontWeight: 'bold' },
-                          ]}
-                        >
-                          {dept}
+                <View style={[styles.redesignedFieldGroup, { marginTop: 14 }]}>
+                  <Text style={styles.redesignedFieldLabel}>DEPARTMENT</Text>
+                  <View style={styles.redesignedReadonlyBox}>
+                    <Text style={styles.redesignedReadonlyText} numberOfLines={1}>
+                      {user?.department || formDepartment || 'BSIT Department'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* SECTION: CAPTION */}
+              <View style={styles.redesignedSectionCard}>
+                <View style={styles.redesignedSectionHeader}>
+                  <View style={styles.redesignedHeaderIconBox}>
+                    <Ionicons name="document-text-outline" size={18} color="#334155" />
+                  </View>
+                  <Text style={styles.redesignedSectionTitle}>Caption</Text>
+                </View>
+
+                <View style={styles.captionGuideCallout}>
+                  <Text style={styles.captionGuideText}>
+                    Include the key details: <Text style={styles.captionGuideBold}>Who</Text> is involved,{' '}
+                    <Text style={styles.captionGuideBold}>What</Text> is happening,{' '}
+                    <Text style={styles.captionGuideBold}>When</Text> it will take place,{' '}
+                    <Text style={styles.captionGuideBold}>Where</Text> it will happen, and{' '}
+                    <Text style={styles.captionGuideBold}>Why</Text> it is important.
+                  </Text>
+                  <Text style={[styles.captionGuideText, { marginTop: 8 }]}>
+                    <Text style={styles.captionGuideBold}>Example:</Text> The JMCFI Student Council invites all students to a Cybersecurity Awareness Seminar on November 18, 2026, at 9:00 AM in the JMCFI Auditorium to promote safe and responsible technology use.
+                  </Text>
+                </View>
+
+                <View style={{ marginBottom: 10 }}>
+                  <RichTextEditor
+                    value={formCaption}
+                    onChange={(val: string) => {
+                      setFormCaption(val);
+                      if (complianceScore > 0) {
+                        setComplianceScore(0);
+                      }
+                    }}
+                    placeholder="Write a brief caption describing the activity, event, or announcement..."
+                    minHeight={180}
+                    hideExtraActions
+                  />
+                </View>
+
+                <View style={styles.redesignedCaptionFooter}>
+                  <Text style={styles.redesignedCharCounter}>
+                    {formCaption.replace(/<[^>]*>/g, '').length} / 2200 characters
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.redesignedAiPolicyBtn,
+                      isCheckingPolicy && { opacity: 0.7 }
+                    ]}
+                    onPress={handleCheckPolicy}
+                    disabled={isCheckingPolicy}
+                    activeOpacity={0.75}
+                  >
+                    {isCheckingPolicy ? (
+                      <ActivityIndicator size="small" color="#334155" style={{ marginRight: 6 }} />
+                    ) : (
+                      <Ionicons name="shield-outline" size={15} color="#334155" style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={styles.redesignedAiPolicyBtnText}>
+                      {isCheckingPolicy ? 'AI Analyzing...' : 'AI Check Policy Alignment'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {complianceScore > 0 && (
+                  <View style={styles.complianceScoreCard}>
+                    <View style={styles.complianceScoreCardLeft}>
+                      <View style={[
+                        styles.complianceScoreIconBadge,
+                        { backgroundColor: complianceStatus === 'compliant' ? '#ECFDF5' : '#FEF3C7' }
+                      ]}>
+                        <Ionicons
+                          name={complianceStatus === 'compliant' ? 'checkmark-circle' : 'alert-circle'}
+                          size={16}
+                          color={complianceStatus === 'compliant' ? '#059669' : '#D97706'}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.complianceScoreCardTitle}>
+                          AI Policy Score: {complianceScore}% ({complianceStatus === 'compliant' ? 'Compliant' : 'Review Suggested'})
                         </Text>
-                      </TouchableOpacity>
-                    ))}
+                        <Text style={styles.complianceScoreCardSub} numberOfLines={1}>
+                          {complianceAnalysis || 'Institutional policy alignment validated.'}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.viewAnalysisBtn}
+                      onPress={() => setIsComplianceModalVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.viewAnalysisBtnText}>View Breakdown</Text>
+                      <Ionicons name="arrow-forward" size={11} color="#6D28D9" style={{ marginLeft: 3 }} />
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
 
-              {/* STEP 4: TARGET PLATFORMS & PHOTO RULES */}
-              <View style={styles.formGroup}>
-                <View style={styles.stepHeaderRow}>
-                  <View style={styles.stepBadge}>
-                    <Text style={styles.stepBadgeText}>4</Text>
+              {/* TARGET PLATFORMS & PHOTO RULES */}
+              <View style={styles.redesignedSectionCard}>
+                <View style={styles.redesignedSectionHeader}>
+                  <View style={styles.redesignedHeaderIconBox}>
+                    <Ionicons name="share-social-outline" size={18} color="#334155" />
                   </View>
-                  <Text style={styles.stepTitle}>Target Platforms & Photo Rules</Text>
+                  <Text style={styles.redesignedSectionTitle}>Target Platforms & Photo Rules</Text>
                 </View>
                 <Text style={styles.platformSectionSub}>
                   Select publishing destinations to activate platform-specific photo quality filters & aspect ratio rules.
@@ -1259,124 +1309,6 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     <Text style={styles.targetPlatformDesc}>Featured Cover</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-
-              {/* SECTION: CONTENT & CAPTION */}
-              <View style={styles.formGroup}>
-                <View style={styles.contentHeaderRow}>
-                  <Ionicons name="document-text" size={18} color="#6D28D9" style={{ marginRight: 6 }} />
-                  <Text style={styles.stepTitle}>Content</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={styles.subFieldLabel}>Caption</Text>
-                  
-                  <TouchableOpacity
-                    style={[
-                      styles.aiCheckPolicyBtn,
-                      isCheckingPolicy && { opacity: 0.7 }
-                    ]}
-                    onPress={handleCheckPolicy}
-                    disabled={isCheckingPolicy}
-                    activeOpacity={0.75}
-                  >
-                    {isCheckingPolicy ? (
-                      <ActivityIndicator size="small" color="#6D28D9" style={{ marginRight: 5 }} />
-                    ) : (
-                      <Ionicons name="sparkles" size={13} color="#6D28D9" style={{ marginRight: 5 }} />
-                    )}
-                    <Text style={styles.aiCheckPolicyBtnText}>
-                      {isCheckingPolicy ? 'AI Analyzing...' : 'AI Check Policy Alignment'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TextInput
-                  style={styles.captionTextArea}
-                  placeholder="Write your caption here..."
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  numberOfLines={4}
-                  value={formCaption}
-                  onChangeText={(val) => {
-                    setFormCaption(val);
-                    if (complianceScore > 0) {
-                      setComplianceScore(0);
-                    }
-                  }}
-                  textAlignVertical="top"
-                />
-
-                <View style={styles.captionMetaRow}>
-                  <Text style={styles.characterCounter}>
-                    {formCaption.length} / 2200 characters
-                  </Text>
-                  
-                  {complianceScore > 0 && (
-                    <TouchableOpacity
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                      onPress={() => setIsComplianceModalVisible(true)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[
-                        styles.inlineScoreBadge,
-                        {
-                          backgroundColor: complianceStatus === 'compliant' ? '#ECFDF5' : '#FEF3C7',
-                          borderColor: complianceStatus === 'compliant' ? '#A7F3D0' : '#FDE68A',
-                        }
-                      ]}>
-                        <Ionicons
-                          name={complianceStatus === 'compliant' ? 'checkmark-circle' : 'alert-circle'}
-                          size={12}
-                          color={complianceStatus === 'compliant' ? '#059669' : '#D97706'}
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text style={[
-                          styles.inlineScoreBadgeText,
-                          { color: complianceStatus === 'compliant' ? '#059669' : '#D97706' }
-                        ]}>
-                          Score: {complianceScore}% ({complianceStatus === 'compliant' ? 'Compliant' : 'Review'})
-                        </Text>
-                      </View>
-                      <Text style={{ fontSize: 11, color: '#6D28D9', fontWeight: '700', textDecorationLine: 'underline' }}>
-                        View Analysis
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {complianceScore > 0 && (
-                  <View style={styles.complianceScoreCard}>
-                    <View style={styles.complianceScoreCardLeft}>
-                      <View style={[
-                        styles.complianceScoreIconBadge,
-                        { backgroundColor: complianceStatus === 'compliant' ? '#ECFDF5' : '#FEF3C7' }
-                      ]}>
-                        <Ionicons
-                          name={complianceStatus === 'compliant' ? 'checkmark-circle' : 'alert-circle'}
-                          size={16}
-                          color={complianceStatus === 'compliant' ? '#059669' : '#D97706'}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.complianceScoreCardTitle}>
-                          AI Policy Score: {complianceScore}% ({complianceStatus === 'compliant' ? 'Compliant' : 'Review Suggested'})
-                        </Text>
-                        <Text style={styles.complianceScoreCardSub} numberOfLines={1}>
-                          {complianceAnalysis || 'Institutional policy alignment validated.'}
-                        </Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.viewAnalysisBtn}
-                      onPress={() => setIsComplianceModalVisible(true)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.viewAnalysisBtnText}>View Breakdown</Text>
-                      <Ionicons name="arrow-forward" size={11} color="#6D28D9" style={{ marginLeft: 3 }} />
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
 
               {/* SECTION: MEDIA ATTACHMENT */}
@@ -1874,396 +1806,1147 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       </View>
 
       {/* ================= VIEW REQUEST PREVIEW MODAL ================= */}
-      {selectedPost && (
-        <Modal
-          visible={Boolean(selectedPost)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSelectedPost(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxWidth: 620 }]}>
-              <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={styles.codeBadge}>
-                    <Text style={styles.codeBadgeText}>{selectedPost.code}</Text>
+      {selectedPost && (() => {
+        const isApprovedOrPublished =
+          selectedPost.status === 'Approved' ||
+          selectedPost.rawStatus === 'approved' ||
+          selectedPost.rawStatus === 'published' ||
+          selectedPost.rawStatus === 'scheduled';
+        const isRejected =
+          selectedPost.rawStatus === 'rejected' ||
+          selectedPost.rawStatus === 'returned_for_revision';
+        const statusLabel = isApprovedOrPublished
+          ? 'Published'
+          : isRejected
+          ? 'Rejected'
+          : 'Pending';
+        const badgeBg = isApprovedOrPublished
+          ? '#DCFCE7'
+          : isRejected
+          ? '#FEE2E2'
+          : '#FEF3C7';
+        const badgeText = isApprovedOrPublished
+          ? '#166534'
+          : isRejected
+          ? '#991B1B'
+          : '#92400E';
+
+        const platformsList =
+          Array.isArray(selectedPost.targetPlatforms) && selectedPost.targetPlatforms.length > 0
+            ? selectedPost.targetPlatforms
+            : ['facebook'];
+
+        const checklist =
+          selectedPost.rawPost?.imc_branding_checklist ||
+          (selectedPost as any).imc_branding_checklist ||
+          null;
+        const originalCaptionText =
+          checklist?.original_caption || selectedPost.caption || 'No caption provided.';
+        const refinedCaptionText =
+          checklist?.refined_caption || selectedPost.caption || 'No caption provided.';
+
+        const rawOriginalMedia =
+          Array.isArray(checklist?.original_media) && checklist.original_media.length > 0
+            ? checklist.original_media
+            : selectedPost.media || selectedPost.rawPost?.media || [];
+        const originalImageUris = Array.isArray(rawOriginalMedia) && rawOriginalMedia.length > 0
+          ? rawOriginalMedia
+              .map((m: any) => resolveImageUrl(m?.url || m?.file_url || m?.file_path || m?.uri) || m?.uri || m?.url)
+              .filter((u: any): u is string => typeof u === 'string' && u.trim().length > 0)
+          : modalPostImageUris;
+
+        const hasReplacementFinalMedia =
+          Boolean(checklist?.has_replacement_media) ||
+          (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0);
+        const rawFinalMedia =
+          Array.isArray(checklist?.final_media) && checklist.final_media.length > 0
+            ? checklist.final_media
+            : checklist?.has_replacement_media
+            ? (selectedPost.media || selectedPost.rawPost?.media || [])
+            : [];
+        const finalReplacementImageUris = Array.isArray(rawFinalMedia)
+          ? rawFinalMedia
+              .map((m: any) => resolveImageUrl(m?.url || m?.file_url || m?.file_path || m?.uri) || m?.uri || m?.url)
+              .filter((u: any): u is string => typeof u === 'string' && u.trim().length > 0)
+          : [];
+        const activePreviewImageUris =
+          isApprovedOrPublished && finalReplacementImageUris.length > 0
+            ? finalReplacementImageUris
+            : originalImageUris;
+
+        const additionalInstructions =
+          selectedPost.rawPost?.additional_instructions ||
+          selectedPost.rawPost?.remarks ||
+          (selectedPost.rawPost?.preferred_schedule_at
+            ? `Preferred publication schedule: ${selectedPost.rawPost.preferred_schedule_at}`
+            : 'Please use the attached poster and retain the official college branding.');
+
+        const safeCarouselIdx =
+          activePreviewImageUris.length > 0
+            ? Math.min(modalPreviewCarouselIndex, activePreviewImageUris.length - 1)
+            : 0;
+
+        return (
+          <Modal
+            visible={Boolean(selectedPost)}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSelectedPost(null)}
+          >
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.modalCard,
+                  {
+                    maxWidth: 1080,
+                    maxHeight: '92%',
+                    padding: 0,
+                    overflow: 'hidden',
+                  },
+                ]}
+              >
+                {/* Modal Header */}
+                <View
+                  style={{
+                    paddingHorizontal: 28,
+                    paddingVertical: 18,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E2E8F0',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <View style={{ flex: 1, paddingRight: 16 }}>
+                    <Text style={{ fontSize: 19, fontWeight: '800', color: '#0F172A' }}>
+                      Request Details
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 2 }}>
+                      Direct IMC publication request · {selectedPost.date}
+                    </Text>
                   </View>
-                  <View style={{ marginLeft: 8 }}>{getStatusBadge(selectedPost.status)}</View>
+
+                  <View
+                    style={{
+                      backgroundColor: badgeBg,
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: badgeText }}>
+                      {statusLabel}
+                    </Text>
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => setSelectedPost(null)}>
-                  <Ionicons name="close" size={24} color="#374151" />
-                </TouchableOpacity>
-              </View>
 
-              {/* Platform Selector Tabs: Facebook / Instagram / Website */}
-              <View style={styles.modalPlatformTabs}>
-                <TouchableOpacity
-                  style={[
-                    styles.modalPlatformTab,
-                    modalPlatformTab === 'facebook' && styles.modalPlatformTabActiveFacebook,
-                  ]}
-                  onPress={() => setModalPlatformTab('facebook')}
-                  activeOpacity={0.7}
+                {/* Scrollable Body */}
+                <ScrollView
+                  style={{ flexShrink: 1, backgroundColor: '#F8FAFC' }}
+                  contentContainerStyle={{ padding: 24 }}
+                  showsVerticalScrollIndicator={true}
                 >
-                  <Ionicons
-                    name="logo-facebook"
-                    size={14}
-                    color={modalPlatformTab === 'facebook' ? '#1877F2' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.modalPlatformTabText,
-                      modalPlatformTab === 'facebook' && styles.modalPlatformTabTextActiveFacebook,
-                    ]}
+                  {/* TRACKING Card */}
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 14,
+                      padding: 20,
+                      marginBottom: 20,
+                      backgroundColor: '#FFFFFF',
+                    }}
                   >
-                    Facebook
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.modalPlatformTab,
-                    modalPlatformTab === 'instagram' && styles.modalPlatformTabActiveInstagram,
-                  ]}
-                  onPress={() => setModalPlatformTab('instagram')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="logo-instagram"
-                    size={14}
-                    color={modalPlatformTab === 'instagram' ? '#E1306C' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.modalPlatformTabText,
-                      modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActiveInstagram,
-                    ]}
-                  >
-                    Instagram
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.modalPlatformTab,
-                    modalPlatformTab === 'website' && styles.modalPlatformTabActiveWebsite,
-                  ]}
-                  onPress={() => setModalPlatformTab('website')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="globe-outline"
-                    size={14}
-                    color={modalPlatformTab === 'website' ? '#059669' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.modalPlatformTabText,
-                      modalPlatformTab === 'website' && styles.modalPlatformTabTextActiveWebsite,
-                    ]}
-                  >
-                    Website
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
-                {/* Social Media Mockup Preview */}
-                {modalPlatformTab === 'facebook' && (
-                  <View style={[styles.facebookMockupCard, { marginBottom: 14 }]}>
-                    <View style={styles.socialHeader}>
-                      <Image
-                        source={require('../../assets/images/jmc_logo.png')}
-                        style={styles.socialAvatar}
-                        resizeMode="contain"
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
-                        <Text style={styles.socialTimeText}>Sponsored &bull; Public</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color="#64748B" />
-                    </View>
-
-                    <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                      <FormattedText style={styles.socialCaptionText}>
-                        {selectedPost.caption || 'No caption provided.'}
-                      </FormattedText>
-                    </View>
-
-                    {modalPostImageUris.length > 0 ? (
-                      <FacebookMediaGrid
-                        images={modalPostImageUris}
-                        onImagePress={(uri) => setFullScreenImage(uri)}
-                      />
-                    ) : (
-                      <View style={styles.emptyMockMedia}>
-                        <Ionicons name="image-outline" size={32} color="#94A3B8" />
-                        <Text style={styles.emptyMockMediaText}>No media attached</Text>
-                      </View>
-                    )}
-
-                    <View style={styles.socialFooterActions}>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="thumbs-up-outline" size={14} color="#64748B" />
-                        <Text style={styles.socialActionText}>Like</Text>
-                      </View>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="chatbubble-outline" size={14} color="#64748B" />
-                        <Text style={styles.socialActionText}>Comment</Text>
-                      </View>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="share-social-outline" size={14} color="#64748B" />
-                        <Text style={styles.socialActionText}>Share</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {modalPlatformTab === 'instagram' && (
-                  <View style={[styles.instagramMockupCard, { marginBottom: 14 }]}>
-                    <View style={styles.instagramHeader}>
-                      <View style={styles.instagramAvatarRing}>
-                        <Image
-                          source={require('../../assets/images/jmc_logo.png')}
-                          style={styles.instagramAvatar}
-                          resizeMode="contain"
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.instagramAuthorName}>jmc_official</Text>
-                        <Text style={styles.instagramLocationText}>Davao City, Philippines</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color="#262626" />
-                    </View>
-
-                    {modalPostImageUris.length > 0 ? (
-                      <InstagramMediaCarousel
-                        images={modalPostImageUris}
-                        onImagePress={(uri) => setFullScreenImage(uri)}
-                      />
-                    ) : (
-                      <View style={[styles.emptyMockMedia, { aspectRatio: 1 }]}>
-                        <Ionicons name="image-outline" size={32} color="#94A3B8" />
-                        <Text style={styles.emptyMockMediaText}>No media attached</Text>
-                      </View>
-                    )}
-
-                    <View style={{ padding: 12 }}>
-                      <View style={styles.instagramActionsRow}>
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <Ionicons name="heart" size={20} color="#E1306C" />
-                          <Ionicons name="chatbubble-outline" size={18} color="#262626" />
-                          <Ionicons name="paper-plane-outline" size={18} color="#262626" />
-                        </View>
-                        <Ionicons name="bookmark-outline" size={18} color="#262626" />
-                      </View>
-                      <Text style={styles.instagramLikesText}>Liked by jmcfi_official and others</Text>
-                      <FormattedText style={styles.instagramCaptionText}>
-                        {'<b>jmc_official </b>' + (selectedPost.caption || '')}
-                      </FormattedText>
-                    </View>
-                  </View>
-                )}
-
-                {modalPlatformTab === 'website' && (
-                  <View style={[styles.websiteMockupCard, { marginBottom: 14 }]}>
-                    <View style={styles.websiteBadgeRow}>
-                      <Ionicons name="globe-outline" size={13} color="#059669" />
-                      <Text style={styles.websiteBadgeText}>Website Article Preview</Text>
-                    </View>
-
-                    <Text style={styles.websiteTitleText}>{selectedPost.title}</Text>
-                    <Text style={styles.websiteMetaText}>
-                      By {selectedPost.requestedBy} &bull; News & Announcements &bull; {selectedPost.date}
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: '700',
+                        color: '#64748B',
+                        letterSpacing: 0.8,
+                        textTransform: 'uppercase',
+                        marginBottom: 16,
+                      }}
+                    >
+                      TRACKING
                     </Text>
 
-                    {modalPostImageUris.length > 0 ? (
-                      <View style={{ marginBottom: 10 }}>
-                        <TouchableOpacity
-                          activeOpacity={0.9}
-                          onPress={() => setFullScreenImage(modalPostImageUris[modalViewFeaturedIndex] || modalPostImageUris[0])}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        justifyContent: 'center',
+                        maxWidth: 640,
+                        alignSelf: 'center',
+                        width: '100%',
+                      }}
+                    >
+                      {/* Step 1: Submitted */}
+                      <View style={{ alignItems: 'center', width: 100 }}>
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: '#DCFCE7',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 15,
+                              backgroundColor: '#10B981',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                          </View>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 8,
+                            textAlign: 'center',
+                          }}
+                        >
+                          Submitted
+                        </Text>
+                      </View>
+
+                      {/* Connector 1 */}
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          backgroundColor: isApprovedOrPublished ? '#10B981' : '#E2E8F0',
+                          marginTop: 20,
+                          marginHorizontal: -12,
+                        }}
+                      />
+
+                      {/* Step 2: IMC Review */}
+                      <View style={{ alignItems: 'center', width: 110 }}>
+                        {isApprovedOrPublished ? (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#DCFCE7',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: '#10B981',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        ) : isRejected ? (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#FEE2E2',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: '#EF4444',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="close" size={16} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#FEF9C3',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                borderWidth: 1.5,
+                                borderColor: '#D97706',
+                                backgroundColor: '#FFFBEB',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="time-outline" size={16} color="#D97706" />
+                            </View>
+                          </View>
+                        )}
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 8,
+                            textAlign: 'center',
+                          }}
+                        >
+                          IMC Review
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: isApprovedOrPublished
+                              ? '#10B981'
+                              : isRejected
+                              ? '#EF4444'
+                              : '#B45309',
+                            marginTop: 2,
+                            textAlign: 'center',
+                          }}
+                        >
+                          {isApprovedOrPublished ? 'Approved' : isRejected ? 'Rejected' : 'Pending'}
+                        </Text>
+                      </View>
+
+                      {/* Connector 2 */}
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          backgroundColor: isApprovedOrPublished ? '#10B981' : '#E2E8F0',
+                          marginTop: 20,
+                          marginHorizontal: -12,
+                        }}
+                      />
+
+                      {/* Step 3: Published */}
+                      <View style={{ alignItems: 'center', width: 100 }}>
+                        {isApprovedOrPublished ? (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#DCFCE7',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: '#10B981',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#F1F5F9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                borderWidth: 1.5,
+                                borderColor: '#94A3B8',
+                                backgroundColor: '#F8FAFC',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="time-outline" size={16} color="#64748B" />
+                            </View>
+                          </View>
+                        )}
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 8,
+                            textAlign: 'center',
+                          }}
+                        >
+                          Published
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: isApprovedOrPublished ? '#10B981' : '#64748B',
+                            marginTop: 2,
+                            textAlign: 'center',
+                          }}
+                        >
+                          {isApprovedOrPublished ? 'Published' : 'Waiting'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Two-Column Main Grid */}
+                  <View
+                    style={{
+                      flexDirection: isDesktop ? 'row' : 'column',
+                      gap: 20,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    {/* Left Column Card: Submitted Materials & Live Preview */}
+                    <View
+                      style={{
+                        flex: 1,
+                        width: '100%',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 14,
+                        padding: 20,
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15.5,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 14,
+                        }}
+                      >
+                        Submitted Materials
+                      </Text>
+
+                      {/* Target Platforms */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 8,
+                        }}
+                      >
+                        Target Platforms
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          marginBottom: 16,
+                        }}
+                      >
+                        {platformsList.map((plat, idx) => {
+                          const pKey = String(plat).toLowerCase();
+                          const label =
+                            pKey === 'facebook'
+                              ? 'Facebook'
+                              : pKey === 'instagram'
+                              ? 'Instagram'
+                              : pKey === 'website'
+                              ? 'Website'
+                              : plat;
+                          const iconName =
+                            pKey === 'facebook'
+                              ? 'logo-facebook'
+                              : pKey === 'instagram'
+                              ? 'logo-instagram'
+                              : 'globe-outline';
+                          const iconColor =
+                            pKey === 'facebook'
+                              ? '#4C1D95'
+                              : pKey === 'instagram'
+                              ? '#9D174D'
+                              : '#4C1D95';
+
+                          return (
+                            <View
+                              key={`${pKey}-${idx}`}
+                              style={{
+                                backgroundColor: '#F5F3FF',
+                                borderWidth: 1,
+                                borderColor: '#DDD6FE',
+                                borderRadius: 999,
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}
+                            >
+                              <Ionicons name={iconName as any} size={13} color={iconColor} />
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: '700',
+                                  color: '#1E1B4B',
+                                }}
+                              >
+                                {label}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {/* Original Caption */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Original Caption
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 10,
+                          padding: 14,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                          {originalCaptionText}
+                        </FormattedText>
+                      </View>
+
+                      {/* Additional Instructions */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Additional Instructions
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 10,
+                          padding: 14,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                          {additionalInstructions}
+                        </Text>
+                      </View>
+
+                      {/* Uploaded Photos · N */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 8,
+                        }}
+                      >
+                        Uploaded Photos · {originalImageUris.length}
+                      </Text>
+                      {originalImageUris.length > 0 ? (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            gap: 12,
+                            marginBottom: 20,
+                          }}
+                        >
+                          {originalImageUris.map((uri, idx) => {
+                            const mediaObj = rawOriginalMedia?.[idx];
+                            const fileName =
+                              mediaObj?.original_filename ||
+                              mediaObj?.original_name ||
+                              mediaObj?.file_name ||
+                              uri.split('/').pop()?.split('?')[0] ||
+                              `photo-${String(idx + 1).padStart(2, '0')}.jpg`;
+                            return (
+                              <TouchableOpacity
+                                key={idx}
+                                activeOpacity={0.85}
+                                onPress={() => setFullScreenImage(uri)}
+                                style={{
+                                  width: '48%',
+                                  flexGrow: 1,
+                                  borderWidth: 1,
+                                  borderColor: '#E2E8F0',
+                                  borderRadius: 10,
+                                  overflow: 'hidden',
+                                  backgroundColor: '#FFFFFF',
+                                }}
+                              >
+                                <Image
+                                  source={{ uri }}
+                                  style={{ width: '100%', height: 135, backgroundColor: '#F1F5F9' }}
+                                  resizeMode="cover"
+                                />
+                                <View
+                                  style={{
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 10,
+                                    alignItems: 'center',
+                                    borderTopWidth: 1,
+                                    borderTopColor: '#F1F5F9',
+                                  }}
+                                >
+                                  <Text
+                                    numberOfLines={1}
+                                    ellipsizeMode="middle"
+                                    style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500' }}
+                                  >
+                                    {fileName}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderStyle: 'dashed',
+                            borderColor: '#CBD5E1',
+                            borderRadius: 10,
+                            padding: 14,
+                            marginBottom: 20,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12.5, color: '#94A3B8' }}>
+                            No photos uploaded with this request.
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Horizontal Divider */}
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: '#E2E8F0',
+                          marginVertical: 16,
+                        }}
+                      />
+
+                      {/* Live Preview */}
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 12,
+                        }}
+                      >
+                        Live Preview
+                      </Text>
+
+                      {/* Platform Pill Tabs */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          marginBottom: 14,
+                        }}
+                      >
+                        {(
+                          [
+                            { key: 'facebook', label: 'Facebook', icon: 'logo-facebook', iconColor: '#1877F2' },
+                            { key: 'instagram', label: 'Instagram', icon: 'logo-instagram', iconColor: '#E1306C' },
+                            { key: 'website', label: 'Website', icon: 'globe-outline', iconColor: '#64748B' },
+                          ] as const
+                        ).map((tab) => {
+                          const isActive = modalPlatformTab === tab.key;
+                          return (
+                            <TouchableOpacity
+                              key={tab.key}
+                              activeOpacity={0.75}
+                              onPress={() => setModalPlatformTab(tab.key)}
+                              style={{
+                                borderRadius: 999,
+                                paddingHorizontal: 14,
+                                paddingVertical: 7,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: isActive ? '#FEF3C7' : '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: isActive ? '#FDE68A' : '#E2E8F0',
+                              }}
+                            >
+                              <Ionicons
+                                name={tab.icon as any}
+                                size={14}
+                                color={
+                                  isActive
+                                    ? tab.key === 'facebook'
+                                      ? '#1877F2'
+                                      : tab.key === 'instagram'
+                                      ? '#E1306C'
+                                      : '#0F172A'
+                                    : tab.iconColor
+                                }
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 12.5,
+                                  fontWeight: '700',
+                                  color: isActive ? '#78350F' : '#475569',
+                                }}
+                              >
+                                {tab.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Social Preview Card */}
+                      <View
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 12,
+                          backgroundColor: '#FFFFFF',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            padding: 14,
+                            gap: 10,
+                          }}
                         >
                           <Image
-                            source={{ uri: modalPostImageUris[modalViewFeaturedIndex] || modalPostImageUris[0] }}
-                            style={styles.websiteFeaturedImage}
-                            resizeMode="cover"
+                            source={require('../../assets/images/jmc_logo_sm.png')}
+                            style={{ width: 36, height: 36, borderRadius: 18 }}
+                            resizeMode="contain"
                           />
-                          <View style={styles.websiteImageTag}>
-                            <Ionicons name="globe-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.websiteImageTagText}>
-                              Website Featured Image {modalPostImageUris.length > 1 ? `(#${modalViewFeaturedIndex + 1})` : ''}
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>
+                              Jose Maria College Foundation Inc.
+                            </Text>
+                            <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                              {modalPlatformTab === 'instagram'
+                                ? 'jmc_official · Official Department Post'
+                                : modalPlatformTab === 'website'
+                                ? `${selectedPost.title} · Official Website Post`
+                                : 'Official Department Post · Public'}
                             </Text>
                           </View>
-                        </TouchableOpacity>
+                        </View>
 
-                        {modalPostImageUris.length > 1 && (
-                          <View style={{ marginTop: 8 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
-                              Website Featured Image (Tap to preview):
+                        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                          <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                            {isApprovedOrPublished ? refinedCaptionText : originalCaptionText}
+                          </FormattedText>
+                        </View>
+
+                        {activePreviewImageUris.length > 0 ? (
+                          <View
+                            style={{
+                              position: 'relative',
+                              width: '100%',
+                              height: 240,
+                              backgroundColor: '#F1F5F9',
+                            }}
+                          >
+                            <TouchableOpacity
+                              activeOpacity={0.92}
+                              onPress={() => setFullScreenImage(activePreviewImageUris[safeCarouselIdx])}
+                              style={{ width: '100%', height: '100%' }}
+                            >
+                              <Image
+                                source={{ uri: activePreviewImageUris[safeCarouselIdx] }}
+                                style={{ width: '100%', height: '100%' }}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
+
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 12,
+                                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 999,
+                              }}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' }}>
+                                {safeCarouselIdx + 1} / {activePreviewImageUris.length}
+                              </Text>
+                            </View>
+
+                            {activePreviewImageUris.length > 1 && (
+                              <>
+                                <TouchableOpacity
+                                  activeOpacity={0.8}
+                                  onPress={() =>
+                                    setModalPreviewCarouselIndex((prev) =>
+                                      prev <= 0 ? activePreviewImageUris.length - 1 : prev - 1
+                                    )
+                                  }
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    left: 12,
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    ...(Platform.OS === 'web'
+                                      ? { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
+                                      : { elevation: 3 }),
+                                  }}
+                                >
+                                  <Ionicons name="chevron-back" size={16} color="#0F172A" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  activeOpacity={0.8}
+                                  onPress={() =>
+                                    setModalPreviewCarouselIndex((prev) =>
+                                      prev >= activePreviewImageUris.length - 1 ? 0 : prev + 1
+                                    )
+                                  }
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    right: 12,
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    ...(Platform.OS === 'web'
+                                      ? { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
+                                      : { elevation: 3 }),
+                                  }}
+                                >
+                                  <Ionicons name="chevron-forward" size={16} color="#0F172A" />
+                                </TouchableOpacity>
+                              </>
+                            )}
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              height: 140,
+                              backgroundColor: '#F8FAFC',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderTopWidth: 1,
+                              borderTopColor: '#E2E8F0',
+                            }}
+                          >
+                            <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                            <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                              No media attached
                             </Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                              {modalPostImageUris.map((uri, idx) => {
-                                const isSel = modalViewFeaturedIndex === idx;
-                                return (
-                                  <TouchableOpacity
-                                    key={idx}
-                                    onPress={() => setModalViewFeaturedIndex(idx)}
-                                    activeOpacity={0.8}
-                                    style={{
-                                      width: 68,
-                                      height: 52,
-                                      borderRadius: 6,
-                                      borderWidth: isSel ? 2 : 1,
-                                      borderColor: isSel ? '#059669' : '#CBD5E1',
-                                      overflow: 'hidden',
-                                      position: 'relative',
-                                    }}
-                                  >
-                                    <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                    {isSel && (
-                                      <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#059669', borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 }}>
-                                        <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>Cover</Text>
-                                      </View>
-                                    )}
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </ScrollView>
                           </View>
                         )}
                       </View>
-                    ) : (
-                      <View style={[styles.emptyMockMedia, { height: 120, marginBottom: 10 }]}>
-                        <Ionicons name="image-outline" size={28} color="#94A3B8" />
-                        <Text style={styles.emptyMockMediaText}>No media attached for website preview</Text>
+                    </View>
+
+                    {/* Right Column Card: Request Information & Final Publication Content */}
+                    <View
+                      style={{
+                        flex: 1,
+                        width: '100%',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 14,
+                        padding: 20,
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15.5,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 14,
+                        }}
+                      >
+                        Request Information
+                      </Text>
+
+                      {/* 2x2 Info Grid */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 12,
+                          marginBottom: 20,
+                        }}
+                      >
+                        {[
+                          { label: 'REQUEST TITLE', value: selectedPost.title },
+                          { label: 'DEPARTMENT', value: selectedPost.department },
+                          { label: 'REQUESTED BY', value: selectedPost.requestedBy },
+                          { label: 'REQUESTED ON', value: selectedPost.date },
+                        ].map((info, i) => (
+                          <View
+                            key={i}
+                            style={{
+                              width: '48%',
+                              flexGrow: 1,
+                              backgroundColor: '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                              borderRadius: 10,
+                              padding: 12,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: '#64748B',
+                                marginBottom: 4,
+                              }}
+                            >
+                              {info.label}
+                            </Text>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                              {info.value}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    )}
 
-                    <FormattedText style={styles.websiteBodyText}>
-                      {selectedPost.caption || 'No caption provided.'}
-                    </FormattedText>
-                  </View>
-                )}
+                      {/* Horizontal Divider */}
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: '#E2E8F0',
+                          marginBottom: 18,
+                        }}
+                      />
 
-                <Text style={styles.modalTitle}>{selectedPost.title}</Text>
+                      <Text
+                        style={{
+                          fontSize: 14.5,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 14,
+                        }}
+                      >
+                        Final Publication Content
+                      </Text>
 
-                <View style={styles.modalInfoRow}>
-                  <Text style={styles.modalInfoLabel}>Date & Time:</Text>
-                  <Text style={styles.modalInfoValue}>
-                    {selectedPost.date} {selectedPost.time || ''}
-                  </Text>
-                </View>
-
-                <View style={styles.modalInfoRow}>
-                  <Text style={styles.modalInfoLabel}>Department:</Text>
-                  <Text style={styles.modalInfoValue}>{selectedPost.department}</Text>
-                </View>
-
-                <View style={styles.modalInfoRow}>
-                  <Text style={styles.modalInfoLabel}>Requested By:</Text>
-                  <Text style={styles.modalInfoValue}>{selectedPost.requestedBy}</Text>
-                </View>
-
-                {/* APPROVAL TRACKING: Request -> IMC -> Publish */}
-                <View style={styles.modalTrackingCard}>
-                  <Text style={styles.modalTrackingTitle}>Approval Tracking</Text>
-                  {(() => {
-                    const isImcApproved = selectedPost.status === 'Approved' || selectedPost.rawStatus === 'approved' || selectedPost.rawStatus === 'published' || selectedPost.rawStatus === 'scheduled';
-                    const isImcRejected = selectedPost.rawStatus === 'rejected' || selectedPost.rawStatus === 'returned_for_revision';
-                    const isPublished = selectedPost.rawStatus === 'published';
-                    const isScheduled = selectedPost.rawStatus === 'scheduled';
-
-                    return (
-                      <View style={styles.modalTrackingStepper}>
-                        {/* Step 1: Request */}
-                        <View style={styles.modalTrackingStep}>
-                          <View style={[styles.modalStepBadge, styles.modalStepBadgeCompleted]}>
-                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                          </View>
-                          <Text style={styles.modalStepName}>Request</Text>
-                          <Text style={[styles.modalStepStatus, { color: '#16A34A' }]}>Submitted</Text>
-                        </View>
-
-                        <View style={[styles.modalStepConnector, isImcApproved || !isImcRejected ? styles.modalStepConnectorActive : null]} />
-
-                        {/* Step 2: IMC */}
-                        <View style={styles.modalTrackingStep}>
-                          <View style={[
-                            styles.modalStepBadge,
-                            isImcApproved
-                              ? styles.modalStepBadgeCompleted
-                              : (isImcRejected ? styles.modalStepBadgeRejected : styles.modalStepBadgeActive)
-                          ]}>
-                            <Ionicons
-                              name={isImcApproved ? "checkmark" : (isImcRejected ? "close" : "time")}
-                              size={14}
-                              color="#FFFFFF"
-                            />
-                          </View>
-                          <Text style={styles.modalStepName}>IMC</Text>
-                          <Text style={[
-                            styles.modalStepStatus,
-                            {
-                              color: isImcApproved
-                                ? '#16A34A'
-                                : (isImcRejected ? '#DC2626' : '#D97706')
-                            }
-                          ]}>
-                            {isImcApproved ? 'Approved' : (selectedPost.rawStatus === 'returned_for_revision' ? 'Revision' : (selectedPost.rawStatus === 'rejected' ? 'Rejected' : 'Reviewing'))}
+                      {/* Refined Caption */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Refined Caption
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 10,
+                          padding: 14,
+                          marginBottom: 16,
+                        }}
+                      >
+                        {isApprovedOrPublished ? (
+                          <FormattedText style={{ fontSize: 13, color: '#1E293B', lineHeight: 19 }}>
+                            {refinedCaptionText}
+                          </FormattedText>
+                        ) : (
+                          <Text style={{ fontSize: 13, fontStyle: 'italic', color: '#94A3B8' }}>
+                            Awaiting IMC caption refinement.
                           </Text>
-                        </View>
-
-                        <View style={[styles.modalStepConnector, isPublished || isScheduled ? styles.modalStepConnectorActive : null]} />
-
-                        {/* Step 3: Publish */}
-                        <View style={styles.modalTrackingStep}>
-                          <View style={[
-                            styles.modalStepBadge,
-                            isPublished
-                              ? styles.modalStepBadgeCompleted
-                              : (isScheduled ? styles.modalStepBadgeActive : styles.modalStepBadgeUpcoming)
-                          ]}>
-                            <Ionicons
-                              name={isPublished ? "checkmark" : (isScheduled ? "calendar" : "globe-outline")}
-                              size={14}
-                              color={isPublished || isScheduled ? "#FFFFFF" : "#94A3B8"}
-                            />
-                          </View>
-                          <Text style={styles.modalStepName}>Publish</Text>
-                          <Text style={[
-                            styles.modalStepStatus,
-                            {
-                              color: isPublished
-                                ? '#16A34A'
-                                : (isScheduled ? '#6D28D9' : '#94A3B8')
-                            }
-                          ]}>
-                            {isPublished ? 'Published' : (isScheduled ? 'Scheduled' : 'Waiting')}
-                          </Text>
-                        </View>
+                        )}
                       </View>
-                    );
-                  })()}
-                </View>
 
-                {Boolean(selectedPost.caption) && (
-                  <View style={{ marginTop: 12 }}>
-                    <Text style={[styles.modalInfoLabel, { marginBottom: 4 }]}>Caption:</Text>
-                    <Text style={styles.modalCaptionText}>{selectedPost.caption}</Text>
+                      {/* Final Images */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
+                          Final Images
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: '#94A3B8' }}>
+                          {isApprovedOrPublished ? 'Published images' : 'Awaiting final images'}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderStyle: 'dashed',
+                          borderColor: '#CBD5E1',
+                          borderRadius: 10,
+                          padding: 14,
+                        }}
+                      >
+                        {isApprovedOrPublished && hasReplacementFinalMedia && finalReplacementImageUris.length > 0 ? (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                            {finalReplacementImageUris.map((uri, idx) => (
+                              <TouchableOpacity
+                                key={idx}
+                                activeOpacity={0.85}
+                                onPress={() => setFullScreenImage(uri)}
+                                style={{
+                                  width: 84,
+                                  height: 64,
+                                  borderRadius: 8,
+                                  overflow: 'hidden',
+                                  borderWidth: 1,
+                                  borderColor: '#E2E8F0',
+                                }}
+                              >
+                                <Image
+                                  source={{ uri }}
+                                  style={{ width: '100%', height: '100%' }}
+                                  resizeMode="cover"
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        ) : isApprovedOrPublished && originalImageUris.length > 0 ? (
+                          <View style={{ gap: 8 }}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                              {originalImageUris.map((uri, idx) => (
+                                <TouchableOpacity
+                                  key={idx}
+                                  activeOpacity={0.85}
+                                  onPress={() => setFullScreenImage(uri)}
+                                  style={{
+                                    width: 84,
+                                    height: 64,
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                  }}
+                                >
+                                  <Image
+                                    source={{ uri }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="cover"
+                                  />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                              Published using original submitted photos.
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18 }}>
+                            No replacement images uploaded. The original photos remain available to IMC.
+                          </Text>
+                        )}
+                      </View>
+                    </View>
                   </View>
-                )}
-              </ScrollView>
+                </ScrollView>
 
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setSelectedPost(null)}
-              >
-                <Text style={styles.modalCloseBtnText}>Close Preview</Text>
-              </TouchableOpacity>
+                {/* Sticky Modal Footer */}
+                <View
+                  style={{
+                    paddingHorizontal: 28,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: '#E2E8F0',
+                    flexDirection: 'row',
+                    justifyContent: 'flex-end',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedPost(null)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      paddingHorizontal: 22,
+                      paddingVertical: 9,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                      Close
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {/* ================= COMPLIANCE RESULT MODAL ================= */}
       <ComplianceResultModal
@@ -2310,7 +2993,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
     padding: 16,
   },
 
@@ -2321,15 +3004,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.8)',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)' }
+      ? {
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+        }
       : { elevation: 2 }),
   },
   topBannerLeft: {
@@ -2426,15 +3113,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  /* Split Layout */
+  /* Split Layout - Form on the left, Content Requests list on the right */
   splitLayout: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 18,
     flex: 1,
     width: '100%',
+    alignItems: 'stretch',
   },
   splitLayoutStacked: {
-    flexDirection: 'column',
+    flexDirection: 'column-reverse',
   },
 
   /* LEFT SECTION */
@@ -2539,23 +3227,34 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   paginationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.8)',
     marginTop: 10,
     overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? {
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+        }
+      : {}),
   },
   requestCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.85)',
     padding: 14,
     width: '100%',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)' }
+      ? {
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+        }
       : { elevation: 1 }),
   },
   cardThumbnail: {
@@ -2695,15 +3394,19 @@ const styles = StyleSheet.create({
 
   /* RIGHT SECTION: CREATE REQUEST PANEL */
   rightSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.85)',
     overflow: 'hidden',
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
     width: '100%',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)' }
+      ? {
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+        }
       : { elevation: 3 }),
   },
   panelHeaderPurple: {
@@ -2743,7 +3446,114 @@ const styles = StyleSheet.create({
   },
   panelFormScrollContent: {
     padding: 16,
-    gap: 14,
+    gap: 18,
+    flex: 1,
+  },
+
+  redesignedSectionCard: {
+    backgroundColor: 'transparent',
+    paddingBottom: 6,
+  },
+  redesignedSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+    marginBottom: 14,
+  },
+  redesignedHeaderIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redesignedSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  redesignedFieldGroup: {
+    gap: 6,
+  },
+  redesignedFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  redesignedTextInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13.5,
+    color: '#0F172A',
+    outlineWidth: 0,
+  },
+  redesignedReadonlyBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  redesignedReadonlyText: {
+    fontSize: 13.5,
+    color: '#334155',
+  },
+  captionGuideCallout: {
+    backgroundColor: '#F8FAFC',
+    borderLeftWidth: 3.5,
+    borderLeftColor: '#581C87',
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+  },
+  captionGuideText: {
+    fontSize: 12.5,
+    color: '#475569',
+    lineHeight: 19,
+  },
+  captionGuideBold: {
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  redesignedCaptionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  redesignedCharCounter: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  redesignedAiPolicyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  redesignedAiPolicyBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0F172A',
   },
 
   formGroup: {

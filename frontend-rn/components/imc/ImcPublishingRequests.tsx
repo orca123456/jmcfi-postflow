@@ -223,7 +223,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
         </Text>
         <Text style={[styles.pageSubtitle, isDarkMode && styles.pageSubtitleDark]}>
           {mode === 'published'
-            ? 'View and manage published releases across all official platforms.'
+            ? 'Completed publications and final post records.'
             : 'Review and prepare submitted publications for release.'}
         </Text>
       </View>
@@ -233,7 +233,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
         {/* Card Toolbar Row */}
         <View style={[styles.cardToolbar, !isTablet && styles.cardToolbarStacked]}>
           <Text style={[styles.cardTitle, isDarkMode && styles.cardTitleDark]}>
-            {mode === 'published' ? 'Published Content' : 'Publishing Requests'}
+            {mode === 'published' ? 'Published Posts' : 'Publishing Requests'}
           </Text>
 
           {/* Right Toolbar Actions */}
@@ -388,12 +388,12 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
           <View style={[styles.tableContainer, !isDesktop && { minWidth: 920 }]}>
             {/* Table Header Row */}
             <View style={[styles.tableHeaderRow, isDarkMode && styles.tableHeaderRowDark]}>
-              <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Request Title</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Department</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Requested By</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.1 }]}>Requested On</Text>
-              <Text style={[styles.tableHeaderCell, { width: 110, textAlign: 'center' }]}>Platforms</Text>
-              <Text style={[styles.tableHeaderCell, { width: 100, textAlign: 'right' }]}>Actions</Text>
+              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 2.5 }]}>Request Title</Text>
+              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 1.4 }]}>Department</Text>
+              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 1.3 }]}>Requested By</Text>
+              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 1.1 }]}>Requested On</Text>
+              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { width: 110, textAlign: 'center' }]}>Platforms</Text>
+              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { width: 100, textAlign: 'right' }]}>Actions</Text>
             </View>
 
             {/* Table Body Rows */}
@@ -520,7 +520,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                         onPress={() => onReviewRequest(req)}
                         activeOpacity={0.82}
                       >
-                        <Text style={styles.reviewButtonText}>Review</Text>
+                        <Text style={styles.reviewButtonText}>{mode === 'published' ? 'View' : 'Review'}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -628,6 +628,12 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
           </View>
         </View>
       </View>
+
+      {mode === 'published' && (
+        <Text style={[styles.simulatedFootnote, isDarkMode && styles.simulatedFootnoteDark]}>
+          Publication results shown here are simulated. No institutional account is connected.
+        </Text>
+      )}
     </View>
   );
 };
@@ -1070,6 +1076,15 @@ const styles = StyleSheet.create({
   },
   perPageDropdownBtnTextDark: {
     color: '#CBD5E1',
+  },
+  simulatedFootnote: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: -6,
+    paddingHorizontal: 4,
+  },
+  simulatedFootnoteDark: {
+    color: '#94A3B8',
   },
 });
 

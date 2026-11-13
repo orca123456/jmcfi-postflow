@@ -38,6 +38,9 @@ if ($isApiRoute) {
     }
 }
 
+// Prevent PHP CLI built-in dev server from hanging sockets in keep-alive
+header('Connection: close');
+
 // Route everything to Laravel (handles routing, CORS middleware, and file serving)
 if ($uri !== '/' && file_exists(__DIR__ . '/public' . $uri)) {
     return false;

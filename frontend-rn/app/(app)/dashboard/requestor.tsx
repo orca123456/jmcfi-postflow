@@ -185,8 +185,27 @@ export default function RequestorDashboard() {
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState('facebook');
+  const [directModalCarouselIdx, setDirectModalCarouselIdx] = useState(0);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedQueuePost) {
+      setDirectModalCarouselIdx(0);
+      const platList = (Array.isArray(selectedQueuePost.platforms) ? selectedQueuePost.platforms : []).map((p: any) =>
+        String(p).toLowerCase()
+      );
+      if (platList.includes('facebook')) {
+        setModalPlatformTab('facebook');
+      } else if (platList.includes('instagram')) {
+        setModalPlatformTab('instagram');
+      } else if (platList.includes('website') || platList.includes('portal') || platList.includes('wordpress')) {
+        setModalPlatformTab('website');
+      } else {
+        setModalPlatformTab('facebook');
+      }
+    }
+  }, [selectedQueuePost]);
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
@@ -554,6 +573,36 @@ export default function RequestorDashboard() {
   });
 
   const mapPost = (p: any) => {
+    const isDirectImc = String(p.routing_type || p.routingType || '').toLowerCase() === 'direct_imc';
+    const rawSt = String(p.status || '').toLowerCase();
+    const directStatusLabel =
+      rawSt === 'published' || rawSt === 'approved' || rawSt === 'scheduled'
+        ? 'Published'
+        : rawSt === 'rejected' || rawSt === 'returned_for_revision'
+        ? 'Rejected'
+        : rawSt === 'under_review' || rawSt === 'reviewing'
+        ? 'Reviewing'
+        : 'Pending';
+    const directStatusBg =
+      directStatusLabel === 'Published'
+        ? '#DCFCE7'
+        : directStatusLabel === 'Rejected'
+        ? '#FEE2E2'
+        : directStatusLabel === 'Reviewing'
+        ? '#EDE9FE'
+        : '#FEF3C7';
+    const directStatusColor =
+      directStatusLabel === 'Published'
+        ? '#166534'
+        : directStatusLabel === 'Rejected'
+        ? '#991B1B'
+        : directStatusLabel === 'Reviewing'
+        ? '#5B21B6'
+        : '#92400E';
+    const directDate = p.created_at
+      ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+      : 'Today';
+
     let rejectedBy = '';
     if ((p.status === 'rejected' || p.status === 'returned_for_revision') && p.approval_workflows && Array.isArray(p.approval_workflows)) {
       const rejectionLog = p.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
@@ -573,18 +622,24 @@ export default function RequestorDashboard() {
       title: p.title || 'Untitled',
       caption: p.caption_narrative || '',
       platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
-      category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
-        ? p.other_category_name
-        : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
+      category: isDirectImc
+        ? 'IMC Publication'
+        : ((p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+          ? p.other_category_name
+          : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category'))),
       other_category_name: p.other_category_name || null,
       preferred_schedule_at: p.preferred_schedule_at || null,
       department: p.requestor?.department || 'Department',
       date: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+      directDate,
       time: p.created_at ? new Date(p.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
       dateSaved: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
       rawStatus: p.status, // Add rawStatus for reliable filtering
       status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
       statusLabel: p.status_label || p.status,
+      directStatusLabel,
+      directStatusBg,
+      directStatusColor,
       statusColor: p.status === 'published' || p.status === 'approved'
         ? '#15803D'
         : (p.status === 'scheduled'
@@ -659,13 +714,11 @@ export default function RequestorDashboard() {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
       const mapped = posts.map(mapPost);
-      // Classic dashboard lists should only contain classic/standard requests (not direct IMC requests)
-      const isClassic = (p: any) => String(p.routing_type || p.routingType || 'standard').toLowerCase() !== 'direct_imc';
-      const filtered = mapped.filter((p: any) => isClassic(p) && p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
+      const filtered = mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
       setMockRequests(filtered);
       setMockQueuePosts(filtered);
-      setDrafts(mapped.filter((p: any) => isClassic(p) && p.rawStatus === 'draft'));
-      setRejectedPosts(mapped.filter((p: any) => isClassic(p) && (p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision')));
+      setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
+      setRejectedPosts(mapped.filter((p: any) => p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision'));
     }
   }, [postsDataRes]);
 
@@ -894,7 +947,7 @@ export default function RequestorDashboard() {
       return;
     }
 
-    if (mediaFiles.length === 0 && supportingDocs.length === 0) {
+    if (mediaFiles.length === 0 && supportingDocs.length === 0 && !editingPostHasImage) {
       alert('Please attach at least one photo or media file before submitting.');
       return;
     }
@@ -1465,7 +1518,9 @@ export default function RequestorDashboard() {
                 </View>
               )}
 
-              {paginatedRequests.map((req) => (
+              {paginatedRequests.map((req) => {
+                const isDirectImc = String(req.routing_type || req.routingType || '').toLowerCase() === 'direct_imc';
+                return (
                 <TouchableOpacity key={req.id} style={[styles.tableRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start', padding: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border }]} onPress={() => setSelectedQueuePost(req)}>
                   <View style={[styles.cellFlex2, styles.titleCellContainer, !isTablet && { width: '100%', marginBottom: 12 }]}>
                     <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
@@ -1482,11 +1537,21 @@ export default function RequestorDashboard() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.postTitleText, !isTablet && { fontSize: 16, marginBottom: 4 }]} numberOfLines={2}>{req.title}</Text>
-                      {!isTablet && <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{req.other_category_name || req.category}</Text>}
+                      {isDirectImc ? (
+                        <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
+                          Direct IMC request · click to view details
+                        </Text>
+                      ) : (
+                        !isTablet && <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{req.other_category_name || req.category}</Text>
+                      )}
                     </View>
                   </View>
                   
-                  {isTablet && <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.other_category_name || req.category}</Text>}
+                  {isTablet && (
+                    <Text style={[styles.tableCellText, styles.cellFlex1]}>
+                      {isDirectImc ? 'IMC Publication' : (req.other_category_name || req.category)}
+                    </Text>
+                  )}
                   
                   {isTablet && (
                   <View style={[styles.cellFlex1, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
@@ -1506,27 +1571,48 @@ export default function RequestorDashboard() {
                   
                   {!isTablet ? (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: 8 }}>
-                      <Text style={[styles.tableCellText, { fontSize: 12, color: Colors.textSecondary }]}>{req.date}</Text>
-                      <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
-                        <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
-                          {req.status}
-                        </Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <>
-                      <Text style={[styles.tableCellText, styles.cellFlex1]}>{req.date}</Text>
-                      <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
+                      <Text style={[styles.tableCellText, { fontSize: 12, color: Colors.textSecondary }]}>
+                        {isDirectImc ? req.directDate : req.date}
+                      </Text>
+                      {isDirectImc ? (
+                        <View style={{ backgroundColor: req.directStatusBg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: req.directStatusColor }}>
+                            {req.directStatusLabel}
+                          </Text>
+                        </View>
+                      ) : (
                         <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
                           <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
                             {req.status}
                           </Text>
                         </View>
+                      )}
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={[styles.tableCellText, styles.cellFlex1]}>
+                        {isDirectImc ? req.directDate : req.date}
+                      </Text>
+                      <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
+                        {isDirectImc ? (
+                          <View style={{ backgroundColor: req.directStatusBg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: req.directStatusColor }}>
+                              {req.directStatusLabel}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
+                            <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
+                              {req.status}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </>
                   )}
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </View>
 
             <PaginationControl
@@ -1659,95 +1745,28 @@ export default function RequestorDashboard() {
                 <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
-                      <Ionicons name="information-circle" size={18} color={Colors.textPrimary} />
+                      <Ionicons name="document-text-outline" size={18} color="#334155" />
                     </View>
                     <Text style={styles.cardTitle}>Basic Information</Text>
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>POST TITLE</Text>
+                    <Text style={styles.inputLabel}>
+                      REQUEST TITLE <Text style={{ color: '#EF4444' }}>*</Text>
+                    </Text>
                     <TextInput
-                      style={styles.textInput}
-                      placeholder="e.g., Enrollment Announcement 2024"
+                      style={[styles.textInput, { borderRadius: 8, height: 42, paddingHorizontal: 14 }]}
+                      placeholder="e.g., Campus Event Announcement"
+                      placeholderTextColor="#94A3B8"
                       value={postTitle}
                       onChangeText={setPostTitle}
                     />
                   </View>
 
-                  <View style={[styles.inlineFieldsRow, isTablet ? styles.rowLayout : styles.columnLayout]}>
-                    <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isCategoryDropdownOpen ? 60 : 1 }]}>
-                      <Text style={styles.inputLabel}>CATEGORY</Text>
-                      {category === 'Others' ? (
-                        <View style={[styles.dropdownSelector, { paddingRight: 8, flexDirection: 'row', alignItems: 'center' }]}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                            <TouchableOpacity
-                              onPress={() => {
-                                setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                                setIsDeptDropdownOpen(false);
-                              }}
-                              style={{ paddingVertical: 4 }}
-                            >
-                              <Text style={styles.dropdownSelectorText}>Others: </Text>
-                            </TouchableOpacity>
-                            <TextInput
-                              style={[{ flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0, height: 24 }, { outlineStyle: 'none' } as any]}
-                              placeholder="Type category here..."
-                              value={otherCategoryName}
-                              onChangeText={setOtherCategoryName}
-                              autoFocus
-                            />
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                              setIsDeptDropdownOpen(false);
-                            }}
-                            style={{ padding: 6 }}
-                          >
-                            <Ionicons name={isCategoryDropdownOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color={Colors.textSecondary} />
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          style={[styles.dropdownSelector, { paddingRight: 12, flexDirection: 'row', alignItems: 'center', cursor: 'pointer' as any }]}
-                          onPress={() => {
-                            setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                            setIsDeptDropdownOpen(false);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.dropdownSelectorText, { flex: 1 }]}>
-                            {category || 'Select Category...'}
-                          </Text>
-                          <Ionicons name={isCategoryDropdownOpen ? "chevron-up-outline" : "chevron-down-outline"} size={16} color={Colors.textSecondary} />
-                        </TouchableOpacity>
-                      )}
-
-                      {isCategoryDropdownOpen && (
-                        <View style={styles.dropdownMenu}>
-                          {apiCategories.map((cat, idx) => (
-                            <TouchableOpacity
-                              key={cat.id}
-                              style={styles.dropdownItem}
-                              onPress={() => {
-                                setCategory(cat.name);
-                                setCategoryId(cat.id);
-                                if (cat.name !== 'Others') setOtherCategoryName('');
-                                setIsCategoryDropdownOpen(false);
-                              }}
-                            >
-                              <Text style={styles.dropdownItemText}>{cat.name}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={[styles.fieldGroup, { flex: 1 }]}>
-                      <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                      <View style={styles.dropdownSelector}>
-                        <Text style={styles.dropdownSelectorText}>{department}</Text>
-                      </View>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>DEPARTMENT</Text>
+                    <View style={[styles.dropdownSelector, { backgroundColor: '#F8FAFC', borderRadius: 8, height: 42, paddingHorizontal: 14 }]}>
+                      <Text style={styles.dropdownSelectorText}>{department}</Text>
                     </View>
                   </View>
                 </Card>
@@ -1872,44 +1891,75 @@ export default function RequestorDashboard() {
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
-                      <Ionicons name="document-text" size={18} color={Colors.textPrimary} />
+                      <Ionicons name="document-text-outline" size={18} color="#334155" />
                     </View>
-                    <Text style={styles.cardTitle}>Content & Caption</Text>
+                    <Text style={styles.cardTitle}>Caption</Text>
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>CAPTION TEXT</Text>
+                    <View style={{
+                      backgroundColor: '#F8FAFC',
+                      borderLeftWidth: 3.5,
+                      borderLeftColor: '#581C87',
+                      borderTopRightRadius: 8,
+                      borderBottomRightRadius: 8,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                      marginBottom: 12,
+                    }}>
+                      <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 19 }}>
+                        Include the key details: <Text style={{ fontWeight: '700', color: '#1E293B' }}>Who</Text> is involved,{' '}
+                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>What</Text> is happening,{' '}
+                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>When</Text> it will take place,{' '}
+                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>Where</Text> it will happen, and{' '}
+                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>Why</Text> it is important.
+                      </Text>
+                      <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 19, marginTop: 8 }}>
+                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>Example:</Text> The JMCFI Student Council invites all students to a Cybersecurity Awareness Seminar on November 18, 2026, at 9:00 AM in the JMCFI Auditorium to promote safe and responsible technology use.
+                      </Text>
+                    </View>
+
                     <View style={{ marginBottom: 8 }}>
                       <RichTextEditor
                         value={caption}
                         onChange={(val: string) => {
                           if (val.length <= 5000) setCaption(val); // HTML strings can be much longer
                         }}
-                        placeholder="Write your post caption here. Ensure it follows the university's brand voice and tonal guidelines..."
-                        minHeight={250}
+                        placeholder="Write a brief caption describing the activity, event, or announcement..."
+                        minHeight={220}
                         hideExtraActions
                       />
                     </View>
                     <View style={styles.textAreaFooter}>
                       <Text style={styles.characterCounter}>
-                        {caption.length} / 2200 characters
+                        {caption.replace(/<[^>]*>/g, '').length} / 2200 characters
                       </Text>
                       <TouchableOpacity
                         style={[
                           styles.checkPolicyBtn,
                           isCheckingPolicy && { opacity: 0.75 },
-                          { cursor: isCheckingPolicy ? 'wait' : 'pointer', flexDirection: 'row', alignItems: 'center' } as any,
+                          {
+                            cursor: isCheckingPolicy ? 'wait' : 'pointer',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: '#CBD5E1',
+                            borderRadius: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                          } as any,
                         ]}
                         onPress={handleCheckPolicy}
                         disabled={isCheckingPolicy}
                         activeOpacity={0.7}
                       >
                         {isCheckingPolicy ? (
-                          <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 6 }} />
+                          <ActivityIndicator size="small" color="#334155" style={{ marginRight: 6 }} />
                         ) : (
-                          <Ionicons name="shield-checkmark-outline" size={15} color={Colors.primary} style={{ marginRight: 6 }} />
+                          <Ionicons name="shield-outline" size={15} color="#334155" style={{ marginRight: 6 }} />
                         )}
-                        <Text style={[styles.checkPolicyBtnText, { color: Colors.primary, fontWeight: '700' }]}>
+                        <Text style={[styles.checkPolicyBtnText, { color: '#0F172A', fontWeight: '700' }]}>
                           {isCheckingPolicy ? 'AI Analyzing Policy...' : 'AI Check Policy Alignment'}
                         </Text>
                       </TouchableOpacity>
@@ -3187,8 +3237,1156 @@ export default function RequestorDashboard() {
 
 
 
-      {/* Review Comments Modal */}
-      {selectedQueuePost && (
+      {/* Review Comments Modal (Separated: Direct IMC vs Old Flow) */}
+      {selectedQueuePost && (String(selectedQueuePost.routing_type || selectedQueuePost.rawPost?.routing_type || '').toLowerCase() === 'direct_imc' ? (() => {
+        const rawSt = String(selectedQueuePost.rawStatus || selectedQueuePost.rawPost?.status || '').toLowerCase();
+        const isApprovedOrPublished =
+          rawSt === 'approved' || rawSt === 'published' || rawSt === 'scheduled';
+        const isRejected =
+          rawSt === 'rejected' || rawSt === 'returned_for_revision';
+        const statusLabel = isApprovedOrPublished
+          ? 'Published'
+          : isRejected
+          ? 'Rejected'
+          : rawSt === 'under_review' || rawSt === 'reviewing'
+          ? 'Reviewing'
+          : 'Pending';
+        const badgeBg = isApprovedOrPublished
+          ? '#DCFCE7'
+          : isRejected
+          ? '#FEE2E2'
+          : statusLabel === 'Reviewing'
+          ? '#EDE9FE'
+          : '#FEF3C7';
+        const badgeText = isApprovedOrPublished
+          ? '#166534'
+          : isRejected
+          ? '#991B1B'
+          : statusLabel === 'Reviewing'
+          ? '#5B21B6'
+          : '#92400E';
+
+        const platformsList =
+          Array.isArray(selectedQueuePost.platforms) && selectedQueuePost.platforms.length > 0
+            ? selectedQueuePost.platforms
+            : ['facebook'];
+
+        const checklist =
+          selectedQueuePost?.rawPost?.imc_branding_checklist ||
+          selectedQueuePost?.imc_branding_checklist ||
+          null;
+        const originalCaptionText =
+          checklist?.original_caption || selectedQueuePost.caption || 'No caption provided.';
+        const refinedCaptionText =
+          checklist?.refined_caption || selectedQueuePost.caption || 'No caption provided.';
+
+        const rawMediaList =
+          Array.isArray(checklist?.original_media) && checklist.original_media.length > 0
+            ? checklist.original_media
+            : selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [];
+        const validUris = getImageUrisFromMedia(Array.isArray(rawMediaList) ? rawMediaList : []);
+        const directImageUris = validUris.length > 0
+          ? validUris
+          : (selectedQueuePost?.thumbnailUrl ? [resolveImageUrl(selectedQueuePost.thumbnailUrl) || selectedQueuePost.thumbnailUrl] : []);
+
+        const hasReplacementFinalMedia =
+          Boolean(checklist?.has_replacement_media) ||
+          (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0);
+        const rawFinalMedia =
+          Array.isArray(checklist?.final_media) && checklist.final_media.length > 0
+            ? checklist.final_media
+            : checklist?.has_replacement_media
+            ? (selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [])
+            : [];
+        const finalReplacementImageUris = getImageUrisFromMedia(Array.isArray(rawFinalMedia) ? rawFinalMedia : []);
+        const activePreviewImageUris =
+          isApprovedOrPublished && finalReplacementImageUris.length > 0
+            ? finalReplacementImageUris
+            : directImageUris;
+
+        const safeCarouselIdx =
+          activePreviewImageUris.length > 0
+            ? Math.min(directModalCarouselIdx, activePreviewImageUris.length - 1)
+            : 0;
+
+        const additionalInstructions =
+          selectedQueuePost.rawPost?.additional_instructions ||
+          selectedQueuePost.rawPost?.remarks ||
+          (selectedQueuePost.preferred_schedule_at
+            ? `Preferred publication schedule: ${selectedQueuePost.preferred_schedule_at}`
+            : 'Please use the attached poster and retain the official college branding.');
+
+        const requestedByName =
+          selectedQueuePost.rawPost?.requestor?.full_name ||
+          user?.full_name ||
+          greetingUserName;
+
+        const displayDate = selectedQueuePost.directDate || selectedQueuePost.date;
+
+        const closeDirectModal = () => {
+          setSelectedQueuePost(null);
+          router.setParams({ postId: '' });
+        };
+
+        return (
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={true}
+            onRequestClose={closeDirectModal}
+          >
+            <View style={styles.modalOverlay}>
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  width: '100%',
+                  maxWidth: 1080,
+                  maxHeight: '92%',
+                  padding: 0,
+                  overflow: 'hidden',
+                  ...(Platform.OS === 'web'
+                    ? { boxShadow: '0 8px 30px rgba(0, 0, 0, 0.15)' }
+                    : { elevation: 5 }),
+                }}
+              >
+                {/* Modal Header */}
+                <View
+                  style={{
+                    paddingHorizontal: 28,
+                    paddingVertical: 18,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E2E8F0',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <View style={{ flex: 1, paddingRight: 16 }}>
+                    <Text style={{ fontSize: 19, fontWeight: '800', color: '#0F172A' }}>
+                      Request Details
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 2 }}>
+                      Direct IMC publication request · {displayDate}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={{
+                      backgroundColor: badgeBg,
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: badgeText }}>
+                      {statusLabel}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Scrollable Body */}
+                <ScrollView
+                  style={{ flexShrink: 1, backgroundColor: '#F8FAFC' }}
+                  contentContainerStyle={{ padding: 24 }}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {/* TRACKING Card */}
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 14,
+                      padding: 20,
+                      marginBottom: 20,
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: '700',
+                        color: '#64748B',
+                        letterSpacing: 0.8,
+                        textTransform: 'uppercase',
+                        marginBottom: 16,
+                      }}
+                    >
+                      TRACKING
+                    </Text>
+
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        justifyContent: 'center',
+                        maxWidth: 640,
+                        alignSelf: 'center',
+                        width: '100%',
+                      }}
+                    >
+                      {/* Step 1: Submitted */}
+                      <View style={{ alignItems: 'center', width: 100 }}>
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: '#DCFCE7',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 15,
+                              backgroundColor: '#10B981',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                          </View>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 8,
+                            textAlign: 'center',
+                          }}
+                        >
+                          Submitted
+                        </Text>
+                      </View>
+
+                      {/* Connector 1 */}
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          backgroundColor: isApprovedOrPublished ? '#10B981' : '#E2E8F0',
+                          marginTop: 20,
+                          marginHorizontal: -12,
+                        }}
+                      />
+
+                      {/* Step 2: IMC Review */}
+                      <View style={{ alignItems: 'center', width: 110 }}>
+                        {isApprovedOrPublished ? (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#DCFCE7',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: '#10B981',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        ) : isRejected ? (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#FEE2E2',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: '#EF4444',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="close" size={16} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#FEF9C3',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                borderWidth: 1.5,
+                                borderColor: '#D97706',
+                                backgroundColor: '#FFFBEB',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="time-outline" size={16} color="#D97706" />
+                            </View>
+                          </View>
+                        )}
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 8,
+                            textAlign: 'center',
+                          }}
+                        >
+                          IMC Review
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: isApprovedOrPublished
+                              ? '#10B981'
+                              : isRejected
+                              ? '#EF4444'
+                              : '#B45309',
+                            marginTop: 2,
+                            textAlign: 'center',
+                          }}
+                        >
+                          {isApprovedOrPublished ? 'Approved' : isRejected ? 'Rejected' : statusLabel}
+                        </Text>
+                      </View>
+
+                      {/* Connector 2 */}
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          backgroundColor: isApprovedOrPublished ? '#10B981' : '#E2E8F0',
+                          marginTop: 20,
+                          marginHorizontal: -12,
+                        }}
+                      />
+
+                      {/* Step 3: Published */}
+                      <View style={{ alignItems: 'center', width: 100 }}>
+                        {isApprovedOrPublished ? (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#DCFCE7',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                backgroundColor: '#10B981',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#F1F5F9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 15,
+                                borderWidth: 1.5,
+                                borderColor: '#94A3B8',
+                                backgroundColor: '#F8FAFC',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Ionicons name="time-outline" size={16} color="#64748B" />
+                            </View>
+                          </View>
+                        )}
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 8,
+                            textAlign: 'center',
+                          }}
+                        >
+                          Published
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: isApprovedOrPublished ? '#10B981' : '#64748B',
+                            marginTop: 2,
+                            textAlign: 'center',
+                          }}
+                        >
+                          {isApprovedOrPublished ? 'Published' : 'Waiting'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Two-Column Main Grid */}
+                  <View
+                    style={{
+                      flexDirection: isLargeScreen ? 'row' : 'column',
+                      gap: 20,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    {/* Left Column Card: Submitted Materials & Live Preview */}
+                    <View
+                      style={{
+                        flex: 1,
+                        width: '100%',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 14,
+                        padding: 20,
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15.5,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 14,
+                        }}
+                      >
+                        Submitted Materials
+                      </Text>
+
+                      {/* Target Platforms */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 8,
+                        }}
+                      >
+                        Target Platforms
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          marginBottom: 16,
+                        }}
+                      >
+                        {platformsList.map((plat: any, idx: number) => {
+                          const pKey = String(plat).toLowerCase();
+                          const label =
+                            pKey === 'facebook'
+                              ? 'Facebook'
+                              : pKey === 'instagram'
+                              ? 'Instagram'
+                              : pKey === 'website' || pKey === 'portal' || pKey === 'wordpress'
+                              ? 'Website'
+                              : String(plat);
+                          const iconName =
+                            pKey === 'facebook'
+                              ? 'logo-facebook'
+                              : pKey === 'instagram'
+                              ? 'logo-instagram'
+                              : 'globe-outline';
+                          const iconColor =
+                            pKey === 'instagram' ? '#9D174D' : '#4C1D95';
+
+                          return (
+                            <View
+                              key={`${pKey}-${idx}`}
+                              style={{
+                                backgroundColor: '#F5F3FF',
+                                borderWidth: 1,
+                                borderColor: '#DDD6FE',
+                                borderRadius: 999,
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}
+                            >
+                              <Ionicons name={iconName as any} size={13} color={iconColor} />
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: '700',
+                                  color: '#1E1B4B',
+                                }}
+                              >
+                                {label}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {/* Original Caption */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Original Caption
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 10,
+                          padding: 14,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                          {originalCaptionText}
+                        </FormattedText>
+                      </View>
+
+                      {/* Additional Instructions */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Additional Instructions
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 10,
+                          padding: 14,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                          {additionalInstructions}
+                        </Text>
+                      </View>
+
+                      {/* Uploaded Photos · N */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 8,
+                        }}
+                      >
+                        Uploaded Photos · {directImageUris.length}
+                      </Text>
+                      {directImageUris.length > 0 ? (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            gap: 12,
+                            marginBottom: 20,
+                          }}
+                        >
+                          {directImageUris.map((uri: string, idx: number) => {
+                            const mediaObj = rawMediaList?.[idx];
+                            const fileName =
+                              mediaObj?.original_name ||
+                              mediaObj?.file_name ||
+                              uri.split('/').pop()?.split('?')[0] ||
+                              `photo-${String(idx + 1).padStart(2, '0')}.jpg`;
+                            return (
+                              <TouchableOpacity
+                                key={idx}
+                                activeOpacity={0.85}
+                                onPress={() => setFullScreenImage(uri)}
+                                style={{
+                                  width: '48%',
+                                  flexGrow: 1,
+                                  borderWidth: 1,
+                                  borderColor: '#E2E8F0',
+                                  borderRadius: 10,
+                                  overflow: 'hidden',
+                                  backgroundColor: '#FFFFFF',
+                                }}
+                              >
+                                <Image
+                                  source={{ uri }}
+                                  style={{ width: '100%', height: 135, backgroundColor: '#F1F5F9' }}
+                                  resizeMode="cover"
+                                />
+                                <View
+                                  style={{
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 10,
+                                    alignItems: 'center',
+                                    borderTopWidth: 1,
+                                    borderTopColor: '#F1F5F9',
+                                  }}
+                                >
+                                  <Text
+                                    numberOfLines={1}
+                                    ellipsizeMode="middle"
+                                    style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500' }}
+                                  >
+                                    {fileName}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderStyle: 'dashed',
+                            borderColor: '#CBD5E1',
+                            borderRadius: 10,
+                            padding: 14,
+                            marginBottom: 20,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12.5, color: '#94A3B8' }}>
+                            No photos uploaded with this request.
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Horizontal Divider */}
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: '#E2E8F0',
+                          marginVertical: 16,
+                        }}
+                      />
+
+                      {/* Live Preview */}
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 12,
+                        }}
+                      >
+                        Live Preview
+                      </Text>
+
+                      {/* Platform Pill Tabs */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          marginBottom: 14,
+                        }}
+                      >
+                        {(
+                          [
+                            { key: 'facebook', label: 'Facebook', icon: 'logo-facebook', iconColor: '#1877F2' },
+                            { key: 'instagram', label: 'Instagram', icon: 'logo-instagram', iconColor: '#E1306C' },
+                            { key: 'website', label: 'Website', icon: 'globe-outline', iconColor: '#64748B' },
+                          ] as const
+                        ).map((tab) => {
+                          const isActive = modalPlatformTab === tab.key;
+                          return (
+                            <TouchableOpacity
+                              key={tab.key}
+                              activeOpacity={0.75}
+                              onPress={() => setModalPlatformTab(tab.key)}
+                              style={{
+                                borderRadius: 999,
+                                paddingHorizontal: 14,
+                                paddingVertical: 7,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: isActive ? '#FEF3C7' : '#F8FAFC',
+                                borderWidth: 1,
+                                borderColor: isActive ? '#FDE68A' : '#E2E8F0',
+                              }}
+                            >
+                              <Ionicons
+                                name={tab.icon as any}
+                                size={14}
+                                color={
+                                  isActive
+                                    ? tab.key === 'facebook'
+                                      ? '#1877F2'
+                                      : tab.key === 'instagram'
+                                      ? '#E1306C'
+                                      : '#0F172A'
+                                    : tab.iconColor
+                                }
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 12.5,
+                                  fontWeight: '700',
+                                  color: isActive ? '#78350F' : '#475569',
+                                }}
+                              >
+                                {tab.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Social Preview Card */}
+                      <View
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 12,
+                          backgroundColor: '#FFFFFF',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            padding: 14,
+                            gap: 10,
+                          }}
+                        >
+                          <Image
+                            source={require('../../../assets/images/jmc_logo_sm.png')}
+                            style={{ width: 36, height: 36, borderRadius: 18 }}
+                            resizeMode="contain"
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>
+                              Jose Maria College Foundation Inc.
+                            </Text>
+                            <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                              {modalPlatformTab === 'instagram'
+                                ? 'jmc_official · Official Department Post'
+                                : modalPlatformTab === 'website'
+                                ? `${selectedQueuePost.title} · Official Website Post`
+                                : 'Official Department Post · Public'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                          <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
+                            {isApprovedOrPublished ? refinedCaptionText : originalCaptionText}
+                          </FormattedText>
+                        </View>
+
+                        {activePreviewImageUris.length > 0 ? (
+                          <View
+                            style={{
+                              position: 'relative',
+                              width: '100%',
+                              height: 240,
+                              backgroundColor: '#F1F5F9',
+                            }}
+                          >
+                            <TouchableOpacity
+                              activeOpacity={0.92}
+                              onPress={() => setFullScreenImage(activePreviewImageUris[safeCarouselIdx])}
+                              style={{ width: '100%', height: '100%' }}
+                            >
+                              <Image
+                                source={{ uri: activePreviewImageUris[safeCarouselIdx] }}
+                                style={{ width: '100%', height: '100%' }}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
+
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 12,
+                                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 999,
+                              }}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' }}>
+                                {safeCarouselIdx + 1} / {activePreviewImageUris.length}
+                              </Text>
+                            </View>
+
+                            {activePreviewImageUris.length > 1 && (
+                              <>
+                                <TouchableOpacity
+                                  activeOpacity={0.8}
+                                  onPress={() =>
+                                    setDirectModalCarouselIdx((prev) =>
+                                      prev <= 0 ? activePreviewImageUris.length - 1 : prev - 1
+                                    )
+                                  }
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    left: 12,
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    ...(Platform.OS === 'web'
+                                      ? { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
+                                      : { elevation: 3 }),
+                                  }}
+                                >
+                                  <Ionicons name="chevron-back" size={16} color="#0F172A" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  activeOpacity={0.8}
+                                  onPress={() =>
+                                    setDirectModalCarouselIdx((prev) =>
+                                      prev >= activePreviewImageUris.length - 1 ? 0 : prev + 1
+                                    )
+                                  }
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    right: 12,
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    ...(Platform.OS === 'web'
+                                      ? { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
+                                      : { elevation: 3 }),
+                                  }}
+                                >
+                                  <Ionicons name="chevron-forward" size={16} color="#0F172A" />
+                                </TouchableOpacity>
+                              </>
+                            )}
+                          </View>
+                        ) : (
+                          <View
+                            style={{
+                              height: 140,
+                              backgroundColor: '#F8FAFC',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderTopWidth: 1,
+                              borderTopColor: '#E2E8F0',
+                            }}
+                          >
+                            <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                            <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                              No media attached
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Right Column Card: Request Information & Final Publication Content */}
+                    <View
+                      style={{
+                        flex: 1,
+                        width: '100%',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 14,
+                        padding: 20,
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15.5,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 14,
+                        }}
+                      >
+                        Request Information
+                      </Text>
+
+                      {/* 2x2 Info Grid */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 12,
+                          marginBottom: 20,
+                        }}
+                      >
+                        {[
+                          { label: 'REQUEST TITLE', value: selectedQueuePost.title },
+                          { label: 'DEPARTMENT', value: selectedQueuePost.department },
+                          { label: 'REQUESTED BY', value: requestedByName },
+                          { label: 'REQUESTED ON', value: displayDate },
+                        ].map((info, i) => (
+                          <View
+                            key={i}
+                            style={{
+                              width: '48%',
+                              flexGrow: 1,
+                              backgroundColor: '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                              borderRadius: 10,
+                              padding: 12,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: '#64748B',
+                                marginBottom: 4,
+                              }}
+                            >
+                              {info.label}
+                            </Text>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                              {info.value}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Horizontal Divider */}
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: '#E2E8F0',
+                          marginBottom: 18,
+                        }}
+                      />
+
+                      <Text
+                        style={{
+                          fontSize: 14.5,
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          marginBottom: 14,
+                        }}
+                      >
+                        Final Publication Content
+                      </Text>
+
+                      {/* Refined Caption */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Refined Caption
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          borderRadius: 10,
+                          padding: 14,
+                          marginBottom: 16,
+                        }}
+                      >
+                        {isApprovedOrPublished ? (
+                          <FormattedText style={{ fontSize: 13, color: '#1E293B', lineHeight: 19 }}>
+                            {refinedCaptionText}
+                          </FormattedText>
+                        ) : (
+                          <Text style={{ fontSize: 13, fontStyle: 'italic', color: '#94A3B8' }}>
+                            Awaiting IMC caption refinement.
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Final Images */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
+                          Final Images
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: '#94A3B8' }}>
+                          {isApprovedOrPublished ? 'Published images' : 'Awaiting final images'}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderStyle: 'dashed',
+                          borderColor: '#CBD5E1',
+                          borderRadius: 10,
+                          padding: 14,
+                        }}
+                      >
+                        {isApprovedOrPublished && hasReplacementFinalMedia && finalReplacementImageUris.length > 0 ? (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                            {finalReplacementImageUris.map((uri: string, idx: number) => (
+                              <TouchableOpacity
+                                key={idx}
+                                activeOpacity={0.85}
+                                onPress={() => setFullScreenImage(uri)}
+                                style={{
+                                  width: 84,
+                                  height: 64,
+                                  borderRadius: 8,
+                                  overflow: 'hidden',
+                                  borderWidth: 1,
+                                  borderColor: '#E2E8F0',
+                                }}
+                              >
+                                <Image
+                                  source={{ uri }}
+                                  style={{ width: '100%', height: '100%' }}
+                                  resizeMode="cover"
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        ) : isApprovedOrPublished && directImageUris.length > 0 ? (
+                          <View style={{ gap: 8 }}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                              {directImageUris.map((uri: string, idx: number) => (
+                                <TouchableOpacity
+                                  key={idx}
+                                  activeOpacity={0.85}
+                                  onPress={() => setFullScreenImage(uri)}
+                                  style={{
+                                    width: 84,
+                                    height: 64,
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                    borderWidth: 1,
+                                    borderColor: '#E2E8F0',
+                                  }}
+                                >
+                                  <Image
+                                    source={{ uri }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="cover"
+                                  />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                              Published using original submitted photos.
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18 }}>
+                            No replacement images uploaded. The original photos remain available to IMC.
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                </ScrollView>
+
+                {/* Sticky Modal Footer */}
+                <View
+                  style={{
+                    paddingHorizontal: 28,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: '#E2E8F0',
+                    flexDirection: 'row',
+                    justifyContent: 'flex-end',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={closeDirectModal}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      paddingHorizontal: 22,
+                      paddingVertical: 9,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                      Close
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        );
+      })() : (
         <Modal
           animationType="fade"
           transparent={true}
@@ -3653,7 +4851,7 @@ export default function RequestorDashboard() {
             </View>
           </View>
         </Modal>
-      )}
+      ))}
 
       {/* Approval Flow Progress Modal for Recent Requests Row Click */}
       {selectedRow && (
@@ -4699,13 +5897,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   formCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
     borderRadius: 8,
     padding: Spacing.lg,
     gap: Spacing.md,
     marginBottom: 20,
+    ...(Platform.OS === 'web'
+      ? {
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+        }
+      : {}),
   },
   configCard: {
     backgroundColor: Colors.surface,

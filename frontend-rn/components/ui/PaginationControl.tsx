@@ -9,6 +9,7 @@ interface PaginationControlProps {
   onPageChange: (page: number) => void;
   onItemsPerPageChange?: (perPage: number) => void;
   itemName?: string;
+  pageSizeOptions?: number[];
 }
 
 export const PaginationControl: React.FC<PaginationControlProps> = ({
@@ -17,7 +18,8 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
   itemsPerPage,
   onPageChange,
   onItemsPerPageChange,
-  itemName = 'items'
+  itemName = 'items',
+  pageSizeOptions = [5, 10, 15, 20, 50],
 }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
@@ -105,10 +107,11 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
               color: '#374151'
             }}
           >
-            <option value={10}>10 / page</option>
-            <option value={15}>15 / page</option>
-            <option value={20}>20 / page</option>
-            <option value={50}>50 / page</option>
+            {pageSizeOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt} / page
+              </option>
+            ))}
           </select>
         )}
       </View>

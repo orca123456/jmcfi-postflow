@@ -41,6 +41,7 @@ class PostRequestResource extends JsonResource
             'program_head_id' => $this->program_head_id,
             'status' => $this->status,
             'routing_type' => $this->routing_type ?? 'standard',
+            'imc_branding_checklist' => $this->imc_branding_checklist ?? null,
             'status_label' => $this->status_label,
             'target_platforms' => $this->target_platforms ?? [],
             'preferred_schedule_at' => $this->preferred_schedule_at?->toISOString(),
