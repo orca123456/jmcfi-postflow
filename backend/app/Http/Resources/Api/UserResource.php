@@ -9,7 +9,11 @@ class UserResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $linkedProgramHead = $this->programHead ?: \App\Models\ProgramHead::where('user_id', $this->id)->first();
+        $wfRole = $this->workflowRole();
+        $linkedProgramHead = $this->programHead;
+        if (!$linkedProgramHead && !in_array($wfRole, ['it_admin', 'it_publisher', 'admin'], true)) {
+            $linkedProgramHead = \App\Models\ProgramHead::where('user_id', $this->id)->first();
+        }
 
         return [
             'id' => $this->id,

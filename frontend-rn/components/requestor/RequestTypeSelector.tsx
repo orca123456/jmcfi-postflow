@@ -1,13 +1,8 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  useWindowDimensions,
-  Platform,
-} from 'react-native';
+﻿import React, { useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Card } from '../ui/Card';
+import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
 import { useThemeStore } from '../../store/theme';
 
 export type RequestSubmissionType = 'standard' | 'imc';
@@ -18,529 +13,227 @@ interface RequestTypeSelectorProps {
   onBackToDashboard?: () => void;
 }
 
+const BRAND_PURPLE = '#4C007C';
+const BRAND_GOLD = '#FFC72C';
+const GOLD_INK = '#1A1A2E';
+const PURPLE_TINT = '#F3E8FF';
+const DARK_PURPLE = '#3B0764';
+const LIGHT_PURPLE = '#C084FC';
+const CONTROL_HEIGHT = 44;
+const CHOICE_COLUMNS_MIN_WIDTH = 640;
+const CTA_RADIUS = 8;
+
+const REQUEST_TYPES: {
+  type: RequestSubmissionType;
+  title: string;
+  description: string;
+  workflow: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+}[] = [
+  {
+    type: 'standard',
+    title: 'Standard Content Request',
+    description: 'Submit content through your department\'s review and approval process.',
+    workflow: 'Standard approval workflow',
+    icon: 'document-text-outline',
+  },
+  {
+    type: 'imc',
+    title: 'IMC Publication Request',
+    description: 'Send publication materials to Integrated Marketing Communications for final preparation and posting.',
+    workflow: 'Direct submission to IMC',
+    icon: 'paper-plane-outline',
+  },
+];
+
 export const RequestTypeSelector: React.FC<RequestTypeSelectorProps> = ({
   initialType = 'imc',
   onSelectType,
   onBackToDashboard,
 }) => {
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
-  const isDesktop = width >= 1024;
-  const isDarkMode = useThemeStore((s) => s.isDarkMode);
-
-  // 'imc' is preselected as shown in the design specification
+  const isDarkMode = useThemeStore((store) => store.isDarkMode);
+  const [contentWidth, setContentWidth] = useState(0);
+  const [choiceWidth, setChoiceWidth] = useState(0);
   const [selectedType, setSelectedType] = useState<RequestSubmissionType>(initialType);
+  const [hoveredControl, setHoveredControl] = useState<string | null>(null);
+  const [focusedControl, setFocusedControl] = useState<string | null>(null);
+  const optionRefs = useRef<Partial<Record<RequestSubmissionType, View | null>>>({});
+  const nativeDark = Platform.OS !== 'web' && isDarkMode;
+  const palette = {
+    surface: nativeDark ? '#1C2541' : Colors.surface,
+    border: nativeDark ? '#334155' : Colors.border,
+    text: nativeDark ? '#F8FAFC' : Colors.textPrimary,
+    secondaryText: nativeDark ? '#CBD5E1' : Colors.textSecondary,
+  };
+  const accentColor = isDarkMode ? LIGHT_PURPLE : BRAND_PURPLE;
+  const isWide = contentWidth >= 700;
+  const hasColumns = choiceWidth >= CHOICE_COLUMNS_MIN_WIDTH;
+  const selectedOption = REQUEST_TYPES.find((option) => option.type === selectedType)!;
 
-  const handleContinue = () => {
-    onSelectType(selectedType);
+  const handleOptionKeyDown = (event: React.KeyboardEvent, type: RequestSubmissionType) => {
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      setSelectedType(type);
+      return;
+    }
+    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 'standard' : event.key === 'End' ? 'imc'
+      : type === 'standard' ? 'imc' : 'standard';
+    setSelectedType(next);
+    optionRefs.current[next]?.focus?.();
   };
 
   return (
-    <View style={styles.pageContainer}>
-      {/* ================= PAGE HEADER & BREADCRUMB ================= */}
+    <View nativeID="requestor-type-selector" style={styles.pageContainer}
+      onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}>
+      {Platform.OS === 'web' && <style>{`
+        #requestor-type-selector :is([role="button"], [role="radio"]) { cursor: pointer; }
+        #requestor-type-selector :is([role="button"], [role="radio"]):focus-visible {
+          outline: 2px solid ${accentColor} !important; outline-offset: 2px;
+        }
+        #requestor-type-selector #requestor-type-continue [dir="auto"] { color: ${GOLD_INK} !important; }
+      `}</style>}
+
       <View style={styles.pageHeader}>
         <View style={styles.breadcrumbRow}>
-          <TouchableOpacity
-            onPress={onBackToDashboard}
-            disabled={!onBackToDashboard}
-            activeOpacity={onBackToDashboard ? 0.7 : 1}
-            style={styles.breadcrumbLink}
-          >
-            <Text style={[styles.breadcrumbText, isDarkMode && styles.breadcrumbTextDark]}>
-              POST REQUESTS
-            </Text>
-          </TouchableOpacity>
-          <Text style={[styles.breadcrumbDivider, isDarkMode && styles.breadcrumbDividerDark]}>
-            /
-          </Text>
-          <Text style={[styles.breadcrumbCurrent, isDarkMode && styles.breadcrumbCurrentDark]}>
-            NEW REQUEST
-          </Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back to post requests"
+            accessibilityState={{ disabled: !onBackToDashboard }} disabled={!onBackToDashboard}
+            onPress={onBackToDashboard} style={({ pressed }) => [styles.breadcrumbLink, pressed && styles.pressed]}>
+            <Text style={[styles.breadcrumbText, { color: accentColor }]}>POST REQUESTS</Text>
+          </Pressable>
+          <Ionicons name="chevron-forward" size={12} color={palette.secondaryText} />
+          <Text style={[styles.breadcrumbText, { color: palette.secondaryText }]}>NEW REQUEST</Text>
         </View>
-
-        <Text
-          style={[
-            styles.pageTitle,
-            !isTablet && styles.pageTitleMobile,
-            isDarkMode && styles.pageTitleDark,
-          ]}
-        >
+        <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 1 } : {})}
+          style={[styles.pageTitle, { color: palette.text, fontSize: isWide ? FontSize.xxl : FontSize.xl }]}>
           Create New Request
         </Text>
-        <Text style={[styles.pageSubtitle, isDarkMode && styles.pageSubtitleDark]}>
-          Select the type of request you wish to submit.
+        <Text style={[styles.supportingText, { color: palette.secondaryText }]}>
+          Choose the process that fits your content.
         </Text>
       </View>
 
-      {/* ================= MAIN SELECTION CARD ================= */}
-      <View
-        style={[
-          styles.mainCard,
-          !isTablet && styles.mainCardMobile,
-          isDarkMode && styles.mainCardDark,
-        ]}
-      >
-        {/* Card Header Section */}
+      <Card padding={isWide ? Spacing.lg : Spacing.md}
+        style={[styles.mainCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <View style={styles.cardHeader}>
-          <Text style={[styles.sectionBadge, isDarkMode && styles.sectionBadgeDark]}>
-            REQUEST TYPE
-          </Text>
-          <Text
-            style={[
-              styles.questionTitle,
-              !isTablet && styles.questionTitleMobile,
-              isDarkMode && styles.questionTitleDark,
-            ]}
-          >
+          <Text style={[styles.sectionBadge, { color: accentColor }]}>REQUEST TYPE</Text>
+          <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})}
+            style={[styles.questionTitle, { color: palette.text }]}>
             How would you like to submit your request?
           </Text>
-          <Text style={[styles.questionSubtitle, isDarkMode && styles.questionSubtitleDark]}>
-            Select the appropriate process. Both options are available within JMCFI PostFlow.
+          <Text style={[styles.supportingText, { color: palette.secondaryText }]}>
+            Select a request type to open the right form and review process.
           </Text>
         </View>
 
-        {/* Options Row */}
-        <View style={[styles.optionsRow, !isTablet && styles.optionsRowStacked]}>
-          {/* OPTION 1: Standard Content Request */}
-          <TouchableOpacity
-            style={[
-              styles.optionCard,
-              isTablet && styles.optionCardSideBySide,
-              isDesktop && styles.optionCardDesktop,
-              isDarkMode && styles.optionCardDark,
-              selectedType === 'standard' && styles.optionCardSelected,
-              selectedType === 'standard' && isDarkMode && styles.optionCardSelectedDark,
-            ]}
-            onPress={() => setSelectedType('standard')}
-            activeOpacity={0.88}
-          >
-            <View style={styles.optionBody}>
-              <View style={styles.optionTopRow}>
-                <View style={[styles.iconBox, isDarkMode && styles.iconBoxDark]}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={22}
-                    color={isDarkMode ? '#C084FC' : '#581C87'}
-                  />
+        <View accessibilityRole="radiogroup" accessibilityLabel="Request type"
+          onLayout={(event) => setChoiceWidth(event.nativeEvent.layout.width)}
+          style={[styles.optionsRow, !hasColumns && styles.stacked]}>
+          {REQUEST_TYPES.map((option) => {
+            const selected = selectedType === option.type;
+            const highlighted = hoveredControl === option.type || focusedControl === option.type;
+            return (
+              <Pressable key={option.type}
+                ref={(node) => { optionRefs.current[option.type] = node; }}
+                accessibilityRole="radio" accessibilityLabel={option.title}
+                accessibilityHint={option.description}
+                accessibilityState={{ checked: selected }}
+                {...(Platform.OS === 'web' ? {
+                  'aria-checked': selected,
+                  tabIndex: selected ? 0 as const : -1 as const,
+                  onKeyDown: (event: React.KeyboardEvent) => handleOptionKeyDown(event, option.type),
+                } : {})}
+                onPress={() => setSelectedType(option.type)}
+                onHoverIn={() => setHoveredControl(option.type)} onHoverOut={() => setHoveredControl(null)}
+                onFocus={() => setFocusedControl(option.type)} onBlur={() => setFocusedControl(null)}
+                style={({ pressed }) => [
+                  styles.optionCard, hasColumns ? styles.optionColumn : styles.fullWidth,
+                  { backgroundColor: palette.surface, borderColor: selected || highlighted ? accentColor : palette.border },
+                  pressed && styles.pressed,
+                ]}>
+                <View style={styles.optionBody}>
+                  <View style={styles.optionTopRow}>
+                    <View style={[styles.iconBox, { backgroundColor: isDarkMode ? DARK_PURPLE : PURPLE_TINT }]}>
+                      <Ionicons name={option.icon} size={22} color={accentColor} />
+                    </View>
+                    <View style={styles.selectionState}>
+                      {selected && <Text style={[styles.selectionLabel, { color: accentColor }]}>Selected</Text>}
+                      <View style={[styles.radioCircle, { borderColor: selected ? BRAND_PURPLE : palette.border,
+                        backgroundColor: selected ? BRAND_PURPLE : palette.surface }]}>
+                        {selected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={[styles.optionTitle, { color: palette.text }]}>{option.title}</Text>
+                  <Text style={[styles.supportingText, { color: palette.secondaryText }]}>{option.description}</Text>
                 </View>
-
-                {/* Radio indicator */}
-                <View
-                  style={[
-                    styles.radioCircle,
-                    isDarkMode && styles.radioCircleDark,
-                    selectedType === 'standard' && styles.radioCircleSelected,
-                  ]}
-                >
-                  {selectedType === 'standard' && (
-                    <Ionicons name="checkmark" size={15} color="#FFFFFF" />
-                  )}
+                <View style={[styles.optionWorkflow, { borderTopColor: palette.border }]}>
+                  <Ionicons name={option.type === 'imc' ? 'send-outline' : 'git-branch-outline'} size={16} color={accentColor} />
+                  <Text style={[styles.workflowText, { color: accentColor }]}>{option.workflow}</Text>
                 </View>
-              </View>
-
-              <Text style={[styles.optionTitle, isDarkMode && styles.optionTitleDark]}>
-                Standard Content Request
-              </Text>
-
-              <Text style={[styles.optionDescription, isDarkMode && styles.optionDescriptionDark]}>
-                Submit content through the established departmental review and approval process.
-              </Text>
-            </View>
-
-            <View style={styles.optionLinkRow}>
-              <Text style={[styles.optionLinkText, isDarkMode && styles.optionLinkTextDark]}>
-                Standard approval workflow
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* OPTION 2: IMC Publication Request */}
-          <TouchableOpacity
-            style={[
-              styles.optionCard,
-              isTablet && styles.optionCardSideBySide,
-              isDesktop && styles.optionCardDesktop,
-              isDarkMode && styles.optionCardDark,
-              selectedType === 'imc' && styles.optionCardSelected,
-              selectedType === 'imc' && isDarkMode && styles.optionCardSelectedDark,
-            ]}
-            onPress={() => setSelectedType('imc')}
-            activeOpacity={0.88}
-          >
-            <View style={styles.optionBody}>
-              <View style={styles.optionTopRow}>
-                <View style={[styles.iconBox, isDarkMode && styles.iconBoxDark]}>
-                  <Ionicons
-                    name="paper-plane-outline"
-                    size={21}
-                    color={isDarkMode ? '#C084FC' : '#581C87'}
-                  />
-                </View>
-
-                {/* Radio indicator */}
-                <View
-                  style={[
-                    styles.radioCircle,
-                    isDarkMode && styles.radioCircleDark,
-                    selectedType === 'imc' && styles.radioCircleSelected,
-                  ]}
-                >
-                  {selectedType === 'imc' && (
-                    <Ionicons name="checkmark" size={15} color="#FFFFFF" />
-                  )}
-                </View>
-              </View>
-
-              <Text style={[styles.optionTitle, isDarkMode && styles.optionTitleDark]}>
-                IMC Publication Request
-              </Text>
-
-              <Text style={[styles.optionDescription, isDarkMode && styles.optionDescriptionDark]}>
-                Submit publication materials directly to Integrated Marketing Communications for final preparation and posting.
-              </Text>
-            </View>
-
-            <View style={styles.optionLinkRow}>
-              <Text style={[styles.optionLinkText, isDarkMode && styles.optionLinkTextDark]}>
-                Direct submission to IMC
-              </Text>
-            </View>
-          </TouchableOpacity>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {/* Card Footer Bar */}
-        <View style={[styles.cardFooter, !isTablet && styles.cardFooterStacked]}>
-          <Text style={[styles.footerNotice, isDarkMode && styles.footerNoticeDark]}>
-            Your selected request type determines which form and review process will be used.
-          </Text>
-
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={handleContinue}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueButtonText}>Continue</Text>
-          </TouchableOpacity>
+        <View style={[styles.cardFooter, !isWide && styles.stacked, { borderTopColor: palette.border }]}>
+          <View style={styles.footerCopy} accessibilityLiveRegion="polite">
+            <Text style={[styles.selectionSummary, { color: palette.text }]}>
+              Selected: {selectedOption.title}
+            </Text>
+            <Text style={[styles.supportingText, { color: palette.secondaryText }]}>
+              Continue to enter your request details.
+            </Text>
+          </View>
+          <Pressable nativeID="requestor-type-continue" accessibilityRole="button"
+            accessibilityLabel={`Continue with ${selectedOption.title}`}
+            accessibilityHint="Opens the form for your selected request type."
+            onPress={() => onSelectType(selectedType)}
+            onHoverIn={() => setHoveredControl('continue')} onHoverOut={() => setHoveredControl(null)}
+            style={({ pressed }) => [styles.continueButton, !isWide && styles.fullWidth,
+              hoveredControl === 'continue' && styles.hoveredButton, pressed && styles.pressed]}>
+            <Text style={styles.continueButtonText}>Continue to form</Text>
+            <Ionicons name="arrow-forward" size={18} color={GOLD_INK} />
+          </Pressable>
         </View>
-      </View>
+      </Card>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  pageContainer: {
-    width: '100%',
-    alignSelf: 'stretch',
-    gap: 18,
-  },
-  pageHeader: {
-    width: '100%',
-    gap: 4,
-  },
-  breadcrumbRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  breadcrumbLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  breadcrumbText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#581C87',
-    letterSpacing: 0.6,
-  },
-  breadcrumbTextDark: {
-    color: '#C084FC',
-  },
-  breadcrumbDivider: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#581C87',
-    marginHorizontal: 2,
-  },
-  breadcrumbDividerDark: {
-    color: '#C084FC',
-  },
-  breadcrumbCurrent: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#581C87',
-    letterSpacing: 0.6,
-  },
-  breadcrumbCurrentDark: {
-    color: '#E9D5FF',
-  },
-  pageTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
-  pageTitleMobile: {
-    fontSize: 22,
-  },
-  pageTitleDark: {
-    color: '#F8FAFC',
-  },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  pageSubtitleDark: {
-    color: '#94A3B8',
-  },
-
-  // Main Card
-  mainCard: {
-    width: '100%',
-    alignSelf: 'stretch',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 32,
-    paddingHorizontal: 32,
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 1px 4px 0 rgba(15, 23, 42, 0.04)',
-        }
-      : {
-          shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.05,
-          shadowRadius: 16,
-          elevation: 2,
-        }),
-  },
-  mainCardMobile: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-  },
-  mainCardDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.35)',
-        }
-      : {}),
-  },
-  cardHeader: {
-    width: '100%',
-    marginBottom: 24,
-  },
-  sectionBadge: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#475569',
-    letterSpacing: 0.8,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  sectionBadgeDark: {
-    color: '#94A3B8',
-  },
-  questionTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-    marginBottom: 4,
-  },
-  questionTitleMobile: {
-    fontSize: 18,
-  },
-  questionTitleDark: {
-    color: '#F8FAFC',
-  },
-  questionSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
-  },
-  questionSubtitleDark: {
-    color: '#94A3B8',
-  },
-
-  // Options Row
-  optionsRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'space-between',
-    gap: 24,
-    marginBottom: 28,
-  },
-  optionsRowStacked: {
-    flexDirection: 'column',
-    gap: 16,
-    marginBottom: 24,
-  },
-  optionCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    padding: 24,
-    minHeight: 210,
-    justifyContent: 'space-between',
-    ...(Platform.OS === 'web'
-      ? {
-          cursor: 'pointer',
-          transition: 'all 0.18s ease-in-out',
-        }
-      : {}),
-  },
-  optionCardSideBySide: {
-    flex: 1,
-    width: '48%' as any,
-  },
-  optionCardDesktop: {
-    padding: 28,
-    minHeight: 225,
-  },
-  optionCardDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
-  },
-  optionCardSelected: {
-    borderColor: '#581C87',
-    borderWidth: 2,
-    backgroundColor: '#FFFFFF',
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: '0 0 0 1px #581C87, 0 4px 16px -2px rgba(88, 28, 135, 0.12)',
-        }
-      : {}),
-  },
-  optionCardSelectedDark: {
-    borderColor: '#A855F7',
-    backgroundColor: '#0F172A',
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: '0 0 0 1px #A855F7, 0 4px 16px -2px rgba(168, 85, 247, 0.25)',
-        }
-      : {}),
-  },
-  optionBody: {
-    width: '100%',
-  },
-  optionTopRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 18,
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#F3E8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconBoxDark: {
-    backgroundColor: '#3B0764',
-  },
-  radioCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#CBD5E1',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioCircleDark: {
-    borderColor: '#475569',
-  },
-  radioCircleSelected: {
-    backgroundColor: '#581C87',
-    borderColor: '#581C87',
-    borderWidth: 0,
-  },
-  optionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 8,
-    letterSpacing: -0.1,
-  },
-  optionTitleDark: {
-    color: '#F8FAFC',
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 21,
-    marginBottom: 20,
-  },
-  optionDescriptionDark: {
-    color: '#94A3B8',
-  },
-  optionLinkRow: {
-    marginTop: 'auto',
-    paddingTop: 4,
-  },
-  optionLinkText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#581C87',
-  },
-  optionLinkTextDark: {
-    color: '#C084FC',
-  },
-
-  // Card Footer
-  cardFooter: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 16,
-    paddingTop: 4,
-  },
-  cardFooterStacked: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 14,
-  },
-  footerNotice: {
-    fontSize: 13.5,
-    color: '#64748B',
-    flex: 1,
-  },
-  footerNoticeDark: {
-    color: '#94A3B8',
-  },
-  continueButton: {
-    backgroundColor: '#FBBF24',
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...(Platform.OS === 'web'
-      ? {
-          cursor: 'pointer',
-          boxShadow: '0 2px 6px 0 rgba(245, 158, 11, 0.25)',
-          transition: 'background-color 0.15s ease-in-out, transform 0.1s ease',
-        }
-      : {}),
-  },
-  continueButtonText: {
-    color: '#0F172A',
-    fontSize: 14.5,
-    fontWeight: '700',
-    letterSpacing: 0.1,
-  },
+  pageContainer: { width: '100%', minWidth: 0, gap: Spacing.lg },
+  pageHeader: { width: '100%', minWidth: 0, gap: Spacing.sm },
+  breadcrumbRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm },
+  breadcrumbLink: { minHeight: CONTROL_HEIGHT, justifyContent: 'center' },
+  breadcrumbText: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold },
+  pageTitle: { fontWeight: FontWeight.bold },
+  supportingText: { fontSize: FontSize.sm, lineHeight: 20, flexShrink: 1 },
+  mainCard: { width: '100%', minWidth: 0, borderWidth: 1, gap: Spacing.lg },
+  cardHeader: { minWidth: 0, gap: Spacing.sm },
+  sectionBadge: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold },
+  questionTitle: { fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold },
+  optionsRow: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'stretch', gap: Spacing.md },
+  stacked: { flexDirection: 'column', alignItems: 'stretch' },
+  fullWidth: { width: '100%' },
+  optionColumn: { flex: 1, flexBasis: 0 },
+  optionCard: { minWidth: 0, borderWidth: 2, borderRadius: BorderRadius.md, padding: Spacing.md, gap: Spacing.lg, justifyContent: 'space-between' },
+  optionBody: { minWidth: 0, gap: Spacing.sm },
+  optionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginBottom: Spacing.sm },
+  iconBox: { width: CONTROL_HEIGHT, height: CONTROL_HEIGHT, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
+  selectionState: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  selectionLabel: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold },
+  radioCircle: { width: Spacing.lg, height: Spacing.lg, borderWidth: 2, borderRadius: BorderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  optionTitle: { fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.semiBold },
+  optionWorkflow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, gap: Spacing.sm, paddingTop: Spacing.md, borderTopWidth: 1 },
+  workflowText: { fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.medium, flexShrink: 1 },
+  cardFooter: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minWidth: 0, gap: Spacing.md, borderTopWidth: 1, paddingTop: Spacing.lg },
+  footerCopy: { flex: 1, minWidth: 0, gap: Spacing.xs },
+  selectionSummary: { fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.semiBold },
+  continueButton: { minHeight: CONTROL_HEIGHT, borderRadius: CTA_RADIUS, backgroundColor: BRAND_GOLD, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  continueButtonText: { color: GOLD_INK, fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.semiBold },
+  hoveredButton: { opacity: 0.92 },
+  pressed: { opacity: 0.82 },
 });

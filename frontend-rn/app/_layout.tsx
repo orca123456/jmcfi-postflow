@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../store/auth';
 import { useFonts, Kameron_400Regular, Kameron_700Bold } from '@expo-google-fonts/kameron';
+import { Merriweather_700Bold } from '@expo-google-fonts/merriweather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CustomAlertProvider } from '../components/CustomAlert';
 import { TopLoadingBar } from '../components/ui/TopLoadingBar';
@@ -14,6 +15,7 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Kameron_400Regular,
     Kameron_700Bold,
+    Merriweather_700Bold,
     ...Ionicons.font,
   });
 
@@ -44,7 +46,8 @@ export default function RootLayout() {
     }
   }, [loadFromStorage]);
 
-  if (!fontsLoaded && !fontError) {
+  // Web can paint with fallback fonts while the custom fonts download.
+  if (Platform.OS !== 'web' && !fontsLoaded && !fontError) {
     return null;
   }
 

@@ -9,10 +9,15 @@
  * Replies are powered by the existing PostFlow AI endpoint (chatbotApi), with
  * the assistant package's built-in FAQ used as an offline fallback.
  */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { chatbotApi } from '../services/api';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
+import PostflowCharacter from './PostflowCharacter.web';
+import { characterStyles } from './postflowCharacterStyles';
+import { useApproverReviewCount } from './useApproverReviewCount';
+import { consumeAssistantWelcome, getAssistantWelcome, subscribeAssistantWelcome } from '../utils/assistantWelcome';
+import { getAssistantSoundEnabled, subscribeAssistantSound, setAssistantSoundEnabled, playAssistantSound, prepareAssistantAudio } from '../utils/assistantSound.web';
 
 const BASE = '/postflow-chatbot';
 const CSS_ID = 'postflow-chatbot-css';
@@ -72,18 +77,19 @@ export function ChatBot() {
   const user = useAuthStore((s) => s.user);
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
-  const { role, welcome, choices } = useMemo(() => {
+  const { role, greeting, welcome, choices } = useMemo(() => {
     const raw = (user?.role || '').toLowerCase();
     const isAdmin = ['admin', 'it_publisher', 'it_admin'].includes(raw);
     const isApprover = !isAdmin && ['approver', 'office_head', 'vice_president', 'imc_qa_checker', 'president'].includes(raw);
     const r: Role = isAdmin ? 'admin' : isApprover ? 'approver' : 'requestor';
     const firstName = user?.first_name || user?.name?.split(' ')[0] || '';
-    const hi = firstName ? `Hi, ${firstName}! 👋` : 'Hi! 👋';
+    const greeting = firstName ? `Hi, ${firstName}.` : 'How can I help?';
 
     if (r === 'admin') {
       return {
         role: r,
-        welcome: `${hi} Welcome to PostFlow. Ask me about system health, users, audit logs or platform settings.`,
+        greeting,
+        welcome: 'Get help with accounts, publishing, and system settings.',
         choices: [
           ['System health', 'System health & publishing status'],
           ['Manage users', 'How to manage user accounts & roles'],
@@ -95,7 +101,8 @@ export function ChatBot() {
     if (r === 'approver') {
       return {
         role: r,
-        welcome: `${hi} Welcome to PostFlow. Need help reviewing a publication request?`,
+        greeting,
+        welcome: 'Get help reviewing requests and moving approvals forward.',
         choices: [
           ['Pending reviews', 'How to review pending posts'],
           ['Branding guidelines', 'Compliance & branding guidelines'],
@@ -106,7 +113,8 @@ export function ChatBot() {
     }
     return {
       role: r,
-      welcome: `${hi} Welcome to PostFlow. Need help with a publication request?`,
+      greeting,
+      welcome: 'Get help with your requests, approvals, and publishing.',
       choices: [
         ['Approval process', 'How does the approval process work?'],
         ['Track a request', 'How do I track my request?'],
@@ -116,18 +124,47 @@ export function ChatBot() {
     };
   }, [user]);
 
+  const review = useApproverReviewCount(role === 'approver');
+  const reviewMessage = review.count === null
+    ? 'I’m here to help with your reviews.'
+    : review.count === 0 ? 'You’re all caught up. No requests awaiting your approval.'
+    : `${review.count} ${review.count === 1 ? 'request is' : 'requests are'} awaiting your approval.`;
+  const name = user?.first_name || user?.name?.split(' ')[0];
+  const welcomeTitle = name ? `Welcome back, ${name}.` : 'Welcome to PostFlow.';
+  const welcomeTicket = useSyncExternalStore(subscribeAssistantWelcome, getAssistantWelcome, () => null);
+  const soundEnabled = useSyncExternalStore(subscribeAssistantSound, getAssistantSoundEnabled, () => true);
+  const [widgetReady, setWidgetReady] = useState(false);
+  const [welcoming, setWelcoming] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const greetRef = useRef<((message: string) => void) | null>(null);
+  const layoutRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!widgetReady || !welcomeTicket?.ready || welcomeTicket.userId !== user?.id) return;
+    // Greet as soon as the dashboard is ready; the real review count updates live.
+    if (consumeAssistantWelcome(welcomeTicket.userId)) {
+      greetRef.current?.(`${welcomeTitle} ${role === 'approver' ? reviewMessage : welcome}`);
+    }
+  }, [widgetReady, welcomeTicket, user?.id, role, reviewMessage, welcomeTitle, welcome]);
+
+  useEffect(() => {
+    layoutRef.current?.();
+    if (welcoming) setAnnouncement(`${welcomeTitle} ${role === 'approver' ? reviewMessage : welcome}`);
+  }, [welcoming, welcomeTitle, role, reviewMessage, welcome]);
+
   const rootRef = useRef<HTMLDivElement>(null);
   // Keep the latest welcome text available to the imperative layer.
-  const welcomeRef = useRef(welcome);
-  welcomeRef.current = welcome;
+  const welcomeRef = useRef(`${greeting} ${welcome}`);
+  welcomeRef.current = `${greeting} ${welcome}${role === 'approver' ? ` ${reviewMessage}` : ''}`;
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
+    setWidgetReady(false);
     let disposed = false;
     const cleanups: Array<() => void> = [];
     const on = <K extends keyof HTMLElementEventMap>(
-      el: HTMLElement | Document | Window, ev: K | string, fn: (e: any) => void, opts?: AddEventListenerOptions,
+      el: EventTarget, ev: K | string, fn: (e: any) => void, opts?: AddEventListenerOptions,
     ) => {
       el.addEventListener(ev as string, fn, opts);
       cleanups.push(() => el.removeEventListener(ev as string, fn, opts));
@@ -143,24 +180,37 @@ export function ChatBot() {
       if (disposed) return;
       const q = <T extends HTMLElement>(sel: string) => root.querySelector(sel) as T;
       const trigger = q<HTMLButtonElement>('[data-pf-launcher]');
+      const greetingButton = q<HTMLButtonElement>('[data-pf-greeting]');
       const panel = q<HTMLElement>('[data-pf-panel]');
       const closer = q<HTMLButtonElement>('[data-pf-close]');
       const body = q<HTMLDivElement>('[data-pf-messages]');
       const form = q<HTMLFormElement>('[data-pf-form]');
-      const input = q<HTMLInputElement>('[data-pf-input]');
+      const input = q<HTMLTextAreaElement>('[data-pf-input]');
       const send = q<HTMLButtonElement>('[data-pf-send]');
       const status = q<HTMLSpanElement>('[data-pf-status]');
 
-      const motionOk = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const motionOk = () => !motion.matches;
       const limit = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
       const history: ChatTurn[] = [{ role: 'assistant', content: welcomeRef.current }];
-      let press: null | { id: number; sx: number; sy: number; x: number; y: number; moved: boolean; lx: number; ly: number; vx: number; vy: number } = null;
+      let press: null | { id: number; sx: number; sy: number; x: number; y: number; moved: boolean; lx: number; ly: number; time: number; vx: number; vy: number } = null;
       let active = false;
       let busy = false;
       let speakTimer: ReturnType<typeof setTimeout> | undefined;
       let greetTimer: ReturnType<typeof setTimeout> | undefined;
+      let landingTimer: ReturnType<typeof setTimeout> | undefined;
+      const resetCape = () => {
+        root.style.setProperty('--pf-tilt', '0deg');
+        root.style.setProperty('--pf-cape-rot', '0deg');
+        root.style.setProperty('--pf-cape-skew', '0deg');
+        root.style.setProperty('--pf-cape-stretch', '1');
+      };
+      const motionChanged = () => { if (!motionOk()) resetCape(); };
+      motion.addEventListener('change', motionChanged);
+      cleanups.push(() => motion.removeEventListener('change', motionChanged));
 
       const showGreeting = (ms = 0) => {
+        if (active) return;
         root.classList.add('pf-active-greet');
         if (greetTimer) clearTimeout(greetTimer);
         if (ms > 0) greetTimer = later(() => root.classList.remove('pf-active-greet'), ms);
@@ -172,23 +222,42 @@ export function ChatBot() {
         speakTimer = later(() => root.classList.remove('pf-speaking'), ms);
       };
 
+      const viewport = () => {
+        const visible = window.visualViewport;
+        return { left: visible?.offsetLeft || 0, top: visible?.offsetTop || 0, width: visible?.width || innerWidth, height: visible?.height || innerHeight };
+      };
       const layout = () => {
         const r = root.getBoundingClientRect();
-        const pw = Math.min(352, innerWidth - 18);
-        const m = 9;
-        const left = limit(r.right - pw, m, innerWidth - pw - m);
+        const v = viewport();
+        const pw = Math.min(360, v.width - 24);
+        const m = 12;
+        const left = limit(r.right - pw, v.left + m, v.left + v.width - pw - m);
+        panel.style.width = `${pw}px`;
         panel.style.left = `${left - r.left}px`;
         panel.style.right = 'auto';
         root.classList.toggle('pf-align-left', r.left < 180);
-        const roomAbove = r.top - m - 10;
-        const roomBelow = innerHeight - r.bottom - m - 10;
+        const roomAbove = r.top - v.top - m - 12;
+        const roomBelow = v.top + v.height - r.bottom - m - 12;
         const below = roomBelow > roomAbove;
         root.classList.toggle('pf-below', below);
-        panel.style.height = `${Math.max(185, Math.min(492, below ? roomBelow : roomAbove))}px`;
+        panel.style.height = `${Math.max(0, Math.min(role === 'approver' ? 496 : 448, below ? roomBelow : roomAbove))}px`;
+        const greetingWidth = Math.min(220, v.width - 24);
+        const fitsLeft = r.left - greetingWidth - 10 >= v.left + m;
+        const fitsRight = r.right + greetingWidth + 10 <= v.left + v.width - m;
+        const greetingLeft = fitsLeft ? r.left - greetingWidth - 10 : fitsRight ? r.right + 10 : limit(r.right - greetingWidth, v.left + m, v.left + v.width - greetingWidth - m);
+        greetingButton.style.width = `${greetingWidth}px`;
+        greetingButton.style.left = `${greetingLeft - r.left}px`;
+        greetingButton.style.right = 'auto';
+        const greetingHeight = greetingButton.offsetHeight || 80;
+        const desiredTop = fitsLeft || fitsRight ? r.top + 13 : r.top - v.top > greetingHeight + 20 ? r.top - greetingHeight - 10 : r.bottom + 10;
+        greetingButton.style.top = `${limit(desiredTop, v.top + m, v.top + v.height - greetingHeight - m) - r.top}px`;
+        root.classList.toggle('pf-greeting-right', !fitsLeft && fitsRight);
+        root.classList.toggle('pf-greeting-stacked', !fitsLeft && !fitsRight);
       };
       const setPos = (x: number, y: number) => {
-        root.style.left = `${limit(x, 7, innerWidth - root.offsetWidth - 7)}px`;
-        root.style.top = `${limit(y, 6, innerHeight - root.offsetHeight - 7)}px`;
+        const v = viewport();
+        root.style.left = `${limit(x, v.left + 7, v.left + v.width - root.offsetWidth - 7)}px`;
+        root.style.top = `${limit(y, v.top + 6, v.top + v.height - root.offsetHeight - 7)}px`;
         root.style.right = 'auto';
         root.style.bottom = 'auto';
         layout();
@@ -200,21 +269,29 @@ export function ChatBot() {
       root.style.visibility = 'visible';
 
       on(window, 'resize', () => { const r = root.getBoundingClientRect(); setPos(r.left, r.top); }, { passive: true });
+      if (window.visualViewport) {
+        const fitViewport = () => { const r = root.getBoundingClientRect(); setPos(r.left, r.top); };
+        on(window.visualViewport, 'resize', fitViewport, { passive: true });
+        on(window.visualViewport, 'scroll', fitViewport, { passive: true });
+      }
 
       const wave = () => {
-        if (!motionOk) return;
+        if (!motionOk()) return;
         root.classList.remove('pf-wave');
         void root.offsetWidth;
         root.classList.add('pf-wave');
         later(() => root.classList.remove('pf-wave'), 1180);
       };
       const open = (next: boolean) => {
+        if (next && !active) playAssistantSound('open');
         active = next;
         root.classList.toggle('pf-open', next);
         trigger.setAttribute('aria-expanded', String(next));
         trigger.setAttribute('aria-label', next ? 'Close PostFlow assistant' : 'Open PostFlow assistant');
         panel.setAttribute('aria-hidden', String(!next));
         (panel as any).inert = !next;
+        hideGreeting();
+        root.classList.remove('pf-speaking');
         layout();
         if (next) { wave(); later(() => input.focus({ preventScroll: true }), 100); }
         else trigger.focus({ preventScroll: true });
@@ -222,15 +299,22 @@ export function ChatBot() {
       (panel as any).inert = true;
 
       on(trigger, 'mouseenter', () => { showGreeting(); startSpeaking(); wave(); });
-      on(trigger, 'mouseleave', () => { if (!press) { hideGreeting(); root.classList.remove('pf-speaking'); } });
+      on(trigger, 'mouseleave', () => { if (!press) { showGreeting(180); root.classList.remove('pf-speaking'); } });
       on(trigger, 'focus', () => { showGreeting(); startSpeaking(); });
-      on(trigger, 'blur', () => { if (!press) { hideGreeting(); root.classList.remove('pf-speaking'); } });
+      on(root, 'focusout', (e: FocusEvent) => { if (!press && !root.contains(e.relatedTarget as Node)) { hideGreeting(); root.classList.remove('pf-speaking'); } });
+      on(greetingButton, 'mouseenter', () => showGreeting());
+      on(greetingButton, 'mouseleave', hideGreeting);
+      on(greetingButton, 'focus', () => showGreeting());
+      on(greetingButton, 'click', () => open(true));
       on(trigger, 'touchstart', () => { showGreeting(2200); startSpeaking(2200); }, { passive: true });
 
       on(trigger, 'pointerdown', (e: PointerEvent) => {
         if (e.button !== 0 || press) return;
+        prepareAssistantAudio();
+        if (landingTimer) { clearTimeout(landingTimer); timers.delete(landingTimer); }
+        root.classList.remove('pf-landing');
         const r = root.getBoundingClientRect();
-        press = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, moved: false, lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
+        press = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, moved: false, lx: e.clientX, ly: e.clientY, time: e.timeStamp, vx: 0, vy: 0 };
         trigger.setPointerCapture(e.pointerId);
         startSpeaking(2600);
       });
@@ -246,17 +330,20 @@ export function ChatBot() {
           startSpeaking(4000);
         }
         if (!press.moved) return;
-        press.vx = e.clientX - press.lx;
-        press.vy = e.clientY - press.ly;
+        // Normalize to a 60 Hz frame so mouse, pen and touch produce the same response.
+        const elapsed = limit(e.timeStamp - press.time, 8, 64);
+        press.vx = press.vx * .4 + (e.clientX - press.lx) * (16.67 / elapsed) * .6;
+        press.vy = press.vy * .4 + (e.clientY - press.ly) * (16.67 / elapsed) * .6;
         press.lx = e.clientX;
         press.ly = e.clientY;
-        const speed = Math.min(Math.hypot(press.vx, press.vy), 20);
-        const angle = (Math.atan2(press.vy, press.vx) * 180) / Math.PI;
-        root.style.setProperty('--pf-tilt', `${limit(press.vx * 1.05, -14, 14)}deg`);
-        root.style.setProperty('--pf-cape-rot', `${limit(angle * 0.06 + press.vx * 0.13, -9, 9)}deg`);
-        root.style.setProperty('--pf-cape-shift', `${-2.5 - speed * 0.3}px`);
-        root.style.setProperty('--pf-cape-stretch', (1 + Math.min(speed * 0.009, 0.16)).toFixed(3));
-        root.style.setProperty('--pf-cape-lift', `${limit(-press.vy * 0.1, -3.6, 3.6)}px`);
+        press.time = e.timeStamp;
+        if (motionOk()) {
+          const speed = Math.min(Math.hypot(press.vx, press.vy), 24);
+          root.style.setProperty('--pf-tilt', `${limit(press.vx * 1.05, -14, 14)}deg`);
+          root.style.setProperty('--pf-cape-rot', `${limit(-press.vx * .65 + press.vy * .2, -16, 16)}deg`);
+          root.style.setProperty('--pf-cape-skew', `${limit(-press.vx * .4, -8, 8)}deg`);
+          root.style.setProperty('--pf-cape-stretch', (1 + speed * .012).toFixed(3));
+        }
         setPos(press.x + dx, press.y + dy);
         e.preventDefault();
       });
@@ -268,16 +355,14 @@ export function ChatBot() {
         root.classList.remove('pf-flying');
         if (p.moved) {
           const r = root.getBoundingClientRect();
-          const boost = motionOk ? 2.4 : 0;
+          const boost = motionOk() ? 2.4 : 0;
           setPos(r.left + p.vx * boost, r.top + p.vy * boost);
           root.classList.add('pf-landing');
-          later(() => {
+          // Let the cape ease back from its current drag pose immediately on release.
+          resetCape();
+          landingTimer = later(() => {
             root.classList.remove('pf-landing');
-            root.style.setProperty('--pf-tilt', '0deg');
-            root.style.setProperty('--pf-cape-rot', '0deg');
-            root.style.setProperty('--pf-cape-shift', '-1px');
-            root.style.setProperty('--pf-cape-stretch', '1');
-            root.style.setProperty('--pf-cape-lift', '0px');
+            landingTimer = undefined;
           }, 520);
           if (e.pointerType === 'touch') { showGreeting(1200); startSpeaking(1200); }
           else { root.classList.remove('pf-speaking'); hideGreeting(); }
@@ -313,7 +398,11 @@ export function ChatBot() {
       };
       const reply = async (text: string) => {
         try {
-          const res = await chatbotApi.sendMessage(history.slice(-12));
+          // Include the current queue summary when the user asks a follow-up.
+          history[0].content = welcomeRef.current;
+          const recent = history.slice(-11);
+          if (recent[0] !== history[0]) recent.unshift(history[0]);
+          const res = await chatbotApi.sendMessage(recent);
           const r = res?.data?.reply;
           if (typeof r === 'string' && r.trim()) return r;
           return localAnswer(text);
@@ -322,17 +411,22 @@ export function ChatBot() {
           return localAnswer(text);
         }
       };
+      const updateComposer = () => {
+        input.style.height = '44px';
+        input.style.height = `${Math.min(104, Math.max(44, input.scrollHeight))}px`;
+        send.disabled = busy || !input.value.trim();
+        form.classList.toggle('pf-busy', busy);
+        form.setAttribute('aria-busy', String(busy));
+      };
       const sendText = async (raw: string) => {
         const text = String(raw || '').trim().slice(0, 500);
         if (!text || busy) return;
         busy = true;
+        playAssistantSound('send');
         input.value = '';
-        send.disabled = true;
-        send.classList.remove('pf-sending');
-        void send.offsetWidth;
-        send.classList.add('pf-sending');
+        updateComposer();
         status.textContent = 'Message sent. Assistant is typing.';
-        body.querySelector('.pf-choices')?.remove();
+        body.querySelector('.pf-introduction')?.remove();
         bubble(text, 'user');
         history.push({ role: 'user', content: text });
         const indicator = typing();
@@ -344,24 +438,43 @@ export function ChatBot() {
           bubble(response, 'bot');
           history.push({ role: 'assistant', content: response });
           status.textContent = 'Reply received.';
+          playAssistantSound('reply');
           startSpeaking(1600);
         } finally {
           busy = false;
-          send.disabled = false;
-          later(() => send.classList.remove('pf-sending'), 500);
+          updateComposer();
           if (!disposed) input.focus({ preventScroll: true });
         }
       };
       on(form, 'submit', (e: Event) => { e.preventDefault(); sendText(input.value); });
+      on(input, 'input', updateComposer);
+      on(input, 'keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(input.value); }
+      });
+      updateComposer();
       root.querySelectorAll<HTMLButtonElement>('[data-pf-question]').forEach((b) =>
         on(b, 'click', () => sendText(b.dataset.pfQuestion || '')),
       );
+
+      layoutRef.current = layout;
+      greetRef.current = message => {
+        setWelcoming(true);
+        setAnnouncement(message);
+        showGreeting(9000);
+        wave();
+        startSpeaking(1800);
+        playAssistantSound('welcome');
+        later(() => setWelcoming(false), 9000);
+      };
+      setWidgetReady(true);
 
       cleanups.push(() => { if (speakTimer) clearTimeout(speakTimer); if (greetTimer) clearTimeout(greetTimer); });
     });
 
     return () => {
       disposed = true;
+      greetRef.current = null;
+      layoutRef.current = null;
       cleanups.forEach((fn) => fn());
       timers.forEach((t) => clearTimeout(t));
     };
@@ -378,9 +491,10 @@ export function ChatBot() {
       data-postflow-assistant=""
       style={{ visibility: 'hidden' }}
     >
+      <style>{characterStyles}</style>
       <section className="pf-panel" data-pf-panel="" id="pf-assistant-dialog" role="dialog" aria-label="PostFlow Assistant" aria-hidden="true">
         <header className="pf-head">
-          <img className="pf-avatar" src={`${BASE}/assets/bot-full.webp`} alt="" draggable={false} />
+          <span className="pf-avatar"><PostflowCharacter tracking={false} decorative /></span>
           <div className="pf-heading">
             <h2>PostFlow Assistant</h2>
             <p>
@@ -389,6 +503,15 @@ export function ChatBot() {
               <span className="pf-role">{roleLabel}</span>
             </p>
           </div>
+          <button className="pf-sound-toggle" type="button" aria-pressed={!soundEnabled} aria-label={soundEnabled ? 'Mute assistant sounds' : 'Enable assistant sounds'} title={soundEnabled ? 'Mute assistant sounds' : 'Enable assistant sounds'} onClick={() => {
+            setAssistantSoundEnabled(!soundEnabled);
+            if (!soundEnabled) playAssistantSound('open');
+          }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4Z" />
+              {soundEnabled ? <path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /> : <path d="m16 9 5 6m0-6-5 6" />}
+            </svg>
+          </button>
           <button className="pf-close" type="button" data-pf-close="" aria-label="Close chat">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -396,23 +519,29 @@ export function ChatBot() {
           </button>
         </header>
         <div className="pf-messages" data-pf-messages="" aria-live="polite" aria-relevant="additions">
-          <div className="pf-day">PostFlow help</div>
-          <div className="pf-bubble">{welcome}</div>
-          <div className="pf-choices">
-            {choices.map(([label, question]) => (
-              <button key={label} type="button" data-pf-question={question}>{label}</button>
-            ))}
+          <div className="pf-introduction">
+            <div className="pf-welcome"><h3>{greeting}</h3><p>{welcome}</p></div>
+            {role === 'approver' && <p className={`pf-review-summary ${review.count !== null && review.count > 0 ? 'pf-review-pending' : ''}`} role="status" aria-live="polite" aria-atomic="true">{reviewMessage}</p>}
+            <p className="pf-topic-label">Explore a topic</p>
+            <div className="pf-choices">
+              {choices.map(([label, question]) => (
+                <button key={label} type="button" data-pf-question={question}>
+                  <span>{label}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <form className="pf-form" data-pf-form="">
           <label className="pf-sr" htmlFor="pf-chat-message">Type your message</label>
-          <input className="pf-input" id="pf-chat-message" data-pf-input="" type="text" maxLength={500} placeholder="Ask me anything about PostFlow..." autoComplete="off" required />
-          <button className="pf-send" data-pf-send="" type="submit" aria-label="Send message">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m22 2-7 20-4-9-9-4Z" />
-              <path d="M22 2 11 13" />
-            </svg>
-          </button>
+          <div className="pf-compose">
+            <textarea className="pf-input" id="pf-chat-message" data-pf-input="" rows={1} maxLength={500} placeholder="Ask about PostFlow…" autoComplete="off" required />
+            <button className="pf-send" data-pf-send="" type="submit" aria-label="Send message" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>
+            </button>
+          </div>
+          <p className="pf-compose-hint">Enter to send <span>·</span> Shift + Enter for a new line</p>
         </form>
         <span className="pf-sr" data-pf-status="" role="status" aria-live="polite" />
       </section>
@@ -426,14 +555,15 @@ export function ChatBot() {
         title="Drag to move, click to chat"
       >
         <span className="pf-bot" aria-hidden="true">
-          <span className="pf-sprite pf-body-layer" />
-          <span className="pf-sprite pf-cape-live" />
-          <img className="pf-sprite pf-eye-blink" src={`${BASE}/assets/bot-blink.webp`} alt="" draggable={false} />
-          <img className="pf-sprite pf-mouth-sprite" src={`${BASE}/assets/bot-mouth-talking.webp`} alt="" draggable={false} />
-          <img className="pf-sprite pf-wave-hand" src={`${BASE}/assets/bot-wave-hand.webp`} alt="" draggable={false} />
+          <PostflowCharacter decorative />
         </span>
       </button>
-      <span className="pf-greeting" aria-hidden="true">👋 Hi! How can I help you today?</span>
+      <button className="pf-greeting" data-pf-greeting="" type="button" aria-label="Chat with PostFlow">
+        <span className="pf-greeting-title">{welcoming ? welcomeTitle : 'Hi! How can I help you?'}</span>
+        {(welcoming || role === 'approver') && <span className="pf-greeting-detail">{role === 'approver' ? reviewMessage : welcome}</span>}
+        <span className="pf-greeting-action">Ask PostFlow <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></span>
+      </button>
+      <span className="pf-sr" data-pf-welcome-announcement="" role="status" aria-live="polite" aria-atomic="true">{announcement}</span>
     </div>
   );
 }

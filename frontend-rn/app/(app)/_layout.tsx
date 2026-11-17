@@ -2,22 +2,8 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/auth';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Data stays "fresh" for 10 minutes in memory
-      staleTime: 10 * 60 * 1000,
-      // Keep data in memory for 1 hour
-      gcTime: 60 * 60 * 1000,
-      // Don't refetch on window focus
-      refetchOnWindowFocus: false,
-      // Retry once on failure
-      retry: 1,
-    },
-  },
-});
+import { DashboardQueryProvider } from '../../components/DashboardQueryProvider';
+import { completeDashboardHandoff } from '../../utils/dashboardHandoff';
 
 // All dashboard routes that exist in the app
 const ALL_DASHBOARDS = [
@@ -76,9 +62,13 @@ const resolveRawRole = (user: any): string => {
 };
 
 export default function AppLayout() {
-  const { user, isInitialized } = useAuthStore();
+  const { user, token, isInitialized } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    if (isInitialized && user) completeDashboardHandoff();
+  }, [isInitialized, user]);
 
   useEffect(() => {
     // Don't make routing decisions until auth storage initialization has finished
@@ -111,12 +101,15 @@ export default function AppLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <DashboardQueryProvider
+      key={JSON.stringify([token, user.id, user.roles, user.role, user.department, user.program_head_id])}
+      user={user}
+    >
       <Stack
         screenOptions={{
           headerShown: false,
         }}
       />
-    </QueryClientProvider>
+    </DashboardQueryProvider>
   );
 }

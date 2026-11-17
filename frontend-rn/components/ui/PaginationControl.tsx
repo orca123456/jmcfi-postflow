@@ -59,6 +59,8 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
       
       <View style={styles.controlsContainer}>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Previous page"
           style={[styles.arrowButton, currentPage === 1 && styles.disabled]}
           onPress={handlePrev}
           disabled={currentPage === 1}
@@ -74,6 +76,10 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
           return (
             <TouchableOpacity
               key={page}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to page ${page}`}
+              accessibilityState={{ selected: isCurrent }}
+              {...(Platform.OS === 'web' ? { 'aria-current': isCurrent ? 'page' as const : undefined } : {})}
               style={[styles.pageButton, isCurrent && styles.activePageButton]}
               onPress={() => onPageChange(page as number)}
             >
@@ -83,6 +89,8 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
         })}
 
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Next page"
           style={[styles.arrowButton, (currentPage === totalPages || totalPages === 0) && styles.disabled]}
           onPress={handleNext}
           disabled={currentPage === totalPages || totalPages === 0}
@@ -92,6 +100,7 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
 
         {Platform.OS === 'web' && onItemsPerPageChange && (
           <select
+            aria-label="Items per page"
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
             style={{

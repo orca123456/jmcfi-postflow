@@ -10,7 +10,6 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from './Card';
@@ -28,8 +27,8 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
   const { policySections, effectiveDate, lastUpdatedDate } = usePolicyStore();
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
   const [searchQuery, setSearchQuery] = useState('');
-  const { width } = useWindowDimensions();
-  const isLarge = width > 1024;
+  const [contentWidth, setContentWidth] = useState(0);
+  const isLarge = contentWidth >= 900;
 
   const SECTION_COLORS: Record<string, { badgeBg: string; iconBg: string; iconColor: string; accent: string; iconName: any }> = {
     '1': { badgeBg: isDarkMode ? '#2563EB' : '#0B2545', iconBg: isDarkMode ? '#1E293B' : '#EFF6FF', iconColor: isDarkMode ? '#60A5FA' : '#2563EB', accent: '#2563EB', iconName: 'book-outline' },
@@ -54,11 +53,11 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
   });
 
   return (
-    <View style={styles.container}>
+    <View nativeID="postflow-policy-rules" onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)} style={styles.container}>
       {/* ── Header ── */}
       <View style={[styles.headerRow, { flexDirection: isLarge ? 'row' : 'column', gap: isLarge ? 0 : 12 }]}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.mainTitle}>POLICY RULES</Text>
+          <Text accessibilityRole="header" style={styles.mainTitle}>Policy Rules</Text>
           <Text style={styles.subTitle}>
             Guidelines for publishing official school website content.
           </Text>
@@ -67,8 +66,9 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
           </Text>
         </View>
 
-        <View style={styles.searchBox}>
+        <View style={[styles.searchBox, !isLarge && { width: '100%' }]}>
           <TextInput
+            accessibilityLabel="Search policy rules"
             placeholder="Search policy rules..."
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
@@ -78,6 +78,14 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
           <Ionicons name="search" size={16} color="#6B7280" />
         </View>
       </View>
+
+      {filtered.length === 0 && <Card style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+        <Ionicons name="search-outline" size={28} color={Colors.textMuted} />
+        <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '600', textAlign: 'center' }}>{searchQuery.trim() ? 'No policy rules match your search' : 'Policy rules will appear here once published.'}</Text>
+        {!!searchQuery.trim() && <TouchableOpacity accessibilityRole="button" onPress={() => setSearchQuery('')} style={{ minHeight: 44, justifyContent: 'center' }}>
+          <Text style={{ color: isDarkMode ? '#FFC72C' : accentColor, fontWeight: '600' }}>Clear search</Text>
+        </TouchableOpacity>}
+      </Card>}
 
       {/* ── Sections ── */}
       {filtered.map((section, sIdx) => {
@@ -155,8 +163,7 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 16,
+    minWidth: 0,
     gap: 24,
     width: '100%',
   },
@@ -167,7 +174,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   mainTitle: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '800',
     color: Colors.textPrimary,
     letterSpacing: 0.5,
@@ -193,7 +200,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
-    minWidth: 240,
+    minHeight: 44,
+    minWidth: 0,
+    width: 260,
+    maxWidth: '100%',
   },
   searchInput: {
     flex: 1,
@@ -226,6 +236,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   sectionTitleText: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 16,
     fontWeight: '700',
     color: Colors.textPrimary,
@@ -270,7 +282,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 280,
-    minWidth: 260,
+    minWidth: 0,
     maxWidth: '100%',
     gap: 10,
     padding: 16,

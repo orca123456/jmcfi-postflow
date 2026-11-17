@@ -36,6 +36,11 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $appends = ['full_name', 'photo_url', 'department_logo_url', 'assigned_program'];
 
+    private bool $deptLogoResolved = false;
+    private ?string $cachedDeptLogoUrl = null;
+    private bool $assignedProgramResolved = false;
+    private ?string $cachedAssignedProgram = null;
+
     protected function casts(): array
     {
         return [
@@ -90,10 +95,15 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!$this->department) {
             return null;
         }
+        if ($this->deptLogoResolved) {
+            return $this->cachedDeptLogoUrl;
+        }
         $dept = \App\Models\Department::where('name', $this->department)
                                       ->orWhere('display_name', $this->department)
                                       ->first();
-        return $dept ? $dept->logo_url : null;
+        $this->cachedDeptLogoUrl = $dept ? $dept->logo_url : null;
+        $this->deptLogoResolved = true;
+        return $this->cachedDeptLogoUrl;
     }
 
     public function programHead(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -117,14 +127,28 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function getAssignedProgramAttribute(): ?string
     {
+        if ($this->assignedProgramResolved) {
+            return $this->cachedAssignedProgram;
+        }
+
+        if ($this->relationLoaded('roles')) {
+            $primaryRole = $this->roles->first()?->name;
+            if (in_array($primaryRole, ['it_admin', 'it_publisher', 'admin'], true) && !$this->program_head_id) {
+                $this->assignedProgramResolved = true;
+                return $this->cachedAssignedProgram = null;
+            }
+        }
+
         $ph = $this->relationLoaded('programHead') ? $this->programHead : $this->programHead()->first();
         if ($ph && !empty($ph->program_name)) {
-            return $ph->program_name;
+            $this->assignedProgramResolved = true;
+            return $this->cachedAssignedProgram = $ph->program_name;
         }
 
         $phByUser = ProgramHead::where('user_id', $this->id)->first();
         if ($phByUser && !empty($phByUser->program_name)) {
-            return $phByUser->program_name;
+            $this->assignedProgramResolved = true;
+            return $this->cachedAssignedProgram = $phByUser->program_name;
         }
 
         if ($this->department) {
@@ -143,7 +167,8 @@ class User extends Authenticatable implements MustVerifyEmail
                     if (!$deptPh->user_id) {
                         $deptPh->update(['user_id' => $this->id]);
                     }
-                    return $deptPh->program_name;
+                    $this->assignedProgramResolved = true;
+                    return $this->cachedAssignedProgram = $deptPh->program_name;
                 }
             }
         }
@@ -151,11 +176,13 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!empty($this->position) && str_contains($this->position, 'Program Head')) {
             $extracted = trim(str_replace('Program Head', '', $this->position));
             if ($extracted !== '') {
-                return $extracted;
+                $this->assignedProgramResolved = true;
+                return $this->cachedAssignedProgram = $extracted;
             }
         }
 
-        return null;
+        $this->assignedProgramResolved = true;
+        return $this->cachedAssignedProgram = null;
     }
 
     public function getDisplayNameAttribute(): string
@@ -216,7 +243,9 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function workflowRole(): ?string
     {
-        $role = $this->getRoleNames()->first();
+        $role = $this->relationLoaded('roles')
+            ? $this->roles->first()?->name
+            : $this->getRoleNames()->first();
         $department = strtolower($this->department ?? '');
 
         if ($role === 'it_admin' || $role === 'admin') {

@@ -1,12 +1,19 @@
+import { useState } from 'react';
 import { Stack, Redirect } from 'expo-router';
 import { useAuthStore } from '../../store/auth';
+import { AuthTransitionContext } from '../../components/AuthTransitionContext';
 
 export default function AuthLayout() {
   const { user } = useAuthStore();
+  const [signInInProgress, setSignInInProgress] = useState(false);
 
-  if (user) {
+  if (user && !signInInProgress) {
     return <Redirect href="/" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <AuthTransitionContext.Provider value={setSignInInProgress}>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AuthTransitionContext.Provider>
+  );
 }

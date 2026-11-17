@@ -123,7 +123,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         return false;
       }
       
-      const errorMessage = err.response?.data?.message || 'Login failed. Please check your credentials.';
+      const errorMessage = err.response?.data?.message || (err.response
+        ? 'Unable to sign in. Please try again.'
+        : 'Unable to connect. Check your connection and try again.');
       set({ error: errorMessage, isLoading: false });
       return false;
     }
@@ -142,7 +144,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           .filter(k => k.startsWith('postflow') || k.includes('auth_') || k.includes('rq-v1'))
           .forEach(k => localStorage.removeItem(k));
         Object.keys(sessionStorage)
-          .filter(k => k.startsWith('postflow') || k.includes('auth_'))
+          .filter(k => (k.startsWith('postflow') && !k.startsWith('postflow_welcome_seen')) || k.includes('auth_'))
           .forEach(k => sessionStorage.removeItem(k));
       } catch (_) {}
     }

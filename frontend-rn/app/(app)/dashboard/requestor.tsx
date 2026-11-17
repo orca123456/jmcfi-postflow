@@ -29,18 +29,21 @@ import { postsApi, authApi, dashboardApi, categoriesApi, platformApi, resolveIma
 import { useQuery } from '@tanstack/react-query';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
-import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 import { optimizeImageForUpload, getImageDimensions, fitImageForInstagram, isImageFile } from '../../../utils/imageOptimizer';
 import { FacebookMediaGrid } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { useThemeStore } from '../../../store/theme';
 import { ModernRequestorDashboard } from '../../../components/requestor/ModernRequestorDashboard';
+import { RequestorOverview, INITIAL_OVERVIEW_STATE, type RequestorOverviewState } from '../../../components/requestor/RequestorOverview';
 import { RequestTypeSelector } from '../../../components/requestor/RequestTypeSelector';
+import { RequestorDrafts } from '../../../components/requestor/RequestorDrafts';
+import { RequestorRejected } from '../../../components/requestor/RequestorRejected';
 
 export default function RequestorDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const { user } = useAuthStore();
   const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Requestor';
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
@@ -134,78 +137,13 @@ export default function RequestorDashboard() {
   const [previewPlatformTab, setPreviewPlatformTab] = useState<'facebook' | 'instagram' | 'wordpress'>('facebook');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
-  // Dashboard Page State
-  const [dashboardPage, setDashboardPage] = useState(1);
-  const [dashboardPerPage, setDashboardPerPage] = useState(10);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
-  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-
-  const [rejectedSearchQuery, setRejectedSearchQuery] = useState('');
-  const [rejectedDateFilter, setRejectedDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
-  const [isRejectedDateDropdownOpen, setIsRejectedDateDropdownOpen] = useState(false);
-  const [customRejectedStartDate, setCustomRejectedStartDate] = useState('');
-  const [customRejectedEndDate, setCustomRejectedEndDate] = useState('');
-
-  const filterDropdownsRef = useRef<View>(null);
-  const rejectedDropdownRef = useRef<View>(null);
-
-  // Close filter dropdowns when clicking outside on web
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    if (!isStatusDropdownOpen && !isDateDropdownOpen && !isRejectedDateDropdownOpen) return;
-
-    const handleOutsideClick = (e: MouseEvent) => {
-      const node = filterDropdownsRef.current as any;
-      if (node && !node.contains(e.target as Node)) {
-        setIsStatusDropdownOpen(false);
-        setIsDateDropdownOpen(false);
-      }
-      const rejNode = rejectedDropdownRef.current as any;
-      if (rejNode && !rejNode.contains(e.target as Node)) {
-        setIsRejectedDateDropdownOpen(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      document.addEventListener('click', handleOutsideClick);
-    }, 10);
-
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('click', handleOutsideClick);
-    };
-  }, [isStatusDropdownOpen, isDateDropdownOpen, isRejectedDateDropdownOpen]);
-
+  // Keep overview filters when navigating between requestor tabs.
+  const [overviewState, setOverviewState] = useState<RequestorOverviewState>(INITIAL_OVERVIEW_STATE);
   // Active Post for Dialog/Comments Modal
   const [selectedQueuePost, setSelectedQueuePost] = useState<any | null>(null);
   const [modalPlatformTab, setModalPlatformTab] = useState('facebook');
-  const [directModalCarouselIdx, setDirectModalCarouselIdx] = useState(0);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (selectedQueuePost) {
-      setDirectModalCarouselIdx(0);
-      const platList = (Array.isArray(selectedQueuePost.platforms) ? selectedQueuePost.platforms : []).map((p: any) =>
-        String(p).toLowerCase()
-      );
-      if (platList.includes('facebook')) {
-        setModalPlatformTab('facebook');
-      } else if (platList.includes('instagram')) {
-        setModalPlatformTab('instagram');
-      } else if (platList.includes('website') || platList.includes('portal') || platList.includes('wordpress')) {
-        setModalPlatformTab('website');
-      } else {
-        setModalPlatformTab('facebook');
-      }
-    }
-  }, [selectedQueuePost]);
 
   // Policy Search State
   const [policySearchQuery, setPolicySearchQuery] = useState('');
@@ -455,154 +393,18 @@ export default function RequestorDashboard() {
   const [mockRequests, setMockRequests] = useState<any[]>([]);
   const [newRequestType, setNewRequestType] = useState('News & Updates');
 
-  const filteredRequests = useMemo(() => {
-    return mockRequests
-      .filter(req => (req.title && req.title.toLowerCase().includes(searchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(searchQuery.toLowerCase())))
-      .filter(req => {
-        let statusMatch = true;
-        if (statusFilter !== 'All') {
-          const st = req.status || '';
-          if (statusFilter === 'PENDING') statusMatch = st.includes('PENDING');
-          else if (statusFilter === 'APPROVED') statusMatch = (st === 'APPROVED' || st === 'PUBLISHED' || st === 'SCHEDULED');
-          else statusMatch = (st === statusFilter);
-        }
-        if (!statusMatch) return false;
-
-        let matchesDate = true;
-        if (dateFilter !== 'All Time') {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const postDate = new Date(req.created_at || Date.now());
-          postDate.setHours(0, 0, 0, 0);
-          const diffTime = today.getTime() - postDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-
-          if (dateFilter === 'Today') {
-            matchesDate = diffDays === 0;
-          } else if (dateFilter === 'Yesterday') {
-            matchesDate = diffDays === 1;
-          } else if (dateFilter === 'Last 7 Days') {
-            matchesDate = diffDays >= 0 && diffDays <= 7;
-          } else if (dateFilter === 'Last 30 Days') {
-            matchesDate = diffDays >= 0 && diffDays <= 30;
-          } else if (dateFilter === 'Custom Range') {
-            const start = new Date(customStartDate);
-            const end = new Date(customEndDate);
-            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              const raw = new Date(req.created_at || Date.now());
-              matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
-            }
-          }
-        }
-        return matchesDate;
-      })
-      .sort((a, b) => {
-        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
-      });
-  }, [mockRequests, searchQuery, statusFilter, sortOrder, dateFilter, customStartDate, customEndDate]);
-
-  useEffect(() => {
-    setDashboardPage(1);
-  }, [searchQuery, statusFilter, sortOrder, dateFilter, customStartDate, customEndDate]);
-
-  const paginatedRequests = useMemo(() => {
-    return filteredRequests.slice((dashboardPage - 1) * dashboardPerPage, dashboardPage * dashboardPerPage);
-  }, [filteredRequests, dashboardPage, dashboardPerPage]);
-
-  const filteredRejectedPosts = useMemo(() => {
-    return rejectedPosts
-      .filter(req => (req.title && req.title.toLowerCase().includes(rejectedSearchQuery.toLowerCase())) || (req.category && req.category.toLowerCase().includes(rejectedSearchQuery.toLowerCase())))
-      .filter(req => {
-        let matchesDate = true;
-        if (rejectedDateFilter !== 'All Time') {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const postDate = new Date(req.created_at || Date.now());
-          postDate.setHours(0, 0, 0, 0);
-          const diffTime = today.getTime() - postDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-
-          if (rejectedDateFilter === 'Today') {
-            matchesDate = diffDays === 0;
-          } else if (rejectedDateFilter === 'Yesterday') {
-            matchesDate = diffDays === 1;
-          } else if (rejectedDateFilter === 'Last 7 Days') {
-            matchesDate = diffDays >= 0 && diffDays <= 7;
-          } else if (rejectedDateFilter === 'Last 30 Days') {
-            matchesDate = diffDays >= 0 && diffDays <= 30;
-          } else if (rejectedDateFilter === 'Custom Range') {
-            const start = new Date(customRejectedStartDate);
-            const end = new Date(customRejectedEndDate);
-            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              const raw = new Date(req.created_at || Date.now());
-              matchesDate = raw >= start && raw <= new Date(end.getTime() + 86400000);
-            }
-          }
-        }
-        return matchesDate;
-      })
-      .sort((a, b) => {
-        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return timeB - timeA;
-      });
-  }, [rejectedPosts, rejectedSearchQuery, rejectedDateFilter, customRejectedStartDate, customRejectedEndDate]);
-
-  const [rejectedPage, setRejectedPage] = useState(1);
-  const rejectedPerPage = 10;
-
-  useEffect(() => {
-    setRejectedPage(1);
-  }, [rejectedSearchQuery, rejectedDateFilter, customRejectedStartDate, customRejectedEndDate]);
-
-  const paginatedRejectedPosts = useMemo(() => {
-    return filteredRejectedPosts.slice((rejectedPage - 1) * rejectedPerPage, rejectedPage * rejectedPerPage);
-  }, [filteredRejectedPosts, rejectedPage, rejectedPerPage]);
-
   const [mockQueuePosts, setMockQueuePosts] = useState<any[]>([]);
 
-  const { data: postsDataRes, isLoading: isInitLoading, refetch: refetchPosts } = useQuery({
+  const { data: postsDataRes, isLoading: isInitLoading, isError: isPostsError, refetch: refetchPosts } = useQuery({
     queryKey: ['requestor-posts'],
     queryFn: () => postsApi.list({ per_page: 50 }),
     staleTime: 5000,
     refetchOnWindowFocus: true,
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
   const mapPost = (p: any) => {
-    const isDirectImc = String(p.routing_type || p.routingType || '').toLowerCase() === 'direct_imc';
-    const rawSt = String(p.status || '').toLowerCase();
-    const directStatusLabel =
-      rawSt === 'published' || rawSt === 'approved' || rawSt === 'scheduled'
-        ? 'Published'
-        : rawSt === 'rejected' || rawSt === 'returned_for_revision'
-        ? 'Rejected'
-        : rawSt === 'under_review' || rawSt === 'reviewing'
-        ? 'Reviewing'
-        : 'Pending';
-    const directStatusBg =
-      directStatusLabel === 'Published'
-        ? '#DCFCE7'
-        : directStatusLabel === 'Rejected'
-        ? '#FEE2E2'
-        : directStatusLabel === 'Reviewing'
-        ? '#EDE9FE'
-        : '#FEF3C7';
-    const directStatusColor =
-      directStatusLabel === 'Published'
-        ? '#166534'
-        : directStatusLabel === 'Rejected'
-        ? '#991B1B'
-        : directStatusLabel === 'Reviewing'
-        ? '#5B21B6'
-        : '#92400E';
-    const directDate = p.created_at
-      ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-      : 'Today';
-
     let rejectedBy = '';
     if ((p.status === 'rejected' || p.status === 'returned_for_revision') && p.approval_workflows && Array.isArray(p.approval_workflows)) {
       const rejectionLog = p.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
@@ -622,24 +424,18 @@ export default function RequestorDashboard() {
       title: p.title || 'Untitled',
       caption: p.caption_narrative || '',
       platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
-      category: isDirectImc
-        ? 'IMC Publication'
-        : ((p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
-          ? p.other_category_name
-          : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category'))),
+      category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+        ? p.other_category_name
+        : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
       other_category_name: p.other_category_name || null,
       preferred_schedule_at: p.preferred_schedule_at || null,
       department: p.requestor?.department || 'Department',
-      date: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
-      directDate,
-      time: p.created_at ? new Date(p.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
-      dateSaved: p.created_at ? new Date(p.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+      date: p.created_at ? new Date(p.created_at).toLocaleDateString() : '—',
+      time: p.created_at ? new Date(p.created_at).toLocaleTimeString() : '',
+      dateSaved: p.updated_at || p.created_at ? new Date(p.updated_at || p.created_at).toLocaleDateString() : '—',
       rawStatus: p.status, // Add rawStatus for reliable filtering
       status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
       statusLabel: p.status_label || p.status,
-      directStatusLabel,
-      directStatusBg,
-      directStatusColor,
       statusColor: p.status === 'published' || p.status === 'approved'
         ? '#15803D'
         : (p.status === 'scheduled'
@@ -714,11 +510,13 @@ export default function RequestorDashboard() {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
       const mapped = posts.map(mapPost);
-      const filtered = mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
+      // Classic dashboard lists should only contain classic/standard requests (not direct IMC requests)
+      const isClassic = (p: any) => String(p.routing_type || p.routingType || 'standard').toLowerCase() !== 'direct_imc';
+      const filtered = mapped.filter((p: any) => isClassic(p) && p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
       setMockRequests(filtered);
       setMockQueuePosts(filtered);
-      setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
-      setRejectedPosts(mapped.filter((p: any) => p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision'));
+      setDrafts(mapped.filter((p: any) => isClassic(p) && p.rawStatus === 'draft'));
+      setRejectedPosts(mapped.filter((p: any) => isClassic(p) && (p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision')));
     }
   }, [postsDataRes]);
 
@@ -756,9 +554,6 @@ export default function RequestorDashboard() {
 
   const isInitialLoading = isInitLoading;
 
-  // Pre-fetch ALL tab data in parallel while skeleton is showing
-  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'requestor';
-  usePrefetchAllTabs(rawRole, isInitialLoading);
 
   // Signal the HTML loading shell to fade out into real content
   useEffect(() => {
@@ -1198,8 +993,8 @@ export default function RequestorDashboard() {
     });
   };
 
-  const isLargeScreen = width > 1024;
-  const isTablet = width > 768;
+  const isLargeScreen = (workspaceWidth || width) >= 1080;
+  const isTablet = (workspaceWidth || width) >= 768;
 
   // Render a single stepper step
   const renderStep = (step: any, index: number, isLast: boolean) => {
@@ -1341,6 +1136,18 @@ export default function RequestorDashboard() {
       userPhotoUrl={profilePhotoUrl}
       onOpenPost={handleOpenPostById}
     >
+      <View nativeID="requestor-workspace" onLayout={(event) => setWorkspaceWidth(event.nativeEvent.layout.width)} style={{ width: '100%', minWidth: 0, gap: Spacing.lg }}>
+      {Platform.OS === 'web' && <style>{`
+        #requestor-workspace :is([role="button"], input, textarea, select):focus-visible { outline: 2px solid #4C007C !important; outline-offset: 2px; }
+        #requestor-request-details [role="button"]:focus-visible { outline: 2px solid #4C007C !important; outline-offset: 2px; }
+        #requestor-workspace input:focus, #requestor-workspace textarea:focus { border-color: #4C007C !important; }
+        :is(#requestor-workspace, #requestor-overview-range) input:is([type="date"], [type="time"]) { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-width: 0; box-sizing: border-box; }
+        #requestor-workspace [data-testid="requestor-submit"] [dir="auto"] { color: #1A1A2E !important; }
+        #requestor-workspace [data-testid="requestor-profile-upload"] [dir="auto"] { color: #1A1A2E !important; }
+        #requestor-workspace [role="button"] { transition: opacity 140ms ease, box-shadow 140ms ease; }
+        #requestor-workspace [role="button"]:hover { filter: brightness(.98); }
+        @media (prefers-reduced-motion: reduce) { #requestor-workspace [role="button"] { transition: none; } }
+      `}</style>}
       <Toast
         visible={toastVisible}
         title={toastTitle}
@@ -1373,260 +1180,18 @@ export default function RequestorDashboard() {
 
       {/* ----------------- REQUESTOR DASHBOARD TAB ----------------- */}
       {activeTab === 'dashboard' && dashboardViewMode !== 'modern' && (
-        <View style={styles.dashboardContainer}>
-          <View style={[styles.dashboardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start' }]}>
-            <View>
-              <Text style={[styles.welcomeTitle, !isTablet && { fontSize: 18 }]}>Welcome, {greetingUserName}</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Here is an overview of your department's content activity for this semester.
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <TouchableOpacity
-                style={[styles.createRequestBtnGold, !isTablet && { alignSelf: 'flex-start', justifyContent: 'center' }]}
-                onPress={() => setActiveTab('request')}
-              >
-                <Ionicons name="add" size={18} color={Colors.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={styles.createRequestBtnGoldText}>Create New Request</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Metrics Row */}
-
-
-          {/* Recent Post Requests Table */}
-          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
-            <View style={[styles.tableHeaderArea, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
-              <Text style={styles.tableCardTitle}>Recent Post Requests</Text>
-              <View style={[styles.tableHeaderActions, !isTablet && { flexDirection: 'column', gap: 8 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: isTablet ? 8 : 0, flex: isTablet ? undefined : 1, width: isTablet ? 200 : undefined, borderWidth: 1, borderColor: Colors.border }}>
-                  <Ionicons name="search" size={16} color={Colors.textSecondary} />
-                  <TextInput
-                    style={{ flex: 1, marginLeft: 8, fontSize: 14, color: Colors.textPrimary, ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
-                    placeholder="Search requests..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                </View>
-
-                <View ref={filterDropdownsRef} style={{ flexDirection: 'row', gap: 8 }}>
-                {activeTab === 'dashboard' ? (
-                  <View style={{ position: 'relative', zIndex: isStatusDropdownOpen ? 70 : 40, flex: isTablet ? undefined : 1 }}>
-                    <TouchableOpacity
-                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, cursor: 'pointer' as any }]}
-                      onPress={() => {
-                        setIsStatusDropdownOpen((prev) => !prev);
-                        setIsDateDropdownOpen(false);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.departmentDropdownText}>
-                        {statusFilter === 'All' ? 'All Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).toLowerCase()}
-                      </Text>
-                      <Ionicons
-                        name={isStatusDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
-                        size={14}
-                        color={Colors.textSecondary}
-                        style={{ marginLeft: 4 }}
-                      />
-                    </TouchableOpacity>
-
-                    {isStatusDropdownOpen && (
-                      <View style={[styles.dropdownMenu, { minWidth: 140, left: 0, right: 'auto', top: 40 }]}>
-                        {[{ label: 'All Status', value: 'All' }, { label: 'Pending', value: 'PENDING' }, { label: 'Approved', value: 'APPROVED' }].map((opt: any) => (
-                          <TouchableOpacity
-                            key={opt.value}
-                            style={styles.dropdownItem}
-                            onPress={() => {
-                              setStatusFilter(opt.value);
-                              setIsStatusDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={[styles.dropdownItemText, statusFilter === opt.value && { fontWeight: 'bold', color: Colors.primary }]}>{opt.label}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                ) : null}
-
-                <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 70 : 40, flex: isTablet ? undefined : 1 }}>
-                  <TouchableOpacity
-                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, cursor: 'pointer' as any }]}
-                    onPress={() => {
-                      setIsDateDropdownOpen((prev) => !prev);
-                      setIsStatusDropdownOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                    <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
-                    <Ionicons
-                      name={isDateDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
-                      size={14}
-                      color={Colors.textSecondary}
-                      style={{ marginLeft: 4 }}
-                    />
-                  </TouchableOpacity>
-
-                  {isDateDropdownOpen && (
-                    <View style={[styles.dropdownMenu, { minWidth: 200, right: 0, left: 'auto', top: 40 }]}>
-                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
-                        <TouchableOpacity
-                          key={opt}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setDateFilter(opt);
-                            if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
-                          }}
-                        >
-                          <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
-                        </TouchableOpacity>
-                      ))}
-
-                      {dateFilter === 'Custom Range' && (
-                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
-                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
-                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} />
-                          <TouchableOpacity
-                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
-                            onPress={() => setIsDateDropdownOpen(false)}
-                          >
-                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Table */}
-            <View style={[styles.table, !isTablet && { borderWidth: 0, backgroundColor: 'transparent' }]}>
-              {isTablet && (
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Request Title</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Category</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Platform</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Date</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Status</Text>
-                </View>
-              )}
-
-              {paginatedRequests.map((req) => {
-                const isDirectImc = String(req.routing_type || req.routingType || '').toLowerCase() === 'direct_imc';
-                return (
-                <TouchableOpacity key={req.id} style={[styles.tableRow, !isTablet && { flexDirection: 'column', alignItems: 'flex-start', padding: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border }]} onPress={() => setSelectedQueuePost(req)}>
-                  <View style={[styles.cellFlex2, styles.titleCellContainer, !isTablet && { width: '100%', marginBottom: 12 }]}>
-                    <View style={[styles.thumbnailPlaceholder, { backgroundColor: req.thumbnailBg }]}>
-                      {req.thumbnailUrl ? (
-                        <Image
-                          source={{ uri: req.thumbnailUrl }}
-                          style={{ width: '100%', height: '100%', borderRadius: 4 }}
-                          resizeMode="cover"
-                          onError={() => { }}
-                        />
-                      ) : (
-                        <Ionicons name={req.thumbnailIcon} size={16} color={Colors.textSecondary} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.postTitleText, !isTablet && { fontSize: 16, marginBottom: 4 }]} numberOfLines={2}>{req.title}</Text>
-                      {isDirectImc ? (
-                        <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
-                          Direct IMC request · click to view details
-                        </Text>
-                      ) : (
-                        !isTablet && <Text style={{ fontSize: 12, color: Colors.textSecondary }}>{req.other_category_name || req.category}</Text>
-                      )}
-                    </View>
-                  </View>
-                  
-                  {isTablet && (
-                    <Text style={[styles.tableCellText, styles.cellFlex1]}>
-                      {isDirectImc ? 'IMC Publication' : (req.other_category_name || req.category)}
-                    </Text>
-                  )}
-                  
-                  {isTablet && (
-                  <View style={[styles.cellFlex1, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                    {(Array.isArray(req.platforms) ? req.platforms : String(req.platforms || '').split(',')).map((p: any, idx: number) => {
-                      const platform = p.trim().toLowerCase();
-                      if (platform === 'facebook') return <Ionicons key={idx} name="logo-facebook" size={16} color="#1877F2" />;
-                      if (platform === 'instagram') return <Ionicons key={idx} name="logo-instagram" size={16} color="#E1306C" />;
-                      if (platform === 'twitter' || platform === 'x') return <Ionicons key={idx} name="logo-twitter" size={16} color="#1DA1F2" />;
-                      if (platform === 'linkedin') return <Ionicons key={idx} name="logo-linkedin" size={16} color="#0077B5" />;
-                      if (platform === 'tiktok') return <Ionicons key={idx} name="logo-tiktok" size={16} color="#000000" />;
-                      if (platform === 'youtube') return <Ionicons key={idx} name="logo-youtube" size={16} color="#FF0000" />;
-                      if (platform === 'website' || platform === 'web' || platform === 'portal' || platform === 'wordpress') return <Ionicons key={idx} name="globe-outline" size={16} color="#3B82F6" />;
-                      return <Text key={idx} style={styles.postPlatformsText}>{p}</Text>;
-                    })}
-                  </View>
-                  )}
-                  
-                  {!isTablet ? (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: 8 }}>
-                      <Text style={[styles.tableCellText, { fontSize: 12, color: Colors.textSecondary }]}>
-                        {isDirectImc ? req.directDate : req.date}
-                      </Text>
-                      {isDirectImc ? (
-                        <View style={{ backgroundColor: req.directStatusBg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: req.directStatusColor }}>
-                            {req.directStatusLabel}
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
-                          <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
-                            {req.status}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  ) : (
-                    <>
-                      <Text style={[styles.tableCellText, styles.cellFlex1]}>
-                        {isDirectImc ? req.directDate : req.date}
-                      </Text>
-                      <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
-                        {isDirectImc ? (
-                          <View style={{ backgroundColor: req.directStatusBg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: req.directStatusColor }}>
-                              {req.directStatusLabel}
-                            </Text>
-                          </View>
-                        ) : (
-                          <View style={[styles.statusBadge, { backgroundColor: req.statusBg }]}>
-                            <Text style={[styles.statusBadgeText, { color: req.statusColor }]}>
-                              {req.status}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </>
-                  )}
-                </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <PaginationControl
-              currentPage={dashboardPage}
-              totalItems={filteredRequests.length}
-              itemsPerPage={dashboardPerPage}
-              onPageChange={setDashboardPage}
-              onItemsPerPageChange={setDashboardPerPage}
-              itemName="requests"
-            />
-          </Card>
-        </View>
+        <RequestorOverview
+          userName={greetingUserName}
+          requests={mockRequests}
+          loading={isInitLoading}
+          error={isPostsError}
+          state={overviewState}
+          onStateChange={setOverviewState}
+          onCreate={() => setActiveTab('request')}
+          onOpen={setSelectedQueuePost}
+          onRetry={() => { void refetchPosts(); }}
+        />
       )}
-
       {/* ----------------- REQUEST TYPE SELECTOR TAB ----------------- */}
       {activeTab === 'request' && dashboardViewMode !== 'modern' && (
         <RequestTypeSelector
@@ -1647,10 +1212,11 @@ export default function RequestorDashboard() {
 
       {/* ----------------- CREATE NEW REQUEST TAB (STANDARD WORKFLOW FORM) ----------------- */}
       {activeTab === 'post-requests' && dashboardViewMode !== 'modern' && (
-        <View style={styles.formContainer}>
-          <View style={styles.topActionRow}>
+        <View nativeID="requestor-standard-form" style={styles.formContainer}>
+          <View style={[styles.topActionRow, !isLargeScreen && { flexDirection: 'column', alignItems: 'stretch' }]}>
             <View style={styles.breadcrumbColumn}>
               <TouchableOpacity
+                accessibilityRole="button" accessibilityLabel="Back to request types"
                 onPress={() => setActiveTab('request')}
                 activeOpacity={0.7}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}
@@ -1665,8 +1231,9 @@ export default function RequestorDashboard() {
                 Submit your content for review by the departmental approval committee.
               </Text>
             </View>
-            <View style={styles.actionButtonsContainer}>
+            <View style={[styles.actionButtonsContainer, !isLargeScreen && { width: '100%' }]}>
               <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.draftButton, { borderColor: '#581C87' }]}
                 onPress={() => setActiveTab('request')}
                 activeOpacity={0.8}
@@ -1675,6 +1242,7 @@ export default function RequestorDashboard() {
                 <Text style={[styles.draftButtonText, { color: '#581C87' }]}>Change Request Type</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.draftButton, (isSavingDraft || isSubmittingRequest) && styles.actionButtonDisabled]}
                 onPress={handleSaveDraft}
                 disabled={isSavingDraft || isSubmittingRequest}
@@ -1683,6 +1251,7 @@ export default function RequestorDashboard() {
                 <Text style={styles.draftButtonText}>{isSavingDraft ? 'Saving...' : 'Save as Draft'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="requestor-submit" accessibilityRole="button"
                 style={[styles.submitButton, (isSubmittingRequest || isSavingDraft) && styles.actionButtonDisabled]}
                 onPress={handleSubmitRequest}
                 disabled={isSubmittingRequest || isSavingDraft}
@@ -1740,7 +1309,7 @@ export default function RequestorDashboard() {
           <View style={{ gap: 16 }}>
             {/* ROW 1 */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
-              <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
                 {/* Basic Information Card */}
                 <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
                   <View style={styles.cardHeader}>
@@ -1755,6 +1324,7 @@ export default function RequestorDashboard() {
                       REQUEST TITLE <Text style={{ color: '#EF4444' }}>*</Text>
                     </Text>
                     <TextInput
+                      accessibilityLabel="Request title" {...(Platform.OS === 'web' ? { 'aria-required': true } : {})}
                       style={[styles.textInput, { borderRadius: 8, height: 42, paddingHorizontal: 14 }]}
                       placeholder="e.g., Campus Event Announcement"
                       placeholderTextColor="#94A3B8"
@@ -1772,7 +1342,7 @@ export default function RequestorDashboard() {
                 </Card>
               </View>
 
-              <View style={styles.rightColumn}>
+              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -1782,7 +1352,7 @@ export default function RequestorDashboard() {
                   </View>
 
                   <View style={styles.platformsList}>
-                    <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('facebook')}>
+                    <TouchableOpacity accessibilityRole="checkbox" accessibilityLabel="Facebook" accessibilityState={{ checked: platforms.facebook }} {...(Platform.OS === 'web' ? { 'aria-checked': platforms.facebook } : {})} style={styles.platformRow} onPress={() => togglePlatform('facebook')}>
                       <View style={styles.platformLeft}>
                         <View style={[styles.platformIconBg, { backgroundColor: '#EFF6FF' }]}>
                           <Ionicons name="logo-facebook" size={18} color="#1877F2" />
@@ -1802,7 +1372,7 @@ export default function RequestorDashboard() {
                           </View>
                           {platformAvailability.facebook?.configured === false && (
                             <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
-                              Facebook Page Token not configured in Admin.
+                              Facebook publishing needs setup. Contact the IT Office.
                             </Text>
                           )}
                         </View>
@@ -1812,7 +1382,7 @@ export default function RequestorDashboard() {
                       </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.platformRow} onPress={() => togglePlatform('instagram')}>
+                    <TouchableOpacity accessibilityRole="checkbox" accessibilityLabel="Instagram" accessibilityState={{ checked: platforms.instagram }} {...(Platform.OS === 'web' ? { 'aria-checked': platforms.instagram } : {})} style={styles.platformRow} onPress={() => togglePlatform('instagram')}>
                       <View style={styles.platformLeft}>
                         <View style={[styles.platformIconBg, { backgroundColor: '#FDF2F8' }]}>
                           <Ionicons name="logo-instagram" size={18} color="#E1306C" />
@@ -1832,7 +1402,7 @@ export default function RequestorDashboard() {
                           </View>
                           {platformAvailability.instagram?.configured === false && (
                             <Text style={{ fontSize: 10, color: '#D97706', marginTop: 1 }}>
-                              Instagram Token not configured in Admin.
+                              Instagram publishing needs setup. Contact the IT Office.
                             </Text>
                           )}
                         </View>
@@ -1843,6 +1413,7 @@ export default function RequestorDashboard() {
                     </TouchableOpacity>
 
                     <TouchableOpacity 
+                      accessibilityRole="checkbox" accessibilityLabel="Website" accessibilityState={{ checked: platforms.portal }} {...(Platform.OS === 'web' ? { 'aria-checked': platforms.portal } : {})}
                       style={[
                         styles.platformRow,
                         (platformAvailability.wordpress?.configured !== true) && {
@@ -1871,7 +1442,7 @@ export default function RequestorDashboard() {
                           </View>
                           {platformAvailability.wordpress?.configured !== true && (
                             <Text style={{ fontSize: 10, color: '#D97706', marginTop: 2 }}>
-                              Requires WordPress API / credentials setup in Admin Platform Tokens.
+                              Website publishing needs setup. Contact the IT Office.
                             </Text>
                           )}
                         </View>
@@ -1887,7 +1458,7 @@ export default function RequestorDashboard() {
 
             {/* ROW 2 */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
-              <View style={[styles.leftColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -1968,7 +1539,7 @@ export default function RequestorDashboard() {
                 </Card>
               </View>
 
-              <View style={styles.rightColumn}>
+              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -1983,6 +1554,7 @@ export default function RequestorDashboard() {
                       {Platform.OS === 'web' ? (
                         <input
                           type="date"
+                          aria-label="Publication date"
                           value={publishDate ? publishDate.split('/').reverse().join('-') : ''}
                           onChange={(e: any) => {
                             const val = e.target.value;
@@ -1998,7 +1570,7 @@ export default function RequestorDashboard() {
                             border: 'none',
                             outline: 'none',
                             fontSize: '14px',
-                            fontFamily: 'inherit',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                             color: Colors.textPrimary,
                             padding: '12px 40px 12px 16px',
                             background: 'transparent',
@@ -2026,6 +1598,7 @@ export default function RequestorDashboard() {
                       {Platform.OS === 'web' ? (
                         <input
                           type="time"
+                          aria-label="Publication time (optional)"
                           value={publishTime}
                           onChange={(e: any) => setPublishTime(e.target.value)}
                           style={{
@@ -2033,7 +1606,7 @@ export default function RequestorDashboard() {
                             border: 'none',
                             outline: 'none',
                             fontSize: '14px',
-                            fontFamily: 'inherit',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                             color: Colors.textPrimary,
                             padding: '12px 40px 12px 16px',
                             background: 'transparent',
@@ -2066,7 +1639,7 @@ export default function RequestorDashboard() {
 
             {/* ROW 3 */}
             <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              <View style={styles.leftColumn}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -2417,7 +1990,7 @@ export default function RequestorDashboard() {
                 </Card>
               </View>
 
-              <View style={styles.rightColumn}>
+              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <TouchableOpacity
@@ -2860,7 +2433,7 @@ export default function RequestorDashboard() {
 
           <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
             {/* Left settings card */}
-            <View style={styles.leftColumn}>
+            <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn]}>
               <Card style={styles.formCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerIconWrapper}>
@@ -2884,7 +2457,7 @@ export default function RequestorDashboard() {
                     <Text style={styles.profilePicTitle}>Profile Picture</Text>
                     <Text style={styles.profilePicSubtitle}>PNG or JPG formats supported. Max 2MB file size.</Text>
                     <View style={styles.profilePicButtonsRow}>
-                      <TouchableOpacity style={styles.profilePicUploadBtn} onPress={handleUploadPhoto} disabled={uploadingPhoto}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Upload new profile photo" testID="requestor-profile-upload" style={styles.profilePicUploadBtn} onPress={handleUploadPhoto} disabled={uploadingPhoto}>
                         <Text style={styles.profilePicUploadBtnText}>{uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}</Text>
                       </TouchableOpacity>
                       {profilePhotoUrl && (
@@ -2898,46 +2471,46 @@ export default function RequestorDashboard() {
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>FULL NAME</Text>
-                  <TextInput style={styles.textInput} value={acctFullName} onChangeText={setAcctFullName} />
+                  <TextInput accessibilityLabel="Full name" style={styles.textInput} value={acctFullName} onChangeText={setAcctFullName} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.email ?? ''} editable={false} />
+                  <TextInput accessibilityLabel="Email address" style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.email ?? ''} editable={false} />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.department || ''} editable={false} />
+                  <TextInput accessibilityLabel="Department" style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.department || ''} editable={false} />
                 </View>
 
-                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleSaveDetails} disabled={savingAcct}>
+                <TouchableOpacity accessibilityRole="button" style={styles.profileSaveButton} onPress={handleSaveDetails} disabled={savingAcct}>
                   <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Saving...' : 'Save Details'}</Text>
                 </TouchableOpacity>
               </Card>
             </View>
 
             {/* Right settings card */}
-            <View style={styles.rightColumn}>
+            <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn]}>
               <Card style={styles.configCard}>
                 <Text style={styles.configCardTitle}>Update Password</Text>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
-                  <TextInput style={styles.textInput} secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} placeholder="Enter current password" />
+                  <TextInput accessibilityLabel="Current password" style={styles.textInput} secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} placeholder="Enter current password" />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>NEW PASSWORD</Text>
-                  <TextInput style={styles.textInput} secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} placeholder="Enter new password" />
+                  <TextInput accessibilityLabel="New password" style={styles.textInput} secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} placeholder="Enter new password" />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                  <TextInput style={styles.textInput} secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
+                  <TextInput accessibilityLabel="Confirm password" style={styles.textInput} secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
                 </View>
 
-                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleChangePw} disabled={savingAcctPw}>
+                <TouchableOpacity accessibilityRole="button" style={styles.profileSaveButton} onPress={handleChangePw} disabled={savingAcctPw}>
                   <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcctPw ? 'Changing...' : 'Change Password'}</Text>
                 </TouchableOpacity>
               </Card>
@@ -2958,1435 +2531,33 @@ export default function RequestorDashboard() {
 
       {/* ----------------- POLICY & RULES TAB ----------------- */}
       {activeTab === 'policy-rules' && (
-        <PolicyRulesView accentColor="#0B2545" />
+        <PolicyRulesView accentColor="#4C007C" />
       )}
 
       {/* ----------------- DRAFTS TAB ----------------- */}
       {(activeTab === 'draft' || activeTab === 'drafts') && (
-        <View style={styles.dashboardContainer}>
-          <View style={styles.dashboardHeaderRow}>
-            <View style={{ flex: 1, maxWidth: '100%' }}>
-              <Text style={styles.welcomeTitle}>Draft Post Requests</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Manage your saved post request drafts. You can edit, update, or submit them for approval.
-              </Text>
-            </View>
-          </View>
-
-          {drafts.length === 0 ? (
-            <Card style={styles.formCard}>
-              <View style={{ alignItems: 'center', padding: Spacing.xl, gap: Spacing.sm }}>
-                <Ionicons name="create-outline" size={48} color={Colors.textMuted} />
-                <Text style={styles.cardTitle}>No Saved Drafts</Text>
-                <Text style={styles.welcomeSubtitle}>You don't have any saved drafts right now.</Text>
-                <TouchableOpacity
-                  style={[styles.createRequestBtnGold, { marginTop: Spacing.sm }]}
-                  onPress={() => setActiveTab('request')}
-                >
-                  <Text style={styles.createRequestBtnGoldText}>Start a New Request</Text>
-                </TouchableOpacity>
-              </View>
-            </Card>
-          ) : (
-            <Card style={styles.tableCard}>
-              <View style={styles.table}>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex2]}>Request Title</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Category</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Date Saved</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1]}>Status</Text>
-                  <Text style={[styles.tableHeaderCell, styles.cellFlex1, styles.alignRight]}>Actions</Text>
-                </View>
-
-                {drafts.map((draft) => (
-                  <TouchableOpacity key={draft.id} style={styles.tableRow} onPress={() => handleEditDraft(draft)}>
-                    <View style={[styles.cellFlex2, styles.titleCellContainer]}>
-                      <View style={[styles.thumbnailPlaceholder, { backgroundColor: draft.thumbnailBg || '#F1F5F9' }]}>
-                        {draft.thumbnailUrl ? (
-                          <Image
-                            source={{ uri: draft.thumbnailUrl }}
-                            style={{ width: '100%', height: '100%', borderRadius: 4 }}
-                            resizeMode="cover"
-                            onError={() => { }}
-                          />
-                        ) : (
-                          <Ionicons name={draft.thumbnailIcon || "document-text-outline"} size={16} color={Colors.textSecondary} />
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.postTitleText}>{draft.title}</Text>
-                        <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textSecondary, marginTop: 4 }}>
-                          {draft.caption ? draft.caption : 'No caption provided'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{draft.category}</Text>
-                    <Text style={[styles.tableCellText, styles.cellFlex1]}>{draft.dateSaved}</Text>
-                    <View style={[styles.cellFlex1, { flexDirection: 'row' }]}>
-                      <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9' }]}>
-                        <Text style={[styles.statusBadgeText, { color: '#475569' }]}>DRAFT</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.cellFlex1, styles.actionsCell, { gap: 8, justifyContent: 'flex-end' }]}>
-                      <TouchableOpacity onPress={() => handleEditDraft(draft)} style={{ paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#FFC72C', borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Ionicons name="create-outline" size={14} color="#1A1A2E" />
-                        <Text style={{ color: '#1A1A2E', fontSize: 11, fontWeight: 'bold' }}>Edit & Submit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDeleteDraft(draft.id); }} style={{ padding: 6, backgroundColor: '#FEF2F2', borderRadius: 6, borderWidth: 1, borderColor: '#FCA5A5' }}>
-                        <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </Card>
-          )}
-        </View>
+        <RequestorDrafts
+          drafts={drafts}
+          loading={isInitLoading}
+          error={isPostsError}
+          onCreate={() => setActiveTab('request')}
+          onEdit={handleEditDraft}
+          onDelete={handleDeleteDraft}
+          onRetry={() => { void refetchPosts(); }}
+        />
       )}
-
       {/* ----------------- REJECTED TAB ----------------- */}
       {(activeTab === 'rejected' || activeTab === 'rejected-requests') && (
-        <View style={styles.dashboardContainer}>
-          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
-            <View style={[styles.tableHeaderArea, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
-              <Text style={styles.tableCardTitle}>Rejected Requests</Text>
-
-              <View style={[styles.tableHeaderActions, !isTablet && { flexDirection: 'column', gap: 8 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: isTablet ? 8 : 0, width: isTablet ? 220 : '100%', borderWidth: 1, borderColor: Colors.border }}>
-                  <Ionicons name="search" size={16} color={Colors.textSecondary} />
-                  <TextInput
-                    style={{ flex: 1, marginLeft: 8, fontSize: 13, color: Colors.textPrimary, ...((Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) as any) }}
-                    placeholder="Search requests..."
-                    value={rejectedSearchQuery}
-                    onChangeText={setRejectedSearchQuery}
-                  />
-                </View>
-
-                <View ref={rejectedDropdownRef} style={{ position: 'relative', zIndex: isRejectedDateDropdownOpen ? 70 : 40 }}>
-                  <TouchableOpacity
-                    style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, cursor: 'pointer' as any }]}
-                    onPress={() => setIsRejectedDateDropdownOpen(!isRejectedDateDropdownOpen)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                    <Text style={styles.departmentDropdownText}>{rejectedDateFilter}</Text>
-                    <Ionicons
-                      name={isRejectedDateDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
-                      size={14}
-                      color={Colors.textSecondary}
-                      style={{ marginLeft: 4 }}
-                    />
-                  </TouchableOpacity>
-
-                  {isRejectedDateDropdownOpen && (
-                    <View style={[styles.dropdownMenu, { minWidth: 200, right: 0, top: 40 }]}>
-                      {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
-                        <TouchableOpacity
-                          key={opt}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setRejectedDateFilter(opt);
-                            if (opt !== 'Custom Range') setIsRejectedDateDropdownOpen(false);
-                          }}
-                        >
-                          <Text style={[styles.dropdownItemText, rejectedDateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
-                        </TouchableOpacity>
-                      ))}
-
-                      {rejectedDateFilter === 'Custom Range' && (
-                        <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
-                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customRejectedStartDate} onChange={(e) => setCustomRejectedStartDate(e.target.value)} />
-                          <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
-                          <input type="date" style={{ height: 32, fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', paddingLeft: 8, paddingRight: 8, outline: 'none', backgroundColor: '#fff', width: '100%', marginBottom: 8 }} value={customRejectedEndDate} onChange={(e) => setCustomRejectedEndDate(e.target.value)} />
-                          <TouchableOpacity
-                            style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
-                            onPress={() => setIsRejectedDateDropdownOpen(false)}
-                          >
-                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {filteredRejectedPosts.length === 0 ? (
-              <Card style={styles.formCard}>
-                <View style={{ alignItems: 'center', padding: Spacing.xl, gap: Spacing.sm }}>
-                  <Ionicons name="checkmark-circle-outline" size={48} color="#16A34A" />
-                  <Text style={styles.cardTitle}>No Rejected Requests</Text>
-                  <Text style={styles.welcomeSubtitle}>All of your submitted requests have passed or are currently in review.</Text>
-                </View>
-              </Card>
-            ) : (
-              <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ width: '100%', minWidth: isTablet ? '100%' : 920 }}>
-                  <View style={[styles.table, { width: '100%', minWidth: isTablet ? '100%' : 920 }]}>
-                    <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
-                      <Text style={[styles.tableHeaderCell, styles.flexDept]}>REJECTED BY & REASON</Text>
-                      <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
-                      <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
-                      <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
-                    </View>
-                    {paginatedRejectedPosts.map((post) => (
-                      <TouchableOpacity
-                        key={post.id}
-                        style={styles.tableRow}
-                        activeOpacity={0.7}
-                        onPress={() => setSelectedQueuePost(post)}
-                      >
-                        {/* REQUEST TITLE + CATEGORY TAG */}
-                        <View style={[styles.cellContainer, styles.flexTitle]}>
-                          <View style={styles.thumbnailBox}>
-                            {post.thumbnailUrl ? (
-                              <Image source={{ uri: post.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
-                            ) : (
-                              <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
-                            )}
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.rowTitleText}>{post.title}</Text>
-                            <View style={styles.categoryPill}>
-                              <Text style={styles.categoryPillText}>{post.other_category_name || post.category}</Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* REJECTED BY & REASON */}
-                        <View style={[styles.cellContainer, styles.flexDept]}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Ionicons name="close-circle" size={14} color="#DC2626" />
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
-                              {post.rejectedBy || 'Approver Rejected'}
-                            </Text>
-                          </View>
-                          <Text numberOfLines={2} style={{ fontSize: 11, color: Colors.textSecondary, marginTop: 2 }}>
-                            {post.rejectionReason || 'No specific reason provided.'}
-                          </Text>
-                        </View>
-
-                        {/* REQUESTED ON */}
-                        <View style={[styles.cellContainer, styles.flexDate]}>
-                          <Text style={styles.rowDateText}>{post.date}</Text>
-                          <Text style={styles.rowTimeText}>{post.time}</Text>
-                        </View>
-
-                        {/* PLATFORMS */}
-                        <View style={[styles.cellContainer, styles.flexPlatforms, { flexDirection: 'row', gap: 6, justifyContent: 'flex-start' }]}>
-                          {(post.platforms || []).includes('facebook') && (
-                            <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
-                              <Ionicons name="logo-facebook" size={13} color="#1877F2" />
-                            </View>
-                          )}
-                          {(post.platforms || []).includes('instagram') && (
-                            <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
-                              <Ionicons name="logo-instagram" size={13} color="#E1306C" />
-                            </View>
-                          )}
-                          {((post.platforms || []).includes('website') || (post.platforms || []).includes('portal') || (post.platforms || []).includes('wordpress')) && (
-                            <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                              <Ionicons name="globe-outline" size={13} color="#059669" />
-                            </View>
-                          )}
-                        </View>
-
-                        {/* ACTIONS */}
-                        <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup, { justifyContent: 'flex-end', gap: 6 }]}>
-                          <TouchableOpacity
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setSelectedQueuePost(post);
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 8,
-                              paddingVertical: 5,
-                              borderRadius: 6,
-                              backgroundColor: '#F3F4F6',
-                              borderWidth: 1,
-                              borderColor: '#E5E7EB',
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons name="eye-outline" size={13} color="#374151" />
-                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#374151' }}>Reason</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-
-                <PaginationControl
-                  currentPage={rejectedPage}
-                  totalItems={filteredRejectedPosts.length}
-                  itemsPerPage={rejectedPerPage}
-                  onPageChange={setRejectedPage}
-                />
-              </>
-            )}
-          </Card>
-        </View>
+        <RequestorRejected
+          requests={rejectedPosts}
+          loading={isInitLoading}
+          error={isPostsError}
+          onOpen={setSelectedQueuePost}
+          onRetry={() => { void refetchPosts(); }}
+        />
       )}
-
-
-
-      {/* Review Comments Modal (Separated: Direct IMC vs Old Flow) */}
-      {selectedQueuePost && (String(selectedQueuePost.routing_type || selectedQueuePost.rawPost?.routing_type || '').toLowerCase() === 'direct_imc' ? (() => {
-        const rawSt = String(selectedQueuePost.rawStatus || selectedQueuePost.rawPost?.status || '').toLowerCase();
-        const isApprovedOrPublished =
-          rawSt === 'approved' || rawSt === 'published' || rawSt === 'scheduled';
-        const isRejected =
-          rawSt === 'rejected' || rawSt === 'returned_for_revision';
-        const statusLabel = isApprovedOrPublished
-          ? 'Published'
-          : isRejected
-          ? 'Rejected'
-          : rawSt === 'under_review' || rawSt === 'reviewing'
-          ? 'Reviewing'
-          : 'Pending';
-        const badgeBg = isApprovedOrPublished
-          ? '#DCFCE7'
-          : isRejected
-          ? '#FEE2E2'
-          : statusLabel === 'Reviewing'
-          ? '#EDE9FE'
-          : '#FEF3C7';
-        const badgeText = isApprovedOrPublished
-          ? '#166534'
-          : isRejected
-          ? '#991B1B'
-          : statusLabel === 'Reviewing'
-          ? '#5B21B6'
-          : '#92400E';
-
-        const platformsList =
-          Array.isArray(selectedQueuePost.platforms) && selectedQueuePost.platforms.length > 0
-            ? selectedQueuePost.platforms
-            : ['facebook'];
-
-        const checklist =
-          selectedQueuePost?.rawPost?.imc_branding_checklist ||
-          selectedQueuePost?.imc_branding_checklist ||
-          null;
-        const originalCaptionText =
-          checklist?.original_caption || selectedQueuePost.caption || 'No caption provided.';
-        const refinedCaptionText =
-          checklist?.refined_caption || selectedQueuePost.caption || 'No caption provided.';
-
-        const rawMediaList =
-          Array.isArray(checklist?.original_media) && checklist.original_media.length > 0
-            ? checklist.original_media
-            : selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [];
-        const validUris = getImageUrisFromMedia(Array.isArray(rawMediaList) ? rawMediaList : []);
-        const directImageUris = validUris.length > 0
-          ? validUris
-          : (selectedQueuePost?.thumbnailUrl ? [resolveImageUrl(selectedQueuePost.thumbnailUrl) || selectedQueuePost.thumbnailUrl] : []);
-
-        const hasReplacementFinalMedia =
-          Boolean(checklist?.has_replacement_media) ||
-          (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0);
-        const rawFinalMedia =
-          Array.isArray(checklist?.final_media) && checklist.final_media.length > 0
-            ? checklist.final_media
-            : checklist?.has_replacement_media
-            ? (selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [])
-            : [];
-        const finalReplacementImageUris = getImageUrisFromMedia(Array.isArray(rawFinalMedia) ? rawFinalMedia : []);
-        const activePreviewImageUris =
-          isApprovedOrPublished && finalReplacementImageUris.length > 0
-            ? finalReplacementImageUris
-            : directImageUris;
-
-        const safeCarouselIdx =
-          activePreviewImageUris.length > 0
-            ? Math.min(directModalCarouselIdx, activePreviewImageUris.length - 1)
-            : 0;
-
-        const additionalInstructions =
-          selectedQueuePost.rawPost?.additional_instructions ||
-          selectedQueuePost.rawPost?.remarks ||
-          (selectedQueuePost.preferred_schedule_at
-            ? `Preferred publication schedule: ${selectedQueuePost.preferred_schedule_at}`
-            : 'Please use the attached poster and retain the official college branding.');
-
-        const requestedByName =
-          selectedQueuePost.rawPost?.requestor?.full_name ||
-          user?.full_name ||
-          greetingUserName;
-
-        const displayDate = selectedQueuePost.directDate || selectedQueuePost.date;
-
-        const closeDirectModal = () => {
-          setSelectedQueuePost(null);
-          router.setParams({ postId: '' });
-        };
-
-        return (
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={true}
-            onRequestClose={closeDirectModal}
-          >
-            <View style={styles.modalOverlay}>
-              <View
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 16,
-                  width: '100%',
-                  maxWidth: 1080,
-                  maxHeight: '92%',
-                  padding: 0,
-                  overflow: 'hidden',
-                  ...(Platform.OS === 'web'
-                    ? { boxShadow: '0 8px 30px rgba(0, 0, 0, 0.15)' }
-                    : { elevation: 5 }),
-                }}
-              >
-                {/* Modal Header */}
-                <View
-                  style={{
-                    paddingHorizontal: 28,
-                    paddingVertical: 18,
-                    borderBottomWidth: 1,
-                    borderBottomColor: '#E2E8F0',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <View style={{ flex: 1, paddingRight: 16 }}>
-                    <Text style={{ fontSize: 19, fontWeight: '800', color: '#0F172A' }}>
-                      Request Details
-                    </Text>
-                    <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 2 }}>
-                      Direct IMC publication request · {displayDate}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={{
-                      backgroundColor: badgeBg,
-                      paddingHorizontal: 14,
-                      paddingVertical: 6,
-                      borderRadius: 999,
-                    }}
-                  >
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: badgeText }}>
-                      {statusLabel}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Scrollable Body */}
-                <ScrollView
-                  style={{ flexShrink: 1, backgroundColor: '#F8FAFC' }}
-                  contentContainerStyle={{ padding: 24 }}
-                  showsVerticalScrollIndicator={true}
-                >
-                  {/* TRACKING Card */}
-                  <View
-                    style={{
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 14,
-                      padding: 20,
-                      marginBottom: 20,
-                      backgroundColor: '#FFFFFF',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: '700',
-                        color: '#64748B',
-                        letterSpacing: 0.8,
-                        textTransform: 'uppercase',
-                        marginBottom: 16,
-                      }}
-                    >
-                      TRACKING
-                    </Text>
-
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'flex-start',
-                        justifyContent: 'center',
-                        maxWidth: 640,
-                        alignSelf: 'center',
-                        width: '100%',
-                      }}
-                    >
-                      {/* Step 1: Submitted */}
-                      <View style={{ alignItems: 'center', width: 100 }}>
-                        <View
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 20,
-                            backgroundColor: '#DCFCE7',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 30,
-                              height: 30,
-                              borderRadius: 15,
-                              backgroundColor: '#10B981',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                          </View>
-                        </View>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: '700',
-                            color: '#0F172A',
-                            marginTop: 8,
-                            textAlign: 'center',
-                          }}
-                        >
-                          Submitted
-                        </Text>
-                      </View>
-
-                      {/* Connector 1 */}
-                      <View
-                        style={{
-                          flex: 1,
-                          height: 2,
-                          backgroundColor: isApprovedOrPublished ? '#10B981' : '#E2E8F0',
-                          marginTop: 20,
-                          marginHorizontal: -12,
-                        }}
-                      />
-
-                      {/* Step 2: IMC Review */}
-                      <View style={{ alignItems: 'center', width: 110 }}>
-                        {isApprovedOrPublished ? (
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              backgroundColor: '#DCFCE7',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: 15,
-                                backgroundColor: '#10B981',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                            </View>
-                          </View>
-                        ) : isRejected ? (
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              backgroundColor: '#FEE2E2',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: 15,
-                                backgroundColor: '#EF4444',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Ionicons name="close" size={16} color="#FFFFFF" />
-                            </View>
-                          </View>
-                        ) : (
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              backgroundColor: '#FEF9C3',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: 15,
-                                borderWidth: 1.5,
-                                borderColor: '#D97706',
-                                backgroundColor: '#FFFBEB',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Ionicons name="time-outline" size={16} color="#D97706" />
-                            </View>
-                          </View>
-                        )}
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: '700',
-                            color: '#0F172A',
-                            marginTop: 8,
-                            textAlign: 'center',
-                          }}
-                        >
-                          IMC Review
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: '700',
-                            color: isApprovedOrPublished
-                              ? '#10B981'
-                              : isRejected
-                              ? '#EF4444'
-                              : '#B45309',
-                            marginTop: 2,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {isApprovedOrPublished ? 'Approved' : isRejected ? 'Rejected' : statusLabel}
-                        </Text>
-                      </View>
-
-                      {/* Connector 2 */}
-                      <View
-                        style={{
-                          flex: 1,
-                          height: 2,
-                          backgroundColor: isApprovedOrPublished ? '#10B981' : '#E2E8F0',
-                          marginTop: 20,
-                          marginHorizontal: -12,
-                        }}
-                      />
-
-                      {/* Step 3: Published */}
-                      <View style={{ alignItems: 'center', width: 100 }}>
-                        {isApprovedOrPublished ? (
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              backgroundColor: '#DCFCE7',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: 15,
-                                backgroundColor: '#10B981',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                            </View>
-                          </View>
-                        ) : (
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              backgroundColor: '#F1F5F9',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: 15,
-                                borderWidth: 1.5,
-                                borderColor: '#94A3B8',
-                                backgroundColor: '#F8FAFC',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Ionicons name="time-outline" size={16} color="#64748B" />
-                            </View>
-                          </View>
-                        )}
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: '700',
-                            color: '#0F172A',
-                            marginTop: 8,
-                            textAlign: 'center',
-                          }}
-                        >
-                          Published
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: '700',
-                            color: isApprovedOrPublished ? '#10B981' : '#64748B',
-                            marginTop: 2,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {isApprovedOrPublished ? 'Published' : 'Waiting'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Two-Column Main Grid */}
-                  <View
-                    style={{
-                      flexDirection: isLargeScreen ? 'row' : 'column',
-                      gap: 20,
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    {/* Left Column Card: Submitted Materials & Live Preview */}
-                    <View
-                      style={{
-                        flex: 1,
-                        width: '100%',
-                        borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                        borderRadius: 14,
-                        padding: 20,
-                        backgroundColor: '#FFFFFF',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 15.5,
-                          fontWeight: '800',
-                          color: '#0F172A',
-                          marginBottom: 14,
-                        }}
-                      >
-                        Submitted Materials
-                      </Text>
-
-                      {/* Target Platforms */}
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '700',
-                          color: '#334155',
-                          marginBottom: 8,
-                        }}
-                      >
-                        Target Platforms
-                      </Text>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          flexWrap: 'wrap',
-                          gap: 8,
-                          marginBottom: 16,
-                        }}
-                      >
-                        {platformsList.map((plat: any, idx: number) => {
-                          const pKey = String(plat).toLowerCase();
-                          const label =
-                            pKey === 'facebook'
-                              ? 'Facebook'
-                              : pKey === 'instagram'
-                              ? 'Instagram'
-                              : pKey === 'website' || pKey === 'portal' || pKey === 'wordpress'
-                              ? 'Website'
-                              : String(plat);
-                          const iconName =
-                            pKey === 'facebook'
-                              ? 'logo-facebook'
-                              : pKey === 'instagram'
-                              ? 'logo-instagram'
-                              : 'globe-outline';
-                          const iconColor =
-                            pKey === 'instagram' ? '#9D174D' : '#4C1D95';
-
-                          return (
-                            <View
-                              key={`${pKey}-${idx}`}
-                              style={{
-                                backgroundColor: '#F5F3FF',
-                                borderWidth: 1,
-                                borderColor: '#DDD6FE',
-                                borderRadius: 999,
-                                paddingHorizontal: 12,
-                                paddingVertical: 5,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                              }}
-                            >
-                              <Ionicons name={iconName as any} size={13} color={iconColor} />
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: '700',
-                                  color: '#1E1B4B',
-                                }}
-                              >
-                                {label}
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-
-                      {/* Original Caption */}
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '700',
-                          color: '#334155',
-                          marginBottom: 6,
-                        }}
-                      >
-                        Original Caption
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          borderRadius: 10,
-                          padding: 14,
-                          marginBottom: 16,
-                        }}
-                      >
-                        <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
-                          {originalCaptionText}
-                        </FormattedText>
-                      </View>
-
-                      {/* Additional Instructions */}
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '700',
-                          color: '#334155',
-                          marginBottom: 6,
-                        }}
-                      >
-                        Additional Instructions
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          borderRadius: 10,
-                          padding: 14,
-                          marginBottom: 16,
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
-                          {additionalInstructions}
-                        </Text>
-                      </View>
-
-                      {/* Uploaded Photos · N */}
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '700',
-                          color: '#334155',
-                          marginBottom: 8,
-                        }}
-                      >
-                        Uploaded Photos · {directImageUris.length}
-                      </Text>
-                      {directImageUris.length > 0 ? (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            flexWrap: 'wrap',
-                            gap: 12,
-                            marginBottom: 20,
-                          }}
-                        >
-                          {directImageUris.map((uri: string, idx: number) => {
-                            const mediaObj = rawMediaList?.[idx];
-                            const fileName =
-                              mediaObj?.original_name ||
-                              mediaObj?.file_name ||
-                              uri.split('/').pop()?.split('?')[0] ||
-                              `photo-${String(idx + 1).padStart(2, '0')}.jpg`;
-                            return (
-                              <TouchableOpacity
-                                key={idx}
-                                activeOpacity={0.85}
-                                onPress={() => setFullScreenImage(uri)}
-                                style={{
-                                  width: '48%',
-                                  flexGrow: 1,
-                                  borderWidth: 1,
-                                  borderColor: '#E2E8F0',
-                                  borderRadius: 10,
-                                  overflow: 'hidden',
-                                  backgroundColor: '#FFFFFF',
-                                }}
-                              >
-                                <Image
-                                  source={{ uri }}
-                                  style={{ width: '100%', height: 135, backgroundColor: '#F1F5F9' }}
-                                  resizeMode="cover"
-                                />
-                                <View
-                                  style={{
-                                    paddingVertical: 8,
-                                    paddingHorizontal: 10,
-                                    alignItems: 'center',
-                                    borderTopWidth: 1,
-                                    borderTopColor: '#F1F5F9',
-                                  }}
-                                >
-                                  <Text
-                                    numberOfLines={1}
-                                    ellipsizeMode="middle"
-                                    style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500' }}
-                                  >
-                                    {fileName}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      ) : (
-                        <View
-                          style={{
-                            backgroundColor: '#F8FAFC',
-                            borderWidth: 1,
-                            borderStyle: 'dashed',
-                            borderColor: '#CBD5E1',
-                            borderRadius: 10,
-                            padding: 14,
-                            marginBottom: 20,
-                            alignItems: 'center',
-                          }}
-                        >
-                          <Text style={{ fontSize: 12.5, color: '#94A3B8' }}>
-                            No photos uploaded with this request.
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Horizontal Divider */}
-                      <View
-                        style={{
-                          height: 1,
-                          backgroundColor: '#E2E8F0',
-                          marginVertical: 16,
-                        }}
-                      />
-
-                      {/* Live Preview */}
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          fontWeight: '800',
-                          color: '#0F172A',
-                          marginBottom: 12,
-                        }}
-                      >
-                        Live Preview
-                      </Text>
-
-                      {/* Platform Pill Tabs */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          flexWrap: 'wrap',
-                          gap: 8,
-                          marginBottom: 14,
-                        }}
-                      >
-                        {(
-                          [
-                            { key: 'facebook', label: 'Facebook', icon: 'logo-facebook', iconColor: '#1877F2' },
-                            { key: 'instagram', label: 'Instagram', icon: 'logo-instagram', iconColor: '#E1306C' },
-                            { key: 'website', label: 'Website', icon: 'globe-outline', iconColor: '#64748B' },
-                          ] as const
-                        ).map((tab) => {
-                          const isActive = modalPlatformTab === tab.key;
-                          return (
-                            <TouchableOpacity
-                              key={tab.key}
-                              activeOpacity={0.75}
-                              onPress={() => setModalPlatformTab(tab.key)}
-                              style={{
-                                borderRadius: 999,
-                                paddingHorizontal: 14,
-                                paddingVertical: 7,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                backgroundColor: isActive ? '#FEF3C7' : '#F8FAFC',
-                                borderWidth: 1,
-                                borderColor: isActive ? '#FDE68A' : '#E2E8F0',
-                              }}
-                            >
-                              <Ionicons
-                                name={tab.icon as any}
-                                size={14}
-                                color={
-                                  isActive
-                                    ? tab.key === 'facebook'
-                                      ? '#1877F2'
-                                      : tab.key === 'instagram'
-                                      ? '#E1306C'
-                                      : '#0F172A'
-                                    : tab.iconColor
-                                }
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 12.5,
-                                  fontWeight: '700',
-                                  color: isActive ? '#78350F' : '#475569',
-                                }}
-                              >
-                                {tab.label}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      {/* Social Preview Card */}
-                      <View
-                        style={{
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          borderRadius: 12,
-                          backgroundColor: '#FFFFFF',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            padding: 14,
-                            gap: 10,
-                          }}
-                        >
-                          <Image
-                            source={require('../../../assets/images/jmc_logo_sm.png')}
-                            style={{ width: 36, height: 36, borderRadius: 18 }}
-                            resizeMode="contain"
-                          />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>
-                              Jose Maria College Foundation Inc.
-                            </Text>
-                            <Text style={{ fontSize: 11.5, color: '#64748B' }}>
-                              {modalPlatformTab === 'instagram'
-                                ? 'jmc_official · Official Department Post'
-                                : modalPlatformTab === 'website'
-                                ? `${selectedQueuePost.title} · Official Website Post`
-                                : 'Official Department Post · Public'}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-                          <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>
-                            {isApprovedOrPublished ? refinedCaptionText : originalCaptionText}
-                          </FormattedText>
-                        </View>
-
-                        {activePreviewImageUris.length > 0 ? (
-                          <View
-                            style={{
-                              position: 'relative',
-                              width: '100%',
-                              height: 240,
-                              backgroundColor: '#F1F5F9',
-                            }}
-                          >
-                            <TouchableOpacity
-                              activeOpacity={0.92}
-                              onPress={() => setFullScreenImage(activePreviewImageUris[safeCarouselIdx])}
-                              style={{ width: '100%', height: '100%' }}
-                            >
-                              <Image
-                                source={{ uri: activePreviewImageUris[safeCarouselIdx] }}
-                                style={{ width: '100%', height: '100%' }}
-                                resizeMode="cover"
-                              />
-                            </TouchableOpacity>
-
-                            <View
-                              style={{
-                                position: 'absolute',
-                                top: 12,
-                                right: 12,
-                                backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                                paddingHorizontal: 10,
-                                paddingVertical: 4,
-                                borderRadius: 999,
-                              }}
-                            >
-                              <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' }}>
-                                {safeCarouselIdx + 1} / {activePreviewImageUris.length}
-                              </Text>
-                            </View>
-
-                            {activePreviewImageUris.length > 1 && (
-                              <>
-                                <TouchableOpacity
-                                  activeOpacity={0.8}
-                                  onPress={() =>
-                                    setDirectModalCarouselIdx((prev) =>
-                                      prev <= 0 ? activePreviewImageUris.length - 1 : prev - 1
-                                    )
-                                  }
-                                  style={{
-                                    position: 'absolute',
-                                    bottom: 12,
-                                    left: 12,
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 15,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    ...(Platform.OS === 'web'
-                                      ? { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
-                                      : { elevation: 3 }),
-                                  }}
-                                >
-                                  <Ionicons name="chevron-back" size={16} color="#0F172A" />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  activeOpacity={0.8}
-                                  onPress={() =>
-                                    setDirectModalCarouselIdx((prev) =>
-                                      prev >= activePreviewImageUris.length - 1 ? 0 : prev + 1
-                                    )
-                                  }
-                                  style={{
-                                    position: 'absolute',
-                                    bottom: 12,
-                                    right: 12,
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 15,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    ...(Platform.OS === 'web'
-                                      ? { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' }
-                                      : { elevation: 3 }),
-                                  }}
-                                >
-                                  <Ionicons name="chevron-forward" size={16} color="#0F172A" />
-                                </TouchableOpacity>
-                              </>
-                            )}
-                          </View>
-                        ) : (
-                          <View
-                            style={{
-                              height: 140,
-                              backgroundColor: '#F8FAFC',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderTopWidth: 1,
-                              borderTopColor: '#E2E8F0',
-                            }}
-                          >
-                            <Ionicons name="image-outline" size={28} color="#94A3B8" />
-                            <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-                              No media attached
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Right Column Card: Request Information & Final Publication Content */}
-                    <View
-                      style={{
-                        flex: 1,
-                        width: '100%',
-                        borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                        borderRadius: 14,
-                        padding: 20,
-                        backgroundColor: '#FFFFFF',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 15.5,
-                          fontWeight: '800',
-                          color: '#0F172A',
-                          marginBottom: 14,
-                        }}
-                      >
-                        Request Information
-                      </Text>
-
-                      {/* 2x2 Info Grid */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          flexWrap: 'wrap',
-                          gap: 12,
-                          marginBottom: 20,
-                        }}
-                      >
-                        {[
-                          { label: 'REQUEST TITLE', value: selectedQueuePost.title },
-                          { label: 'DEPARTMENT', value: selectedQueuePost.department },
-                          { label: 'REQUESTED BY', value: requestedByName },
-                          { label: 'REQUESTED ON', value: displayDate },
-                        ].map((info, i) => (
-                          <View
-                            key={i}
-                            style={{
-                              width: '48%',
-                              flexGrow: 1,
-                              backgroundColor: '#F8FAFC',
-                              borderWidth: 1,
-                              borderColor: '#E2E8F0',
-                              borderRadius: 10,
-                              padding: 12,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 10.5,
-                                fontWeight: '700',
-                                color: '#64748B',
-                                marginBottom: 4,
-                              }}
-                            >
-                              {info.label}
-                            </Text>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                              {info.value}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-
-                      {/* Horizontal Divider */}
-                      <View
-                        style={{
-                          height: 1,
-                          backgroundColor: '#E2E8F0',
-                          marginBottom: 18,
-                        }}
-                      />
-
-                      <Text
-                        style={{
-                          fontSize: 14.5,
-                          fontWeight: '800',
-                          color: '#0F172A',
-                          marginBottom: 14,
-                        }}
-                      >
-                        Final Publication Content
-                      </Text>
-
-                      {/* Refined Caption */}
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '700',
-                          color: '#334155',
-                          marginBottom: 6,
-                        }}
-                      >
-                        Refined Caption
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          borderRadius: 10,
-                          padding: 14,
-                          marginBottom: 16,
-                        }}
-                      >
-                        {isApprovedOrPublished ? (
-                          <FormattedText style={{ fontSize: 13, color: '#1E293B', lineHeight: 19 }}>
-                            {refinedCaptionText}
-                          </FormattedText>
-                        ) : (
-                          <Text style={{ fontSize: 13, fontStyle: 'italic', color: '#94A3B8' }}>
-                            Awaiting IMC caption refinement.
-                          </Text>
-                        )}
-                      </View>
-
-                      {/* Final Images */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: 6,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
-                          Final Images
-                        </Text>
-                        <Text style={{ fontSize: 11.5, color: '#94A3B8' }}>
-                          {isApprovedOrPublished ? 'Published images' : 'Awaiting final images'}
-                        </Text>
-                      </View>
-
-                      <View
-                        style={{
-                          backgroundColor: '#F8FAFC',
-                          borderWidth: 1,
-                          borderStyle: 'dashed',
-                          borderColor: '#CBD5E1',
-                          borderRadius: 10,
-                          padding: 14,
-                        }}
-                      >
-                        {isApprovedOrPublished && hasReplacementFinalMedia && finalReplacementImageUris.length > 0 ? (
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                            {finalReplacementImageUris.map((uri: string, idx: number) => (
-                              <TouchableOpacity
-                                key={idx}
-                                activeOpacity={0.85}
-                                onPress={() => setFullScreenImage(uri)}
-                                style={{
-                                  width: 84,
-                                  height: 64,
-                                  borderRadius: 8,
-                                  overflow: 'hidden',
-                                  borderWidth: 1,
-                                  borderColor: '#E2E8F0',
-                                }}
-                              >
-                                <Image
-                                  source={{ uri }}
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="cover"
-                                />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        ) : isApprovedOrPublished && directImageUris.length > 0 ? (
-                          <View style={{ gap: 8 }}>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                              {directImageUris.map((uri: string, idx: number) => (
-                                <TouchableOpacity
-                                  key={idx}
-                                  activeOpacity={0.85}
-                                  onPress={() => setFullScreenImage(uri)}
-                                  style={{
-                                    width: 84,
-                                    height: 64,
-                                    borderRadius: 8,
-                                    overflow: 'hidden',
-                                    borderWidth: 1,
-                                    borderColor: '#E2E8F0',
-                                  }}
-                                >
-                                  <Image
-                                    source={{ uri }}
-                                    style={{ width: '100%', height: '100%' }}
-                                    resizeMode="cover"
-                                  />
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                            <Text style={{ fontSize: 11.5, color: '#64748B' }}>
-                              Published using original submitted photos.
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18 }}>
-                            No replacement images uploaded. The original photos remain available to IMC.
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                </ScrollView>
-
-                {/* Sticky Modal Footer */}
-                <View
-                  style={{
-                    paddingHorizontal: 28,
-                    paddingVertical: 14,
-                    borderTopWidth: 1,
-                    borderTopColor: '#E2E8F0',
-                    flexDirection: 'row',
-                    justifyContent: 'flex-end',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={closeDirectModal}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: '#CBD5E1',
-                      backgroundColor: '#FFFFFF',
-                      paddingHorizontal: 22,
-                      paddingVertical: 9,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                      Close
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-        );
-      })() : (
+      {/* Review Comments Modal */}
+      {selectedQueuePost && (
         <Modal
           animationType="fade"
           transparent={true}
@@ -4397,25 +2568,31 @@ export default function RequestorDashboard() {
           }}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
+            <View nativeID="requestor-request-details" style={styles.modalContainer}>
               <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalHeaderTitle}>Request Details</Text>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1, minWidth: 0, gap: Spacing.sm }}>
+                <Text accessibilityRole="header" style={styles.modalHeaderTitle}>Request Details</Text>
+                <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
                   <View style={[styles.statusBadge, { backgroundColor: selectedQueuePost.statusBg || Colors.border }]}>
                     <Text style={[styles.statusBadgeText, { color: selectedQueuePost.statusColor || Colors.textPrimary }]}>
                       {selectedQueuePost.status}
                     </Text>
                   </View>
                 </View>
+                </View>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close request details" style={styles.modalCloseIconBtn} onPress={() => { setSelectedQueuePost(null); router.setParams({ postId: '' }); }}>
+                  <Ionicons name="close" size={22} color={Colors.textPrimary} />
+                </TouchableOpacity>
               </View>
 
               {/* Modal Body Split */}
               <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
                 {(selectedQueuePost.rawStatus === 'rejected' || selectedQueuePost.rawStatus === 'returned_for_revision') && (
                   <View style={{ marginBottom: 16 }}>
-                    <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444' }}>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#EF4444', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Rejected by: {selectedQueuePost.rejectedBy}</Text>
-                      <Text style={{ fontSize: 15, color: '#EF4444', fontWeight: '500' }}>
+                    <View style={{ backgroundColor: isDarkMode ? '#302238' : selectedQueuePost.rawStatus === 'returned_for_revision' ? '#FFFBEB' : '#FEF2F2', padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: isDarkMode ? '#6B4B75' : selectedQueuePost.rawStatus === 'returned_for_revision' ? '#FDE68A' : '#FECACA', gap: Spacing.sm }}>
+                      <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: isDarkMode ? '#F8FAFC' : selectedQueuePost.rawStatus === 'returned_for_revision' ? '#92400E' : '#B91C1C' }}>{selectedQueuePost.rawStatus === 'returned_for_revision' ? 'Changes requested' : 'Review feedback'}</Text>
+                      {!!selectedQueuePost.rejectedBy && <Text style={{ fontSize: FontSize.xs, lineHeight: 18, color: Colors.textSecondary }}>Reviewed by {selectedQueuePost.rejectedBy}</Text>}
+                      <Text style={{ fontSize: FontSize.sm, lineHeight: 20, color: Colors.textPrimary }}>
                         {selectedQueuePost.rejectionReason || 'No reason provided.'}
                       </Text>
                     </View>
@@ -4423,8 +2600,8 @@ export default function RequestorDashboard() {
                 )}
 
                 <View style={{ marginBottom: 16 }}>
-                  <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
+                  <View style={{ backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border }}>
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textPrimary, marginBottom: Spacing.md }}>Approval progress</Text>
                     {(() => {
                       const isDirectImc = selectedQueuePost.routing_type === 'direct_imc' || selectedQueuePost.rawPost?.routing_type === 'direct_imc';
                       const workflows = selectedQueuePost.approval_workflows || [];
@@ -4586,10 +2763,11 @@ export default function RequestorDashboard() {
 
                 <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
                   {/* Left Side: Social Media Mockup Preview */}
-                  <View style={styles.modalLeftColumn}>
+                  <View style={isLargeScreen ? styles.modalLeftColumn : styles.stackedColumn}>
                     {/* Platform Selector Tabs */}
                     <View style={styles.modalPlatformTabs}>
                       <TouchableOpacity
+                        accessibilityRole="button" accessibilityLabel="Preview on Facebook"
                         style={[
                           styles.modalPlatformTab,
                           modalPlatformTab === 'facebook' && styles.modalPlatformTabActive,
@@ -4603,6 +2781,7 @@ export default function RequestorDashboard() {
                       </TouchableOpacity>
 
                       <TouchableOpacity
+                        accessibilityRole="button" accessibilityLabel="Preview on Instagram"
                         style={[
                           styles.modalPlatformTab,
                           modalPlatformTab === 'instagram' && styles.modalPlatformTabActive,
@@ -4616,6 +2795,7 @@ export default function RequestorDashboard() {
                       </TouchableOpacity>
 
                       <TouchableOpacity
+                        accessibilityRole="button" accessibilityLabel="Preview on Website"
                         style={[
                           styles.modalPlatformTab,
                           modalPlatformTab === 'website' && styles.modalPlatformTabActive,
@@ -4741,7 +2921,7 @@ export default function RequestorDashboard() {
                   </View>
 
                   {/* Right Side: Request Details Metadata */}
-                  <View style={styles.modalRightColumn}>
+                  <View style={[isLargeScreen ? styles.modalRightColumn : styles.stackedColumn, { gap: Spacing.md }]}>
 
                     <View style={styles.metaRow}>
                       <Text style={styles.metaLabel}>Request Title</Text>
@@ -4851,7 +3031,7 @@ export default function RequestorDashboard() {
             </View>
           </View>
         </Modal>
-      ))}
+      )}
 
       {/* Approval Flow Progress Modal for Recent Requests Row Click */}
       {selectedRow && (
@@ -5372,6 +3552,7 @@ export default function RequestorDashboard() {
         }}
       />
 
+      </View>
     </DashboardShell>
   );
 }
@@ -5727,7 +3908,9 @@ const styles = StyleSheet.create({
 
   // Form Container Styles
   formContainer: {
-    gap: Spacing.md,
+    gap: Spacing.lg,
+    minWidth: 0,
+    width: '100%',
   },
   topActionRow: {
     flexDirection: 'row',
@@ -5741,7 +3924,7 @@ const styles = StyleSheet.create({
   },
   breadcrumbColumn: {
     flex: 1,
-    minWidth: 280,
+    minWidth: 0,
     maxWidth: '100%',
     gap: 4,
   },
@@ -5752,10 +3935,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   mainPageTitle: {
-    fontSize: FontSize.xxl - 2,
+    fontSize: FontSize.xxl,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
-    lineHeight: 28,
+    lineHeight: 32,
     marginBottom: 4,
   },
   mainPageSubtitle: {
@@ -5769,15 +3952,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.sm,
     alignItems: 'center',
+    flexWrap: 'wrap',
+    minWidth: 0,
+    maxWidth: '100%',
   },
   draftButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.primary,
-    borderRadius: 4,
+    borderRadius: BorderRadius.md,
     paddingHorizontal: 16,
-    height: 38,
+    minHeight: 44,
+    paddingVertical: Spacing.sm,
+    flexGrow: 1,
+    justifyContent: 'center',
+    maxWidth: '100%',
     backgroundColor: Colors.surface,
   },
   draftButtonText: {
@@ -5790,9 +3980,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 4,
+    borderRadius: BorderRadius.md,
     paddingHorizontal: 16,
-    height: 38,
+    minHeight: 44,
+    paddingVertical: Spacing.sm,
+    flexGrow: 1,
+    justifyContent: 'center',
     backgroundColor: '#FFC72C', // Changed to Gold
   },
   submitButtonProgressFill: {
@@ -5809,7 +4002,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     fontSize: FontSize.sm,
-    color: Colors.textPrimary, // Changed to dark text for contrast on gold
+    color: '#1A1A2E',
     fontWeight: FontWeight.bold,
     zIndex: 2,
   },
@@ -5892,18 +4085,26 @@ const styles = StyleSheet.create({
   },
   leftColumn: {
     flex: 1.5,
+    minWidth: 0,
   },
   rightColumn: {
     flex: 1,
+    minWidth: 0,
+  },
+  stackedColumn: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    width: '100%',
   },
   formCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 8,
-    padding: Spacing.lg,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
     gap: Spacing.md,
-    marginBottom: 20,
+    marginBottom: 0,
     ...(Platform.OS === 'web'
       ? {
           backdropFilter: 'blur(16px)',
@@ -5942,28 +4143,29 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   fieldGroup: {
-    gap: 6,
+    gap: Spacing.sm,
   },
   inputLabel: {
-    fontSize: 10,
+    fontSize: FontSize.xs,
     fontWeight: 'bold',
     color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   textInput: {
-    height: 38,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
     paddingHorizontal: 12,
     fontSize: FontSize.sm,
+    color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
   inlineFieldsRow: {
     gap: Spacing.md,
   },
   dropdownSelector: {
-    height: 38,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 4,
@@ -5976,6 +4178,8 @@ const styles = StyleSheet.create({
   dropdownSelectorText: {
     fontSize: FontSize.sm,
     color: Colors.textPrimary,
+    flexShrink: 1,
+    lineHeight: 20,
   },
   dropdownMenu: {
     position: 'absolute',
@@ -6081,13 +4285,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: Spacing.sm,
     backgroundColor: Colors.surface,
+    gap: Spacing.sm,
+    minHeight: 44,
   },
   platformLeft: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
   },
   platformIconBg: {
+    flexShrink: 0,
     width: 32,
     height: 32,
     borderRadius: 4,
@@ -6100,6 +4309,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   checkboxOutline: {
+    flexShrink: 0,
     width: 18,
     height: 18,
     borderWidth: 1,
@@ -6110,23 +4320,30 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   checkboxChecked: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: '#4C007C',
+    borderColor: '#4C007C',
   },
   inputIconWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
+    minHeight: 44,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface,
   },
   textInputWithIcon: {
     flex: 1,
-    height: 38,
-    borderWidth: 1,
+    minHeight: 44,
+    borderWidth: 0,
     borderColor: Colors.border,
     borderRadius: 4,
     paddingLeft: 12,
     paddingRight: 36,
     fontSize: FontSize.sm,
+    color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
   inputFieldIcon: {
@@ -6538,6 +4755,15 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.background,
     marginBottom: 12,
   },
+  profileSaveButton: {
+    backgroundColor: '#4C007C',
+    minHeight: 44,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+  },
   profilePicLarge: {
     width: 64,
     height: 64,
@@ -6566,28 +4792,29 @@ const styles = StyleSheet.create({
   },
   profilePicButtonsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginTop: 6,
   },
   profilePicUploadBtn: {
     backgroundColor: '#FFC72C',
     paddingHorizontal: 12,
-    height: 28,
-    borderRadius: 4,
+    minHeight: 44,
+    borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   profilePicUploadBtnText: {
-    color: Colors.textPrimary,
-    fontSize: 11,
+    color: '#1A1A2E',
+    fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
   },
   profilePicRemoveBtn: {
     borderWidth: 1,
     borderColor: '#DC2626',
     paddingHorizontal: 12,
-    height: 28,
-    borderRadius: 4,
+    minHeight: 44,
+    borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -6855,6 +5082,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
@@ -6866,7 +5094,10 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   modalCloseIconBtn: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBodyScroll: {
     maxHeight: 520,
@@ -6874,7 +5105,6 @@ const styles = StyleSheet.create({
   modalBodyContent: {
     padding: Spacing.lg,
   },
-
   // (Duplicated Layout Splits removed)
 
   modalSplitRow: {
@@ -6891,10 +5121,13 @@ const styles = StyleSheet.create({
   // Social Media Mockup
   modalPlatformTabs: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    minWidth: 0,
     gap: 8,
     marginBottom: Spacing.md,
   },
   modalPlatformTab: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,

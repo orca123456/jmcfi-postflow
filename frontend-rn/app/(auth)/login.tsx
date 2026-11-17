@@ -2,14 +2,20 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView,
-  Image, ImageBackground, Animated, TextInputProps, Easing, ViewStyle
+  Image, TextInputProps, ViewStyle, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, getRoleDashboardPath } from '../../store/auth';
 import { signalPostflowReady } from '../../utils/postflowReady';
+import AuthExperience from '../../components/AuthExperience';
+import { useAuthTransition } from '../../components/AuthTransitionContext';
+import { beginDashboardHandoff } from '../../utils/dashboardHandoff';
+import { queueAssistantWelcome } from '../../utils/assistantWelcome';
+import { prepareAssistantAudio, playAssistantError } from '../../utils/assistantSound';
+import type { LoginAssistantNotice } from '../../components/AuthExperience.types';
 
-// ── Floating Label Input Component (Facebook Style) ───────────────
+// Web label position follows the actual DOM value, including silent browser autofill.
 interface FloatingLabelProps extends TextInputProps {
   label: string;
   secureTextEntry?: boolean;
@@ -17,86 +23,44 @@ interface FloatingLabelProps extends TextInputProps {
   containerStyle?: ViewStyle;
   id?: string;
   name?: string;
+  validationMessage?: string;
+  feedbackId?: string;
 }
 
 const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
-  ({ label, value, onChangeText, secureTextEntry, rightIcon, containerStyle, ...props }, ref) => {
+  ({ label, value, onChangeText, secureTextEntry, rightIcon, containerStyle, validationMessage, feedbackId, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
-    const [isElevated, setIsElevated] = useState(!!value);
-    const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
+    const centeredNativeLabel = Platform.OS !== 'web' && !isFocused && !value;
+    const fieldId = props.id ? `postflow-${props.id}` : undefined;
 
-    const handleFocus = useCallback(() => {
-      setIsFocused(true);
-      setIsElevated(true);
-      Animated.timing(animatedValue, {
-        toValue: 1,
-        duration: 150,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
-      }).start();
-    }, [animatedValue]);
-
-    const handleBlur = useCallback(() => {
-      setIsFocused(false);
-      if (!value) {
-        setIsElevated(false);
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 150,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: false,
-        }).start();
-      }
-    }, [animatedValue, value]);
-
-    useEffect(() => {
-      if (value && !isElevated) {
-        setIsElevated(true);
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 0,
-          useNativeDriver: false,
-        }).start();
-      }
-    }, [value, isElevated, animatedValue]);
-
-    const labelStyle = {
-      position: 'absolute' as const,
-      left: 16,
-      top: animatedValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [18, 6],
-      }),
-      fontSize: animatedValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [15, 12],
-      }),
-      color: isFocused ? '#1877F2' : '#9CA3AF',
-      zIndex: 1,
-    };
-
-    return (
-      <View style={[
+    return (<>
+      <View nativeID={fieldId ? `${fieldId}-field` : undefined} style={[
         styles.flContainer,
         isFocused ? styles.flContainerFocused : undefined,
+        validationMessage ? styles.flContainerError : undefined,
         containerStyle
       ]}>
-        <Animated.Text style={labelStyle}>
-          {label}
-        </Animated.Text>
+        <View nativeID={fieldId ? `${fieldId}-label` : undefined} style={[styles.flLabel, centeredNativeLabel && styles.flLabelCentered]} pointerEvents="none">
+          <Text style={[styles.flLabelText, centeredNativeLabel && styles.flLabelTextCentered, isFocused && { color: '#6c3baa' }, validationMessage && { color: '#9E3A50' }]}>{label}</Text>
+        </View>
         <View style={styles.flInputWrapper}>
           <TextInput
             ref={ref}
+            accessibilityLabel={label}
+            accessibilityHint={validationMessage}
+            aria-invalid={validationMessage ? true : undefined}
+            aria-describedby={validationMessage && fieldId ? `${fieldId}-error` : feedbackId}
             style={[
               styles.flInput,
+              rightIcon ? { paddingRight: 56 } : undefined,
               Platform.OS === 'web' && { outlineStyle: 'none' } as any
             ]}
             value={value}
             onChangeText={onChangeText}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             secureTextEntry={secureTextEntry}
-            placeholder=""
+            placeholder={Platform.OS === 'web' ? ' ' : ''}
             {...props}
           />
           {rightIcon && (
@@ -106,7 +70,11 @@ const FloatingLabelInput = React.forwardRef<TextInput, FloatingLabelProps>(
           )}
         </View>
       </View>
-    );
+      {validationMessage && <View nativeID={fieldId ? `${fieldId}-error` : undefined} style={styles.fieldHint} accessibilityRole="alert" accessibilityLiveRegion="polite">
+        <Ionicons name="information-circle-outline" size={13} color="#9E3A50" style={{ marginTop: 1, marginRight: 5 }} />
+        <Text style={styles.fieldHintText}>{validationMessage}</Text>
+      </View>}
+    </>);
   }
 );
 FloatingLabelInput.displayName = 'FloatingLabelInput';
@@ -117,16 +85,38 @@ export default function LoginScreen() {
     signalPostflowReady();
   }, []);
   const router = useRouter();
+  const setAuthTransitionActive = useAuthTransition();
   const { login, error, clearError, lockUntil, setLockUntil } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [departing, setDeparting] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [assistantNotice, setAssistantNotice] = useState<LoginAssistantNotice | null>(null);
+  const noticeSequence = useRef(0);
+  const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+  const loginInFlight = useRef(false);
+  const pendingDestination = useRef<string | null>(null);
+  const isCredentialError = !!error && /credentials|email or password|incorrect password|invalid password/i.test(error);
+  const credentialFeedbackId = isCredentialError && countdown <= 0 ? 'postflow-login-feedback' : undefined;
 
-  // Focus tracking for animation (placeholder behavior if needed)
-  const [focusedInput, setFocusedInput] = useState<'email' | 'password' | null>(null);
+  useEffect(() => {
+    if (isCredentialError && !loading && countdown <= 0) passwordRef.current?.focus();
+  }, [isCredentialError, loading, countdown]);
+
+  useEffect(() => () => {
+    setAuthTransitionActive(false);
+  }, [setAuthTransitionActive]);
+
+  const finishSignIn = useCallback(() => {
+    const destination = pendingDestination.current;
+    if (!destination) return;
+    pendingDestination.current = null;
+    beginDashboardHandoff(() => router.replace(destination as any));
+  }, [router]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -149,6 +139,7 @@ export default function LoginScreen() {
           const remaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
           setCountdown(remaining);
           if (remaining <= 0) {
+            setAssistantNotice(null);
             setLockUntil(null);
             clearError();
             clearInterval(interval);
@@ -165,11 +156,29 @@ export default function LoginScreen() {
   }, [lockUntil, setLockUntil, clearError]);
 
   const handleLogin = async () => {
-    if (loading || countdown > 0) return;
+    if (loginInFlight.current || loading || countdown > 0) return;
+    prepareAssistantAudio();
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const validation: { email?: string; password?: string } = {};
+    if (!normalizedEmail) validation.email = 'Enter your email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) validation.email = 'Enter a valid email address.';
+    if (!password) validation.password = 'Enter your password.';
+    setFieldErrors(validation);
+    if (validation.email || validation.password) {
+      clearError();
+      setAssistantNotice({ id: ++noticeSequence.current, message: validation.email ? normalizedEmail ? 'Check your email address.' : 'Enter your email to sign in.' : 'Please enter your password.' });
+      playAssistantError();
+      if (validation.email) emailRef.current?.focus();
+      else passwordRef.current?.focus();
+      return;
+    }
+
+    loginInFlight.current = true;
+    setAssistantNotice(null);
+    setAuthTransitionActive(true);
     setLoading(true);
-    const success = await login(email.trim().toLowerCase(), password);
-    setLoading(false);
+    const success = await login(normalizedEmail, password);
 
     if (success) {
       const user = useAuthStore.getState().user;
@@ -187,35 +196,50 @@ export default function LoginScreen() {
           } catch (e) {}
         }
         if (intended) {
-          router.replace(intended as any);
+          pendingDestination.current = intended;
         } else if (targetPostId) {
-          router.replace(`${getRoleDashboardPath(user.role)}?postId=${targetPostId}` as any);
+          pendingDestination.current = `${getRoleDashboardPath(user.role)}?postId=${targetPostId}`;
         } else {
-          router.replace(getRoleDashboardPath(user.role) as any);
+          pendingDestination.current = getRoleDashboardPath(user.role);
         }
+        queueAssistantWelcome(user.id);
+        setDeparting(true);
+        return;
       }
     } else {
       setPassword('');
+      const failure = useAuthStore.getState();
+      setAssistantNotice(failure.lockUntil && failure.lockUntil > Date.now() ? null : {
+        id: ++noticeSequence.current,
+        message: /credentials|email or password|incorrect password|invalid password/i.test(failure.error || '')
+          ? 'Check your email and password.'
+          : /connect/i.test(failure.error || '') ? 'Can’t connect. Try again.' : 'Sign-in failed. Try again.',
+      });
+      playAssistantError();
     }
+    loginInFlight.current = false;
+    setLoading(false);
+    setAuthTransitionActive(false);
   };
 
   const handleEmailChange = (text: string) => {
     setEmail(text);
+    const remaining = fieldErrors.password ? 'Please enter your password.' : null;
+    setAssistantNotice(current => remaining ? current?.message === remaining ? current : { id: ++noticeSequence.current, message: remaining } : null);
+    if (fieldErrors.email) setFieldErrors(current => ({ ...current, email: undefined }));
     if (error && countdown <= 0) clearError();
   };
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
+    const remaining = fieldErrors.email ? email.trim() ? 'Check your email address.' : 'Enter your email to sign in.' : null;
+    setAssistantNotice(current => remaining ? current?.message === remaining ? current : { id: ++noticeSequence.current, message: remaining } : null);
+    if (fieldErrors.password) setFieldErrors(current => ({ ...current, password: undefined }));
     if (error && countdown <= 0) clearError();
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/jmcbg2.jpeg')}
-      style={styles.backgroundImage}
-      imageStyle={{ opacity: 0.9 }}
-      blurRadius={2}
-    >
+    <AuthExperience departing={departing} onDepartureComplete={finishSignIn} assistantNotice={assistantNotice} lockSeconds={countdown}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -226,21 +250,29 @@ export default function LoginScreen() {
               <Image
                 source={require('../../assets/images/jmc_logo.png')}
                 style={styles.logo}
+                nativeID="postflow-login-logo"
                 resizeMode="contain"
+                accessibilityLabel="Jose Maria College logo"
               />
               <Text style={styles.headerTitle}>JMCFI PostFlow</Text>
+              <Text style={styles.headerSubtitle}>Sign in to your account</Text>
             </View>
 
             <View style={styles.formContainer}>
               <View style={styles.field}>
                 <FloatingLabelInput
+                  ref={emailRef}
                   label="Email"
+                  validationMessage={fieldErrors.email}
+                  feedbackId={credentialFeedbackId}
                   id="email"
                   name="email"
                   value={email}
+                  editable={!loading}
                   onChangeText={handleEmailChange}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                   autoComplete="email"
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
@@ -252,9 +284,12 @@ export default function LoginScreen() {
                 <FloatingLabelInput
                   ref={passwordRef}
                   label="Password"
+                  validationMessage={fieldErrors.password}
+                  feedbackId={credentialFeedbackId}
                   id="password"
                   name="password"
                   value={password}
+                  editable={!loading}
                   onChangeText={handlePasswordChange}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -264,7 +299,10 @@ export default function LoginScreen() {
                   rightIcon={
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
-                      style={{ padding: 4 }}
+                      disabled={loading}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                     >
                       <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
                     </TouchableOpacity>
@@ -272,47 +310,59 @@ export default function LoginScreen() {
                 />
               </View>
 
-              {(error || countdown > 0) ? (
-                <View style={styles.errorBox}>
-                  <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 8 }} />
-                  <Text style={styles.errorText}>
-                    {countdown > 0 ? `Too many login attempts. Please try again in ${countdown} seconds.` : error}
-                  </Text>
+              {error && countdown <= 0 && !lockUntil ? (
+                <View nativeID="postflow-login-feedback" style={[styles.feedback, !!credentialFeedbackId && styles.feedbackCredentials]} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                  {credentialFeedbackId ? <>
+                    <Ionicons name="information-circle-outline" size={14} color="#934152" style={{ marginRight: 7 }} accessible={false} />
+                    <Text style={styles.credentialsText}>Email or password is incorrect.</Text>
+                  </> : <>
+                  <View style={styles.feedbackIcon}>
+                    <Ionicons name="lock-closed-outline" size={16} color="#70448F" accessible={false} />
+                  </View>
+                  <View style={styles.feedbackCopy}>
+                    <Text style={styles.feedbackTitle}>Couldn’t sign in</Text>
+                    <Text style={styles.feedbackText}>{error}</Text>
+                  </View>
+                  </>}
                 </View>
               ) : null}
 
               <View style={styles.field}>
                 <TouchableOpacity
-                  style={[styles.submitButton, (loading || countdown > 0) && styles.submitButtonDisabled]}
+                  style={[styles.submitButton, (loading || countdown > 0) && !departing && styles.submitButtonDisabled]}
                   onPress={handleLogin}
                   disabled={loading || countdown > 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={countdown > 0 ? `Try again in ${countdown}s` : departing ? 'Signed in' : loading ? 'Signing in...' : 'Login'}
+                  accessibilityState={{ disabled: loading || countdown > 0, busy: loading }}
                 >
+                  {departing ? <Ionicons name="checkmark" size={18} color="#fff" style={{ marginRight: 10 }} />
+                    : loading && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />}
                   <Text style={styles.submitText}>
                     {countdown > 0
                       ? `Try again in ${countdown}s`
-                      : (loading ? 'Signing in...' : 'Login')}
+                      : (departing ? 'Signed in' : loading ? 'Signing in...' : 'Login')}
                   </Text>
+                  {!loading && countdown <= 0 && <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 12 }} />}
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.footer}>
-              <Text style={styles.footerText}>© 2026 JMCFI POSTFLOW SYSTEM</Text>
+              <View style={styles.accessNote}>
+                <Ionicons name="shield-checkmark-outline" size={15} color="#8c6da3" />
+                <Text style={styles.footerText}>For authorized JMCFI accounts</Text>
+              </View>
+              <Text style={styles.helpText}>Need access? Contact IT Office.</Text>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </AuthExperience>
   );
 }
 
 const styles = StyleSheet.create({
-  backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#000',
-  },
   container: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -321,113 +371,193 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: Platform.OS === 'web' ? 0 : 16,
+    paddingHorizontal: Platform.OS === 'web' ? 0 : 20,
   },
   card: {
     width: '100%',
-    maxWidth: 380,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#000000',
-    paddingTop: 32,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+    maxWidth: 360,
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#FFFFFF',
+    borderRadius: Platform.OS === 'web' ? 0 : 20,
+    borderWidth: Platform.OS === 'web' ? 0 : 1,
+    borderColor: '#e9dfef',
+    paddingTop: Platform.OS === 'web' ? 0 : 38,
+    paddingBottom: Platform.OS === 'web' ? 0 : 28,
+    paddingHorizontal: Platform.OS === 'web' ? 0 : 30,
+    shadowColor: '#4b0082',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: Platform.OS === 'web' ? 0 : 0.05,
+    shadowRadius: 36,
+    elevation: Platform.OS === 'web' ? 0 : 4,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 14,
   },
   logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 12,
+    width: 56,
+    height: 56,
+    marginBottom: 8,
   },
   headerTitle: {
-    fontFamily: 'Kameron_700Bold',
+    fontFamily: 'Merriweather_700Bold',
     fontSize: 22,
+    lineHeight: 29,
     color: '#8A008A',
     letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#756980',
+    marginTop: 4,
     textAlign: 'center',
   },
   formContainer: {
     width: '100%',
   },
   field: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
   // ── Floating Label Styles ──
   flContainer: {
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#000000',
-    backgroundColor: '#F0F2F5',
-    minHeight: 56,
+    borderColor: '#e3d9eb',
+    backgroundColor: '#fcfafd',
+    minHeight: 60,
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
   },
   flContainerFocused: {
-    borderColor: '#1877F2',
+    borderColor: '#6c3baa',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#1877F2',
+    shadowColor: '#6c3baa',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.12,
     shadowRadius: 3,
     elevation: 2,
+  },
+  flContainerError: {
+    borderColor: '#CB9AA6',
+    backgroundColor: '#FFFBFC',
+    shadowColor: '#AC3C51',
+  },
+  fieldHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 5,
+    paddingHorizontal: 2,
+  },
+  fieldHintText: {
+    flex: 1,
+    color: '#9E3A50',
+    fontSize: 11,
+    lineHeight: 16,
   },
   flInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: '100%',
+    minHeight: 58,
+  },
+  flLabel: {
+    position: 'absolute',
+    left: 16,
+    top: 6,
+    zIndex: 1,
+  },
+  flLabelText: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: '#756980',
+  },
+  flLabelCentered: {
+    top: '50%',
+    transform: [{ translateY: -9 }],
+  },
+  flLabelTextCentered: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   flInput: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 22,
-    paddingBottom: 6,
-    fontSize: 15,
-    color: '#111827',
-    minHeight: 56,
+    paddingTop: 26,
+    paddingBottom: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#30203f',
+    minHeight: 58,
   },
   flRightIcon: {
     position: 'absolute',
-    right: 12,
+    right: 6,
     height: '100%',
     justifyContent: 'center',
     zIndex: 2,
   },
   // ────────────────────────────
-  errorBox: {
+  feedback: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    alignItems: 'flex-start',
+    backgroundColor: '#FBF8FD',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    borderColor: '#E8DDEF',
+    borderLeftWidth: 3,
+    borderLeftColor: '#AB8EBF',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
   },
-  errorText: {
-    color: '#DC2626',
-    fontSize: 14,
-    fontWeight: '500',
+  feedbackCredentials: {
+    alignItems: 'center',
+    backgroundColor: '#FFFBFC',
+    borderColor: '#EAD9DE',
+    borderLeftWidth: 1,
+    borderLeftColor: '#EAD9DE',
+    paddingVertical: 9,
+  },
+  credentialsText: {
     flex: 1,
+    color: '#934152',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  feedbackIcon: {
+    width: 28,
+    height: 28,
+    marginRight: 9,
+    borderRadius: 8,
+    backgroundColor: '#F0E8F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackCopy: {
+    flex: 1,
+  },
+  feedbackTitle: {
+    color: '#523363',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  feedbackText: {
+    color: '#756581',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
   },
   submitButton: {
     backgroundColor: '#4B0082',
-    paddingVertical: 14,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   submitButtonDisabled: {
     opacity: 0.6,
@@ -435,18 +565,31 @@ const styles = StyleSheet.create({
   submitText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
   },
   footer: {
-    marginTop: 24,
+    marginTop: 4,
     backgroundColor: 'transparent',
-    paddingVertical: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0e9f5',
     borderRadius: 2,
     alignItems: 'center',
   },
   footerText: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#756980',
+    fontSize: 11,
+    marginLeft: 7,
+  },
+  accessNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  helpText: {
+    color: '#756980',
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 5,
   },
 });

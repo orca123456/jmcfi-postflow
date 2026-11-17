@@ -82,6 +82,7 @@ export function DashboardShell({
   const [unreadCount, setUnreadCount] = React.useState<number>(0);
 
   const fetchNotifications = React.useCallback(async () => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && document.hidden) return;
     try {
       const res = await notificationsApi.getNotifications();
       if (res.data) {
@@ -243,6 +244,7 @@ export function DashboardShell({
 
   const refreshProfile = React.useCallback(() => {
     if (!user?.id) return;
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && document.hidden) return;
     authApi.getUser().then(res => {
       const userData = res.data?.user || res.data;
       if (!userData) return;
@@ -279,22 +281,26 @@ export function DashboardShell({
     }
   }, [user]);
 
-  // Refresh user data immediately on mount, on activeTab change, on window focus, and on interval
+  // Refresh user data after initial dashboard load, on interval, and on window focus
   React.useEffect(() => {
-    refreshProfile();
-    const interval = setInterval(refreshProfile, 15000);
+    const hasInitialProfile = Boolean(user?.department && user?.role);
+    const initialTimer = setTimeout(() => {
+      refreshProfile();
+    }, hasInitialProfile ? 2500 : 0);
+    const interval = setInterval(refreshProfile, 60000);
     let handleFocus: (() => void) | null = null;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       handleFocus = () => refreshProfile();
       window.addEventListener('focus', handleFocus);
     }
     return () => {
+      clearTimeout(initialTimer);
       clearInterval(interval);
       if (handleFocus && typeof window !== 'undefined') {
         window.removeEventListener('focus', handleFocus);
       }
     };
-  }, [refreshProfile, activeTab]);
+  }, [refreshProfile, activeTab, user?.department, user?.role]);
 
   // Fallback: Query department program heads only if program assignment is not yet known
   React.useEffect(() => {
@@ -364,6 +370,10 @@ export function DashboardShell({
   const MIN_WIDTH = 64;
   const MAX_WIDTH = 275;
   const sidebarWidthAnim = React.useRef(new Animated.Value(MIN_WIDTH)).current;
+  const contentScrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    contentScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [activeTab]);
 
   const openSidebar = React.useCallback(() => {
     setIsSidebarOpen(true);
@@ -769,6 +779,10 @@ export function DashboardShell({
         <View style={styles.headerLeft}>
           {/* Hamburger with hover ripple */}
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={isDesktop ? 'Toggle navigation' : 'Open navigation'}
+            accessibilityState={{ expanded: isDesktop ? isSidebarOpen : isMobileDrawerOpen }}
+            {...(Platform.OS === 'web' ? { 'aria-expanded': isDesktop ? isSidebarOpen : isMobileDrawerOpen } : {})}
             style={[
               styles.hamburgerBtn,
               isHamburgerHovered && styles.hamburgerBtnHovered,
@@ -788,7 +802,9 @@ export function DashboardShell({
                 router.push(getRoleDashboardPath(user.role) as any);
               }
             }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="JMCFI PostFlow dashboard"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 }}
           >
             <Image 
               source={require('../assets/images/jmc_logo.png')} 
@@ -802,7 +818,7 @@ export function DashboardShell({
         </View>
         <View style={styles.headerRight}>
           {/* USER ROLE BADGE */}
-          {Boolean(roleBadgeLabel) && (
+          {Boolean(roleBadgeLabel) && width >= 600 && (
             <View style={[styles.roleBadge, width < 420 && styles.roleBadgeSmall]}>
               <Text style={[styles.roleBadgeText, width < 420 && styles.roleBadgeTextSmall]}>
                 {roleBadgeLabel}
@@ -812,6 +828,10 @@ export function DashboardShell({
 
           {/* NOTIFICATION TRIGGER */}
           <TouchableOpacity 
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            accessibilityState={{ expanded: isNotificationDropdownOpen }}
+            {...(Platform.OS === 'web' ? { 'aria-expanded': isNotificationDropdownOpen } : {})}
             onPress={() => {
               setIsProfileDropdownOpen(false);
               setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
@@ -830,6 +850,10 @@ export function DashboardShell({
 
           {/* PROFILE TRIGGER */}
           <TouchableOpacity 
+            accessibilityRole="button"
+            accessibilityLabel="Account menu"
+            accessibilityState={{ expanded: isProfileDropdownOpen }}
+            {...(Platform.OS === 'web' ? { 'aria-expanded': isProfileDropdownOpen } : {})}
             style={styles.profileTrigger} 
             onPress={() => {
               setIsNotificationDropdownOpen(false);
@@ -868,7 +892,7 @@ export function DashboardShell({
 
         {/* NOTIFICATIONS DROPDOWN OVERLAY (HEADER LEVEL) */}
         {isNotificationDropdownOpen && (
-          <View style={[styles.notificationsDropdownContainer, isDarkMode && { backgroundColor: '#1C2541', borderColor: '#334155' }]}>
+          <View style={[styles.notificationsDropdownContainer, { width: Math.min(380, width - 24) }, isDarkMode && { backgroundColor: '#1C2541', borderColor: '#334155' }]}>
             <View style={[styles.notifHeader, isDarkMode && { backgroundColor: '#1E293B' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={[styles.notifHeaderTitle, isDarkMode && { color: '#F8FAFC' }]}>Notifications</Text>
@@ -1246,7 +1270,8 @@ export function DashboardShell({
               resizeMode="cover"
             >
               <ScrollView
-                style={styles.content}
+                ref={contentScrollRef}
+                style={[styles.content, !isDesktop && user?.role === 'requestor' && styles.requestorMobileContent]}
                 contentContainerStyle={[styles.contentContainer, !isDesktop && styles.contentContainerMobile]}
                 showsVerticalScrollIndicator={false}
               >
@@ -1255,7 +1280,8 @@ export function DashboardShell({
             </ImageBackground>
           ) : (
             <ScrollView
-              style={styles.content}
+              ref={contentScrollRef}
+              style={[styles.content, !isDesktop && user?.role === 'requestor' && styles.requestorMobileContent]}
               contentContainerStyle={[styles.contentContainer, !isDesktop && styles.contentContainerMobile]}
               showsVerticalScrollIndicator={false}
             >
@@ -1412,8 +1438,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flexShrink: 1,
+    minWidth: 0,
   },
   logoText: {
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 16,
     fontWeight: FontWeight.bold,
     fontFamily: 'Kameron_700Bold',
@@ -1799,6 +1828,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  requestorMobileContent: {
+    // Keep the default floating assistant clear of form fields and actions.
+    marginBottom: 128,
   },
   contentContainer: {
     padding: Spacing.lg,

@@ -22,10 +22,14 @@ class AuthController extends Controller
 {
     private const MAX_LOGIN_ATTEMPTS = 3;
 
+    private static ?bool $hasLoginLockoutsTable = null;
+    private static ?bool $hasCacheTable = null;
+    private bool $hadLockoutRecord = false;
+
     public function login(LoginRequest $request): JsonResponse
     {
         $throttleKey = $this->loginThrottleKey($request);
-        $user = User::where('email', $request->email)->first();
+        $user = User::with(['roles', 'programHead'])->where('email', $request->email)->first();
 
         if (($seconds = $this->loginLockoutSeconds($throttleKey)) > 0) {
             AuditLogService::logForUser($user, 'LOGIN_LOCKED', 'Blocked login attempt during lockout for ' . $request->email, 'WARNING', [
@@ -71,13 +75,29 @@ class AuthController extends Controller
 
         $token = $user->createToken('postflow-api')->plainTextToken;
 
-        AuditLogService::logForUser($user, 'LOGIN_SUCCESS', 'User logged in: ' . $user->full_name, 'INFO', [
-            'email' => $user->email,
-            'role' => $user->workflowRole(),
-        ], $request);
+        $plainPassword = (string) $request->password;
+        $wfRole = $user->workflowRole();
+        $userEmail = $user->email;
+        $userFullName = $user->full_name;
+        app()->terminating(function () use ($user, $plainPassword, $wfRole, $userEmail, $userFullName, $request) {
+            try {
+                if (Hash::needsRehash($user->password, ['rounds' => 10])) {
+                    $user->forceFill([
+                        'password' => Hash::make($plainPassword, ['rounds' => 10]),
+                    ])->saveQuietly();
+                }
+
+                AuditLogService::logForUser($user, 'LOGIN_SUCCESS', 'User logged in: ' . $userFullName, 'INFO', [
+                    'email' => $userEmail,
+                    'role' => $wfRole,
+                ], $request);
+            } catch (\Throwable) {
+                // Never break termination after login response has been sent
+            }
+        });
 
         return response()->json([
-            'user' => new UserResource($user->load(['roles', 'programHead'])),
+            'user' => new UserResource($user),
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -90,19 +110,32 @@ class AuthController extends Controller
         return hash_hmac('sha256', $email, (string) config('app.key'));
     }
 
+    private function hasLoginLockoutsTable(): bool
+    {
+        return self::$hasLoginLockoutsTable ??= Schema::hasTable('login_lockouts');
+    }
+
+    private function hasCacheTable(): bool
+    {
+        return self::$hasCacheTable ??= Schema::hasTable('cache');
+    }
+
     private function loginLockoutSeconds(string $key): int
     {
+        $this->hadLockoutRecord = false;
+
         if ($this->shouldUseRedisLoginLockout()) {
             return RateLimiter::tooManyAttempts($key, self::MAX_LOGIN_ATTEMPTS)
                 ? max(1, RateLimiter::availableIn($key))
                 : 0;
         }
 
-        if (Schema::hasTable('login_lockouts')) {
+        if ($this->hasLoginLockoutsTable()) {
             $record = DB::table('login_lockouts')->where('key', $key)->first();
             if (! $record) {
                 return 0;
             }
+            $this->hadLockoutRecord = true;
 
             $now = now();
             $lockedUntil = $record->locked_until
@@ -115,12 +148,13 @@ class AuthController extends Controller
 
             if ($now->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($record->expires_at))) {
                 DB::table('login_lockouts')->where('key', $key)->delete();
+                $this->hadLockoutRecord = false;
             }
 
             return 0;
         }
 
-        if (! Schema::hasTable('cache')) {
+        if (! $this->hasCacheTable()) {
             return 0;
         }
 
@@ -128,10 +162,12 @@ class AuthController extends Controller
         if (! $record) {
             return 0;
         }
+        $this->hadLockoutRecord = true;
 
         $now = now();
         if ((int) $record->expiration <= $now->getTimestamp()) {
             DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
+            $this->hadLockoutRecord = false;
             return 0;
         }
 
@@ -143,6 +179,7 @@ class AuthController extends Controller
         }
 
         DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
+        $this->hadLockoutRecord = false;
 
         return 0;
     }
@@ -157,7 +194,7 @@ class AuthController extends Controller
                 : 0;
         }
 
-        if (Schema::hasTable('login_lockouts')) {
+        if ($this->hasLoginLockoutsTable()) {
             return DB::transaction(function () use ($key) {
                 $now = now();
                 $windowEndsAt = $now->copy()->addSeconds(59);
@@ -189,7 +226,7 @@ class AuthController extends Controller
             });
         }
 
-        if (! Schema::hasTable('cache')) {
+        if (! $this->hasCacheTable()) {
             RateLimiter::hit($key, 59);
 
             return RateLimiter::tooManyAttempts($key, self::MAX_LOGIN_ATTEMPTS)
@@ -233,17 +270,21 @@ class AuthController extends Controller
 
     private function clearFailedLogins(string $key): void
     {
+        if (! $this->hadLockoutRecord) {
+            return;
+        }
+
         if ($this->shouldUseRedisLoginLockout()) {
             RateLimiter::clear($key);
             return;
         }
 
-        if (Schema::hasTable('login_lockouts')) {
+        if ($this->hasLoginLockoutsTable()) {
             DB::table('login_lockouts')->where('key', $key)->delete();
             return;
         }
 
-        if (Schema::hasTable('cache')) {
+        if ($this->hasCacheTable()) {
             DB::table('cache')->where('key', $this->loginCacheKey($key))->delete();
             return;
         }

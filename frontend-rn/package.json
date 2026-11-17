@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/kameron": "^0.4.2",
+    "@expo-google-fonts/merriweather": "^0.4.2",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/query-persist-client-core": "^5.104.0",
@@ -44,7 +45,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web --port 3000",
+    "web": "npm run export:web && node scripts/serve-web.cjs --port 3000",
+    "preview:web": "node scripts/serve-web.cjs --port 3000",
     "dev": "expo start --web --port 3000",
     "export:web": "expo export --platform web && node inject-shell.js",
     "postbuild": "node inject-shell.js",
