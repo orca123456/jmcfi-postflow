@@ -57,6 +57,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('posts/ai-check-draft', [PostRequestController::class, 'runDraftAiCheck'])->middleware('throttle:15,1');
     Route::post('posts/{postRequest}/ai-check', [PostRequestController::class, 'runAiCheck'])->middleware('throttle:15,1')->where(['postRequest' => '[0-9]{1,19}']);
     Route::post('posts/{postRequest}/featured-media', [PostRequestController::class, 'setFeaturedMedia'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::get('posts/{postRequest}/download-media', [PostRequestController::class, 'downloadAllMedia'])->where(['postRequest' => '[0-9]{1,19}']);
+    Route::post('posts/{postRequest}/save-imc-changes', [PostRequestController::class, 'saveImcChanges'])->middleware('role:imc_qa_checker,it_admin,it_publisher')->where(['postRequest' => '[0-9]{1,19}']);
 
     // Categories
     Route::get('categories', [CategoryController::class, 'index']);

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { resolveImageUrl } from '../../services/api';
+import { resolveImageUrl, postsApi } from '../../services/api';
 import { FacebookMediaGrid } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
 import { FormattedText } from '../ui/FormattedText';
@@ -25,6 +25,7 @@ export interface PublicationReviewModalProps {
   onClose: () => void;
   onPublish: (req: any, payload: { finalCaption: string; replacementFiles: any[] }) => Promise<void> | void;
   onReject: (req: any) => void;
+  onSaveChanges?: (req: any, payload: { finalCaption: string; replacementFiles: any[] }) => Promise<void> | void;
   onOpenFullScreenImage?: (url: string) => void;
 }
 
@@ -69,6 +70,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   onClose,
   onPublish,
   onReject,
+  onSaveChanges,
   onOpenFullScreenImage,
 }) => {
   const { width } = useWindowDimensions();
@@ -80,7 +82,10 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   const [previewPlatform, setPreviewPlatform] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
 
   // Extract original media items with resolved URLs
   const originalMedia = useMemo(() => {
@@ -95,12 +100,20 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
         const type = String(m?.type || m?.mime_type || '').toLowerCase();
         return !type || type === 'image' || type.startsWith('image/');
       })
-      .map((m: any, idx: number) => ({
-        id: m.id || idx,
-        url: resolveImageUrl(m.url || m.file_url || m.file_path) || '',
-        name: m.original_filename || m.name || `photo-${idx + 1}.jpg`,
-        size: m.size || 0,
-      }))
+      .map((m: any, idx: number) => {
+        const rawName = m.original_name || m.original_filename || m.name || `photo-${idx + 1}.jpg`;
+        const hasExt = /\.[a-z0-9]{3,4}$/i.test(rawName);
+        const name = hasExt ? rawName : `${rawName}.jpg`;
+        const rawUrl = m.url || m.file_url || m.file_path || '';
+        const url = resolveImageUrl(rawUrl) || '';
+        return {
+          id: m.id || idx,
+          url,
+          rawUrl,
+          name,
+          size: m.size || m.file_size || 0,
+        };
+      })
       .filter((m: any) => Boolean(m.url));
   }, [request]);
 
@@ -149,6 +162,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
       setActiveOrigIndex(0);
       setReplacementFiles([]);
       setIsPublishing(false);
+      setIsSavingChanges(false);
       setPreviewDevice('mobile');
       if (targetPlatforms.includes('facebook')) setPreviewPlatform('facebook');
       else if (targetPlatforms.includes('instagram')) setPreviewPlatform('instagram');
@@ -157,16 +171,14 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
     }
   }, [visible, request?.id]);
 
-  if (!visible || !request) return null;
-
   const isPending = (() => {
-    const s = String(request.status || request.rawStatus || '').toUpperCase();
+    const s = String(request?.status || request?.rawStatus || '').toUpperCase();
     return s === 'PENDING' || s === 'PENDING_IMC_QA' || s === 'PENDING_OFFICE_HEAD' || s === 'PENDING_VICE_PRESIDENT' || s === 'PENDING_PRESIDENT';
   })();
 
-  const submittedDateText = formatDisplayDate(request.created_at || request.rawDate || request.date);
-  const deptName = request.dept || request.requestor?.department || request.other_category_name || 'Department';
-  const requestorName = request.requestedBy || request.requestor?.full_name || 'Requestor';
+  const submittedDateText = formatDisplayDate(request?.created_at || request?.rawDate || request?.date);
+  const deptName = request?.dept || request?.requestor?.department || request?.other_category_name || 'Department';
+  const requestorName = request?.requestedBy || request?.requestor?.full_name || 'Requestor';
   const photoCountLabel =
     originalMedia.length === 0
       ? 'Text only'
@@ -175,9 +187,9 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
       : `${originalMedia.length} photos`;
 
   const additionalInstructions =
-    request.remarks ||
-    request.additional_instructions ||
-    (request.preferred_schedule_at ? `Preferred Schedule: ${formatDisplayDate(request.preferred_schedule_at)}` : '');
+    request?.remarks ||
+    request?.additional_instructions ||
+    (request?.preferred_schedule_at ? `Preferred Schedule: ${formatDisplayDate(request?.preferred_schedule_at)}` : '');
 
   // Active preview media (uses final uploaded images if any, otherwise published finals or originals)
   const previewMediaList =
@@ -255,24 +267,149 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   };
 
   const handleDownloadAllPhotos = async () => {
-    if (originalMedia.length === 0) return;
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      for (const item of originalMedia) {
+    if (originalMedia.length === 0 || isDownloadingAll) return;
+    setIsDownloadingAll(true);
+    setDownloadProgress('Preparing...');
+
+    try {
+      // 1. First attempt: Server-side bundled ZIP (or direct attachment) download
+      const postId = request?.id ? Number(request.id) : null;
+      if (postId && !isNaN(postId)) {
         try {
-          const res = await fetch(item.url);
-          const blob = await res.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = item.name || 'photo.jpg';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-        } catch {
-          window.open(item.url, '_blank');
+          setDownloadProgress('Downloading from server...');
+          const res = await postsApi.downloadAllMedia(postId);
+          if (res?.data) {
+            const contentType = typeof res.headers?.['content-type'] === 'string'
+              ? res.headers['content-type']
+              : (originalMedia.length === 1 ? 'image/jpeg' : 'application/zip');
+            const blob = new Blob([res.data], { type: contentType });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+
+            let filename = originalMedia.length === 1
+              ? (originalMedia[0]?.name || 'photo.jpg')
+              : `post_${postId}_photos.zip`;
+            const disposition = typeof res.headers?.['content-disposition'] === 'string'
+              ? res.headers['content-disposition']
+              : '';
+            if (disposition && disposition.includes('filename=')) {
+              const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+              if (match && match[1]) filename = match[1].replace(/['"]/g, '');
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(blobUrl);
+            }, 3000);
+
+            setDownloadProgress('Done!');
+            setTimeout(() => {
+              setIsDownloadingAll(false);
+              setDownloadProgress(null);
+            }, 1500);
+            return;
+          }
+        } catch (serverErr) {
+          console.warn('Server download endpoint fallback to client-side direct download:', serverErr);
         }
       }
+
+      // 2. Client-side sequential direct download fallback
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        for (let i = 0; i < originalMedia.length; i++) {
+          const item = originalMedia[i];
+          setDownloadProgress(`Downloading photo ${i + 1} of ${originalMedia.length}...`);
+
+          let fetchTarget = item.url;
+          if (typeof window !== 'undefined' && fetchTarget.includes('/storage/')) {
+            fetchTarget = '/storage/' + fetchTarget.split('/storage/')[1];
+          }
+
+          try {
+            const res = await fetch(fetchTarget, { mode: 'cors' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = item.name || `photo-${i + 1}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(blobUrl);
+            }, 3000);
+          } catch (fetchErr) {
+            console.warn(`Direct fetch failed for ${item.url}, opening download link fallback:`, fetchErr);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = fetchTarget;
+            a.download = item.name || `photo-${i + 1}.jpg`;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => document.body.removeChild(a), 2000);
+          }
+
+          if (i < originalMedia.length - 1) {
+            await new Promise((r) => setTimeout(r, 450));
+          }
+        }
+        setDownloadProgress('Done!');
+        setTimeout(() => {
+          setIsDownloadingAll(false);
+          setDownloadProgress(null);
+        }, 1500);
+      }
+    } catch (err: any) {
+      console.error('Download all photos failed:', err);
+      alert('Unable to download photos: ' + (err?.message || 'Download failed'));
+      setIsDownloadingAll(false);
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleDownloadActivePhoto = async () => {
+    if (!activeOrig || !activeOrig.url) return;
+    try {
+      let fetchTarget = activeOrig.url;
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && fetchTarget.includes('/storage/')) {
+        fetchTarget = '/storage/' + fetchTarget.split('/storage/')[1];
+      }
+      const res = await fetch(fetchTarget, { mode: 'cors' });
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = blobUrl;
+      a.download = activeOrig.name || 'photo.jpg';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 2000);
+    } catch {
+      window.open(activeOrig.url, '_blank');
+    }
+  };
+
+  const handleSaveChangesPress = async () => {
+    if (!onSaveChanges) return;
+    setIsSavingChanges(true);
+    try {
+      await onSaveChanges(request, {
+        finalCaption: finalCaption.trim(),
+        replacementFiles,
+      });
+    } finally {
+      setIsSavingChanges(false);
     }
   };
 
@@ -310,6 +447,8 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   const activeOrig = originalMedia[activeOrigIndex] || null;
   const previewCardWidth = previewDevice === 'mobile' ? 370 : Math.min(620, width - 90);
 
+  if (!visible || !request) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -336,7 +475,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
           <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator>
             {/* Title + Date Line */}
             <View style={styles.titleRow}>
-              <Text style={styles.postTitle}>{request.title || 'Untitled Request'}</Text>
+              <Text style={styles.postTitle}>{request?.title || 'Untitled Request'}</Text>
               {submittedDateText ? (
                 <Text style={styles.submittedDate}>Submitted {submittedDateText}</Text>
               ) : null}
@@ -433,18 +572,36 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                         {activeOrigIndex + 1} of {originalMedia.length}
                       </Text>
                     </View>
-                    <Text style={styles.filenameText} numberOfLines={1}>
-                      {activeOrig?.name}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 2 }}>
+                      <Text style={[styles.filenameText, { flex: 1, marginRight: 8 }]} numberOfLines={1}>
+                        {activeOrig?.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={handleDownloadActivePhoto}
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 3, paddingHorizontal: 8, backgroundColor: '#F1F5F9', borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0' }}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Download this photo"
+                      >
+                        <Ionicons name="download-outline" size={13} color="#475569" style={{ marginRight: 4 }} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>Download this photo</Text>
+                      </TouchableOpacity>
+                    </View>
 
                     {/* Download All Photos */}
                     <TouchableOpacity
-                      style={styles.downloadAllBtn}
+                      style={[styles.downloadAllBtn, isDownloadingAll && { opacity: 0.75 }]}
                       onPress={handleDownloadAllPhotos}
+                      disabled={isDownloadingAll}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="download-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
-                      <Text style={styles.downloadAllText}>Download All Photos</Text>
+                      {isDownloadingAll ? (
+                        <ActivityIndicator size="small" color="#1E293B" style={{ marginRight: 8 }} />
+                      ) : (
+                        <Ionicons name="download-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
+                      )}
+                      <Text style={styles.downloadAllText}>
+                        {downloadProgress || (originalMedia.length > 1 ? 'Download All Photos (ZIP)' : 'Download Photo')}
+                      </Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -463,9 +620,9 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                 <Text style={styles.subLabel}>CAPTION</Text>
                 <View style={styles.readOnlyBox}>
                   <FormattedText style={styles.readOnlyText}>
-                    {request.imc_branding_checklist?.original_caption ||
-                      request.caption ||
-                      request.caption_narrative ||
+                    {request?.imc_branding_checklist?.original_caption ||
+                      request?.caption ||
+                      request?.caption_narrative ||
                       'No caption provided.'}
                   </FormattedText>
                 </View>
@@ -783,7 +940,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                       <View style={styles.webDeptBadge}>
                         <Text style={styles.webDeptBadgeText}>{deptName}</Text>
                       </View>
-                      <Text style={styles.webTitle}>{request.title || 'Untitled Article'}</Text>
+                      <Text style={styles.webTitle}>{request?.title || 'Untitled Article'}</Text>
                       <Text style={styles.webMeta}>Published by IMC · {submittedDateText || 'Today'}</Text>
                       <Text style={styles.webBody}>
                         {finalCaption.trim() || 'Your final article content will appear here...'}
@@ -806,15 +963,32 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                 <TouchableOpacity
                   style={styles.rejectBtn}
                   onPress={() => onReject(request)}
-                  disabled={isPublishing}
+                  disabled={isPublishing || isSavingChanges}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.rejectBtnText}>Reject</Text>
                 </TouchableOpacity>
+
+                {onSaveChanges && (
+                  <TouchableOpacity
+                    style={[styles.saveChangesBtn, (isSavingChanges || isPublishing) && { opacity: 0.7 }]}
+                    onPress={handleSaveChangesPress}
+                    disabled={isSavingChanges || isPublishing}
+                    activeOpacity={0.85}
+                  >
+                    {isSavingChanges ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
+                    ) : (
+                      <Ionicons name="save-outline" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={styles.saveChangesBtnText}>Save Changes</Text>
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
-                  style={[styles.publishBtn, isPublishing && { opacity: 0.7 }]}
+                  style={[styles.publishBtn, (isPublishing || isSavingChanges) && { opacity: 0.7 }]}
                   onPress={handlePublishPress}
-                  disabled={isPublishing}
+                  disabled={isPublishing || isSavingChanges}
                   activeOpacity={0.85}
                 >
                   {isPublishing ? (
@@ -1475,10 +1649,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-end',
   },
   footerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   rejectBtn: {
@@ -1486,24 +1662,41 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 40,
   },
   rejectBtnText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
   },
+  saveChangesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4C007C',
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  saveChangesBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   publishBtn: {
     backgroundColor: '#FFC72C',
     borderRadius: 8,
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     paddingVertical: 10,
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 110,
+    minHeight: 40,
   },
   publishBtnText: {
     fontSize: 14,

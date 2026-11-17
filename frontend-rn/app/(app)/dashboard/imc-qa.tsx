@@ -142,8 +142,12 @@ export default function ImcQaDashboard() {
     try {
       const fullUrl = resolveImageUrl(url) || url;
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        let fetchTarget = fullUrl;
+        if (typeof window !== 'undefined' && fetchTarget.includes('/storage/')) {
+          fetchTarget = '/storage/' + fetchTarget.split('/storage/')[1];
+        }
         try {
-          const resp = await fetch(fullUrl, { mode: 'cors' });
+          const resp = await fetch(fetchTarget, { mode: 'cors' });
           if (resp.ok) {
             const blob = await resp.blob();
             const blobUrl = window.URL.createObjectURL(blob);
@@ -164,7 +168,7 @@ export default function ImcQaDashboard() {
         }
         const a = document.createElement('a');
         a.style.display = 'none';
-        a.href = fullUrl;
+        a.href = fetchTarget;
         a.download = filename || 'attachment.png';
         a.target = '_blank';
         document.body.appendChild(a);
@@ -689,6 +693,59 @@ export default function ImcQaDashboard() {
     }
   };
 
+  const handleSaveChangesFromModal = async (
+    req: any,
+    payload: { finalCaption: string; replacementFiles: any[] }
+  ) => {
+    const reqId = req.id;
+    let requestBody: any = { caption_narrative: payload.finalCaption };
+    if (payload.replacementFiles && payload.replacementFiles.length > 0) {
+      const formData = new FormData();
+      formData.append('caption_narrative', payload.finalCaption);
+      for (const item of payload.replacementFiles) {
+        if (Platform.OS === 'web') {
+          if (item.file instanceof File || item.file instanceof Blob) {
+            formData.append('media[]', item.file, item.name || 'edited.jpg');
+          } else if (
+            typeof item.uri === 'string' &&
+            (item.uri.startsWith('blob:') || item.uri.startsWith('data:'))
+          ) {
+            const fetchRes = await fetch(item.uri);
+            const blob = await fetchRes.blob();
+            const fileObj = new File([blob], item.name || 'edited.jpg', {
+              type: item.mimeType || blob.type || 'image/jpeg',
+            });
+            formData.append('media[]', fileObj, item.name || 'edited.jpg');
+          }
+        } else {
+          formData.append('media[]', {
+            uri: item.uri,
+            name: item.name || 'edited.jpg',
+            type: item.mimeType || 'image/jpeg',
+          } as any);
+        }
+      }
+      requestBody = formData;
+    }
+
+    try {
+      const res = await postsApi.saveImcChanges(reqId, requestBody);
+      const updatedPost = res.data?.data || res.data;
+      if (updatedPost) {
+        setRequestsList((prev) =>
+          prev.map((item) => (item.id === reqId ? { ...item, ...updatedPost } : item))
+        );
+        setPublicationReviewRequest((prev: any) =>
+          prev && prev.id === reqId ? { ...prev, ...updatedPost } : prev
+        );
+      }
+      await loadData(false);
+      alert('Changes saved! Both IMC and the Requestor can now see the updated text and photos.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to save changes.');
+    }
+  };
+
   const renderActionBadge = (req: any) => {
     if (activeTab === 'dashboard' || (activeTab === 'all' && isPendingStatus(req.status))) {
       return (
@@ -1188,6 +1245,7 @@ export default function ImcQaDashboard() {
           router.setParams({ postId: '' });
         }}
         onPublish={handlePublishFromModal}
+        onSaveChanges={handleSaveChangesFromModal}
         onReject={(req) => {
           setPublicationReviewRequest(null);
           handleRejectClick(req);

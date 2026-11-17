@@ -902,6 +902,185 @@ class PostRequestController extends Controller
         ]);
     }
 
+    public function downloadAllMedia(PostRequest $postRequest)
+    {
+        $media = $postRequest->media()->where(function ($q) {
+            $q->where('type', 'image')->orWhereNull('type');
+        })->get();
+
+        if ($media->isEmpty()) {
+            return response()->json(['message' => 'No photos available for download.'], 404);
+        }
+
+        $getFileData = function (PostMedia $item) {
+            $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+            $fullPath = Storage::disk($disk)->path($item->file_path);
+            if (!file_exists($fullPath)) {
+                $fullPath = storage_path('app/public/' . ltrim($item->file_path, '/'));
+            }
+            if (file_exists($fullPath)) {
+                return ['type' => 'file', 'path' => $fullPath];
+            }
+            $dbFile = $item->file;
+            if ($dbFile && $dbFile->content) {
+                return ['type' => 'binary', 'content' => $dbFile->content];
+            }
+            return null;
+        };
+
+        if ($media->count() === 1) {
+            $first = $media->first();
+            $data = $getFileData($first);
+            if ($data) {
+                $filename = $first->original_name ?: basename($first->file_path);
+                if (!pathinfo($filename, PATHINFO_EXTENSION)) {
+                    $filename .= '.jpg';
+                }
+                if ($data['type'] === 'file') {
+                    return response()->download($data['path'], $filename);
+                } else {
+                    return response($data['content'])
+                        ->header('Content-Type', $first->mime_type ?: 'image/jpeg')
+                        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+                }
+            }
+        }
+
+        $cleanTitle = Str::slug($postRequest->title ?: 'request_' . $postRequest->id, '_');
+        $zipFileName = 'post_' . $postRequest->id . '_' . $cleanTitle . '_photos.zip';
+        $tempDir = storage_path('app/temp');
+        if (!file_exists($tempDir)) {
+            @mkdir($tempDir, 0755, true);
+        }
+        $zipPath = $tempDir . '/' . uniqid('photos_', true) . '.zip';
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+            $usedNames = [];
+            foreach ($media as $idx => $item) {
+                $data = $getFileData($item);
+                if ($data) {
+                    $rawName = $item->original_name ?: basename($item->file_path);
+                    $nameInfo = pathinfo($rawName);
+                    $ext = !empty($nameInfo['extension']) ? '.' . $nameInfo['extension'] : '.jpg';
+                    $baseName = !empty($nameInfo['filename']) ? $nameInfo['filename'] : 'photo_' . ($idx + 1);
+                    $finalName = $baseName . $ext;
+
+                    $counter = 1;
+                    while (in_array(strtolower($finalName), $usedNames, true)) {
+                        $finalName = $baseName . '_' . $counter . $ext;
+                        $counter++;
+                    }
+                    $usedNames[] = strtolower($finalName);
+
+                    if ($data['type'] === 'file') {
+                        $zip->addFile($data['path'], $finalName);
+                    } else {
+                        $zip->addFromString($finalName, $data['content']);
+                    }
+                }
+            }
+            $zip->close();
+
+            if (file_exists($zipPath) && filesize($zipPath) > 0) {
+                return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+            }
+        }
+
+        return response()->json(['message' => 'Failed to bundle photos into zip.'], 500);
+    }
+
+    public function saveImcChanges(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $user = $request->user();
+
+        return DB::transaction(function () use ($request, $postRequest, $user) {
+            // Preserve original requestor submission snapshot before applying reviewer edits/replacements
+            $existingChecklist = is_array($postRequest->imc_branding_checklist) ? $postRequest->imc_branding_checklist : [];
+            $originalCaption = $existingChecklist['original_caption'] ?? $postRequest->caption_narrative;
+            $originalMedia = $existingChecklist['original_media'] ?? $postRequest->media->map(fn ($m) => [
+                'id' => $m->id,
+                'type' => $m->type,
+                'original_filename' => $m->original_name,
+                'file_path' => $m->file_path,
+                'url' => $m->url,
+                'mime_type' => $m->mime_type,
+                'size' => $m->file_size,
+            ])->values()->all();
+            $hasReplacementMedia = $existingChecklist['has_replacement_media'] ?? false;
+
+            // Apply caption/title edits if provided
+            $updateData = [];
+            if ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative))) {
+                $updateData['caption_narrative'] = $request->caption_narrative;
+            }
+            if ($request->has('title') && !empty(trim((string) $request->title))) {
+                $updateData['title'] = $request->title;
+            }
+            if (!empty($updateData)) {
+                $postRequest->update($updateData);
+            }
+
+            // Handle replacement media file(s) if uploaded
+            if ($request->hasFile('media')) {
+                $files = $request->file('media');
+                $files = is_array($files) ? $files : [$files];
+                $validFiles = array_values(array_filter($files, fn($f) => $f instanceof \Illuminate\Http\UploadedFile));
+                if (!empty($validFiles)) {
+                    $hasReplacementMedia = true;
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    $postRequest->media()->delete();
+                    foreach ($validFiles as $index => $file) {
+                        $path = $file->store('post-media/' . $postRequest->id, $disk);
+                        $mime = $file->getMimeType() ?: 'image/jpeg';
+                        $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), $index, $index === 0);
+                    }
+                    $postRequest->load('media');
+                }
+            }
+
+            $refinedCaption = ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative)))
+                ? $request->caption_narrative
+                : ($existingChecklist['refined_caption'] ?? $postRequest->caption_narrative);
+
+            $finalMedia = $hasReplacementMedia
+                ? $postRequest->media()->get()->map(fn ($m) => [
+                    'id' => $m->id,
+                    'type' => $m->type,
+                    'original_filename' => $m->original_name,
+                    'file_path' => $m->file_path,
+                    'url' => $m->url,
+                    'mime_type' => $m->mime_type,
+                    'size' => $m->file_size,
+                ])->values()->all()
+                : ($existingChecklist['final_media'] ?? []);
+
+            $postRequest->update([
+                'imc_branding_checklist' => array_merge($existingChecklist, [
+                    'original_caption' => $originalCaption,
+                    'refined_caption' => $refinedCaption,
+                    'original_media' => $originalMedia,
+                    'has_replacement_media' => $hasReplacementMedia,
+                    'final_media' => $finalMedia,
+                ]),
+            ]);
+
+            $this->recordAuditTrail(
+                $postRequest,
+                'IMC_QA_CHANGES_SAVED',
+                $user,
+                'IMC saved caption and/or media preparation changes.'
+            );
+
+            $this->clearDashboardCache();
+
+            return response()->json([
+                'message' => 'Changes saved successfully.',
+                'data' => new PostRequestResource($postRequest->load(['category', 'requestor', 'media', 'approvalWorkflows.approver'])),
+            ]);
+        });
+    }
+
     public function getDashboardStats(Request $request): JsonResponse
     {
         $user = $request->user();

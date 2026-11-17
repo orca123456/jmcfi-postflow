@@ -2966,14 +2966,63 @@ export default function RequestorDashboard() {
 
                     {/* Interactive Mockup Container */}
                     {(() => {
-                      const rawList = selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [];
-                      const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
+                      let checklist = selectedQueuePost?.imc_branding_checklist || selectedQueuePost?.rawPost?.imc_branding_checklist;
+                      if (typeof checklist === 'string') {
+                        try { checklist = JSON.parse(checklist); } catch {}
+                      }
+
+                      const originalMediaList: any[] = (Array.isArray(checklist?.original_media) && checklist.original_media.length > 0)
+                        ? checklist.original_media
+                        : (selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || []);
+
+                      const finalMediaList: any[] = (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0)
+                        ? checklist.final_media
+                        : (checklist?.has_replacement_media && Array.isArray(selectedQueuePost?.media) && selectedQueuePost.media.length > 0)
+                        ? selectedQueuePost.media
+                        : [];
+
+                      const hasReplacements = finalMediaList.length > 0 && (
+                        Boolean(checklist?.has_replacement_media) ||
+                        (originalMediaList.length > 0 && JSON.stringify(finalMediaList) !== JSON.stringify(originalMediaList))
+                      );
+
+                      const mediaSource = hasReplacements && finalMediaList.length > 0
+                        ? finalMediaList
+                        : originalMediaList;
+
+                      const validList = getImageUrisFromMedia(Array.isArray(mediaSource) ? mediaSource : []);
                       const queuePostMediaImages = validList.length > 0
                         ? validList
                         : (selectedQueuePost?.thumbnailUrl ? [selectedQueuePost.thumbnailUrl] : []);
 
+                      const originalCaption = checklist?.original_caption || selectedQueuePost?.rawPost?.caption_narrative || selectedQueuePost?.caption || '';
+                      const refinedCaption = checklist?.refined_caption;
+                      const isCaptionRefined = Boolean(refinedCaption && refinedCaption.trim() && refinedCaption.trim() !== originalCaption.trim());
+                      const activeCaption = isCaptionRefined ? refinedCaption : (selectedQueuePost?.caption || '');
+                      const hasEnhancements = hasReplacements || isCaptionRefined;
+
                       return (
                         <>
+                          {hasEnhancements && (
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              borderRadius: 8,
+                              paddingHorizontal: 12,
+                              paddingVertical: 7,
+                              marginBottom: 10,
+                              gap: 8,
+                            }}>
+                              <Ionicons name="checkmark-done-circle" size={16} color="#4C007C" />
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
+                                Preview reflects approved IMC revisions (caption & media)
+                              </Text>
+                            </View>
+                          )}
+
                           {modalPlatformTab === 'facebook' && (
                             <View style={styles.socialMockupCard}>
                               <View style={styles.socialHeader}>
@@ -2984,7 +3033,7 @@ export default function RequestorDashboard() {
                                 </View>
                               </View>
 
-                              <FormattedText style={styles.socialCaptionText}>{selectedQueuePost.caption}</FormattedText>
+                              <FormattedText style={styles.socialCaptionText}>{activeCaption}</FormattedText>
 
                               {queuePostMediaImages.length > 0 ? (
                                 <FacebookMediaGrid
@@ -3045,7 +3094,7 @@ export default function RequestorDashboard() {
                                   <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
                                 </View>
                                 <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                                <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_cite </b>' + (selectedQueuePost.caption || '')}</FormattedText>
+                                <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_cite </b>' + (activeCaption || '')}</FormattedText>
                               </View>
                             </View>
                           )}
@@ -3069,7 +3118,12 @@ export default function RequestorDashboard() {
                           <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
                           <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedQueuePost.title}</Text>
                           <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedQueuePost.date}</Text>
-                          <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedQueuePost.caption}</FormattedText>
+                          <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>
+                            {(() => {
+                              const checklist = selectedQueuePost?.imc_branding_checklist || selectedQueuePost?.rawPost?.imc_branding_checklist;
+                              return checklist?.refined_caption || selectedQueuePost.caption;
+                            })()}
+                          </FormattedText>
                         </View>
                       </View>
                     )}
@@ -3165,12 +3219,192 @@ export default function RequestorDashboard() {
                       </View>
                     </View>
 
-                    <View style={styles.metaDivider} />
+                    {(() => {
+                      const isDirectImc = selectedQueuePost.routing_type === 'direct_imc' || selectedQueuePost.rawPost?.routing_type === 'direct_imc';
+                      let checklist = selectedQueuePost.imc_branding_checklist || selectedQueuePost.rawPost?.imc_branding_checklist;
+                      if (typeof checklist === 'string') {
+                        try { checklist = JSON.parse(checklist); } catch {}
+                      }
 
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Caption / Main Text</Text>
-                      <FormattedText style={styles.metaCaptionBox}>{selectedQueuePost.caption}</FormattedText>
-                    </View>
+                      const originalCaption = checklist?.original_caption || selectedQueuePost.rawPost?.caption_narrative || selectedQueuePost.caption || '';
+                      const refinedCaption = checklist?.refined_caption;
+                      const isCaptionRefined = Boolean(refinedCaption && refinedCaption.trim() && refinedCaption.trim() !== originalCaption.trim());
+                      const finalCaption = (typeof refinedCaption === 'string' && refinedCaption.trim()) ? refinedCaption : (selectedQueuePost.caption || '');
+
+                      const originalMediaList: any[] = (Array.isArray(checklist?.original_media) && checklist.original_media.length > 0)
+                        ? checklist.original_media
+                        : (selectedQueuePost.media || selectedQueuePost.rawPost?.media || []);
+
+                      const finalMediaList: any[] = (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0)
+                        ? checklist.final_media
+                        : (checklist?.has_replacement_media && Array.isArray(selectedQueuePost.media) && selectedQueuePost.media.length > 0)
+                        ? selectedQueuePost.media
+                        : [];
+
+                      const hasReplacementMedia = Boolean(
+                        (checklist?.has_replacement_media && finalMediaList.length > 0) ||
+                        (finalMediaList.length > 0 && originalMediaList.length > 0 &&
+                         JSON.stringify(finalMediaList.map((m: any) => m.url || m.file_path || m.name || m.original_name)) !==
+                         JSON.stringify(originalMediaList.map((m: any) => m.url || m.file_path || m.name || m.original_name)))
+                      );
+
+                      const isPendingQa = ['pending_imc_qa', 'pending', 'pending_qa'].includes(String(selectedQueuePost.rawStatus || '').toLowerCase());
+
+                      return (
+                        <>
+                          <View style={styles.metaDivider} />
+
+                          {/* ── Status Note for Direct IMC Under QA ── */}
+                          {isDirectImc && isPendingQa && (
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 8,
+                              backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                              padding: 10,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              marginBottom: 4,
+                            }}>
+                              <Ionicons name="information-circle-outline" size={17} color="#4C007C" />
+                              <Text style={{ fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#475569', flex: 1, lineHeight: 17 }}>
+                                Directly routed to IMC. Currently under QA review. Caption refinements or replacement graphics prepared by IMC will appear below.
+                              </Text>
+                            </View>
+                          )}
+
+                          {/* ── CAPTION SECTION ── */}
+                          {isCaptionRefined ? (
+                            <View style={{ gap: 6 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Ionicons name="document-text-outline" size={14} color="#4C007C" />
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#4C007C', textTransform: 'uppercase' }}>
+                                    Final Caption (Updated by IMC)
+                                  </Text>
+                                </View>
+                                <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#DDD6FE' }}>
+                                  <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#6B21A8' }}>Refined by IMC</Text>
+                                </View>
+                              </View>
+                              <View style={{ backgroundColor: isDarkMode ? '#0F172A' : '#FAF5FF', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#D8B4FE' }}>
+                                <FormattedText style={{ fontSize: 13, color: Colors.textPrimary, lineHeight: 19 }}>
+                                  {refinedCaption}
+                                </FormattedText>
+                              </View>
+
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary, marginTop: 4, textTransform: 'uppercase' }}>
+                                Original Submitted Caption
+                              </Text>
+                              <View style={{ backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#E2E8F0' }}>
+                                <FormattedText style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18 }}>
+                                  {originalCaption}
+                                </FormattedText>
+                              </View>
+                            </View>
+                          ) : (
+                            <View style={styles.metaRow}>
+                              <Text style={styles.metaLabel}>Caption / Main Text</Text>
+                              <FormattedText style={styles.metaCaptionBox}>{finalCaption || 'No caption provided.'}</FormattedText>
+                            </View>
+                          )}
+
+                          <View style={styles.metaDivider} />
+
+                          {/* ── MEDIA ATTACHMENTS & REPLACEMENTS SECTION ── */}
+                          {hasReplacementMedia ? (
+                            <View style={{ gap: 10 }}>
+                              {/* Replaced Images by IMC */}
+                              <View style={{ gap: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="images" size={14} color="#4C007C" />
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#4C007C', textTransform: 'uppercase' }}>
+                                      Final Images (Uploaded by IMC - {finalMediaList.length})
+                                    </Text>
+                                  </View>
+                                  <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#DDD6FE' }}>
+                                    <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#6B21A8' }}>Replaced by IMC</Text>
+                                  </View>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                                  {finalMediaList.map((m: any, idx: number) => {
+                                    const uri = resolveImageUrl(m.url || m.file_url || m.file_path) || m.url;
+                                    return (
+                                      <TouchableOpacity
+                                        key={m.id || idx}
+                                        onPress={() => uri && setFullScreenImage(uri)}
+                                        activeOpacity={0.8}
+                                        style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: '#7C3AED', backgroundColor: '#F1F5F9' }}
+                                      >
+                                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+
+                              {/* Original Submitted Media */}
+                              <View style={{ gap: 6, marginTop: 4 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Ionicons name="folder-outline" size={13} color={Colors.textSecondary} />
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary, textTransform: 'uppercase' }}>
+                                    Original Submitted Images ({originalMediaList.length})
+                                  </Text>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                                  {originalMediaList.map((m: any, idx: number) => {
+                                    const uri = resolveImageUrl(m.url || m.file_url || m.file_path) || m.url;
+                                    return (
+                                      <TouchableOpacity
+                                        key={m.id || idx}
+                                        onPress={() => uri && setFullScreenImage(uri)}
+                                        activeOpacity={0.8}
+                                        style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: isDarkMode ? '#475569' : '#CBD5E1', backgroundColor: '#F1F5F9' }}
+                                      >
+                                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+                            </View>
+                          ) : (
+                            /* Attached Media Gallery (Original images) */
+                            <View style={{ gap: 6 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="images-outline" size={14} color={Colors.textPrimary} />
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary, textTransform: 'uppercase' }}>
+                                  Attached Images ({originalMediaList.length})
+                                </Text>
+                              </View>
+                              {originalMediaList.length > 0 ? (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                                  {originalMediaList.map((m: any, idx: number) => {
+                                    const uri = resolveImageUrl(m.url || m.file_url || m.file_path) || m.url;
+                                    return (
+                                      <TouchableOpacity
+                                        key={m.id || idx}
+                                        onPress={() => uri && setFullScreenImage(uri)}
+                                        activeOpacity={0.8}
+                                        style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: isDarkMode ? '#475569' : '#CBD5E1', backgroundColor: '#F1F5F9' }}
+                                      >
+                                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </ScrollView>
+                              ) : (
+                                <Text style={{ fontSize: 12, color: Colors.textMuted, fontStyle: 'italic' }}>
+                                  No photo attachments (Text-only request).
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
                   </View>
                 </View>
               </ScrollView>

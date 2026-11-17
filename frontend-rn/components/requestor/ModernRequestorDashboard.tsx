@@ -1167,14 +1167,14 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
               <View style={styles.redesignedSectionCard}>
                 <View style={styles.redesignedSectionHeader}>
                   <View style={styles.redesignedHeaderIconBox}>
-                    <Ionicons name="document-text-outline" size={18} color={palette.muted} />
+                    <Ionicons name="document-text-outline" size={18} color="#64748B" />
                   </View>
                   <Text style={styles.redesignedSectionTitle}>Basic Information</Text>
                 </View>
 
                 <View style={styles.redesignedFieldGroup}>
                   <Text style={styles.redesignedFieldLabel}>
-                    REQUEST TITLE <Text style={{ color: '#EF4444' }}>*</Text>
+                    Request title <Text style={{ color: '#EF4444' }}>*</Text>
                   </Text>
                   <TextInput
                     style={styles.redesignedTextInput}
@@ -1187,10 +1187,10 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 </View>
 
                 <View style={[styles.redesignedFieldGroup, { marginTop: 14 }]}>
-                  <Text style={styles.redesignedFieldLabel}>DEPARTMENT</Text>
+                  <Text style={styles.redesignedFieldLabel}>Department</Text>
                   <View style={styles.redesignedReadonlyBox}>
                     <Text style={styles.redesignedReadonlyText} numberOfLines={1}>
-                      {user?.department || formDepartment || 'BSIT Department'}
+                      {user?.department || formDepartment || 'College of Information Technology Education'}
                     </Text>
                   </View>
                 </View>
@@ -1200,21 +1200,19 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
               <View style={styles.redesignedSectionCard}>
                 <View style={styles.redesignedSectionHeader}>
                   <View style={styles.redesignedHeaderIconBox}>
-                    <Ionicons name="document-text-outline" size={18} color={palette.muted} />
+                    <Ionicons name="document-text-outline" size={18} color="#64748B" />
                   </View>
-                  <Text style={styles.redesignedSectionTitle}>Caption</Text>
+                  <Text style={styles.redesignedSectionTitle}>
+                    Caption <Text style={{ color: '#EF4444' }}>*</Text>
+                  </Text>
                 </View>
 
                 <View style={styles.captionGuideCallout}>
                   <Text style={styles.captionGuideText}>
-                    Include the key details: <Text style={styles.captionGuideBold}>Who</Text> is involved,{' '}
-                    <Text style={styles.captionGuideBold}>What</Text> is happening,{' '}
-                    <Text style={styles.captionGuideBold}>When</Text> it will take place,{' '}
-                    <Text style={styles.captionGuideBold}>Where</Text> it will happen, and{' '}
-                    <Text style={styles.captionGuideBold}>Why</Text> it is important.
+                    Include who is involved, what is happening, when and where it takes place, and why it matters.
                   </Text>
-                  <Text style={[styles.captionGuideText, { marginTop: 8 }]}>
-                    <Text style={styles.captionGuideBold}>Example:</Text> The JMCFI Student Council invites all students to a Cybersecurity Awareness Seminar on November 18, 2026, at 9:00 AM in the JMCFI Auditorium to promote safe and responsible technology use.
+                  <Text style={[styles.captionGuideText, { marginTop: 6 }]}>
+                    Example: The JMCFI Student Council invites all students to [event] on [date and time] at [venue] to [purpose].
                   </Text>
                 </View>
 
@@ -1228,7 +1226,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                       }
                     }}
                     placeholder="Write a brief caption describing the activity, event, or announcement..."
-                    minHeight={180}
+                    minHeight={160}
                     hideExtraActions
                   />
                 </View>
@@ -1249,9 +1247,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     activeOpacity={0.75}
                   >
                     {isCheckingPolicy ? (
-                      <ActivityIndicator size="small" color={palette.muted} style={{ marginRight: 6 }} />
+                      <ActivityIndicator size="small" color="#4C007C" style={{ marginRight: 6 }} />
                     ) : (
-                      <Ionicons name="shield-outline" size={15} color={palette.muted} style={{ marginRight: 6 }} />
+                      <Ionicons name="shield-checkmark-outline" size={15} color="#4C007C" style={{ marginRight: 6 }} />
                     )}
                     <Text style={styles.redesignedAiPolicyBtnText}>
                       {isCheckingPolicy ? 'AI Analyzing...' : 'AI Check Policy Alignment'}
@@ -1294,16 +1292,18 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 )}
               </View>
 
-              {/* TARGET PLATFORMS & PHOTO RULES */}
+              {/* TARGET PLATFORMS */}
               <View style={styles.redesignedSectionCard}>
                 <View style={styles.redesignedSectionHeader}>
                   <View style={styles.redesignedHeaderIconBox}>
-                    <Ionicons name="share-social-outline" size={18} color={palette.muted} />
+                    <Ionicons name="share-social-outline" size={18} color="#64748B" />
                   </View>
-                  <Text style={styles.redesignedSectionTitle}>Target Platforms & Photo Rules</Text>
+                  <Text style={styles.redesignedSectionTitle}>
+                    Target Platforms <Text style={{ color: '#EF4444' }}>*</Text>
+                  </Text>
                 </View>
                 <Text style={styles.platformSectionSub}>
-                  Select publishing destinations to activate platform-specific photo quality filters & aspect ratio rules.
+                  Choose where to publish. Photo requirements apply to your selected platforms.
                 </Text>
 
                 <View style={styles.targetPlatformCardsRow}>
@@ -1327,8 +1327,8 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     activeOpacity={0.75}
                   >
                     <View style={styles.targetPlatformCardTop}>
-                      <View style={[styles.targetPlatformIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                        <Ionicons name="logo-facebook" size={16} color="#1877F2" />
+                      <View style={[styles.targetPlatformIconWrap, { backgroundColor: '#1877F2' }]}>
+                        <Ionicons name="logo-facebook" size={15} color="#FFFFFF" />
                       </View>
                       <View style={[
                         styles.targetPlatformCheckbox,
@@ -1339,6 +1339,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     </View>
                     <Text style={styles.targetPlatformTitle}>Facebook</Text>
                     <Text style={styles.targetPlatformDesc}>Auto HD &bull; Max 4MB</Text>
+                    <Text style={[styles.targetPlatformStatus, targetPlatforms.facebook && { color: '#1877F2', fontWeight: '700' }]}>
+                      {targetPlatforms.facebook ? 'Selected' : 'Not selected'}
+                    </Text>
                   </TouchableOpacity>
 
                   {/* Instagram */}
@@ -1373,6 +1376,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     </View>
                     <Text style={styles.targetPlatformTitle}>Instagram</Text>
                     <Text style={styles.targetPlatformDesc}>4:5 to 1.91:1 Ratio</Text>
+                    <Text style={[styles.targetPlatformStatus, targetPlatforms.instagram && { color: '#E1306C', fontWeight: '700' }]}>
+                      {targetPlatforms.instagram ? 'Selected' : 'Not selected'}
+                    </Text>
                   </TouchableOpacity>
 
                   {/* Website */}
@@ -1407,26 +1413,29 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     </View>
                     <Text style={styles.targetPlatformTitle}>Website</Text>
                     <Text style={styles.targetPlatformDesc}>Featured Cover</Text>
+                    <Text style={[styles.targetPlatformStatus, targetPlatforms.website && { color: '#059669', fontWeight: '700' }]}>
+                      {targetPlatforms.website ? 'Selected' : 'Not selected'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* SECTION: MEDIA ATTACHMENT */}
-              <View style={styles.formGroup}>
-                <Text style={styles.subFieldLabel}>Media Attachment</Text>
+              <View style={styles.redesignedSectionCard}>
+                <Text style={styles.cleanSectionHeading}>Media Attachment</Text>
 
                 <TouchableOpacity
-                  style={styles.dropzoneContainer}
+                  style={styles.cleanDropzoneContainer}
                   accessibilityRole="button"
-                  accessibilityLabel="Upload an image"
+                  accessibilityLabel="Browse images"
                   onPress={handlePickMedia}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.uploadIconBadge}>
-                    <Ionicons name="image" size={24} color="#6D28D9" />
+                  <View style={styles.cleanUploadIconBadge}>
+                    <Ionicons name="images" size={22} color="#7C3AED" />
                   </View>
-                  <Text style={styles.dropzoneTitle}>Upload Image</Text>
-                  <Text style={styles.dropzoneSubtitle}>Drag and drop your image here or click to browse (JPG, PNG, WebP)</Text>
+                  <Text style={styles.cleanDropzoneTitle}>Browse images</Text>
+                  <Text style={styles.cleanDropzoneSubtitle}>JPEG, PNG or WebP · Select one or more images</Text>
                 </TouchableOpacity>
 
                 {attachedFiles.length > 0 && (
@@ -1666,84 +1675,82 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
               </View>
 
               {/* LIVE CONTENT PREVIEW: FACEBOOK / INSTAGRAM / WEBSITE */}
-              <View style={styles.formGroup}>
-                <View style={styles.previewHeaderRow}>
-                  <Text style={styles.subFieldLabel}>Content Preview</Text>
+              <View style={styles.redesignedSectionCard}>
+                <Text style={styles.cleanSectionHeading}>Content Preview</Text>
 
-                  {/* Platform Selector Tabs */}
-                  <View style={styles.platformSelectorRow}>
-                    <TouchableOpacity
-                      accessibilityRole="button"
+                {/* Platform Selector Tabs */}
+                <View style={styles.cleanPreviewPlatformTabsRow}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={[
+                      styles.cleanPreviewPlatformTab,
+                      formPreviewPlatform === 'facebook' && styles.cleanPreviewPlatformTabActiveFb,
+                    ]}
+                    onPress={() => setFormPreviewPlatform('facebook')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="logo-facebook"
+                      size={15}
+                      color={formPreviewPlatform === 'facebook' ? '#1877F2' : '#64748B'}
+                    />
+                    <Text
                       style={[
-                        styles.platformSelectorTab,
-                        formPreviewPlatform === 'facebook' && styles.platformSelectorTabActiveFacebook,
+                        styles.cleanPreviewPlatformTabText,
+                        formPreviewPlatform === 'facebook' && styles.cleanPreviewPlatformTabTextActiveFb,
                       ]}
-                      onPress={() => setFormPreviewPlatform('facebook')}
-                      activeOpacity={0.7}
                     >
-                      <Ionicons
-                        name="logo-facebook"
-                        size={13}
-                        color={formPreviewPlatform === 'facebook' ? '#1877F2' : '#64748B'}
-                      />
-                      <Text
-                        style={[
-                          styles.platformSelectorTabText,
-                          formPreviewPlatform === 'facebook' && styles.platformSelectorTabTextActiveFacebook,
-                        ]}
-                      >
-                        Facebook
-                      </Text>
-                    </TouchableOpacity>
+                      Facebook
+                    </Text>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={[
+                      styles.cleanPreviewPlatformTab,
+                      formPreviewPlatform === 'instagram' && styles.cleanPreviewPlatformTabActiveIg,
+                    ]}
+                    onPress={() => setFormPreviewPlatform('instagram')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="logo-instagram"
+                      size={15}
+                      color={formPreviewPlatform === 'instagram' ? '#E1306C' : '#64748B'}
+                    />
+                    <Text
                       style={[
-                        styles.platformSelectorTab,
-                        formPreviewPlatform === 'instagram' && styles.platformSelectorTabActiveInstagram,
+                        styles.cleanPreviewPlatformTabText,
+                        formPreviewPlatform === 'instagram' && styles.cleanPreviewPlatformTabTextActiveIg,
                       ]}
-                      onPress={() => setFormPreviewPlatform('instagram')}
-                      activeOpacity={0.7}
                     >
-                      <Ionicons
-                        name="logo-instagram"
-                        size={13}
-                        color={formPreviewPlatform === 'instagram' ? '#E1306C' : '#64748B'}
-                      />
-                      <Text
-                        style={[
-                          styles.platformSelectorTabText,
-                          formPreviewPlatform === 'instagram' && styles.platformSelectorTabTextActiveInstagram,
-                        ]}
-                      >
-                        Instagram
-                      </Text>
-                    </TouchableOpacity>
+                      Instagram
+                    </Text>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={[
+                      styles.cleanPreviewPlatformTab,
+                      formPreviewPlatform === 'website' && styles.cleanPreviewPlatformTabActiveWeb,
+                    ]}
+                    onPress={() => setFormPreviewPlatform('website')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="globe-outline"
+                      size={15}
+                      color={formPreviewPlatform === 'website' ? '#059669' : '#64748B'}
+                    />
+                    <Text
                       style={[
-                        styles.platformSelectorTab,
-                        formPreviewPlatform === 'website' && styles.platformSelectorTabActiveWebsite,
+                        styles.cleanPreviewPlatformTabText,
+                        formPreviewPlatform === 'website' && styles.cleanPreviewPlatformTabTextActiveWeb,
                       ]}
-                      onPress={() => setFormPreviewPlatform('website')}
-                      activeOpacity={0.7}
                     >
-                      <Ionicons
-                        name="globe-outline"
-                        size={13}
-                        color={formPreviewPlatform === 'website' ? '#059669' : '#64748B'}
-                      />
-                      <Text
-                        style={[
-                          styles.platformSelectorTabText,
-                          formPreviewPlatform === 'website' && styles.platformSelectorTabTextActiveWebsite,
-                        ]}
-                      >
-                        Website
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                      Website
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Mockup Card */}
@@ -1762,11 +1769,13 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                       <Ionicons name="ellipsis-horizontal" size={16} color={palette.muted} />
                     </View>
 
-                    <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                      <Text style={styles.socialCaptionText}>
-                        {formCaption ? formCaption.replace(/<[^>]*>/g, '') : 'Upload media to see your content preview here...'}
-                      </Text>
-                    </View>
+                    {formCaption ? (
+                      <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                        <Text style={styles.socialCaptionText}>
+                          {formCaption.replace(/<[^>]*>/g, '')}
+                        </Text>
+                      </View>
+                    ) : null}
 
                     {createFormImageUris.length > 0 ? (
                       <FacebookMediaGrid
@@ -1774,9 +1783,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         onImagePress={(uri) => setFullScreenImage(uri)}
                       />
                     ) : (
-                      <View style={styles.emptyMockMedia}>
-                        <Ionicons name="image-outline" size={32} color={palette.muted} />
-                        <Text style={styles.emptyMockMediaText}>Upload media to see your content preview here...</Text>
+                      <View style={styles.emptyMockMediaClean}>
+                        <Ionicons name="image-outline" size={36} color="#94A3B8" />
+                        <Text style={styles.emptyMockMediaCleanText}>No image attached</Text>
                       </View>
                     )}
 
@@ -1820,9 +1829,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         onImagePress={(uri) => setFullScreenImage(uri)}
                       />
                     ) : (
-                      <View style={[styles.emptyMockMedia, { aspectRatio: 1 }]}>
-                        <Ionicons name="image-outline" size={32} color={palette.muted} />
-                        <Text style={styles.emptyMockMediaText}>Upload media to see your content preview here...</Text>
+                      <View style={[styles.emptyMockMediaClean, { aspectRatio: 1, height: undefined }]}>
+                        <Ionicons name="image-outline" size={36} color="#94A3B8" />
+                        <Text style={styles.emptyMockMediaCleanText}>No image attached</Text>
                       </View>
                     )}
 
@@ -1836,10 +1845,12 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         <Ionicons name="bookmark-outline" size={18} color="#262626" />
                       </View>
                       <Text style={styles.instagramLikesText}>Liked by jmcfi_official and others</Text>
-                      <Text style={styles.instagramCaptionText}>
-                        <Text style={{ fontWeight: '700' }}>jmc_official </Text>
-                        {formCaption ? formCaption.replace(/<[^>]*>/g, '') : 'Upload media to see your content preview here...'}
-                      </Text>
+                      {formCaption ? (
+                        <Text style={styles.instagramCaptionText}>
+                          <Text style={{ fontWeight: '700' }}>jmc_official </Text>
+                          {formCaption.replace(/<[^>]*>/g, '')}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                 )}
@@ -1878,47 +1889,59 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         </View>
                       </TouchableOpacity>
                     ) : (
-                      <View style={[styles.emptyMockMedia, { height: 120, marginBottom: 10 }]}>
-                        <Ionicons name="image-outline" size={28} color={palette.muted} />
-                        <Text style={styles.emptyMockMediaText}>Upload media for Website Featured Image...</Text>
+                      <View style={[styles.emptyMockMediaClean, { height: 140, marginBottom: 10 }]}>
+                        <Ionicons name="image-outline" size={36} color="#94A3B8" />
+                        <Text style={styles.emptyMockMediaCleanText}>No image attached</Text>
                       </View>
                     )}
 
-                    <Text style={styles.websiteBodyText}>
-                      {formCaption ? formCaption.replace(/<[^>]*>/g, '') : 'Upload media to see your content preview here...'}
-                    </Text>
+                    {formCaption ? (
+                      <Text style={styles.websiteBodyText}>
+                        {formCaption.replace(/<[^>]*>/g, '')}
+                      </Text>
+                    ) : null}
                   </View>
                 )}
               </View>
 
-              {/* BUTTONS: CANCEL & SUBMIT */}
-              <View style={[styles.formActionsRow, isCompact && styles.formActionsCompact]}>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={[styles.cancelBtn, isCompact && styles.formActionCompact]}
-                  onPress={() => {
-                    setFormTitle('');
-                    setFormCaption('');
-                    setAttachedFiles([]);
-                    setFeaturedMediaIndex(0);
-                    if (!isDesktop) setIsSidePanelOpen(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
+              {/* PANEL FOOTER BAR: SUMMARY & ACTIONS */}
+              <View style={styles.panelFooterBar}>
+                <View style={styles.footerSummaryCol}>
+                  <Text style={styles.footerSummaryTitle}>Add a title, caption, and publishing destination</Text>
+                  <Text style={styles.footerSummarySub}>
+                    {[targetPlatforms.facebook, targetPlatforms.instagram, targetPlatforms.website].filter(Boolean).length} platforms selected &bull; {attachedFiles.length} images attached &bull; Images are optional
+                  </Text>
+                </View>
 
-                <TouchableOpacity
-                  style={[styles.submitBtn, isCompact && styles.formActionCompact]}
-                  accessibilityRole="button"
-                  accessibilityLabel={isSubmitting ? 'Submitting request to IMC' : 'Submit request to IMC'}
-                  testID="requestor-imc-submit"
-                  onPress={handleSubmit}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="paper-plane" size={16} color={GOLD_INK} style={{ marginRight: 6 }} />
-                  <Text style={styles.submitBtnText}>{isSubmitting ? "Submitting to IMC..." : "Submit Request"}</Text>
-                </TouchableOpacity>
+                <View style={styles.footerActionsGroup}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.cleanCancelBtn}
+                    onPress={() => {
+                      setFormTitle('');
+                      setFormCaption('');
+                      setAttachedFiles([]);
+                      setFeaturedMediaIndex(0);
+                      if (!isDesktop) setIsSidePanelOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cleanCancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.cleanSubmitBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={isSubmitting ? 'Submitting request to IMC' : 'Submit request to IMC'}
+                    testID="requestor-imc-submit"
+                    onPress={handleSubmit}
+                    activeOpacity={0.85}
+                    disabled={isSubmitting}
+                  >
+                    <Ionicons name="send" size={13} color="#1A1A2E" style={{ marginRight: 6 }} />
+                    <Text style={styles.cleanSubmitBtnText}>{isSubmitting ? "Submitting to IMC..." : "Submit Request"}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
@@ -4316,6 +4339,179 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     color: palette.dark ? '#93C5FD' : '#1E40AF',
     fontWeight: '600',
     flex: 1,
+  },
+
+  targetPlatformStatus: {
+    lineHeight: 14,
+    fontSize: 11,
+    color: palette.muted,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  cleanSectionHeading: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: palette.text,
+    marginBottom: 10,
+  },
+  cleanDropzoneContainer: {
+    backgroundColor: palette.dark ? '#1E293B' : '#F8FAFC',
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  cleanUploadIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  cleanDropzoneTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 4,
+  },
+  cleanDropzoneSubtitle: {
+    fontSize: 11.5,
+    color: palette.muted,
+  },
+  cleanPreviewPlatformTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  cleanPreviewPlatformTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.field,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.15s ease' } : {}),
+  },
+  cleanPreviewPlatformTabActiveFb: {
+    borderColor: '#BFDBFE',
+    backgroundColor: palette.dark ? '#172554' : '#EFF6FF',
+  },
+  cleanPreviewPlatformTabActiveIg: {
+    borderColor: '#FBCFE8',
+    backgroundColor: palette.dark ? '#500724' : '#FDF2F8',
+  },
+  cleanPreviewPlatformTabActiveWeb: {
+    borderColor: '#A7F3D0',
+    backgroundColor: palette.dark ? '#052E2B' : '#ECFDF5',
+  },
+  cleanPreviewPlatformTabText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: palette.muted,
+  },
+  cleanPreviewPlatformTabTextActiveFb: {
+    color: '#1877F2',
+    fontWeight: '700',
+  },
+  cleanPreviewPlatformTabTextActiveIg: {
+    color: '#E1306C',
+    fontWeight: '700',
+  },
+  cleanPreviewPlatformTabTextActiveWeb: {
+    color: '#059669',
+    fontWeight: '700',
+  },
+  emptyMockMediaClean: {
+    height: 160,
+    backgroundColor: palette.dark ? '#0F172A' : '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
+  },
+  emptyMockMediaCleanText: {
+    fontSize: 12.5,
+    color: '#94A3B8',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  panelFooterBar: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  footerSummaryCol: {
+    flex: 1,
+    minWidth: 220,
+  },
+  footerSummaryTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 4,
+  },
+  footerSummarySub: {
+    fontSize: 12,
+    color: palette.muted,
+  },
+  footerActionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cleanCancelBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.field,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  cleanCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: palette.text,
+  },
+  cleanSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: '#FFC72C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  cleanSubmitBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1A1A2E',
   },
 
   lightboxOverlay: {

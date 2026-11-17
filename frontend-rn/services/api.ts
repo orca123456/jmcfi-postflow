@@ -150,6 +150,13 @@ export const postsApi = {
   aiCheck: (id: number) => api.post(`/posts/${id}/ai-check`),
   aiCheckDraft: (data: object) => api.post(`/posts/ai-check-draft`, data),
   setFeaturedMedia: (id: number, mediaId: number) => api.post(`/posts/${id}/featured-media`, { media_id: mediaId }),
+  downloadAllMedia: (id: number) => api.get(`/posts/${id}/download-media`, { responseType: 'blob' }),
+  saveImcChanges: (id: number | string, data: any) => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    return api.post(`/posts/${id}/save-imc-changes`, data, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
+  },
   adminBypassApprove: (id: number, data: object = {}) => api.post(`/posts/${id}/admin-bypass-approve`, data),
 };
 
