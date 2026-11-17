@@ -596,6 +596,25 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     }
   };
 
+  const filterAllowedImages = (items: AttachedMediaItem[]) => {
+    const valid: AttachedMediaItem[] = [];
+    let rejectedVideoOrNonImage = false;
+    for (const item of items) {
+      const mime = String(item.mimeType || '').toLowerCase();
+      const name = String(item.name || '').toLowerCase();
+      const isVideo = mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(name);
+      if (isVideo || (!mime.startsWith('image/') && !/\.(jpe?g|png|webp)$/i.test(name) && !isImageFile(item))) {
+        rejectedVideoOrNonImage = true;
+      } else {
+        valid.push(item);
+      }
+    }
+    if (rejectedVideoOrNonImage) {
+      alert('Video uploads are not allowed. Please select images (JPG, PNG, WebP) only.');
+    }
+    return valid;
+  };
+
   const handlePickMedia = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
@@ -604,15 +623,17 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         copyToCacheDirectory: true,
       });
       if (!res.canceled && res.assets && res.assets.length > 0) {
-        const rawItems = res.assets.map((asset) => ({
+        const rawItems = filterAllowedImages(res.assets.map((asset) => ({
           uri: asset.uri,
           name: asset.name || 'image.jpg',
           file: (asset as any).file,
           mimeType: asset.mimeType || 'image/jpeg',
           size: asset.size || 0,
-        }));
-        const processed = await processFiles(rawItems);
-        setAttachedFiles((prev) => [...prev, ...processed]);
+        })));
+        if (rawItems.length > 0) {
+          const processed = await processFiles(rawItems);
+          setAttachedFiles((prev) => [...prev, ...processed]);
+        }
       }
     } catch {
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -623,15 +644,17 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         input.onchange = async (e: any) => {
           const files = Array.from(e.target.files || []) as File[];
           if (files.length > 0) {
-            const rawItems = files.map((f) => ({
+            const rawItems = filterAllowedImages(files.map((f) => ({
               uri: URL.createObjectURL(f),
               name: f.name,
               file: f,
               mimeType: f.type,
               size: f.size,
-            }));
-            const processed = await processFiles(rawItems);
-            setAttachedFiles((prev) => [...prev, ...processed]);
+            })));
+            if (rawItems.length > 0) {
+              const processed = await processFiles(rawItems);
+              setAttachedFiles((prev) => [...prev, ...processed]);
+            }
           }
         };
         input.click();
@@ -1395,15 +1418,15 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 <TouchableOpacity
                   style={styles.dropzoneContainer}
                   accessibilityRole="button"
-                  accessibilityLabel="Upload an image or video"
+                  accessibilityLabel="Upload an image"
                   onPress={handlePickMedia}
                   activeOpacity={0.8}
                 >
                   <View style={styles.uploadIconBadge}>
                     <Ionicons name="image" size={24} color="#6D28D9" />
                   </View>
-                  <Text style={styles.dropzoneTitle}>Upload Image or Video</Text>
-                  <Text style={styles.dropzoneSubtitle}>Drag and drop your file here or click to browse</Text>
+                  <Text style={styles.dropzoneTitle}>Upload Image</Text>
+                  <Text style={styles.dropzoneSubtitle}>Drag and drop your image here or click to browse (JPG, PNG, WebP)</Text>
                 </TouchableOpacity>
 
                 {attachedFiles.length > 0 && (

@@ -40,6 +40,15 @@ import { RequestTypeSelector } from '../../../components/requestor/RequestTypeSe
 import { RequestorDrafts } from '../../../components/requestor/RequestorDrafts';
 import { RequestorRejected } from '../../../components/requestor/RequestorRejected';
 
+const DEFAULT_CATEGORIES: { id: number; name: string }[] = [
+  { id: 1, name: 'Announcement' },
+  { id: 2, name: 'News' },
+  { id: 3, name: 'Event' },
+  { id: 4, name: 'Advisory' },
+  { id: 5, name: 'Blog' },
+  { id: 6, name: 'Others' },
+];
+
 export default function RequestorDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -103,7 +112,7 @@ export default function RequestorDashboard() {
   const [category, setCategory] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [otherCategoryName, setOtherCategoryName] = useState('');
-  const [apiCategories, setApiCategories] = useState<{ id: number; name: string }[]>([]);
+  const [apiCategories, setApiCategories] = useState<{ id: number; name: string }[]>(DEFAULT_CATEGORIES);
   const [department, setDepartment] = useState(user?.department || 'ICT');
 
   useEffect(() => {
@@ -130,6 +139,7 @@ export default function RequestorDashboard() {
 
   // Dropdown States
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
 
   // Preview States
@@ -284,14 +294,21 @@ export default function RequestorDashboard() {
   const handleEditDraft = (draft: any) => {
     setEditingPostId(draft.id);
     setPostTitle(draft.title || '');
-    const matchedCat = apiCategories.find(c => c.name === draft.category);
-    if (matchedCat) {
-      setCategory(matchedCat.name);
-      setCategoryId(matchedCat.id);
-      if (matchedCat.name === 'Others') {
-        setOtherCategoryName(draft.other_category_name || '');
-      } else {
-        setOtherCategoryName('');
+    if (draft.other_category_name) {
+      const othersCat = apiCategories.find(c => ['others', 'other'].includes(c.name.toLowerCase()));
+      setCategory('Others');
+      setCategoryId(othersCat ? othersCat.id : (draft.category_id || 6));
+      setOtherCategoryName(draft.other_category_name);
+    } else {
+      const matchedCat = apiCategories.find(c => c.name === draft.category);
+      if (matchedCat) {
+        setCategory(matchedCat.name);
+        setCategoryId(matchedCat.id);
+        if (['others', 'other'].includes(matchedCat.name.toLowerCase())) {
+          setOtherCategoryName(draft.other_category_name || '');
+        } else {
+          setOtherCategoryName('');
+        }
       }
     }
     setCaption(draft.caption_narrative || draft.caption || '');
@@ -327,14 +344,21 @@ export default function RequestorDashboard() {
 
   const handleCreateNewFromRejected = (post: any) => {
     setPostTitle(post.title ? `${post.title} (Revised)` : '');
-    const matchedCat = apiCategories.find(c => c.name === post.category);
-    if (matchedCat) {
-      setCategory(matchedCat.name);
-      setCategoryId(matchedCat.id);
-      if (matchedCat.name === 'Others') {
-        setOtherCategoryName(post.other_category_name || '');
-      } else {
-        setOtherCategoryName('');
+    if (post.other_category_name) {
+      const othersCat = apiCategories.find(c => ['others', 'other'].includes(c.name.toLowerCase()));
+      setCategory('Others');
+      setCategoryId(othersCat ? othersCat.id : (post.category_id || 6));
+      setOtherCategoryName(post.other_category_name);
+    } else {
+      const matchedCat = apiCategories.find(c => c.name === post.category);
+      if (matchedCat) {
+        setCategory(matchedCat.name);
+        setCategoryId(matchedCat.id);
+        if (['others', 'other'].includes(matchedCat.name.toLowerCase())) {
+          setOtherCategoryName(post.other_category_name || '');
+        } else {
+          setOtherCategoryName('');
+        }
       }
     }
     setCaption(post.caption_narrative || post.caption || '');
@@ -358,29 +382,24 @@ export default function RequestorDashboard() {
   // Fetch categories from API on mount
   useEffect(() => {
     categoriesApi.list().then((res: any) => {
-      const cats = res.data?.data || [];
-      setApiCategories(cats);
-      if (cats.length > 0 && !categoryId) {
-        setCategory(cats[0].name);
-        setCategoryId(cats[0].id);
+      const rawCats = res.data?.data || res.data || [];
+      const list = Array.isArray(rawCats) && rawCats.length > 0 ? [...rawCats] : [...DEFAULT_CATEGORIES];
+      const isOthers = (name: string) => ['other', 'others'].includes(String(name || '').trim().toLowerCase());
+      const standardCats = list.filter((c: any) => !isOthers(c?.name));
+      const othersCats = list.filter((c: any) => isOthers(c?.name));
+      if (othersCats.length === 0) {
+        othersCats.push({ id: 6, name: 'Others' });
       }
+      const normalized = [...standardCats, ...othersCats];
+      setApiCategories(normalized);
     }).catch(() => {
       // fallback to static options if API fails
-      const fallback = [
-        { id: 1, name: 'Announcement' },
-        { id: 2, name: 'News' },
-        { id: 3, name: 'Event' },
-        { id: 4, name: 'Advisory' },
-        { id: 5, name: 'Blog' },
-      ];
-      setApiCategories(fallback);
-      setCategory(fallback[0].name);
-      setCategoryId(fallback[0].id);
+      setApiCategories(DEFAULT_CATEGORIES);
     });
   }, []);
 
   // Categories & Departments options
-  const categoryOptions = apiCategories.length > 0 ? apiCategories.map(c => c.name) : ['Announcement', 'News', 'Event', 'Advisory', 'Blog'];
+  const categoryOptions = apiCategories.length > 0 ? apiCategories.map(c => c.name) : DEFAULT_CATEGORIES.map(c => c.name);
 
   const departmentOptions = [
     'College of Computing Studies',
@@ -424,9 +443,11 @@ export default function RequestorDashboard() {
       title: p.title || 'Untitled',
       caption: p.caption_narrative || '',
       platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
-      category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
-        ? p.other_category_name
-        : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
+      category: (p.routing_type === 'direct_imc' || p.routingType === 'direct_imc')
+        ? 'Direct to IMC'
+        : ((p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+          ? p.other_category_name
+          : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category'))),
       other_category_name: p.other_category_name || null,
       preferred_schedule_at: p.preferred_schedule_at || null,
       department: p.requestor?.department || 'Department',
@@ -510,13 +531,12 @@ export default function RequestorDashboard() {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
       const mapped = posts.map(mapPost);
-      // Classic dashboard lists should only contain classic/standard requests (not direct IMC requests)
-      const isClassic = (p: any) => String(p.routing_type || p.routingType || 'standard').toLowerCase() !== 'direct_imc';
-      const filtered = mapped.filter((p: any) => isClassic(p) && p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
+      // Include all requests (both standard and direct IMC) in the requestor lists
+      const filtered = mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
       setMockRequests(filtered);
       setMockQueuePosts(filtered);
-      setDrafts(mapped.filter((p: any) => isClassic(p) && p.rawStatus === 'draft'));
-      setRejectedPosts(mapped.filter((p: any) => isClassic(p) && (p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision')));
+      setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
+      setRejectedPosts(mapped.filter((p: any) => (p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision')));
     }
   }, [postsDataRes]);
 
@@ -742,6 +762,16 @@ export default function RequestorDashboard() {
       return;
     }
 
+    if (!category) {
+      alert('Please select a category for your request.');
+      return;
+    }
+
+    if (category === 'Others' && !otherCategoryName.trim()) {
+      alert('Please specify the category of your request.');
+      return;
+    }
+
     if (mediaFiles.length === 0 && supportingDocs.length === 0 && !editingPostHasImage) {
       alert('Please attach at least one photo or media file before submitting.');
       return;
@@ -860,6 +890,9 @@ export default function RequestorDashboard() {
       showToast('Content request submitted successfully!');
       setEditingPostId(null);
       setPostTitle('');
+      setCategory('');
+      setCategoryId(null);
+      setOtherCategoryName('');
       setCaption('');
       setPublishDate('');
       setPublishTime('');
@@ -1141,6 +1174,7 @@ export default function RequestorDashboard() {
         #requestor-workspace :is([role="button"], input, textarea, select):focus-visible { outline: 2px solid #4C007C !important; outline-offset: 2px; }
         #requestor-request-details [role="button"]:focus-visible { outline: 2px solid #4C007C !important; outline-offset: 2px; }
         #requestor-workspace input:focus, #requestor-workspace textarea:focus { border-color: #4C007C !important; }
+        #requestor-workspace input[aria-label="Custom category name"], #requestor-workspace input[aria-label="Custom category name"]:focus, #requestor-workspace input[aria-label="Custom category name"]:focus-visible { outline: none !important; border: none !important; box-shadow: none !important; }
         :is(#requestor-workspace, #requestor-overview-range) input:is([type="date"], [type="time"]) { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-width: 0; box-sizing: border-box; }
         #requestor-workspace [data-testid="requestor-submit"] [dir="auto"] { color: #1A1A2E !important; }
         #requestor-workspace [data-testid="requestor-profile-upload"] [dir="auto"] { color: #1A1A2E !important; }
@@ -1172,8 +1206,13 @@ export default function RequestorDashboard() {
             setDashboardViewMode('classic');
             setActiveTab('dashboard');
           }}
-          onRequestSubmitted={() => {
-            loadPosts();
+          onRequestSubmitted={(newPostData?: any) => {
+            if (newPostData) {
+              const formattedSubmitted = mapPost(newPostData);
+              setMockRequests((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
+              setMockQueuePosts((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
+            }
+            loadPosts(false);
           }}
         />
       )}
@@ -1308,10 +1347,10 @@ export default function RequestorDashboard() {
           {/* Form Layout Split */}
           <View style={{ gap: 16 }}>
             {/* ROW 1 */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
-              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 200 : 2 }]}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 200 : 2 }]}>
                 {/* Basic Information Card */}
-                <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
+                <Card style={[styles.formCard, { overflow: 'visible' }, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 200, position: 'relative' } : {}] as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="document-text-outline" size={18} color="#334155" />
@@ -1333,16 +1372,155 @@ export default function RequestorDashboard() {
                     />
                   </View>
 
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                    <View style={[styles.dropdownSelector, { backgroundColor: '#F8FAFC', borderRadius: 8, height: 42, paddingHorizontal: 14 }]}>
-                      <Text style={styles.dropdownSelectorText}>{department}</Text>
+                  <View style={[styles.inlineFieldsRow, isTablet ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: isCategoryDropdownOpen ? 200 : 10 }]}>
+                    <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isCategoryDropdownOpen ? 200 : 10 }]}>
+                      <Text style={styles.inputLabel}>CATEGORY</Text>
+                      <View style={{ position: 'relative', zIndex: isCategoryDropdownOpen ? 200 : 10 }}>
+                        {category === 'Others' ? (
+                          <View
+                            style={[
+                              styles.dropdownSelector,
+                              { borderRadius: 8, height: 42, paddingHorizontal: 14, paddingRight: 8, flexDirection: 'row', alignItems: 'center' },
+                              isCategoryDropdownOpen && { borderColor: '#4C007C' },
+                            ]}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel="Change category"
+                                onPress={() => {
+                                  setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                                  setIsDeptDropdownOpen(false);
+                                }}
+                                style={{ paddingVertical: 4 }}
+                              >
+                                <Text style={[styles.dropdownSelectorText, { fontWeight: '600' }]}>Other: </Text>
+                              </TouchableOpacity>
+                              <TextInput
+                                accessibilityLabel="Custom category name"
+                                style={[
+                                  {
+                                    flex: 1,
+                                    fontSize: 14,
+                                    color: Colors.textPrimary,
+                                    padding: 0,
+                                    height: 24,
+                                    borderWidth: 0,
+                                    backgroundColor: 'transparent',
+                                  },
+                                  Platform.OS === 'web' && ({ outlineStyle: 'none', boxShadow: 'none' } as any),
+                                ]}
+                                placeholder="Type category here..."
+                                placeholderTextColor="#94A3B8"
+                                value={otherCategoryName}
+                                onChangeText={setOtherCategoryName}
+                                autoFocus
+                              />
+                            </View>
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              accessibilityLabel="Toggle category options"
+                              onPress={() => {
+                                setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                                setIsDeptDropdownOpen(false);
+                              }}
+                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                              style={[
+                                { padding: 6 },
+                                Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
+                              ]}
+                            >
+                              <Ionicons name={isCategoryDropdownOpen ? 'caret-up' : 'caret-down'} size={13} color="#52525B" />
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Category"
+                            style={[
+                              styles.dropdownSelector,
+                              { borderRadius: 8, height: 42, paddingHorizontal: 14, paddingRight: 12, flexDirection: 'row', alignItems: 'center' },
+                              isCategoryDropdownOpen && { borderColor: '#4C007C' },
+                              Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
+                            ]}
+                            onPress={() => {
+                              setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                              setIsDeptDropdownOpen(false);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.dropdownSelectorText, { flex: 1, color: category ? Colors.textPrimary : '#71717A' }]}>
+                              {category || 'Choose'}
+                            </Text>
+                            <Ionicons name={isCategoryDropdownOpen ? 'caret-up' : 'caret-down'} size={13} color="#52525B" />
+                          </TouchableOpacity>
+                        )}
+
+                        {isCategoryDropdownOpen && (
+                          <View style={[styles.dropdownMenu, { zIndex: 9999, backgroundColor: '#FFFFFF', borderRadius: 4, borderColor: '#E5E7EB', paddingVertical: 6, overflow: 'hidden' }]}>
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              style={{ paddingVertical: 12, paddingHorizontal: 18, backgroundColor: '#FFFFFF' }}
+                              onPress={() => {
+                                setCategory('');
+                                setCategoryId(null);
+                                setOtherCategoryName('');
+                                setHoveredCategory(null);
+                                setIsCategoryDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, color: '#71717A' }}>Choose</Text>
+                            </TouchableOpacity>
+                            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 4 }} />
+                            {apiCategories.map((cat) => {
+                              const isOtherItem = ['other', 'others'].includes(cat.name.toLowerCase());
+                              const isSelected = category === cat.name || (category === 'Others' && isOtherItem);
+                              const isHovered = hoveredCategory === cat.name;
+                              return (
+                                <TouchableOpacity
+                                  key={cat.id}
+                                  accessibilityRole="button"
+                                  {...(Platform.OS === 'web'
+                                    ? ({
+                                        onMouseEnter: () => setHoveredCategory(cat.name),
+                                        onMouseLeave: () => setHoveredCategory((prev) => (prev === cat.name ? null : prev)),
+                                      } as any)
+                                    : {})}
+                                  style={{
+                                    paddingVertical: 12,
+                                    paddingHorizontal: 18,
+                                    backgroundColor: isSelected || isHovered ? '#EEF4FF' : '#FFFFFF',
+                                  }}
+                                  onPress={() => {
+                                    setCategory(isOtherItem ? 'Others' : cat.name);
+                                    setCategoryId(cat.id);
+                                    if (!isOtherItem) setOtherCategoryName('');
+                                    setHoveredCategory(null);
+                                    setIsCategoryDropdownOpen(false);
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 14, color: '#1E293B', fontWeight: '400' }}>
+                                    {cat.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={[styles.fieldGroup, { flex: 1, zIndex: 1 }]}>
+                      <Text style={styles.inputLabel}>DEPARTMENT</Text>
+                      <View style={[styles.dropdownSelector, { backgroundColor: '#F8FAFC', borderRadius: 8, height: 42, paddingHorizontal: 14 }]}>
+                        <Text style={styles.dropdownSelectorText}>{department}</Text>
+                      </View>
                     </View>
                   </View>
                 </Card>
               </View>
 
-              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn]}>
+              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn, { zIndex: 1 }]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -1457,8 +1635,8 @@ export default function RequestorDashboard() {
             </View>
 
             {/* ROW 2 */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
-              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: 1 }]}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: 1 }]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -1468,28 +1646,6 @@ export default function RequestorDashboard() {
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <View style={{
-                      backgroundColor: '#F8FAFC',
-                      borderLeftWidth: 3.5,
-                      borderLeftColor: '#581C87',
-                      borderTopRightRadius: 8,
-                      borderBottomRightRadius: 8,
-                      paddingVertical: 12,
-                      paddingHorizontal: 14,
-                      marginBottom: 12,
-                    }}>
-                      <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 19 }}>
-                        Include the key details: <Text style={{ fontWeight: '700', color: '#1E293B' }}>Who</Text> is involved,{' '}
-                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>What</Text> is happening,{' '}
-                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>When</Text> it will take place,{' '}
-                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>Where</Text> it will happen, and{' '}
-                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>Why</Text> it is important.
-                      </Text>
-                      <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 19, marginTop: 8 }}>
-                        <Text style={{ fontWeight: '700', color: '#1E293B' }}>Example:</Text> The JMCFI Student Council invites all students to a Cybersecurity Awareness Seminar on November 18, 2026, at 9:00 AM in the JMCFI Auditorium to promote safe and responsible technology use.
-                      </Text>
-                    </View>
-
                     <View style={{ marginBottom: 8 }}>
                       <RichTextEditor
                         value={caption}
@@ -2710,7 +2866,6 @@ export default function RequestorDashboard() {
                                 <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                                   <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
                                 </View>
-                                <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                               </View>
 
                               <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
@@ -2937,7 +3092,11 @@ export default function RequestorDashboard() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.metaLabel}>Category</Text>
-                        <Text style={styles.metaVal}>{selectedQueuePost.other_category_name || selectedQueuePost.category}</Text>
+                        <Text style={styles.metaVal}>
+                          {(selectedQueuePost.routing_type === 'direct_imc' || selectedQueuePost.rawPost?.routing_type === 'direct_imc')
+                            ? 'Direct to IMC'
+                            : (selectedQueuePost.other_category_name || selectedQueuePost.category)}
+                        </Text>
                       </View>
                     </View>
 

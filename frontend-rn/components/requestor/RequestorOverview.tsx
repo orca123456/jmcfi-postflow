@@ -99,6 +99,12 @@ function displayInputDate(value: string): string {
 }
 
 function categoryName(request: any): string {
+  const isDirectImc = request.routing_type === 'direct_imc' ||
+    String(request.routingType || '').toLowerCase() === 'direct_imc' ||
+    request.rawPost?.routing_type === 'direct_imc';
+  if (isDirectImc) {
+    return 'Direct to IMC';
+  }
   const value = request.other_category_name || request.category?.name || request.category;
   return typeof value === 'string' && value.trim() ? value : '—';
 }
@@ -114,7 +120,7 @@ function sentenceCase(value: unknown): string {
 }
 
 function requestStatus(request: any): { label: string; stage: string } {
-  const raw = String(request.rawStatus || '').toLowerCase();
+  const raw = String(request.rawStatus || request.status || request.rawPost?.status || '').toLowerCase();
   if (raw === 'pending' || raw.startsWith('pending_')) {
     const stages: Record<string, string> = {
       pending_office_head: 'Department Head', pending_department_head: 'Department Head',
@@ -269,7 +275,7 @@ export function RequestorOverview({
   };
 
   const renderPlatforms = (request: any) => {
-    const names = platformNames(request.platforms);
+    const names = platformNames(request.platforms || request.target_platforms || request.rawPost?.target_platforms);
     return names.length ? names.map((name) => {
       const platform = platformDetails(name);
       return (
