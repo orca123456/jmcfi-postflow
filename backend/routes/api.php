@@ -33,6 +33,8 @@ Route::post('/auth/profile-photo', [AuthController::class, 'uploadPhoto'])->midd
 Route::delete('/auth/profile-photo', [AuthController::class, 'removePhoto'])->middleware('auth:sanctum');
 Route::match(['GET', 'HEAD', 'OPTIONS'], '/profile-photo/{user}', [AuthController::class, 'getPhoto'])->whereNumber('user');
 Route::match(['GET', 'HEAD', 'OPTIONS'], '/auth/profile-photo/{user}', [AuthController::class, 'getPhoto'])->whereNumber('user');
+Route::match(['GET', 'HEAD', 'OPTIONS'], '/email-template-image/{type}', [\App\Http\Controllers\Api\EmailSettingController::class, 'getTemplateImage'])
+    ->whereIn('type', ['logo', 'banner', 'content']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

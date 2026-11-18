@@ -301,12 +301,14 @@ export const emailSettingsApi = {
   get: () => api.get('/email-settings'),
   update: (data: object) => api.post('/email-settings', data),
   test: (data?: object) => api.post('/email-settings/test', data || {}, { timeout: 15000 }),
-  uploadLogo: (file: File) => {
+  uploadLogo: (file: File, type: 'logo' | 'banner' | 'content' = 'logo') => {
     const form = new FormData();
     form.append('logo', file);
+    form.append('type', type);
     return api.post('/email-settings/logo', form);
   },
-  removeLogo: () => api.delete('/email-settings/logo'),
+  removeLogo: (type: 'logo' | 'banner' | 'content' = 'logo') =>
+    api.delete('/email-settings/logo', { params: { type } }),
 };
 
 // ── API Tokens endpoints (Developer API) ──────────────────────────────────

@@ -23,9 +23,18 @@ class EmailSettingController extends Controller
         'mail_from_name',
         'mail_encryption',
         'email_template_header_title',
+        'email_template_header_subtitle',
         'email_template_brand_color',
+        'email_template_status_badge',
+        'email_template_greeting',
+        'email_template_body_message',
+        'email_template_button_text',
         'email_template_footer_text',
         'email_template_logo_url',
+        'email_template_banner_url',
+        'email_template_banner_mode',
+        'email_template_content_image_url',
+        'email_template_details_json',
     ];
 
     /**
@@ -66,17 +75,26 @@ class EmailSettingController extends Controller
             'mail_encryption'             => 'nullable|string|in:tls,ssl,',
             'mail_from_address'           => 'nullable|email|max:255',
             'mail_from_name'              => 'nullable|string|max:255',
-            'email_template_header_title' => 'nullable|string|max:255',
-            'email_template_brand_color'   => 'nullable|string|max:50',
-            'email_template_footer_text'  => 'nullable|string|max:1000',
-            'email_template_logo_url'     => 'nullable|string|max:2000',
+            'email_template_header_title'    => 'nullable|string|max:255',
+            'email_template_header_subtitle' => 'nullable|string|max:255',
+            'email_template_brand_color'     => 'nullable|string|max:50',
+            'email_template_status_badge'    => 'nullable|string|max:255',
+            'email_template_greeting'        => 'nullable|string|max:255',
+            'email_template_body_message'    => 'nullable|string|max:2000',
+            'email_template_button_text'     => 'nullable|string|max:255',
+            'email_template_footer_text'        => 'nullable|string|max:1000',
+            'email_template_logo_url'           => 'nullable|string|max:2000',
+            'email_template_banner_url'         => 'nullable|string|max:2000',
+            'email_template_banner_mode'        => 'nullable|string|in:overlay,full_image',
+            'email_template_content_image_url'  => 'nullable|string|max:2000',
+            'email_template_details_json'       => 'nullable|string|max:10000',
         ]);
 
         foreach ($this->allowedKeys as $key) {
-            if (isset($validated[$key])) {
+            if (array_key_exists($key, $validated)) {
                 SystemSetting::updateOrCreate(
                     ['key' => $key],
-                    ['value' => $validated[$key], 'type' => 'string', 'description' => "Mail setting: {$key}", 'is_public' => false]
+                    ['value' => (string)($validated[$key] ?? ''), 'type' => 'string', 'description' => "Mail setting: {$key}", 'is_public' => false]
                 );
             }
         }
@@ -129,28 +147,62 @@ class EmailSettingController extends Controller
         $adminName  = $request->user()->full_name;
         $cleanPassword = str_replace(' ', '', $password);
 
-        $tmplHeader = $request->input('email_template_header_title') ?: (SystemSetting::where('key', 'email_template_header_title')->value('value') ?: 'JMCFI PostFlow Notification');
-        $tmplColor  = $request->input('email_template_brand_color')   ?: (SystemSetting::where('key', 'email_template_brand_color')->value('value')   ?: '#800000');
-        $tmplFooter = $request->input('email_template_footer_text')  ?: (SystemSetting::where('key', 'email_template_footer_text')->value('value')  ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.');
-        $tmplLogo   = $request->input('email_template_logo_url')     ?: (SystemSetting::where('key', 'email_template_logo_url')->value('value')     ?: '');
+        $tmplHeader   = $request->input('email_template_header_title')    ?: (SystemSetting::where('key', 'email_template_header_title')->value('value')    ?: 'Jose Maria College Foundation, Inc.');
+        $tmplSubtitle = $request->input('email_template_header_subtitle') ?: (SystemSetting::where('key', 'email_template_header_subtitle')->value('value') ?: 'Assured • Consistent • Quality Education');
+        $tmplColor    = $request->input('email_template_brand_color')     ?: (SystemSetting::where('key', 'email_template_brand_color')->value('value')     ?: '#2E0854');
+        $tmplBadge    = $request->input('email_template_status_badge')    ?: (SystemSetting::where('key', 'email_template_status_badge')->value('value')    ?: 'PUBLISHED — SOCIAL MEDIA');
+        $tmplGreeting = $request->input('email_template_greeting')        ?: (SystemSetting::where('key', 'email_template_greeting')->value('value')        ?: "Hello {$adminName},");
+        $tmplBody     = $request->input('email_template_body_message')    ?: (SystemSetting::where('key', 'email_template_body_message')->value('value')    ?: 'The following post has been successfully published to the target institutional platforms.');
+        $tmplButton   = $request->input('email_template_button_text')     ?: (SystemSetting::where('key', 'email_template_button_text')->value('value')     ?: 'View in Dashboard');
+        $tmplFooter   = $request->input('email_template_footer_text')     ?: (SystemSetting::where('key', 'email_template_footer_text')->value('value')     ?: '© ' . date('Y') . ' Jose Maria College Foundation, Inc. All rights reserved.');
+        $tmplLogo     = $request->input('email_template_logo_url')        ?: (SystemSetting::where('key', 'email_template_logo_url')->value('value')        ?: '');
+        $tmplBanner   = $request->input('email_template_banner_url')      ?: (SystemSetting::where('key', 'email_template_banner_url')->value('value')      ?: '');
+        $tmplBannerMode = $request->input('email_template_banner_mode')   ?: (SystemSetting::where('key', 'email_template_banner_mode')->value('value')     ?: 'overlay');
+        $tmplContentImg = $request->input('email_template_content_image_url') ?: (SystemSetting::where('key', 'email_template_content_image_url')->value('value') ?: '');
+        $tmplDetailsRaw = $request->input('email_template_details_json')  ?: (SystemSetting::where('key', 'email_template_details_json')->value('value')  ?: '');
+
+        $tableDetails = [];
+        if (!empty($tmplDetailsRaw)) {
+            $decodedRows = is_string($tmplDetailsRaw) ? json_decode($tmplDetailsRaw, true) : $tmplDetailsRaw;
+            if (is_array($decodedRows)) {
+                foreach ($decodedRows as $row) {
+                    $label = trim((string)($row['label'] ?? ''));
+                    $val   = trim((string)($row['value'] ?? ''));
+                    if ($label !== '') {
+                        $tableDetails[$label] = $val;
+                    }
+                }
+            }
+        }
+        if (empty($tableDetails)) {
+            $tableDetails = [
+                'Title'               => 'Annual Campus Activity Request 2026',
+                'Category'            => 'Announcement',
+                'Published Platforms' => 'Facebook',
+                'Published At'        => now()->format('M d, Y h:i A'),
+                'Facebook Post ID'    => '122125475451447703',
+            ];
+        }
 
         $viewData = [
-            'headerTitle'     => $tmplHeader,
-            'brandColor'      => $tmplColor,
-            'footerText'      => $tmplFooter,
-            'headerBannerUrl' => $tmplLogo ?: null,
-            'userName'        => $adminName,
-            'statusBadge'     => 'CONFIGURATION VERIFIED',
-            'statusType'      => 'approved',
-            'bodyMessage'     => 'This is a test notification from JMCFI PostFlow. Your custom email template styling has been applied!',
-            'tableDetails'    => [
-                'Title'            => 'Annual Campus Activity Request 2026',
-                'Approved by'      => 'IT Administration',
-                'Category'         => 'Institutional Announcement',
-                'Target Platforms' => 'Facebook, Instagram',
-            ],
-            'actionUrl'       => url(config('app.frontend_url') ?? 'https://jmcfi-postflow-production.up.railway.app'),
-            'buttonText'      => 'View System Dashboard'
+            'headerTitle'       => $tmplHeader,
+            'headerSubtitle'    => $tmplSubtitle,
+            'brandColor'        => $tmplColor,
+            'buttonColor'       => $tmplColor,
+            'footerText'        => $tmplFooter,
+            'headerBannerUrl'   => $tmplLogo ?: null,
+            'headerBannerBgUrl' => $tmplBanner ?: null,
+            'bannerMode'        => $tmplBannerMode,
+            'contentImageUrl'   => $tmplContentImg ?: null,
+            'userName'          => $adminName,
+            'greeting'          => $tmplGreeting,
+            'statusBadge'       => $tmplBadge,
+            'statusType'        => 'published',
+            'bodyMessage'       => $tmplBody,
+            'tableDetails'      => $tableDetails,
+            'actionUrl'             => url(config('app.frontend_url') ?? 'https://jmcfi-postflow-production.up.railway.app'),
+            'buttonText'            => $tmplButton,
+            'isTemplatePreviewTest' => true,
         ];
 
         $htmlContent = view('emails.custom-template', $viewData)->render();
@@ -350,7 +402,7 @@ class EmailSettingController extends Controller
     }
 
     /**
-     * Upload an institutional logo image for email templates.
+     * Upload a custom email template image ('logo', 'banner', or 'content').
      */
     public function uploadLogo(Request $request): JsonResponse
     {
@@ -360,54 +412,62 @@ class EmailSettingController extends Controller
 
         $request->validate([
             'logo' => 'required|image|mimes:jpeg,png,jpg,webp,svg,gif|max:5120',
+            'type' => 'nullable|string|in:logo,banner,content',
         ]);
+
+        $type = in_array($request->input('type'), ['logo', 'banner', 'content'], true)
+            ? $request->input('type')
+            : 'logo';
 
         $file = $request->file('logo');
         $mime = $file->getMimeType() ?: 'image/png';
         $bytes = file_get_contents($file->getRealPath());
 
         $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        $pathKey = "email_template_{$type}_path";
+        $dataKey = "email_template_{$type}_data";
+        $mimeKey = "email_template_{$type}_mime";
+        $urlKey  = $type === 'content' ? 'email_template_content_image_url' : "email_template_{$type}_url";
 
-        // Delete old uploaded logo file if exists
-        $oldPath = SystemSetting::where('key', 'email_template_logo_path')->value('value');
+        $oldPath = SystemSetting::where('key', $pathKey)->value('value');
         if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
             Storage::disk($disk)->delete($oldPath);
         }
 
         $path = $file->store('email-logos', $disk);
 
-        // Store file path and base64 fallback in database
         SystemSetting::updateOrCreate(
-            ['key' => 'email_template_logo_path'],
-            ['value' => $path, 'type' => 'string', 'description' => 'Email template logo file path', 'is_public' => false]
+            ['key' => $pathKey],
+            ['value' => $path, 'type' => 'string', 'description' => "Email template {$type} file path", 'is_public' => false]
         );
         SystemSetting::updateOrCreate(
-            ['key' => 'email_template_logo_data'],
-            ['value' => base64_encode($bytes), 'type' => 'string', 'description' => 'Email template logo binary base64', 'is_public' => false]
+            ['key' => $dataKey],
+            ['value' => base64_encode($bytes), 'type' => 'string', 'description' => "Email template {$type} binary base64", 'is_public' => false]
         );
         SystemSetting::updateOrCreate(
-            ['key' => 'email_template_logo_mime'],
-            ['value' => $mime, 'type' => 'string', 'description' => 'Email template logo mime type', 'is_public' => false]
-        );
-
-        // Compute publicly accessible URL
-        $publicUrl = url('/email-template-logo');
-
-        SystemSetting::updateOrCreate(
-            ['key' => 'email_template_logo_url'],
-            ['value' => $publicUrl, 'type' => 'string', 'description' => 'Mail setting: email_template_logo_url', 'is_public' => false]
+            ['key' => $mimeKey],
+            ['value' => $mime, 'type' => 'string', 'description' => "Email template {$type} mime type", 'is_public' => false]
         );
 
-        AuditLogService::log('EMAIL_TEMPLATE_LOGO_UPLOADED', 'Uploaded custom email template logo', 'INFO', [], $request);
+        $publicUrl = url("/api/email-template-image/{$type}") . '?v=' . time();
+
+        SystemSetting::updateOrCreate(
+            ['key' => $urlKey],
+            ['value' => $publicUrl, 'type' => 'string', 'description' => "Mail setting: {$urlKey}", 'is_public' => false]
+        );
+
+        AuditLogService::log('EMAIL_TEMPLATE_' . strtoupper($type) . '_UPLOADED', "Uploaded custom email template {$type} image", 'INFO', [], $request);
 
         return response()->json([
-            'message' => 'Logo uploaded successfully.',
+            'message'  => ucfirst($type) . ' picture uploaded successfully.',
+            'type'     => $type,
             'logo_url' => $publicUrl,
+            'url'      => $publicUrl,
         ]);
     }
 
     /**
-     * Remove the custom uploaded email template logo.
+     * Remove a custom uploaded email template image ('logo', 'banner', or 'content').
      */
     public function removeLogo(Request $request): JsonResponse
     {
@@ -415,31 +475,57 @@ class EmailSettingController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
+        $type = in_array($request->input('type'), ['logo', 'banner', 'content'], true)
+            ? $request->input('type')
+            : 'logo';
+
+        $pathKey = "email_template_{$type}_path";
+        $dataKey = "email_template_{$type}_data";
+        $urlKey  = $type === 'content' ? 'email_template_content_image_url' : "email_template_{$type}_url";
+
         $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-        $oldPath = SystemSetting::where('key', 'email_template_logo_path')->value('value');
+        $oldPath = SystemSetting::where('key', $pathKey)->value('value');
         if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
             Storage::disk($disk)->delete($oldPath);
         }
 
-        SystemSetting::where('key', 'email_template_logo_path')->update(['value' => '']);
-        SystemSetting::where('key', 'email_template_logo_data')->update(['value' => '']);
-        SystemSetting::where('key', 'email_template_logo_url')->update(['value' => '']);
+        SystemSetting::where('key', $pathKey)->update(['value' => '']);
+        SystemSetting::where('key', $dataKey)->update(['value' => '']);
+        SystemSetting::where('key', $urlKey)->update(['value' => '']);
 
-        AuditLogService::log('EMAIL_TEMPLATE_LOGO_REMOVED', 'Removed custom email template logo', 'INFO', [], $request);
+        AuditLogService::log('EMAIL_TEMPLATE_' . strtoupper($type) . '_REMOVED', "Removed custom email template {$type} image", 'INFO', [], $request);
 
         return response()->json([
-            'message' => 'Logo removed successfully.',
+            'message'  => ucfirst($type) . ' picture removed successfully.',
+            'type'     => $type,
             'logo_url' => '',
+            'url'      => '',
         ]);
     }
 
     /**
-     * Public endpoint to serve the email template logo to email clients.
+     * Legacy public endpoint for the email template logo.
      */
     public function getLogo()
     {
-        $base64 = SystemSetting::where('key', 'email_template_logo_data')->value('value');
-        $mime = SystemSetting::where('key', 'email_template_logo_mime')->value('value') ?: 'image/png';
+        return $this->getTemplateImage('logo');
+    }
+
+    /**
+     * Public endpoint to serve custom email template images ('logo', 'banner', or 'content').
+     */
+    public function getTemplateImage(string $type = 'logo')
+    {
+        if (!in_array($type, ['logo', 'banner', 'content'], true)) {
+            abort(404);
+        }
+
+        $dataKey = "email_template_{$type}_data";
+        $mimeKey = "email_template_{$type}_mime";
+        $pathKey = "email_template_{$type}_path";
+
+        $base64 = SystemSetting::where('key', $dataKey)->value('value');
+        $mime = SystemSetting::where('key', $mimeKey)->value('value') ?: 'image/png';
 
         if (!empty($base64)) {
             $content = base64_decode($base64);
@@ -453,7 +539,7 @@ class EmailSettingController extends Controller
             ]);
         }
 
-        $path = SystemSetting::where('key', 'email_template_logo_path')->value('value');
+        $path = SystemSetting::where('key', $pathKey)->value('value');
         if (!$path) {
             abort(404);
         }
