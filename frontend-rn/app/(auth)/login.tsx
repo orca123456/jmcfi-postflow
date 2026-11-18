@@ -349,10 +349,6 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.footer}>
-              <View style={styles.accessNote}>
-                <Ionicons name="shield-checkmark-outline" size={15} color="#8c6da3" />
-                <Text style={styles.footerText}>For authorized JMCFI accounts</Text>
-              </View>
               <Text style={styles.helpText}>Need access? Contact IT Office.</Text>
             </View>
           </View>
