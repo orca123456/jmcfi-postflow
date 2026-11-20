@@ -216,24 +216,6 @@ export function RequestorOverview({
   const filterSignature = JSON.stringify([state.search, state.status, state.routingFilter, state.date, state.startDate, state.endDate, state.order, perPage]);
   const previousFilterSignature = useRef(filterSignature);
 
-  const routingCounts = useMemo(() => {
-    let standard = 0;
-    let direct = 0;
-    for (const r of recentRequests) {
-      const isDirect = String(r?.routing_type || (r as any)?.routingType || '').toLowerCase() === 'direct_imc' || r?.category === 'Direct to IMC';
-      if (isDirect) {
-        direct++;
-      } else {
-        standard++;
-      }
-    }
-    return {
-      all: recentRequests.length,
-      standard,
-      direct,
-    };
-  }, [recentRequests]);
-
   const filteredRequests = useMemo(() => {
     const search = state.search.trim().toLocaleLowerCase();
     const customStart = inputDay(state.startDate);
@@ -384,79 +366,8 @@ export function RequestorOverview({
       <Card padding={isTable ? Spacing.lg : Spacing.md} style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         {Platform.OS !== 'web' && openMenu && <Pressable accessibilityLabel="Close filters" onPress={() => setOpenMenu(null)} style={styles.nativePanelDismiss} />}
         <View style={[styles.panelHeader, !isWideToolbar && styles.stacked]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})}
-              style={[styles.panelTitle, { color: palette.text }]}>Recent Post Requests</Text>
-
-            {/* Pill Tabs: All (4) | Standard (2) | Direct to IMC (2) */}
-            <View style={[styles.pillTabsContainer, { backgroundColor: nativeDark ? '#1E293B' : '#F1F5F9' }]}>
-              <Pressable
-                onPress={() => updateFilter({ routingFilter: 'all' })}
-                style={[
-                  styles.pillTab,
-                  (!state.routingFilter || state.routingFilter === 'all') && [
-                    styles.pillTabActive,
-                    { backgroundColor: palette.surface, shadowColor: '#000' }
-                  ]
-                ]}
-              >
-                <Text style={[
-                  styles.pillTabText,
-                  { color: palette.secondaryText },
-                  (!state.routingFilter || state.routingFilter === 'all') && [
-                    styles.pillTabTextActive,
-                    { color: palette.text }
-                  ]
-                ]}>
-                  All ({routingCounts.all})
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => updateFilter({ routingFilter: 'standard' })}
-                style={[
-                  styles.pillTab,
-                  state.routingFilter === 'standard' && [
-                    styles.pillTabActive,
-                    { backgroundColor: palette.surface, shadowColor: '#000' }
-                  ]
-                ]}
-              >
-                <Text style={[
-                  styles.pillTabText,
-                  { color: palette.secondaryText },
-                  state.routingFilter === 'standard' && [
-                    styles.pillTabTextActive,
-                    { color: palette.text }
-                  ]
-                ]}>
-                  Standard ({routingCounts.standard})
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => updateFilter({ routingFilter: 'direct_imc' })}
-                style={[
-                  styles.pillTab,
-                  state.routingFilter === 'direct_imc' && [
-                    styles.pillTabActive,
-                    { backgroundColor: palette.surface, shadowColor: '#000' }
-                  ]
-                ]}
-              >
-                <Text style={[
-                  styles.pillTabText,
-                  { color: palette.secondaryText },
-                  state.routingFilter === 'direct_imc' && [
-                    styles.pillTabTextActive,
-                    { color: palette.text }
-                  ]
-                ]}>
-                  Direct to IMC ({routingCounts.direct})
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+          <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})}
+            style={[styles.panelTitle, { color: palette.text }]}>Recent Post Requests</Text>
           <View style={[styles.toolbar, !isWideToolbar && styles.fullWidth]}>
             <View nativeID="requestor-overview-search" style={[styles.search, { backgroundColor: palette.background, borderColor: palette.border }, !isWideToolbar && styles.searchFull]}>
               <Ionicons name="search-outline" size={18} color={palette.secondaryText} />
@@ -670,31 +581,6 @@ const styles = StyleSheet.create({
   panel: { borderWidth: 1, overflow: 'visible', zIndex: 3 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, zIndex: 20 },
   panelTitle: { fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
-  pillTabsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    padding: 3,
-    gap: 2,
-  },
-  pillTab: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  pillTabActive: {
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  pillTabText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  pillTabTextActive: {
-    fontWeight: '700',
-  },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap', minWidth: 0 },
   fullWidth: { width: '100%' },
   flexible: { flex: 1 },

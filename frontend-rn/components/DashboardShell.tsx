@@ -99,7 +99,11 @@ export function DashboardShell({
 
   React.useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
+    const interval = setInterval(() => {
+      // Skip background polling while the browser tab is hidden
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && document.hidden) return;
+      fetchNotifications();
+    }, 15000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
@@ -342,10 +346,13 @@ export function DashboardShell({
     }
   }, [user]);
 
-  // Refresh user data immediately on mount, on activeTab change, on window focus, and on interval
+  // Refresh user data on mount, on window focus, and on a slow interval (not on every tab click)
   React.useEffect(() => {
     refreshProfile();
-    const interval = setInterval(refreshProfile, 60000);
+    const interval = setInterval(() => {
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && document.hidden) return;
+      refreshProfile();
+    }, 60000);
     let handleFocus: (() => void) | null = null;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       handleFocus = () => refreshProfile();
@@ -357,7 +364,7 @@ export function DashboardShell({
         window.removeEventListener('focus', handleFocus);
       }
     };
-  }, [refreshProfile, activeTab]);
+  }, [refreshProfile]);
 
   // Check if current user is eligible for program indicator (Requestors and Department Head / Office Head Approvers with an assigned Program Head)
   const canHaveProgramIndicator = React.useMemo(() => {

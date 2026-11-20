@@ -241,7 +241,32 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
 
   useEffect(() => {
     setActiveMediaFailed(false);
+    const uri = submittedPhotos[carouselIndex]?.uri;
+    if (!uri) {
+      setActiveMediaLoading(false);
+      return;
+    }
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const probe = new (window as any).Image();
+      probe.src = uri;
+      if (probe.complete && probe.naturalWidth > 0) {
+        setActiveMediaLoading(false);
+        return;
+      }
+      probe.onload = () => setActiveMediaLoading(false);
+      probe.onerror = () => {
+        setActiveMediaFailed(true);
+        setActiveMediaLoading(false);
+      };
+    }
+
     setActiveMediaLoading(true);
+    const timer = setTimeout(() => {
+      setActiveMediaLoading(false);
+    }, 450);
+
+    return () => clearTimeout(timer);
   }, [carouselIndex, submittedPhotos]);
 
   useEffect(() => {
@@ -629,11 +654,12 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                                 source={{ uri: submittedPhotos[carouselIndex]?.uri }}
                                 style={styles.mainPreviewImage}
                                 resizeMode="contain"
+                                onLoad={() => setActiveMediaLoading(false)}
+                                onLoadEnd={() => setActiveMediaLoading(false)}
                                 onError={() => {
                                   setActiveMediaFailed(true);
                                   setActiveMediaLoading(false);
                                 }}
-                                onLoadEnd={() => setActiveMediaLoading(false)}
                               />
                             </TouchableOpacity>
                           )}

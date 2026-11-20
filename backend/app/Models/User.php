@@ -85,8 +85,29 @@ class User extends Authenticatable implements MustVerifyEmail
         return url($path);
     }
 
+    private static array $departmentLogoCache = [];
+    private static ?\Illuminate\Support\Collection $cachedDeptsWithLogo = null;
+    private static array $assignedProgramCache = [];
+    private static ?bool $hasProgramHeadsTable = null;
+    private static ?int $cacheScopeId = null;
+
+    /** Reset memoized lookups whenever a new request/app instance is active. */
+    private static function syncRequestCacheScope(): void
+    {
+        $scope = spl_object_id(app()) . ':' . (app()->bound('request') ? spl_object_id(request()) : 0);
+        $scopeId = crc32($scope);
+        if (self::$cacheScopeId !== $scopeId) {
+            self::$cacheScopeId = $scopeId;
+            self::$departmentLogoCache = [];
+            self::$cachedDeptsWithLogo = null;
+            self::$assignedProgramCache = [];
+            self::$hasProgramHeadsTable = null;
+        }
+    }
+
     public function getDepartmentLogoUrlAttribute(): ?string
     {
+        self::syncRequestCacheScope();
         if ($this->program_head_id) {
             $ph = $this->relationLoaded('programHead') ? $this->programHead : $this->programHead()->first();
             if ($ph && $ph->department && $ph->department->logo_url) {
@@ -97,29 +118,30 @@ class User extends Authenticatable implements MustVerifyEmail
             return null;
         }
 
-        // 1. Exact match by name or display_name
-        $dept = \App\Models\Department::where('name', $this->department)
-                                      ->orWhere('display_name', $this->department)
-                                      ->first();
-        if ($dept && $dept->logo_url) {
-            return $dept->logo_url;
+        $deptKey = trim($this->department);
+        if (array_key_exists($deptKey, self::$departmentLogoCache)) {
+            return self::$departmentLogoCache[$deptKey];
         }
 
-        // 2. Case-insensitive / normalized match across departments with a logo
-        $deptClean = strtolower(trim($this->department));
-        $allDepts = \App\Models\Department::whereNotNull('logo_path')
-            ->where('logo_path', '!=', '')
-            ->get();
+        if (self::$cachedDeptsWithLogo === null) {
+            self::$cachedDeptsWithLogo = \App\Models\Department::whereNotNull('logo_path')
+                ->where('logo_path', '!=', '')
+                ->get();
+        }
 
+        $allDepts = self::$cachedDeptsWithLogo;
+
+        // 1. Exact match by name or display_name
+        $deptClean = strtolower($deptKey);
         foreach ($allDepts as $d) {
             $dName = strtolower(trim($d->name));
             $dDisplay = strtolower(trim($d->display_name));
             if ($dName === $deptClean || $dDisplay === $deptClean) {
-                return $d->logo_url;
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
         }
 
-        // 3. Known Institutional Aliases & Keyword matching
+        // 2. Known Institutional Aliases & Keyword matching
         $isIT = str_contains($deptClean, 'bsit') || str_contains($deptClean, 'information technology') || str_contains($deptClean, 'computer') || str_contains($deptClean, 'cite');
         $isAgri = str_contains($deptClean, 'agri');
         $isEng = str_contains($deptClean, 'engineer');
@@ -129,33 +151,33 @@ class User extends Authenticatable implements MustVerifyEmail
         foreach ($allDepts as $d) {
             $target = strtolower($d->name . ' ' . $d->display_name);
             if ($isIT && (str_contains($target, 'information technology') || str_contains($target, 'computer') || str_contains($target, 'bsit') || str_contains($target, 'cite'))) {
-                return $d->logo_url;
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
             if ($isAgri && str_contains($target, 'agri')) {
-                return $d->logo_url;
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
             if ($isEng && str_contains($target, 'engineer')) {
-                return $d->logo_url;
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
             if ($isBsa && (str_contains($target, 'bsa') || str_contains($target, 'accountan'))) {
-                return $d->logo_url;
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
             if ($isPsyc && str_contains($target, 'psyc')) {
-                return $d->logo_url;
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
         }
 
-        // 4. Substring / partial match fallback
+        // 3. Substring / partial match fallback
         foreach ($allDepts as $d) {
             $dDisplay = strtolower(trim($d->display_name));
             $dName = strtolower(trim($d->name));
-            if (str_contains($deptClean, $dDisplay) || str_contains($dDisplay, $deptClean) ||
-                str_contains($deptClean, $dName) || str_contains($dName, $deptClean)) {
-                return $d->logo_url;
+            if (($dDisplay !== '' && (str_contains($deptClean, $dDisplay) || str_contains($dDisplay, $deptClean))) ||
+                ($dName !== '' && (str_contains($deptClean, $dName) || str_contains($dName, $deptClean)))) {
+                return self::$departmentLogoCache[$deptKey] = $d->logo_url;
             }
         }
 
-        return null;
+        return self::$departmentLogoCache[$deptKey] = null;
     }
 
     public function programHead(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -183,7 +205,22 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function getAssignedProgramAttribute(): ?string
     {
-        if (!\Illuminate\Support\Facades\Schema::hasTable('program_heads')) {
+        self::syncRequestCacheScope();
+        $cacheKey = $this->id . '|' . $this->program_head_id . '|' . $this->department . '|' . $this->position;
+        if (array_key_exists($cacheKey, self::$assignedProgramCache)) {
+            return self::$assignedProgramCache[$cacheKey];
+        }
+        $result = $this->resolveAssignedProgram();
+        return self::$assignedProgramCache[$cacheKey] = $result;
+    }
+
+    private function resolveAssignedProgram(): ?string
+    {
+        if (self::$hasProgramHeadsTable === null) {
+            self::$hasProgramHeadsTable = \Illuminate\Support\Facades\Schema::hasTable('program_heads');
+        }
+
+        if (!self::$hasProgramHeadsTable) {
             return null;
         }
 

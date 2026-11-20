@@ -104,7 +104,34 @@ function Photos({
 
   useEffect(() => {
     setFailed(false);
+    if (!currentPhoto?.uri) {
+      setLoading(false);
+      return;
+    }
+
+    // On web: check if the browser has already cached/completed loading this image
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const probe = new (window as any).Image();
+      probe.src = currentPhoto.uri;
+      if (probe.complete && probe.naturalWidth > 0) {
+        setLoading(false);
+        return;
+      }
+      probe.onload = () => setLoading(false);
+      probe.onerror = () => {
+        setFailed(true);
+        setLoading(false);
+      };
+    }
+
     setLoading(true);
+
+    // Safety timeout: Never allow spinner to loop indefinitely
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 450);
+
+    return () => clearTimeout(timer);
   }, [currentPhoto?.uri]);
 
   const handlePrev = () => {
@@ -161,12 +188,12 @@ function Photos({
               source={{ uri: currentPhoto?.uri }}
               style={styles.mainPreviewImage}
               resizeMode="contain"
+              onLoad={() => setLoading(false)}
+              onLoadEnd={() => setLoading(false)}
               onError={() => {
                 setFailed(true);
                 setLoading(false);
               }}
-              onLoadStart={() => setLoading(true)}
-              onLoadEnd={() => setLoading(false)}
             />
           </TouchableOpacity>
         )}

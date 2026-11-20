@@ -537,7 +537,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
   // Sync if allRawPosts passed from parent
   useEffect(() => {
-    if (Array.isArray(allRawPosts) && allRawPosts.length > 0) {
+    if (Array.isArray(allRawPosts)) {
       // STRICT FILTER: Only show direct IMC requests in this new dashboard
       const directOnly = allRawPosts.filter(isDirectImcPost).map((p) => mapRawPostToCard(p, user));
       setRequests(directOnly);
