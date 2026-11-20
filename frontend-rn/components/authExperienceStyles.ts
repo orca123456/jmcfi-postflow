@@ -155,13 +155,13 @@ export const authExperienceStyles = `
 .pfa-intro-wordmark h1 span { display: inline; }
 .pfa-intro-wordmark > p { color: #eee7f2; font-size: 13px; line-height: 21px; letter-spacing: .15px; margin: 0; animation: pfa-wordmark-enter .65s .95s both; }
 .pfa-intro-signature { display: flex; align-items: center; gap: 8px; margin-top: 22px; color: #f3eaf9; font-size: 10.5px; line-height: 18px; letter-spacing: .3px; }
-.pfa-workflow-step { --step-delay: 1.15s; display: flex; align-items: center; gap: 7px; padding: 8px 0; font-weight: 500; animation: pfa-wordmark-enter .4s var(--step-delay) both, pfa-stage-focus 1s var(--step-delay) both; }
-.pfa-workflow-step:nth-of-type(2) { --step-delay: 1.65s; }
-.pfa-workflow-step:nth-of-type(3) { --step-delay: 2.15s; }
-.pfa-workflow-step svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 90; animation: pfa-signature-draw .7s var(--step-delay) both; }
+.pfa-workflow-step { --step-delay: 0.7s; display: flex; align-items: center; gap: 7px; padding: 8px 0; font-weight: 500; animation: pfa-wordmark-enter .4s var(--step-delay) both, pfa-stage-focus .8s var(--step-delay) both; }
+.pfa-workflow-step:nth-of-type(2) { --step-delay: 1.2s; }
+.pfa-workflow-step:nth-of-type(3) { --step-delay: 1.7s; }
+.pfa-workflow-step svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 90; animation: pfa-signature-draw .6s var(--step-delay) both; }
 .pfa-intro-signature i { position: relative; width: 12px; height: 1px; background: #d5bbed40; }
-.pfa-intro-signature i::after { content: ''; position: absolute; inset: 0; background: #ebd7fa; transform-origin: left; animation: pfa-stage-link .5s 1.5s both; }
-.pfa-intro-signature i:last-of-type::after { animation-delay: 2s; }
+.pfa-intro-signature i::after { content: ''; position: absolute; inset: 0; background: #ebd7fa; transform-origin: left; animation: pfa-stage-link .4s 1.05s both; }
+.pfa-intro-signature i:last-of-type::after { animation-delay: 1.55s; }
 .pfa-intro-school { position: absolute; bottom: 27px; left: 20px; right: 20px; font-size: 9px; font-weight: 500; line-height: 16px; letter-spacing: 1.6px; text-align: center; color: #eee5f1; transition: opacity .4s ease; }
 .pfa-intro .pfa-topbar { transition: opacity .45s ease; }
 .pfa-intro-leaving { pointer-events: none; }

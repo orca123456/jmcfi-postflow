@@ -1,5 +1,5 @@
-﻿import React, { useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState, useCallback } from 'react';
+import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../ui/Card';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
@@ -30,30 +30,38 @@ const REQUEST_TYPES: {
   workflow: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
 }[] = [
-  {
-    type: 'standard',
-    title: 'Standard Content Request',
-    description: 'Submit content through your department\'s review and approval process.',
-    workflow: 'Standard approval workflow',
-    icon: 'document-text-outline',
-  },
-  {
-    type: 'imc',
-    title: 'IMC Publication Request',
-    description: 'Send publication materials to Integrated Marketing Communications for final preparation and posting.',
-    workflow: 'Direct submission to IMC',
-    icon: 'paper-plane-outline',
-  },
-];
+    {
+      type: 'standard',
+      title: 'Standard Content Request',
+      description: 'Submit content through your department\'s review and approval process.',
+      workflow: 'Standard approval workflow',
+      icon: 'document-text-outline',
+    },
+    {
+      type: 'imc',
+      title: 'IMC Publication Request',
+      description: 'Send publication materials to Integrated Marketing Communications for final preparation and posting.',
+      workflow: 'Direct submission to IMC',
+      icon: 'paper-plane-outline',
+    },
+  ];
 
 export const RequestTypeSelector: React.FC<RequestTypeSelectorProps> = ({
-  initialType = 'imc',
+  initialType = 'standard',
   onSelectType,
   onBackToDashboard,
 }) => {
   const isDarkMode = useThemeStore((store) => store.isDarkMode);
   const [contentWidth, setContentWidth] = useState(0);
   const [choiceWidth, setChoiceWidth] = useState(0);
+  const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    setContentWidth((prev) => (Math.abs(prev - next) >= 4 ? next : prev));
+  }, []);
+  const handleChoiceLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    setChoiceWidth((prev) => (Math.abs(prev - next) >= 4 ? next : prev));
+  }, []);
   const [selectedType, setSelectedType] = useState<RequestSubmissionType>(initialType);
   const [hoveredControl, setHoveredControl] = useState<string | null>(null);
   const [focusedControl, setFocusedControl] = useState<string | null>(null);
@@ -87,7 +95,7 @@ export const RequestTypeSelector: React.FC<RequestTypeSelectorProps> = ({
 
   return (
     <View nativeID="requestor-type-selector" style={styles.pageContainer}
-      onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}>
+      onLayout={handleContentLayout}>
       {Platform.OS === 'web' && <style>{`
         #requestor-type-selector :is([role="button"], [role="radio"]) { cursor: pointer; }
         #requestor-type-selector :is([role="button"], [role="radio"]):focus-visible {
@@ -129,7 +137,7 @@ export const RequestTypeSelector: React.FC<RequestTypeSelectorProps> = ({
         </View>
 
         <View accessibilityRole="radiogroup" accessibilityLabel="Request type"
-          onLayout={(event) => setChoiceWidth(event.nativeEvent.layout.width)}
+          onLayout={handleChoiceLayout}
           style={[styles.optionsRow, !hasColumns && styles.stacked]}>
           {REQUEST_TYPES.map((option) => {
             const selected = selectedType === option.type;
@@ -160,8 +168,10 @@ export const RequestTypeSelector: React.FC<RequestTypeSelectorProps> = ({
                     </View>
                     <View style={styles.selectionState}>
                       {selected && <Text style={[styles.selectionLabel, { color: accentColor }]}>Selected</Text>}
-                      <View style={[styles.radioCircle, { borderColor: selected ? BRAND_PURPLE : palette.border,
-                        backgroundColor: selected ? BRAND_PURPLE : palette.surface }]}>
+                      <View style={[styles.radioCircle, {
+                        borderColor: selected ? BRAND_PURPLE : palette.border,
+                        backgroundColor: selected ? BRAND_PURPLE : palette.surface
+                      }]}>
                         {selected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
                       </View>
                     </View>
@@ -193,7 +203,7 @@ export const RequestTypeSelector: React.FC<RequestTypeSelectorProps> = ({
             onPress={() => onSelectType(selectedType)}
             onHoverIn={() => setHoveredControl('continue')} onHoverOut={() => setHoveredControl(null)}
             style={({ pressed }) => [styles.continueButton, !isWide && styles.fullWidth,
-              hoveredControl === 'continue' && styles.hoveredButton, pressed && styles.pressed]}>
+            hoveredControl === 'continue' && styles.hoveredButton, pressed && styles.pressed]}>
             <Text style={styles.continueButtonText}>Continue to form</Text>
             <Ionicons name="arrow-forward" size={18} color={GOLD_INK} />
           </Pressable>

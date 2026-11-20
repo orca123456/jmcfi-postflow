@@ -48,8 +48,20 @@ function titleOf(draft: any): string {
 }
 
 function categoryOf(draft: any): string {
-  const value = draft.other_category_name || draft.category?.name || draft.category;
-  return typeof value === 'string' && value.trim() ? value.trim() : 'Uncategorized';
+  if (String(draft.routing_type || draft.routingType || '').toLowerCase() === 'direct_imc') {
+    return 'Direct to IMC';
+  }
+  const catName = draft.category?.name || (typeof draft.category === 'string' ? draft.category : '');
+  const isOther = ['other', 'others'].includes(String(catName || '').trim().toLowerCase());
+  const dept = draft.department || draft.requestor?.department || '';
+  if (draft.other_category_name && typeof draft.other_category_name === 'string') {
+    const custom = draft.other_category_name.trim();
+    if (isOther) return custom || 'Others';
+    if (!catName && custom.toLowerCase() !== String(dept).toLowerCase()) {
+      return custom;
+    }
+  }
+  return catName || 'Uncategorized';
 }
 
 function savedDateOf(draft: any): string {
@@ -116,7 +128,7 @@ export function RequestorDrafts({ drafts, loading, error, onCreate, onEdit, onDe
   const renderRetry = () => (
     <Pressable accessibilityRole="button" accessibilityLabel="Retry loading drafts" onPress={onRetry}
       {...focusProps('retry')} style={({ pressed }) => [styles.outlineButton,
-        { borderColor: palette.border, backgroundColor: palette.surface }, pressed && styles.pressed, focusStyle('retry')]}>
+      { borderColor: palette.border, backgroundColor: palette.surface }, pressed && styles.pressed, focusStyle('retry')]}>
       <Ionicons name="refresh-outline" size={16} color={actionColor} />
       <Text style={[styles.actionText, { color: actionColor }]}>Try again</Text>
     </Pressable>
@@ -168,7 +180,7 @@ export function RequestorDrafts({ drafts, loading, error, onCreate, onEdit, onDe
             </Text>
           </View>
           <View nativeID="requestor-drafts-search" style={[styles.search,
-            { backgroundColor: palette.background, borderColor: palette.border }, !wideHeader && styles.searchFull, focusStyle('search')]}>
+          { backgroundColor: palette.background, borderColor: palette.border }, !wideHeader && styles.searchFull, focusStyle('search')]}>
             <Ionicons name="search-outline" size={18} color={palette.secondaryText} />
             <TextInput value={search} onChangeText={(value) => { setSearch(value); setCurrentPage(1); }}
               accessibilityLabel="Search drafts by title, category, or caption" placeholder="Search drafts…"
@@ -291,7 +303,7 @@ export function RequestorDrafts({ drafts, loading, error, onCreate, onEdit, onDe
                     <Pressable nativeID={`requestor-drafts-delete-${controlKey}`} accessibilityRole="button"
                       accessibilityLabel={`Delete draft: ${title}`} onPress={() => onDelete(draft.id)} {...focusProps(`delete-${controlKey}`)}
                       style={({ pressed }) => [styles.deleteButton, { borderColor: palette.border },
-                        pressed && { backgroundColor: palette.secondarySurface }, focusStyle(`delete-${controlKey}`)]}>
+                      pressed && { backgroundColor: palette.secondarySurface }, focusStyle(`delete-${controlKey}`)]}>
                       <Ionicons name="trash-outline" size={18} color={palette.error} />
                     </Pressable>
                   </View>

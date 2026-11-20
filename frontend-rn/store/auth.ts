@@ -122,7 +122,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         });
         return false;
       }
-      
+
       const errorMessage = err.response?.data?.message || (err.response
         ? 'Unable to sign in. Please try again.'
         : 'Unable to connect. Check your connection and try again.');
@@ -133,7 +133,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   logout: async () => {
     // 1. Fire-and-forget server logout (never blocks UI or hangs on network delay)
-    authApi.logout().catch(() => {});
+    authApi.logout().catch(() => { });
 
     // 2. Clear credentials immediately
     await storage.remove('auth_token');
@@ -144,9 +144,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           .filter(k => k.startsWith('postflow') || k.includes('auth_') || k.includes('rq-v1'))
           .forEach(k => localStorage.removeItem(k));
         Object.keys(sessionStorage)
-          .filter(k => (k.startsWith('postflow') && !k.startsWith('postflow_welcome_seen')) || k.includes('auth_'))
+          .filter(k => k.startsWith('postflow') || k.includes('auth_'))
           .forEach(k => sessionStorage.removeItem(k));
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 3. Clear auth state immediately
@@ -160,7 +160,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           Object.keys(localStorage)
             .filter(k => k.startsWith('postflow_') || k.includes('rq-v1') || k === 'auth_token' || k === 'auth_user')
             .forEach(k => localStorage.removeItem(k));
-        } catch (_) {}
+        } catch (_) { }
       }
 
       const token = await storage.get('auth_token');
@@ -188,7 +188,28 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 }));
 
 // Role helper
-export const getRoleDashboardPath = (role: string): string => {
+export const getRoleDashboardPath = (role: string, department?: string): string => {
+  const dept = (department || '').toLowerCase();
+  const r = (role || '').toLowerCase();
+
+  if (
+    r === 'imc_qa_checker' ||
+    dept.includes('integrated marketing') ||
+    dept.includes('institutional marketing') ||
+    dept.includes('marketing communication') ||
+    dept.includes('imc')
+  ) {
+    if (r !== 'admin' && r !== 'it_admin' && r !== 'requestor' && r !== 'content_requestor') {
+      return '/dashboard/imc-qa';
+    }
+  }
+
+  if (r === 'vice_president' || dept.includes('vice president') || dept.includes('vpaa')) {
+    if (r !== 'admin' && r !== 'it_admin' && r !== 'requestor' && r !== 'content_requestor') {
+      return '/dashboard/vp';
+    }
+  }
+
   const map: Record<string, string> = {
     requestor: '/dashboard/requestor',
     approver: '/dashboard/office-head',

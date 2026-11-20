@@ -16,10 +16,12 @@ import { PaginationControl } from '../ui/PaginationControl';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
 import { resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
+import { rq } from './requestorMotion';
 
 export type RequestorOverviewState = {
   search: string;
   status: 'all' | 'review' | 'approved' | 'scheduled' | 'published';
+  routingFilter?: 'all' | 'standard' | 'direct_imc';
   date: 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
   startDate: string;
   endDate: string;
@@ -29,7 +31,7 @@ export type RequestorOverviewState = {
 };
 
 export const INITIAL_OVERVIEW_STATE: RequestorOverviewState = {
-  search: '', status: 'all', date: 'all', startDate: '', endDate: '',
+  search: '', status: 'all', routingFilter: 'all', date: 'all', startDate: '', endDate: '',
   order: 'desc', page: 1, perPage: 10,
 };
 
@@ -99,14 +101,25 @@ function displayInputDate(value: string): string {
 }
 
 function categoryName(request: any): string {
-  const isDirectImc = request.routing_type === 'direct_imc' ||
-    String(request.routingType || '').toLowerCase() === 'direct_imc' ||
-    request.rawPost?.routing_type === 'direct_imc';
-  if (isDirectImc) {
+  if (String(request.routing_type || request.routingType || '').toLowerCase() === 'direct_imc') {
     return 'Direct to IMC';
   }
-  const value = request.other_category_name || request.category?.name || request.category;
-  return typeof value === 'string' && value.trim() ? value : '—';
+
+  const catName = request.category?.name || (typeof request.category === 'string' ? request.category : '');
+  const isOther = ['other', 'others'].includes(String(catName || '').trim().toLowerCase());
+  const dept = request.department || request.requestor?.department || '';
+
+  if (request.other_category_name && typeof request.other_category_name === 'string') {
+    const custom = request.other_category_name.trim();
+    if (isOther) return custom || 'Others';
+    if (!catName && custom.toLowerCase() !== String(dept).toLowerCase()) {
+      return custom;
+    }
+  }
+
+  if (catName && !isOther) return catName;
+  if (catName) return catName;
+  return '—';
 }
 
 function requestCode(request: any): string {
@@ -120,7 +133,15 @@ function sentenceCase(value: unknown): string {
 }
 
 function requestStatus(request: any): { label: string; stage: string } {
-  const raw = String(request.rawStatus || request.status || request.rawPost?.status || '').toLowerCase();
+  const isDirect = String(request.routing_type || request.routingType || '').toLowerCase() === 'direct_imc';
+  const workflows = request.approval_workflows || request.approvalWorkflows || request.rawPost?.approval_workflows || [];
+  const imcWf = Array.isArray(workflows) ? [...workflows].reverse().find((w: any) => w.stage === 'imc_qa') : null;
+  const imcAction = String(imcWf?.action || '').toLowerCase();
+  const raw = String(request.rawStatus || '').toLowerCase();
+  if (isDirect && !['approved', 'scheduled', 'published', 'rejected', 'returned_for_revision'].includes(raw)) {
+    if (imcAction === 'editing') return { label: 'Editing', stage: 'IMC' };
+    if (imcAction === 'reviewing') return { label: 'Reviewing', stage: 'IMC' };
+  }
   if (raw === 'pending' || raw.startsWith('pending_')) {
     const stages: Record<string, string> = {
       pending_office_head: 'Department Head', pending_department_head: 'Department Head',
@@ -192,14 +213,39 @@ export function RequestorOverview({
   const recentRequests = Array.isArray(requests) ? requests : [];
   const nowDay = Math.floor((Date.now() + MANILA_OFFSET_MS) / DAY_MS);
   const perPage = Number.isFinite(state.perPage) && state.perPage > 0 ? Math.floor(state.perPage) : 10;
-  const filterSignature = JSON.stringify([state.search, state.status, state.date, state.startDate, state.endDate, state.order, perPage]);
+  const filterSignature = JSON.stringify([state.search, state.status, state.routingFilter, state.date, state.startDate, state.endDate, state.order, perPage]);
   const previousFilterSignature = useRef(filterSignature);
+
+  const routingCounts = useMemo(() => {
+    let standard = 0;
+    let direct = 0;
+    for (const r of recentRequests) {
+      const isDirect = String(r?.routing_type || (r as any)?.routingType || '').toLowerCase() === 'direct_imc' || r?.category === 'Direct to IMC';
+      if (isDirect) {
+        direct++;
+      } else {
+        standard++;
+      }
+    }
+    return {
+      all: recentRequests.length,
+      standard,
+      direct,
+    };
+  }, [recentRequests]);
 
   const filteredRequests = useMemo(() => {
     const search = state.search.trim().toLocaleLowerCase();
     const customStart = inputDay(state.startDate);
     const customEnd = inputDay(state.endDate);
     return recentRequests.filter((request) => {
+      if (state.routingFilter === 'standard') {
+        const isDirect = String(request.routing_type || (request as any).routingType || '').toLowerCase() === 'direct_imc' || request.category === 'Direct to IMC';
+        if (isDirect) return false;
+      } else if (state.routingFilter === 'direct_imc') {
+        const isDirect = String(request.routing_type || (request as any).routingType || '').toLowerCase() === 'direct_imc' || request.category === 'Direct to IMC';
+        if (!isDirect) return false;
+      }
       if (search && ![request.title, categoryName(request), requestCode(request)]
         .some((value) => String(value || '').toLocaleLowerCase().includes(search))) return false;
       const rawStatus = String(request.rawStatus || '').toLowerCase();
@@ -221,7 +267,7 @@ export function RequestorOverview({
       if (second === null) return -1;
       return (state.order === 'desc' ? second - first : first - second) || a.index - b.index;
     }).map(({ request }) => request);
-  }, [recentRequests, state.search, state.status, state.date, state.startDate, state.endDate, state.order, nowDay]);
+  }, [recentRequests, state.search, state.status, state.routingFilter, state.date, state.startDate, state.endDate, state.order, nowDay]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / perPage));
   const page = Math.min(totalPages, Math.max(1, Number.isFinite(state.page) ? Math.floor(state.page) : 1));
@@ -275,7 +321,7 @@ export function RequestorOverview({
   };
 
   const renderPlatforms = (request: any) => {
-    const names = platformNames(request.platforms || request.target_platforms || request.rawPost?.target_platforms);
+    const names = platformNames(request.platforms);
     return names.length ? names.map((name) => {
       const platform = platformDetails(name);
       return (
@@ -299,12 +345,6 @@ export function RequestorOverview({
     );
   };
 
-  const appliedFilters = [
-    state.search.trim() ? `“${state.search.trim()}”` : '',
-    state.status !== 'all' ? selectedStatus : '',
-    state.date === 'custom' ? `${displayInputDate(state.startDate)} – ${displayInputDate(state.endDate)}`
-      : state.date !== 'all' ? selectedDate : '',
-  ].filter(Boolean).join(' · ');
 
   return (
     <View nativeID="requestor-overview" style={styles.container}
@@ -333,7 +373,7 @@ export function RequestorOverview({
           </Text>
           <Text style={[styles.subtitle, { color: palette.secondaryText }]}>Keep track of your post requests and their approval status.</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Create New Request" onPress={onCreate} style={styles.createButton}>
+        <Pressable {...rq('primary')} accessibilityRole="button" accessibilityLabel="Create New Request" onPress={onCreate} style={styles.createButton}>
           <Ionicons name="add" size={18} color={GOLD_INK} />
           <Text style={styles.createButtonText}>Create New Request</Text>
         </Pressable>
@@ -344,8 +384,79 @@ export function RequestorOverview({
       <Card padding={isTable ? Spacing.lg : Spacing.md} style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         {Platform.OS !== 'web' && openMenu && <Pressable accessibilityLabel="Close filters" onPress={() => setOpenMenu(null)} style={styles.nativePanelDismiss} />}
         <View style={[styles.panelHeader, !isWideToolbar && styles.stacked]}>
-          <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})}
-            style={[styles.panelTitle, { color: palette.text }]}>Recent Post Requests</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})}
+              style={[styles.panelTitle, { color: palette.text }]}>Recent Post Requests</Text>
+
+            {/* Pill Tabs: All (4) | Standard (2) | Direct to IMC (2) */}
+            <View style={[styles.pillTabsContainer, { backgroundColor: nativeDark ? '#1E293B' : '#F1F5F9' }]}>
+              <Pressable
+                onPress={() => updateFilter({ routingFilter: 'all' })}
+                style={[
+                  styles.pillTab,
+                  (!state.routingFilter || state.routingFilter === 'all') && [
+                    styles.pillTabActive,
+                    { backgroundColor: palette.surface, shadowColor: '#000' }
+                  ]
+                ]}
+              >
+                <Text style={[
+                  styles.pillTabText,
+                  { color: palette.secondaryText },
+                  (!state.routingFilter || state.routingFilter === 'all') && [
+                    styles.pillTabTextActive,
+                    { color: palette.text }
+                  ]
+                ]}>
+                  All ({routingCounts.all})
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => updateFilter({ routingFilter: 'standard' })}
+                style={[
+                  styles.pillTab,
+                  state.routingFilter === 'standard' && [
+                    styles.pillTabActive,
+                    { backgroundColor: palette.surface, shadowColor: '#000' }
+                  ]
+                ]}
+              >
+                <Text style={[
+                  styles.pillTabText,
+                  { color: palette.secondaryText },
+                  state.routingFilter === 'standard' && [
+                    styles.pillTabTextActive,
+                    { color: palette.text }
+                  ]
+                ]}>
+                  Standard ({routingCounts.standard})
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => updateFilter({ routingFilter: 'direct_imc' })}
+                style={[
+                  styles.pillTab,
+                  state.routingFilter === 'direct_imc' && [
+                    styles.pillTabActive,
+                    { backgroundColor: palette.surface, shadowColor: '#000' }
+                  ]
+                ]}
+              >
+                <Text style={[
+                  styles.pillTabText,
+                  { color: palette.secondaryText },
+                  state.routingFilter === 'direct_imc' && [
+                    styles.pillTabTextActive,
+                    { color: palette.text }
+                  ]
+                ]}>
+                  Direct to IMC ({routingCounts.direct})
+                </Text>
+              </Pressable>
+            </View>
+          </View>
           <View style={[styles.toolbar, !isWideToolbar && styles.fullWidth]}>
             <View nativeID="requestor-overview-search" style={[styles.search, { backgroundColor: palette.background, borderColor: palette.border }, !isWideToolbar && styles.searchFull]}>
               <Ionicons name="search-outline" size={18} color={palette.secondaryText} />
@@ -407,12 +518,6 @@ export function RequestorOverview({
           </View>
         </View>
 
-        {hasFilters && <View style={styles.appliedFilters}>
-          <Text style={[styles.smallText, { color: palette.secondaryText, flex: 1, minWidth: 0 }]}>Filters: {appliedFilters}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Clear filters" onPress={clearFilters} style={styles.textButton}>
-            <Text style={[styles.linkText, { color: actionColor }]}>Clear filters</Text>
-          </Pressable>
-        </View>}
 
         <View style={styles.resultSummary}>
           <View style={styles.resultCount}>
@@ -470,7 +575,7 @@ export function RequestorOverview({
               const imageUrl = resolveImageUrl(request.thumbnailUrl);
               return (
                 <Pressable key={request.id ?? index} nativeID={`requestor-overview-row-${index}`}
-                  {...(Platform.OS === 'web' ? { dataSet: { overviewRow: 'true' } } : {})}
+                  {...(Platform.OS === 'web' ? { dataSet: { overviewRow: 'true', rq: 'row' } } : {})}
                   accessibilityRole="button" accessibilityLabel={`View request: ${request.title}`}
                   onPress={() => onOpen(request)}
                   style={[styles.requestRow, { borderColor: palette.border }, !isTable && [styles.requestCard, { backgroundColor: palette.surface }]]}>
@@ -483,14 +588,14 @@ export function RequestorOverview({
                     <View style={styles.titleCopy}>
                       <Text numberOfLines={2} style={[styles.requestTitle, { color: palette.text }]}>{request.title || 'Untitled'}</Text>
                     </View>
-                    {!isTable && <Ionicons name="chevron-forward" size={18} color={palette.mutedText} />}
+                    {!isTable && <View {...rq('chevron')}><Ionicons name="chevron-forward" size={18} color={palette.mutedText} /></View>}
                   </View>
                   {isTable ? <>
                     <Text style={[styles.smallText, styles.column, { color: palette.secondaryText }]}>{categoryName(request)}</Text>
                     <View style={[styles.column, styles.platformList]}>{renderPlatforms(request)}</View>
                     <Text style={[styles.smallText, styles.column, { color: palette.secondaryText }]}>{displayDate(request)}</Text>
                     <View style={styles.statusColumn}>{renderStatus(request)}</View>
-                    <View style={styles.detailsColumn}><Ionicons name="chevron-forward" size={18} color={palette.mutedText} /></View>
+                    <View {...rq('chevron')} style={styles.detailsColumn}><Ionicons name="chevron-forward" size={18} color={palette.mutedText} /></View>
                   </> : <>
                     <View style={styles.cardMeta}>
                       <Text style={[styles.smallText, { color: palette.secondaryText, flex: 1 }]}>{categoryName(request)}</Text>
@@ -518,10 +623,13 @@ export function RequestorOverview({
       <Modal visible={rangeOpen} transparent animationType="none" onRequestClose={closeRange}>
         <View nativeID="requestor-overview-range" style={styles.modalBackdrop}>
           <Pressable accessibilityLabel="Cancel custom date range" onPress={closeRange} style={styles.dismissBackdrop} />
-          <View accessibilityViewIsModal style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <View {...rq('modal')} accessibilityViewIsModal style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: palette.border, borderTopWidth: 4, borderTopColor: BRAND_PURPLE }]}>
             <View style={styles.dialogHeading}>
-              <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})} style={[styles.panelTitle, { color: palette.text, flex: 1 }]}>Custom date range</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Cancel custom date range" onPress={closeRange} style={styles.closeDialog}><Ionicons name="close" size={20} color={palette.secondaryText} /></Pressable>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text style={[styles.dialogEyebrow, { color: actionColor }]}>DATE FILTER</Text>
+                <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})} style={[styles.panelTitle, { color: palette.text }]}>Custom date range</Text>
+              </View>
+              <Pressable {...rq('close')} accessibilityRole="button" accessibilityLabel="Cancel custom date range" onPress={closeRange} style={[styles.closeDialog, { borderColor: palette.border, backgroundColor: palette.background }]}><Ionicons name="close" size={20} color={palette.secondaryText} /></Pressable>
             </View>
             <Text style={[styles.smallText, { color: palette.secondaryText }]}>Filter by the date requested in Manila time.</Text>
             <View style={styles.dateField}>
@@ -562,6 +670,31 @@ const styles = StyleSheet.create({
   panel: { borderWidth: 1, overflow: 'visible', zIndex: 3 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, zIndex: 20 },
   panelTitle: { fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
+  pillTabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    padding: 3,
+    gap: 2,
+  },
+  pillTab: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  pillTabActive: {
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  pillTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  pillTabTextActive: {
+    fontWeight: '700',
+  },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap', minWidth: 0 },
   fullWidth: { width: '100%' },
   flexible: { flex: 1 },
@@ -578,7 +711,6 @@ const styles = StyleSheet.create({
   dismissBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   nativeDismiss: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2 },
   nativePanelDismiss: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
-  appliedFilters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
   textButton: { minHeight: CONTROL_HEIGHT, justifyContent: 'center', paddingHorizontal: Spacing.sm, alignSelf: 'flex-start' },
   linkText: { fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.semiBold },
   resultSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm, marginBottom: Spacing.sm },
@@ -613,13 +745,14 @@ const styles = StyleSheet.create({
   cardMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: Spacing.sm },
   cardFooter: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.md, flexWrap: 'wrap' },
   pagination: { marginTop: Spacing.sm, minWidth: 0 },
-  modalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.4)', padding: Spacing.md },
-  rangeDialog: { width: '100%', maxWidth: 400, padding: Spacing.lg, gap: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1 },
+  modalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.5)', padding: Spacing.md },
+  rangeDialog: { width: '100%', maxWidth: 420, padding: Spacing.lg, gap: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1 },
   dialogHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  closeDialog: { width: CONTROL_HEIGHT, height: CONTROL_HEIGHT, alignItems: 'center', justifyContent: 'center' },
+  dialogEyebrow: { fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
+  closeDialog: { width: 40, height: 40, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dateField: { gap: Spacing.sm },
   fieldLabel: { fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.semiBold },
   dateInput: { minHeight: CONTROL_HEIGHT, paddingHorizontal: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.md, fontSize: FontSize.sm },
-  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: Spacing.sm },
+  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: Spacing.sm, paddingTop: Spacing.xs },
   dialogButton: { minHeight: CONTROL_HEIGHT, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../../store/theme';
 
 interface PaginationControlProps {
   currentPage: number;
@@ -10,6 +11,8 @@ interface PaginationControlProps {
   onItemsPerPageChange?: (perPage: number) => void;
   itemName?: string;
   pageSizeOptions?: number[];
+  style?: any;
+  noWrap?: boolean;
 }
 
 export const PaginationControl: React.FC<PaginationControlProps> = ({
@@ -19,9 +22,12 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
   onPageChange,
   onItemsPerPageChange,
   itemName = 'items',
-  pageSizeOptions = [5, 10, 15, 20, 50],
+  pageSizeOptions = [5, 10, 20, 50],
+  style,
+  noWrap,
 }) => {
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   const handlePrev = () => {
     if (currentPage > 1) onPageChange(currentPage - 1);
@@ -52,25 +58,34 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.infoText}>
+    <View style={[
+      styles.container,
+      isDarkMode && styles.containerDark,
+      noWrap && { flexWrap: 'nowrap' },
+      style,
+    ]}>
+      <Text style={[styles.infoText, isDarkMode && styles.infoTextDark, noWrap && ({ whiteSpace: 'nowrap' } as any)]}>
         Showing {startItem} to {endItem} of {totalItems} {itemName}
       </Text>
       
-      <View style={styles.controlsContainer}>
+      <View style={[styles.controlsContainer, noWrap && { flexShrink: 0 }]}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Previous page"
-          style={[styles.arrowButton, currentPage === 1 && styles.disabled]}
+          style={[styles.arrowButton, currentPage <= 1 && styles.disabled]}
           onPress={handlePrev}
-          disabled={currentPage === 1}
+          disabled={currentPage <= 1}
         >
-          <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#d1d5db" : "#6b7280"} />
+          <Ionicons
+            name="chevron-back"
+            size={16}
+            color={currentPage <= 1 ? (isDarkMode ? '#475569' : '#d1d5db') : (isDarkMode ? '#CBD5E1' : '#6b7280')}
+          />
         </TouchableOpacity>
 
         {getPageNumbers().map((page, index) => {
           if (page === '...') {
-            return <Text key={`ellipsis-${index}`} style={styles.ellipsis}>...</Text>;
+            return <Text key={`ellipsis-${index}`} style={[styles.ellipsis, isDarkMode && styles.ellipsisDark]}>...</Text>;
           }
           const isCurrent = page === currentPage;
           return (
@@ -83,7 +98,11 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
               style={[styles.pageButton, isCurrent && styles.activePageButton]}
               onPress={() => onPageChange(page as number)}
             >
-              <Text style={[styles.pageText, isCurrent && styles.activePageText]}>{page}</Text>
+              <Text style={[
+                styles.pageText,
+                isDarkMode && styles.pageTextDark,
+                isCurrent && styles.activePageText,
+              ]}>{page}</Text>
             </TouchableOpacity>
           );
         })}
@@ -91,11 +110,15 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Next page"
-          style={[styles.arrowButton, (currentPage === totalPages || totalPages === 0) && styles.disabled]}
+          style={[styles.arrowButton, (currentPage >= totalPages || totalPages === 0) && styles.disabled]}
           onPress={handleNext}
-          disabled={currentPage === totalPages || totalPages === 0}
+          disabled={currentPage >= totalPages || totalPages === 0}
         >
-          <Ionicons name="chevron-forward" size={16} color={(currentPage === totalPages || totalPages === 0) ? "#d1d5db" : "#6b7280"} />
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={(currentPage >= totalPages || totalPages === 0) ? (isDarkMode ? '#475569' : '#d1d5db') : (isDarkMode ? '#CBD5E1' : '#6b7280')}
+          />
         </TouchableOpacity>
 
         {Platform.OS === 'web' && onItemsPerPageChange && (
@@ -104,20 +127,22 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
             style={{
-              marginLeft: 16,
+              marginLeft: 14,
               height: 32,
               fontSize: 13,
               borderRadius: 6,
-              border: '1px solid #e5e7eb',
+              border: `1.5px solid ${isDarkMode ? '#334155' : '#4C007C'}`,
               paddingLeft: 8,
               paddingRight: 24,
               outline: 'none',
-              backgroundColor: '#fff',
-              color: '#374151'
+              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+              color: isDarkMode ? '#F8FAFC' : '#374151',
+              cursor: 'pointer',
+              fontWeight: '500',
             }}
           >
             {pageSizeOptions.map((opt) => (
-              <option key={opt} value={opt}>
+              <option key={opt} value={opt} style={{ backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F8FAFC' : '#374151' }}>
                 {opt} / page
               </option>
             ))}
@@ -139,9 +164,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
   },
+  containerDark: {
+    borderTopColor: '#334155',
+  },
   infoText: {
     fontSize: 13,
     color: '#6b7280',
+    fontWeight: '500',
+  },
+  infoTextDark: {
+    color: '#94a3b8',
   },
   controlsContainer: {
     flexDirection: 'row',
@@ -153,9 +185,11 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.45,
+    ...(Platform.OS === 'web' ? ({ cursor: 'default' } as any) : {}),
   },
   pageButton: {
     width: 32,
@@ -164,14 +198,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
   },
   activePageButton: {
-    backgroundColor: '#4C007C',
+    backgroundColor: '#3b0764',
   },
   pageText: {
     color: '#4b5563',
     fontSize: 13,
-    fontWeight: '400',
+    fontWeight: '500',
+  },
+  pageTextDark: {
+    color: '#cbd5e1',
   },
   activePageText: {
     color: '#fff',
@@ -181,5 +219,8 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginHorizontal: 4,
     fontSize: 13,
-  }
+  },
+  ellipsisDark: {
+    color: '#64748b',
+  },
 });

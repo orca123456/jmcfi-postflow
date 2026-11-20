@@ -39,20 +39,11 @@ import { RequestorOverview, INITIAL_OVERVIEW_STATE, type RequestorOverviewState 
 import { RequestTypeSelector } from '../../../components/requestor/RequestTypeSelector';
 import { RequestorDrafts } from '../../../components/requestor/RequestorDrafts';
 import { RequestorRejected } from '../../../components/requestor/RequestorRejected';
-
-const DEFAULT_CATEGORIES: { id: number; name: string }[] = [
-  { id: 1, name: 'Announcement' },
-  { id: 2, name: 'News' },
-  { id: 3, name: 'Event' },
-  { id: 4, name: 'Advisory' },
-  { id: 5, name: 'Blog' },
-  { id: 6, name: 'Others' },
-];
+import { DirectImcRequestDetailsModal, isDirectImcDetailsRequest } from '../../../components/requestor/DirectImcRequestDetailsModal';
 
 export default function RequestorDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const { user } = useAuthStore();
   const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Requestor';
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
@@ -112,7 +103,7 @@ export default function RequestorDashboard() {
   const [category, setCategory] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [otherCategoryName, setOtherCategoryName] = useState('');
-  const [apiCategories, setApiCategories] = useState<{ id: number; name: string }[]>(DEFAULT_CATEGORIES);
+  const [apiCategories, setApiCategories] = useState<{ id: number; name: string }[]>([]);
   const [department, setDepartment] = useState(user?.department || 'ICT');
 
   useEffect(() => {
@@ -139,7 +130,6 @@ export default function RequestorDashboard() {
 
   // Dropdown States
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
 
   // Preview States
@@ -294,21 +284,14 @@ export default function RequestorDashboard() {
   const handleEditDraft = (draft: any) => {
     setEditingPostId(draft.id);
     setPostTitle(draft.title || '');
-    if (draft.other_category_name) {
-      const othersCat = apiCategories.find(c => ['others', 'other'].includes(c.name.toLowerCase()));
-      setCategory('Others');
-      setCategoryId(othersCat ? othersCat.id : (draft.category_id || 6));
-      setOtherCategoryName(draft.other_category_name);
-    } else {
-      const matchedCat = apiCategories.find(c => c.name === draft.category);
-      if (matchedCat) {
-        setCategory(matchedCat.name);
-        setCategoryId(matchedCat.id);
-        if (['others', 'other'].includes(matchedCat.name.toLowerCase())) {
-          setOtherCategoryName(draft.other_category_name || '');
-        } else {
-          setOtherCategoryName('');
-        }
+    const matchedCat = apiCategories.find(c => c.name === draft.category);
+    if (matchedCat) {
+      setCategory(matchedCat.name);
+      setCategoryId(matchedCat.id);
+      if (matchedCat.name === 'Others') {
+        setOtherCategoryName(draft.other_category_name || '');
+      } else {
+        setOtherCategoryName('');
       }
     }
     setCaption(draft.caption_narrative || draft.caption || '');
@@ -344,21 +327,14 @@ export default function RequestorDashboard() {
 
   const handleCreateNewFromRejected = (post: any) => {
     setPostTitle(post.title ? `${post.title} (Revised)` : '');
-    if (post.other_category_name) {
-      const othersCat = apiCategories.find(c => ['others', 'other'].includes(c.name.toLowerCase()));
-      setCategory('Others');
-      setCategoryId(othersCat ? othersCat.id : (post.category_id || 6));
-      setOtherCategoryName(post.other_category_name);
-    } else {
-      const matchedCat = apiCategories.find(c => c.name === post.category);
-      if (matchedCat) {
-        setCategory(matchedCat.name);
-        setCategoryId(matchedCat.id);
-        if (['others', 'other'].includes(matchedCat.name.toLowerCase())) {
-          setOtherCategoryName(post.other_category_name || '');
-        } else {
-          setOtherCategoryName('');
-        }
+    const matchedCat = apiCategories.find(c => c.name === post.category);
+    if (matchedCat) {
+      setCategory(matchedCat.name);
+      setCategoryId(matchedCat.id);
+      if (matchedCat.name === 'Others') {
+        setOtherCategoryName(post.other_category_name || '');
+      } else {
+        setOtherCategoryName('');
       }
     }
     setCaption(post.caption_narrative || post.caption || '');
@@ -382,24 +358,29 @@ export default function RequestorDashboard() {
   // Fetch categories from API on mount
   useEffect(() => {
     categoriesApi.list().then((res: any) => {
-      const rawCats = res.data?.data || res.data || [];
-      const list = Array.isArray(rawCats) && rawCats.length > 0 ? [...rawCats] : [...DEFAULT_CATEGORIES];
-      const isOthers = (name: string) => ['other', 'others'].includes(String(name || '').trim().toLowerCase());
-      const standardCats = list.filter((c: any) => !isOthers(c?.name));
-      const othersCats = list.filter((c: any) => isOthers(c?.name));
-      if (othersCats.length === 0) {
-        othersCats.push({ id: 6, name: 'Others' });
+      const cats = res.data?.data || [];
+      setApiCategories(cats);
+      if (cats.length > 0 && !categoryId) {
+        setCategory(cats[0].name);
+        setCategoryId(cats[0].id);
       }
-      const normalized = [...standardCats, ...othersCats];
-      setApiCategories(normalized);
     }).catch(() => {
       // fallback to static options if API fails
-      setApiCategories(DEFAULT_CATEGORIES);
+      const fallback = [
+        { id: 1, name: 'Announcement' },
+        { id: 2, name: 'News' },
+        { id: 3, name: 'Event' },
+        { id: 4, name: 'Advisory' },
+        { id: 5, name: 'Blog' },
+      ];
+      setApiCategories(fallback);
+      setCategory(fallback[0].name);
+      setCategoryId(fallback[0].id);
     });
   }, []);
 
   // Categories & Departments options
-  const categoryOptions = apiCategories.length > 0 ? apiCategories.map(c => c.name) : DEFAULT_CATEGORIES.map(c => c.name);
+  const categoryOptions = apiCategories.length > 0 ? apiCategories.map(c => c.name) : ['Announcement', 'News', 'Event', 'Advisory', 'Blog'];
 
   const departmentOptions = [
     'College of Computing Studies',
@@ -443,7 +424,7 @@ export default function RequestorDashboard() {
       title: p.title || 'Untitled',
       caption: p.caption_narrative || '',
       platforms: Array.isArray(p.target_platforms) ? p.target_platforms : (p.target_platforms || []),
-      category: (p.routing_type === 'direct_imc' || p.routingType === 'direct_imc')
+      category: (String(p.routing_type || (p as any).routingType || '').toLowerCase() === 'direct_imc')
         ? 'Direct to IMC'
         : ((p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
           ? p.other_category_name
@@ -455,28 +436,36 @@ export default function RequestorDashboard() {
       time: p.created_at ? new Date(p.created_at).toLocaleTimeString() : '',
       dateSaved: p.updated_at || p.created_at ? new Date(p.updated_at || p.created_at).toLocaleDateString() : '—',
       rawStatus: p.status, // Add rawStatus for reliable filtering
-      status: p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN'),
-      statusLabel: p.status_label || p.status,
-      statusColor: p.status === 'published' || p.status === 'approved'
-        ? '#15803D'
-        : (p.status === 'scheduled'
-          ? '#6D28D9'
-          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309')),
-      statusBg: p.status === 'published' || p.status === 'approved'
-        ? '#DCFCE7'
-        : (p.status === 'scheduled'
-          ? '#EDE9FE'
-          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7')),
-      badgeColor: p.status === 'published' || p.status === 'approved'
-        ? '#15803D'
-        : (p.status === 'scheduled'
-          ? '#6D28D9'
-          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309')),
-      badgeBg: p.status === 'published' || p.status === 'approved'
-        ? '#DCFCE7'
-        : (p.status === 'scheduled'
-          ? '#EDE9FE'
-          : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7')),
+      ...(() => {
+        const workflows = p.approval_workflows || [];
+        const imcWf = Array.isArray(workflows) ? [...workflows].reverse().find((w: any) => w.stage === 'imc_qa') : null;
+        const imcAction = String(imcWf?.action || '').toLowerCase();
+        const isDirect = String(p.routing_type || (p as any).routingType || '').toLowerCase() === 'direct_imc';
+        const isEditing = isDirect && imcAction === 'editing' && !['approved', 'scheduled', 'published', 'rejected', 'returned_for_revision'].includes(p.status);
+        const isReviewing = isDirect && imcAction === 'reviewing' && !['approved', 'scheduled', 'published', 'rejected', 'returned_for_revision'].includes(p.status);
+
+        const calculatedStatus = isEditing ? 'EDITING' : (isReviewing ? 'REVIEWING' : (p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN')));
+        const calculatedStatusLabel = isEditing ? 'Editing' : (isReviewing ? 'Reviewing' : (p.status_label || p.status));
+        const calculatedStatusColor = isEditing ? '#6D28D9' : (isReviewing ? '#0284C7' : (p.status === 'published' || p.status === 'approved'
+          ? '#15803D'
+          : (p.status === 'scheduled'
+            ? '#6D28D9'
+            : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'))));
+        const calculatedStatusBg = isEditing ? '#F3E8FF' : (isReviewing ? '#E0F2FE' : (p.status === 'published' || p.status === 'approved'
+          ? '#DCFCE7'
+          : (p.status === 'scheduled'
+            ? '#EDE9FE'
+            : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'))));
+
+        return {
+          status: calculatedStatus,
+          statusLabel: calculatedStatusLabel,
+          statusColor: calculatedStatusColor,
+          statusBg: calculatedStatusBg,
+          badgeColor: calculatedStatusColor,
+          badgeBg: calculatedStatusBg,
+        };
+      })(),
       thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
         ? (() => {
             const getUrl = (m: any) => m?.url || m?.file_url || m?.file_path || null;
@@ -531,12 +520,11 @@ export default function RequestorDashboard() {
     if (postsDataRes?.data?.data) {
       const posts = postsDataRes.data.data;
       const mapped = posts.map(mapPost);
-      // Include all requests (both standard and direct IMC) in the requestor lists
       const filtered = mapped.filter((p: any) => p.rawStatus !== 'draft' && p.rawStatus !== 'rejected' && p.rawStatus !== 'returned_for_revision');
       setMockRequests(filtered);
       setMockQueuePosts(filtered);
       setDrafts(mapped.filter((p: any) => p.rawStatus === 'draft'));
-      setRejectedPosts(mapped.filter((p: any) => (p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision')));
+      setRejectedPosts(mapped.filter((p: any) => p.rawStatus === 'rejected' || p.rawStatus === 'returned_for_revision'));
     }
   }, [postsDataRes]);
 
@@ -686,6 +674,7 @@ export default function RequestorDashboard() {
         target_platforms: selectedPlatforms.length > 0 ? selectedPlatforms : undefined,
         program_head_id: user?.program_head_id || undefined,
         is_draft: true,
+        routing_type: 'standard',
       };
 
       if (publishDate) {
@@ -698,6 +687,7 @@ export default function RequestorDashboard() {
         const formData = new FormData();
         formData.append('title', payload.title);
         formData.append('caption_narrative', payload.caption_narrative);
+        formData.append('routing_type', 'standard');
         if (payload.category_id) formData.append('category_id', String(payload.category_id));
         if (payload.other_category_name) formData.append('other_category_name', payload.other_category_name);
         if (payload.program_head_id) formData.append('program_head_id', String(payload.program_head_id));
@@ -762,17 +752,7 @@ export default function RequestorDashboard() {
       return;
     }
 
-    if (!category) {
-      alert('Please select a category for your request.');
-      return;
-    }
-
-    if (category === 'Others' && !otherCategoryName.trim()) {
-      alert('Please specify the category of your request.');
-      return;
-    }
-
-    if (mediaFiles.length === 0 && supportingDocs.length === 0 && !editingPostHasImage) {
+    if (mediaFiles.length === 0 && supportingDocs.length === 0) {
       alert('Please attach at least one photo or media file before submitting.');
       return;
     }
@@ -796,6 +776,7 @@ export default function RequestorDashboard() {
         target_platforms: selectedPlatforms,
         program_head_id: user?.program_head_id || undefined,
         is_draft: false,
+        routing_type: 'standard',
       };
 
       if (publishDate) {
@@ -821,6 +802,7 @@ export default function RequestorDashboard() {
         const formData = new FormData();
         formData.append('title', payload.title);
         formData.append('caption_narrative', payload.caption_narrative);
+        formData.append('routing_type', 'standard');
         if (payload.category_id) formData.append('category_id', String(payload.category_id));
         if (payload.other_category_name) formData.append('other_category_name', payload.other_category_name);
         if (payload.program_head_id) formData.append('program_head_id', String(payload.program_head_id));
@@ -890,9 +872,6 @@ export default function RequestorDashboard() {
       showToast('Content request submitted successfully!');
       setEditingPostId(null);
       setPostTitle('');
-      setCategory('');
-      setCategoryId(null);
-      setOtherCategoryName('');
       setCaption('');
       setPublishDate('');
       setPublishTime('');
@@ -1026,8 +1005,8 @@ export default function RequestorDashboard() {
     });
   };
 
-  const isLargeScreen = (workspaceWidth || width) >= 1080;
-  const isTablet = (workspaceWidth || width) >= 768;
+  const isLargeScreen = width >= 1080;
+  const isTablet = width >= 768;
 
   // Render a single stepper step
   const renderStep = (step: any, index: number, isLast: boolean) => {
@@ -1169,12 +1148,11 @@ export default function RequestorDashboard() {
       userPhotoUrl={profilePhotoUrl}
       onOpenPost={handleOpenPostById}
     >
-      <View nativeID="requestor-workspace" onLayout={(event) => setWorkspaceWidth(event.nativeEvent.layout.width)} style={{ width: '100%', minWidth: 0, gap: Spacing.lg }}>
+      <View nativeID="requestor-workspace" style={{ width: '100%', minWidth: 0, gap: Spacing.lg }}>
       {Platform.OS === 'web' && <style>{`
         #requestor-workspace :is([role="button"], input, textarea, select):focus-visible { outline: 2px solid #4C007C !important; outline-offset: 2px; }
         #requestor-request-details [role="button"]:focus-visible { outline: 2px solid #4C007C !important; outline-offset: 2px; }
         #requestor-workspace input:focus, #requestor-workspace textarea:focus { border-color: #4C007C !important; }
-        #requestor-workspace input[aria-label="Custom category name"], #requestor-workspace input[aria-label="Custom category name"]:focus, #requestor-workspace input[aria-label="Custom category name"]:focus-visible { outline: none !important; border: none !important; box-shadow: none !important; }
         :is(#requestor-workspace, #requestor-overview-range) input:is([type="date"], [type="time"]) { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-width: 0; box-sizing: border-box; }
         #requestor-workspace [data-testid="requestor-submit"] [dir="auto"] { color: #1A1A2E !important; }
         #requestor-workspace [data-testid="requestor-profile-upload"] [dir="auto"] { color: #1A1A2E !important; }
@@ -1206,13 +1184,8 @@ export default function RequestorDashboard() {
             setDashboardViewMode('classic');
             setActiveTab('dashboard');
           }}
-          onRequestSubmitted={(newPostData?: any) => {
-            if (newPostData) {
-              const formattedSubmitted = mapPost(newPostData);
-              setMockRequests((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
-              setMockQueuePosts((prev: any) => [formattedSubmitted, ...prev.filter((p: any) => p.id !== formattedSubmitted.id)]);
-            }
-            loadPosts(false);
+          onRequestSubmitted={() => {
+            loadPosts();
           }}
         />
       )}
@@ -1347,10 +1320,10 @@ export default function RequestorDashboard() {
           {/* Form Layout Split */}
           <View style={{ gap: 16 }}>
             {/* ROW 1 */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 200 : 2 }]}>
-              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 200 : 2 }]}>
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? 100 : 2 }]}>
                 {/* Basic Information Card */}
-                <Card style={[styles.formCard, { overflow: 'visible' }, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 200, position: 'relative' } : {}] as any}>
+                <Card style={[styles.formCard, (isCategoryDropdownOpen || isDeptDropdownOpen) ? { zIndex: 100, position: 'relative' } : {}] as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
                       <Ionicons name="document-text-outline" size={18} color="#334155" />
@@ -1372,155 +1345,154 @@ export default function RequestorDashboard() {
                     />
                   </View>
 
-                  <View style={[styles.inlineFieldsRow, isTablet ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: isCategoryDropdownOpen ? 200 : 10 }]}>
-                    <View style={[styles.fieldGroup, { flex: 1, position: 'relative', zIndex: isCategoryDropdownOpen ? 200 : 10 }]}>
+                  {/* CATEGORY & DEPARTMENT INLINE ROW */}
+                  <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 12 }}>
+                    {/* CATEGORY */}
+                    <View style={{ flex: 1, position: 'relative', zIndex: 110 }}>
                       <Text style={styles.inputLabel}>CATEGORY</Text>
-                      <View style={{ position: 'relative', zIndex: isCategoryDropdownOpen ? 200 : 10 }}>
-                        {category === 'Others' ? (
-                          <View
-                            style={[
-                              styles.dropdownSelector,
-                              { borderRadius: 8, height: 42, paddingHorizontal: 14, paddingRight: 8, flexDirection: 'row', alignItems: 'center' },
-                              isCategoryDropdownOpen && { borderColor: '#4C007C' },
-                            ]}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                              <TouchableOpacity
-                                accessibilityRole="button"
-                                accessibilityLabel="Change category"
-                                onPress={() => {
-                                  setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                                  setIsDeptDropdownOpen(false);
-                                }}
-                                style={{ paddingVertical: 4 }}
-                              >
-                                <Text style={[styles.dropdownSelectorText, { fontWeight: '600' }]}>Other: </Text>
-                              </TouchableOpacity>
-                              <TextInput
-                                accessibilityLabel="Custom category name"
-                                style={[
-                                  {
-                                    flex: 1,
-                                    fontSize: 14,
-                                    color: Colors.textPrimary,
-                                    padding: 0,
-                                    height: 24,
-                                    borderWidth: 0,
-                                    backgroundColor: 'transparent',
-                                  },
-                                  Platform.OS === 'web' && ({ outlineStyle: 'none', boxShadow: 'none' } as any),
-                                ]}
-                                placeholder="Type category here..."
-                                placeholderTextColor="#94A3B8"
-                                value={otherCategoryName}
-                                onChangeText={setOtherCategoryName}
-                                autoFocus
-                              />
-                            </View>
-                            <TouchableOpacity
-                              accessibilityRole="button"
-                              accessibilityLabel="Toggle category options"
-                              onPress={() => {
-                                setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                                setIsDeptDropdownOpen(false);
-                              }}
-                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                              style={[
-                                { padding: 6 },
-                                Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
-                              ]}
-                            >
-                              <Ionicons name={isCategoryDropdownOpen ? 'caret-up' : 'caret-down'} size={13} color="#52525B" />
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
+                      {category === 'Others' ? (
+                        <View style={[
+                          styles.dropdownSelector,
+                          {
+                            borderRadius: 8,
+                            height: 42,
+                            paddingHorizontal: 14,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            borderColor: isCategoryDropdownOpen ? '#4C007C' : '#E2E8F0',
+                            borderWidth: 1,
+                            backgroundColor: '#FFFFFF',
+                          }
+                        ]}>
+                          <Text style={[styles.dropdownSelectorText, { fontWeight: '600', color: '#1E293B', marginRight: 4 }]}>Other:</Text>
+                          <TextInput
+                            style={{ flex: 1, height: 38, fontSize: 13, color: '#1E293B', padding: 0 }}
+                            value={otherCategoryName}
+                            onChangeText={setOtherCategoryName}
+                            placeholder="Specify category"
+                            placeholderTextColor="#94A3B8"
+                          />
                           <TouchableOpacity
-                            accessibilityRole="button"
-                            accessibilityLabel="Category"
-                            style={[
-                              styles.dropdownSelector,
-                              { borderRadius: 8, height: 42, paddingHorizontal: 14, paddingRight: 12, flexDirection: 'row', alignItems: 'center' },
-                              isCategoryDropdownOpen && { borderColor: '#4C007C' },
-                              Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
-                            ]}
-                            onPress={() => {
-                              setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                              setIsDeptDropdownOpen(false);
-                            }}
-                            activeOpacity={0.7}
+                            onPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                            style={{ padding: 4 }}
                           >
-                            <Text style={[styles.dropdownSelectorText, { flex: 1, color: category ? Colors.textPrimary : '#71717A' }]}>
-                              {category || 'Choose'}
-                            </Text>
-                            <Ionicons name={isCategoryDropdownOpen ? 'caret-up' : 'caret-down'} size={13} color="#52525B" />
+                            <Ionicons name={isCategoryDropdownOpen ? 'caret-up' : 'caret-down'} size={14} color="#475569" />
                           </TouchableOpacity>
-                        )}
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.dropdownSelector,
+                            {
+                              borderRadius: 8,
+                              height: 42,
+                              paddingHorizontal: 14,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              borderColor: isCategoryDropdownOpen ? '#4C007C' : '#E2E8F0',
+                              borderWidth: 1,
+                              backgroundColor: '#FFFFFF',
+                            }
+                          ]}
+                          onPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.dropdownSelectorText, { color: category ? '#1E293B' : '#64748B' }]}>
+                            {category || 'Choose'}
+                          </Text>
+                          <Ionicons name={isCategoryDropdownOpen ? 'caret-up' : 'caret-down'} size={14} color="#475569" />
+                        </TouchableOpacity>
+                      )}
 
-                        {isCategoryDropdownOpen && (
-                          <View style={[styles.dropdownMenu, { zIndex: 9999, backgroundColor: '#FFFFFF', borderRadius: 4, borderColor: '#E5E7EB', paddingVertical: 6, overflow: 'hidden' }]}>
-                            <TouchableOpacity
-                              accessibilityRole="button"
-                              style={{ paddingVertical: 12, paddingHorizontal: 18, backgroundColor: '#FFFFFF' }}
-                              onPress={() => {
-                                setCategory('');
-                                setCategoryId(null);
-                                setOtherCategoryName('');
-                                setHoveredCategory(null);
-                                setIsCategoryDropdownOpen(false);
-                              }}
-                            >
-                              <Text style={{ fontSize: 14, color: '#71717A' }}>Choose</Text>
-                            </TouchableOpacity>
-                            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 4 }} />
-                            {apiCategories.map((cat) => {
-                              const isOtherItem = ['other', 'others'].includes(cat.name.toLowerCase());
-                              const isSelected = category === cat.name || (category === 'Others' && isOtherItem);
-                              const isHovered = hoveredCategory === cat.name;
+                      {/* Dropdown Menu Overlay */}
+                      {isCategoryDropdownOpen && (
+                        <>
+                          <TouchableOpacity
+                            style={{
+                              position: (Platform.OS === 'web' ? 'fixed' : 'absolute'),
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              zIndex: 9998,
+                            } as any}
+                            onPress={() => setIsCategoryDropdownOpen(false)}
+                          />
+                          <View style={{
+                            position: 'absolute',
+                            top: 68,
+                            left: 0,
+                            right: 0,
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 8,
+                            elevation: 10,
+                            zIndex: 9999,
+                            paddingVertical: 4,
+                          }}>
+                            {['Choose', 'Advisory', 'Announcement', 'Blog', 'Event', 'News', 'Others'].map((catName) => {
+                              const isSelected = catName === 'Choose' ? !category : category === catName;
                               return (
                                 <TouchableOpacity
-                                  key={cat.id}
-                                  accessibilityRole="button"
-                                  {...(Platform.OS === 'web'
-                                    ? ({
-                                        onMouseEnter: () => setHoveredCategory(cat.name),
-                                        onMouseLeave: () => setHoveredCategory((prev) => (prev === cat.name ? null : prev)),
-                                      } as any)
-                                    : {})}
+                                  key={catName}
                                   style={{
-                                    paddingVertical: 12,
-                                    paddingHorizontal: 18,
-                                    backgroundColor: isSelected || isHovered ? '#EEF4FF' : '#FFFFFF',
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 14,
+                                    backgroundColor: isSelected ? '#F8FAFC' : 'transparent',
                                   }}
                                   onPress={() => {
-                                    setCategory(isOtherItem ? 'Others' : cat.name);
-                                    setCategoryId(cat.id);
-                                    if (!isOtherItem) setOtherCategoryName('');
-                                    setHoveredCategory(null);
+                                    if (catName === 'Choose') {
+                                      setCategory('');
+                                      setCategoryId(null);
+                                      setOtherCategoryName('');
+                                    } else if (catName === 'Others') {
+                                      setCategory('Others');
+                                      const match = apiCategories.find(c => ['other', 'others'].includes(c.name.toLowerCase()));
+                                      setCategoryId(match ? match.id : 6);
+                                    } else {
+                                      setCategory(catName);
+                                      const match = apiCategories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+                                      setCategoryId(match ? match.id : null);
+                                      setOtherCategoryName('');
+                                    }
                                     setIsCategoryDropdownOpen(false);
                                   }}
                                 >
-                                  <Text style={{ fontSize: 14, color: '#1E293B', fontWeight: '400' }}>
-                                    {cat.name}
+                                  <Text style={{
+                                    fontSize: 13.5,
+                                    color: isSelected ? '#4C007C' : '#334155',
+                                    fontWeight: isSelected ? '600' : '400',
+                                  }}>
+                                    {catName}
                                   </Text>
                                 </TouchableOpacity>
                               );
                             })}
                           </View>
-                        )}
-                      </View>
+                        </>
+                      )}
                     </View>
 
-                    <View style={[styles.fieldGroup, { flex: 1, zIndex: 1 }]}>
+                    {/* DEPARTMENT */}
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.inputLabel}>DEPARTMENT</Text>
-                      <View style={[styles.dropdownSelector, { backgroundColor: '#F8FAFC', borderRadius: 8, height: 42, paddingHorizontal: 14 }]}>
-                        <Text style={styles.dropdownSelectorText}>{department}</Text>
+                      <View style={[styles.dropdownSelector, { backgroundColor: '#F8FAFC', borderRadius: 8, height: 42, paddingHorizontal: 14, justifyContent: 'center' }]}>
+                        <Text style={[styles.dropdownSelectorText, { color: '#334155' }]} numberOfLines={1}>
+                          {department}
+                        </Text>
                       </View>
                     </View>
                   </View>
                 </Card>
               </View>
 
-              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn, { zIndex: 1 }]}>
+              <View style={[isLargeScreen ? styles.rightColumn : styles.stackedColumn]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -1635,8 +1607,8 @@ export default function RequestorDashboard() {
             </View>
 
             {/* ROW 2 */}
-            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: 1 }]}>
-              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: 1 }]}>
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
+              <View style={[isLargeScreen ? styles.leftColumn : styles.stackedColumn, { position: 'relative', zIndex: (isCategoryDropdownOpen || isDeptDropdownOpen) ? -1 : 1 }]}>
                 <Card style={styles.formCard as any}>
                   <View style={styles.cardHeader}>
                     <View style={styles.headerIconWrapper}>
@@ -2714,6 +2686,15 @@ export default function RequestorDashboard() {
       )}
       {/* Review Comments Modal */}
       {selectedQueuePost && (
+        isDirectImcDetailsRequest(selectedQueuePost) || (selectedQueuePost.routing_type || selectedQueuePost.routingType || selectedQueuePost.rawPost?.routing_type || selectedQueuePost.rawPost?.routingType) === 'direct_imc' ? (
+          <DirectImcRequestDetailsModal
+            request={selectedQueuePost}
+            onClose={() => {
+              setSelectedQueuePost(null);
+              router.setParams({ postId: '' });
+            }}
+          />
+        ) : (
         <Modal
           animationType="fade"
           transparent={true}
@@ -2743,17 +2724,99 @@ export default function RequestorDashboard() {
 
               {/* Modal Body Split */}
               <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
-                {(selectedQueuePost.rawStatus === 'rejected' || selectedQueuePost.rawStatus === 'returned_for_revision') && (
-                  <View style={{ marginBottom: 16 }}>
-                    <View style={{ backgroundColor: isDarkMode ? '#302238' : selectedQueuePost.rawStatus === 'returned_for_revision' ? '#FFFBEB' : '#FEF2F2', padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: isDarkMode ? '#6B4B75' : selectedQueuePost.rawStatus === 'returned_for_revision' ? '#FDE68A' : '#FECACA', gap: Spacing.sm }}>
-                      <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: isDarkMode ? '#F8FAFC' : selectedQueuePost.rawStatus === 'returned_for_revision' ? '#92400E' : '#B91C1C' }}>{selectedQueuePost.rawStatus === 'returned_for_revision' ? 'Changes requested' : 'Review feedback'}</Text>
-                      {!!selectedQueuePost.rejectedBy && <Text style={{ fontSize: FontSize.xs, lineHeight: 18, color: Colors.textSecondary }}>Reviewed by {selectedQueuePost.rejectedBy}</Text>}
-                      <Text style={{ fontSize: FontSize.sm, lineHeight: 20, color: Colors.textPrimary }}>
-                        {selectedQueuePost.rejectionReason || 'No reason provided.'}
-                      </Text>
+                {(selectedQueuePost.rawStatus === 'rejected' || selectedQueuePost.rawStatus === 'returned_for_revision') && (() => {
+                  const isRevision = selectedQueuePost.rawStatus === 'returned_for_revision';
+                  const approverName = selectedQueuePost.rejectedBy || selectedQueuePost.rawPost?.rejected_by || '';
+                  const alertBg = isRevision
+                    ? (isDarkMode ? '#271705' : '#FFFBEB')
+                    : (isDarkMode ? '#251214' : '#FEF2F2');
+                  const alertBorder = isRevision
+                    ? (isDarkMode ? '#78350F' : '#FDE68A')
+                    : (isDarkMode ? '#7F1D1D' : '#FECACA');
+                  const accentColor = isRevision ? '#D97706' : '#DC2626';
+                  const titleColor = isRevision
+                    ? (isDarkMode ? '#FDE68A' : '#92400E')
+                    : (isDarkMode ? '#FECACA' : '#991B1B');
+                  const cardBg = isDarkMode ? '#18181B' : '#FFFFFF';
+                  const cardBorder = isRevision
+                    ? (isDarkMode ? '#451A03' : '#FEF3C7')
+                    : (isDarkMode ? '#38161A' : '#FEE2E2');
+                  const labelColor = isRevision
+                    ? (isDarkMode ? '#F59E0B' : '#B45309')
+                    : (isDarkMode ? '#EF4444' : '#B91C1C');
+                  const textColor = isDarkMode ? '#F1F5F9' : '#1E293B';
+
+                  const bannerTitle = isRevision
+                    ? (approverName ? `Revision requested by ${approverName}` : 'Revision Requested')
+                    : (approverName ? `Rejected by ${approverName}` : 'Post Rejected');
+
+                  return (
+                    <View style={{
+                      marginBottom: 16,
+                      backgroundColor: alertBg,
+                      borderWidth: 1,
+                      borderColor: alertBorder,
+                      borderLeftWidth: 4,
+                      borderLeftColor: accentColor,
+                      borderRadius: 12,
+                      padding: 14,
+                      gap: 10,
+                      ...(Platform.OS === 'web'
+                        ? { boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(220, 38, 38, 0.06)' }
+                        : { elevation: 2 }),
+                    }}>
+                      {/* Top Header Row: Solid circular accent icon + Clean Title (No redundant status badge) */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: accentColor,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Ionicons
+                            name={isRevision ? "alert" : "close"}
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        </View>
+                        <Text style={{
+                          fontSize: 14,
+                          fontWeight: '700',
+                          color: titleColor,
+                          letterSpacing: -0.2,
+                          flex: 1,
+                        }}>
+                          {bannerTitle}
+                        </Text>
+                      </View>
+
+                      {/* Remarks Content Box - High Contrast, Legible Modern Surface */}
+                      <View style={{
+                        backgroundColor: cardBg,
+                        borderWidth: 1,
+                        borderColor: cardBorder,
+                        borderRadius: 8,
+                        padding: 12,
+                        gap: 4,
+                      }}>
+                        <Text style={{
+                          fontSize: 10.5,
+                          fontWeight: '700',
+                          letterSpacing: 0.6,
+                          textTransform: 'uppercase',
+                          color: labelColor,
+                        }}>
+                          {isRevision ? 'Revision Notes' : 'Remarks'}
+                        </Text>
+                        <Text style={{ fontSize: 13.5, lineHeight: 20, color: textColor, fontWeight: '500' }}>
+                          {selectedQueuePost.rejectionReason || 'No specific remarks provided.'}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                )}
+                  );
+                })()}
 
                 <View style={{ marginBottom: 16 }}>
                   <View style={{ backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border }}>
@@ -2780,15 +2843,20 @@ export default function RequestorDashboard() {
                       const getIcon = (state: string) => {
                         if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
                         if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return { name: 'checkmark-circle', color: '#059669' };
+                        if (state === 'Editing') return { name: 'brush', color: '#7C3AED' };
+                        if (state === 'Reviewing') return { name: 'eye', color: '#0284C7' };
                         return { name: 'time', color: Colors.textMuted };
                       };
                       const getColor = (state: string) => {
                         if (state === 'Rejected') return '#DC2626';
                         if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
+                        if (state === 'Editing') return '#7C3AED';
+                        if (state === 'Reviewing') return '#0284C7';
                         return Colors.textMuted;
                       };
                       const getLineColor = (state: string) => {
                         if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
+                        if (state === 'Editing') return '#7C3AED';
                         if (state === 'Rejected') return '#DC2626';
                         return Colors.border;
                       };
@@ -2797,7 +2865,12 @@ export default function RequestorDashboard() {
                       if (isDirectImc) {
                         const requestState = 'Approved'; // Submitted
                         let imcState = getStageStatus('imc_qa');
-                        if (selectedQueuePost.rawStatus === 'pending_imc_qa') imcState = 'Pending';
+                        const wfList = selectedQueuePost.approval_workflows || selectedQueuePost.rawPost?.approval_workflows || [];
+                        const imcWorkflow = Array.isArray(wfList) ? [...wfList].reverse().find((w: any) => w.stage === 'imc_qa') : null;
+                        const imcAct = String(imcWorkflow?.action || '').toLowerCase();
+                        if (selectedQueuePost.rawStatus === 'pending_imc_qa') {
+                          imcState = imcAct === 'editing' ? 'Editing' : (imcAct === 'reviewing' ? 'Reviewing' : 'Pending');
+                        }
                         if (selectedQueuePost.rawStatus === 'rejected') imcState = 'Rejected';
                         if (selectedQueuePost.rawStatus === 'returned_for_revision') imcState = 'Rejected';
                         if (['approved', 'scheduled', 'published'].includes(selectedQueuePost.rawStatus)) imcState = 'Approved';
@@ -2866,6 +2939,7 @@ export default function RequestorDashboard() {
                                 <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                                   <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
                                 </View>
+                                <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                               </View>
 
                               <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
@@ -2966,63 +3040,14 @@ export default function RequestorDashboard() {
 
                     {/* Interactive Mockup Container */}
                     {(() => {
-                      let checklist = selectedQueuePost?.imc_branding_checklist || selectedQueuePost?.rawPost?.imc_branding_checklist;
-                      if (typeof checklist === 'string') {
-                        try { checklist = JSON.parse(checklist); } catch {}
-                      }
-
-                      const originalMediaList: any[] = (Array.isArray(checklist?.original_media) && checklist.original_media.length > 0)
-                        ? checklist.original_media
-                        : (selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || []);
-
-                      const finalMediaList: any[] = (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0)
-                        ? checklist.final_media
-                        : (checklist?.has_replacement_media && Array.isArray(selectedQueuePost?.media) && selectedQueuePost.media.length > 0)
-                        ? selectedQueuePost.media
-                        : [];
-
-                      const hasReplacements = finalMediaList.length > 0 && (
-                        Boolean(checklist?.has_replacement_media) ||
-                        (originalMediaList.length > 0 && JSON.stringify(finalMediaList) !== JSON.stringify(originalMediaList))
-                      );
-
-                      const mediaSource = hasReplacements && finalMediaList.length > 0
-                        ? finalMediaList
-                        : originalMediaList;
-
-                      const validList = getImageUrisFromMedia(Array.isArray(mediaSource) ? mediaSource : []);
+                      const rawList = selectedQueuePost?.media || selectedQueuePost?.rawPost?.media || [];
+                      const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
                       const queuePostMediaImages = validList.length > 0
                         ? validList
                         : (selectedQueuePost?.thumbnailUrl ? [selectedQueuePost.thumbnailUrl] : []);
 
-                      const originalCaption = checklist?.original_caption || selectedQueuePost?.rawPost?.caption_narrative || selectedQueuePost?.caption || '';
-                      const refinedCaption = checklist?.refined_caption;
-                      const isCaptionRefined = Boolean(refinedCaption && refinedCaption.trim() && refinedCaption.trim() !== originalCaption.trim());
-                      const activeCaption = isCaptionRefined ? refinedCaption : (selectedQueuePost?.caption || '');
-                      const hasEnhancements = hasReplacements || isCaptionRefined;
-
                       return (
                         <>
-                          {hasEnhancements && (
-                            <View style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                              borderWidth: 1,
-                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 7,
-                              marginBottom: 10,
-                              gap: 8,
-                            }}>
-                              <Ionicons name="checkmark-done-circle" size={16} color="#4C007C" />
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
-                                Preview reflects approved IMC revisions (caption & media)
-                              </Text>
-                            </View>
-                          )}
-
                           {modalPlatformTab === 'facebook' && (
                             <View style={styles.socialMockupCard}>
                               <View style={styles.socialHeader}>
@@ -3033,7 +3058,7 @@ export default function RequestorDashboard() {
                                 </View>
                               </View>
 
-                              <FormattedText style={styles.socialCaptionText}>{activeCaption}</FormattedText>
+                              <FormattedText style={styles.socialCaptionText}>{selectedQueuePost.caption}</FormattedText>
 
                               {queuePostMediaImages.length > 0 ? (
                                 <FacebookMediaGrid
@@ -3094,7 +3119,7 @@ export default function RequestorDashboard() {
                                   <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
                                 </View>
                                 <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                                <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_cite </b>' + (activeCaption || '')}</FormattedText>
+                                <FormattedText style={styles.socialCaptionText}>{'<b>jmcfi_cite </b>' + (selectedQueuePost.caption || '')}</FormattedText>
                               </View>
                             </View>
                           )}
@@ -3118,12 +3143,7 @@ export default function RequestorDashboard() {
                           <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
                           <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedQueuePost.title}</Text>
                           <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedQueuePost.date}</Text>
-                          <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>
-                            {(() => {
-                              const checklist = selectedQueuePost?.imc_branding_checklist || selectedQueuePost?.rawPost?.imc_branding_checklist;
-                              return checklist?.refined_caption || selectedQueuePost.caption;
-                            })()}
-                          </FormattedText>
+                          <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedQueuePost.caption}</FormattedText>
                         </View>
                       </View>
                     )}
@@ -3146,11 +3166,7 @@ export default function RequestorDashboard() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.metaLabel}>Category</Text>
-                        <Text style={styles.metaVal}>
-                          {(selectedQueuePost.routing_type === 'direct_imc' || selectedQueuePost.rawPost?.routing_type === 'direct_imc')
-                            ? 'Direct to IMC'
-                            : (selectedQueuePost.other_category_name || selectedQueuePost.category)}
-                        </Text>
+                        <Text style={styles.metaVal}>{selectedQueuePost.other_category_name || selectedQueuePost.category}</Text>
                       </View>
                     </View>
 
@@ -3219,192 +3235,12 @@ export default function RequestorDashboard() {
                       </View>
                     </View>
 
-                    {(() => {
-                      const isDirectImc = selectedQueuePost.routing_type === 'direct_imc' || selectedQueuePost.rawPost?.routing_type === 'direct_imc';
-                      let checklist = selectedQueuePost.imc_branding_checklist || selectedQueuePost.rawPost?.imc_branding_checklist;
-                      if (typeof checklist === 'string') {
-                        try { checklist = JSON.parse(checklist); } catch {}
-                      }
+                    <View style={styles.metaDivider} />
 
-                      const originalCaption = checklist?.original_caption || selectedQueuePost.rawPost?.caption_narrative || selectedQueuePost.caption || '';
-                      const refinedCaption = checklist?.refined_caption;
-                      const isCaptionRefined = Boolean(refinedCaption && refinedCaption.trim() && refinedCaption.trim() !== originalCaption.trim());
-                      const finalCaption = (typeof refinedCaption === 'string' && refinedCaption.trim()) ? refinedCaption : (selectedQueuePost.caption || '');
-
-                      const originalMediaList: any[] = (Array.isArray(checklist?.original_media) && checklist.original_media.length > 0)
-                        ? checklist.original_media
-                        : (selectedQueuePost.media || selectedQueuePost.rawPost?.media || []);
-
-                      const finalMediaList: any[] = (Array.isArray(checklist?.final_media) && checklist.final_media.length > 0)
-                        ? checklist.final_media
-                        : (checklist?.has_replacement_media && Array.isArray(selectedQueuePost.media) && selectedQueuePost.media.length > 0)
-                        ? selectedQueuePost.media
-                        : [];
-
-                      const hasReplacementMedia = Boolean(
-                        (checklist?.has_replacement_media && finalMediaList.length > 0) ||
-                        (finalMediaList.length > 0 && originalMediaList.length > 0 &&
-                         JSON.stringify(finalMediaList.map((m: any) => m.url || m.file_path || m.name || m.original_name)) !==
-                         JSON.stringify(originalMediaList.map((m: any) => m.url || m.file_path || m.name || m.original_name)))
-                      );
-
-                      const isPendingQa = ['pending_imc_qa', 'pending', 'pending_qa'].includes(String(selectedQueuePost.rawStatus || '').toLowerCase());
-
-                      return (
-                        <>
-                          <View style={styles.metaDivider} />
-
-                          {/* ── Status Note for Direct IMC Under QA ── */}
-                          {isDirectImc && isPendingQa && (
-                            <View style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 8,
-                              backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                              padding: 10,
-                              borderRadius: 8,
-                              borderWidth: 1,
-                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                              marginBottom: 4,
-                            }}>
-                              <Ionicons name="information-circle-outline" size={17} color="#4C007C" />
-                              <Text style={{ fontSize: 12, color: isDarkMode ? '#E2E8F0' : '#475569', flex: 1, lineHeight: 17 }}>
-                                Directly routed to IMC. Currently under QA review. Caption refinements or replacement graphics prepared by IMC will appear below.
-                              </Text>
-                            </View>
-                          )}
-
-                          {/* ── CAPTION SECTION ── */}
-                          {isCaptionRefined ? (
-                            <View style={{ gap: 6 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <Ionicons name="document-text-outline" size={14} color="#4C007C" />
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#4C007C', textTransform: 'uppercase' }}>
-                                    Final Caption (Updated by IMC)
-                                  </Text>
-                                </View>
-                                <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#DDD6FE' }}>
-                                  <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#6B21A8' }}>Refined by IMC</Text>
-                                </View>
-                              </View>
-                              <View style={{ backgroundColor: isDarkMode ? '#0F172A' : '#FAF5FF', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#D8B4FE' }}>
-                                <FormattedText style={{ fontSize: 13, color: Colors.textPrimary, lineHeight: 19 }}>
-                                  {refinedCaption}
-                                </FormattedText>
-                              </View>
-
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary, marginTop: 4, textTransform: 'uppercase' }}>
-                                Original Submitted Caption
-                              </Text>
-                              <View style={{ backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#E2E8F0' }}>
-                                <FormattedText style={{ fontSize: 12, color: Colors.textSecondary, lineHeight: 18 }}>
-                                  {originalCaption}
-                                </FormattedText>
-                              </View>
-                            </View>
-                          ) : (
-                            <View style={styles.metaRow}>
-                              <Text style={styles.metaLabel}>Caption / Main Text</Text>
-                              <FormattedText style={styles.metaCaptionBox}>{finalCaption || 'No caption provided.'}</FormattedText>
-                            </View>
-                          )}
-
-                          <View style={styles.metaDivider} />
-
-                          {/* ── MEDIA ATTACHMENTS & REPLACEMENTS SECTION ── */}
-                          {hasReplacementMedia ? (
-                            <View style={{ gap: 10 }}>
-                              {/* Replaced Images by IMC */}
-                              <View style={{ gap: 6 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="images" size={14} color="#4C007C" />
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#4C007C', textTransform: 'uppercase' }}>
-                                      Final Images (Uploaded by IMC - {finalMediaList.length})
-                                    </Text>
-                                  </View>
-                                  <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#DDD6FE' }}>
-                                    <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#6B21A8' }}>Replaced by IMC</Text>
-                                  </View>
-                                </View>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-                                  {finalMediaList.map((m: any, idx: number) => {
-                                    const uri = resolveImageUrl(m.url || m.file_url || m.file_path) || m.url;
-                                    return (
-                                      <TouchableOpacity
-                                        key={m.id || idx}
-                                        onPress={() => uri && setFullScreenImage(uri)}
-                                        activeOpacity={0.8}
-                                        style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: '#7C3AED', backgroundColor: '#F1F5F9' }}
-                                      >
-                                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                      </TouchableOpacity>
-                                    );
-                                  })}
-                                </ScrollView>
-                              </View>
-
-                              {/* Original Submitted Media */}
-                              <View style={{ gap: 6, marginTop: 4 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <Ionicons name="folder-outline" size={13} color={Colors.textSecondary} />
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary, textTransform: 'uppercase' }}>
-                                    Original Submitted Images ({originalMediaList.length})
-                                  </Text>
-                                </View>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-                                  {originalMediaList.map((m: any, idx: number) => {
-                                    const uri = resolveImageUrl(m.url || m.file_url || m.file_path) || m.url;
-                                    return (
-                                      <TouchableOpacity
-                                        key={m.id || idx}
-                                        onPress={() => uri && setFullScreenImage(uri)}
-                                        activeOpacity={0.8}
-                                        style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: isDarkMode ? '#475569' : '#CBD5E1', backgroundColor: '#F1F5F9' }}
-                                      >
-                                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                      </TouchableOpacity>
-                                    );
-                                  })}
-                                </ScrollView>
-                              </View>
-                            </View>
-                          ) : (
-                            /* Attached Media Gallery (Original images) */
-                            <View style={{ gap: 6 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="images-outline" size={14} color={Colors.textPrimary} />
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.textSecondary, textTransform: 'uppercase' }}>
-                                  Attached Images ({originalMediaList.length})
-                                </Text>
-                              </View>
-                              {originalMediaList.length > 0 ? (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-                                  {originalMediaList.map((m: any, idx: number) => {
-                                    const uri = resolveImageUrl(m.url || m.file_url || m.file_path) || m.url;
-                                    return (
-                                      <TouchableOpacity
-                                        key={m.id || idx}
-                                        onPress={() => uri && setFullScreenImage(uri)}
-                                        activeOpacity={0.8}
-                                        style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: isDarkMode ? '#475569' : '#CBD5E1', backgroundColor: '#F1F5F9' }}
-                                      >
-                                        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                      </TouchableOpacity>
-                                    );
-                                  })}
-                                </ScrollView>
-                              ) : (
-                                <Text style={{ fontSize: 12, color: Colors.textMuted, fontStyle: 'italic' }}>
-                                  No photo attachments (Text-only request).
-                                </Text>
-                              )}
-                            </View>
-                          )}
-                        </>
-                      );
-                    })()}
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Caption / Main Text</Text>
+                      <FormattedText style={styles.metaCaptionBox}>{selectedQueuePost.caption}</FormattedText>
+                    </View>
                   </View>
                 </View>
               </ScrollView>
@@ -3424,6 +3260,7 @@ export default function RequestorDashboard() {
             </View>
           </View>
         </Modal>
+        )
       )}
 
       {/* Approval Flow Progress Modal for Recent Requests Row Click */}
@@ -5460,10 +5297,14 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '100%',
-    maxWidth: 780,
+    maxWidth: 820,
     maxHeight: '90%',
     backgroundColor: Colors.surface,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderTopWidth: 4,
+    borderTopColor: '#4C007C',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },

@@ -195,12 +195,13 @@ class ApprovalWorkflowService
     public function notifyITPublisher(PostRequest $postRequest): void
     {
         try {
-            $publishers = User::whereHas('roles', function ($query) {
-                $query->whereIn('name', ['it_admin', 'it_publisher', 'admin']);
-            })->where('status', 'active')
-              ->get();
+            $publisher = User::whereHas('roles', function ($query) {
+                $query->where('name', 'admin');
+            })->where('department', 'Information Technology Office')
+              ->where('status', 'active')
+              ->first();
 
-            foreach ($publishers as $publisher) {
+            if ($publisher) {
                 $publisher->notify(new \App\Notifications\PostReadyForPublishingNotification($postRequest));
             }
         } catch (\Throwable $e) {

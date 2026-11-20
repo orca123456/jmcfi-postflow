@@ -94,7 +94,11 @@ async function run() {
       await rejectedSearch.fill('no matching feedback');
       assert.equal(await page.getByRole('button', { name: /^View request details:/ }).count(), 0);
       await page.getByRole('button', { name: 'Clear request search', exact: true }).click();
-      await page.getByRole('button', { name: 'Filter request date: Custom range', exact: true }).click();
+      const customFilterBtn = page.getByRole('button', { name: 'Filter request date: Custom range', exact: true });
+      if (!await customFilterBtn.isVisible()) {
+        await page.getByRole('button', { name: 'Filter request date', exact: true }).click();
+      }
+      await customFilterBtn.click();
       await page.getByLabel('Rejected start date', { exact: true }).fill('2026-11-17');
       await page.getByLabel('Rejected end date', { exact: true }).fill('2026-11-16');
       assert.equal(await page.getByRole('button', { name: 'Apply rejected request date range', exact: true }).isDisabled(), true);
@@ -128,7 +132,7 @@ async function run() {
       await fitControls(page, '#requestor-imc-preview');
       assert.equal(await page.locator('#requestor-imc-preview').getByText(/REQ-\d+|^#\d+$/).count(), 0);
       await capture(page, `workspace-imc-preview-${width}`);
-      await page.getByRole('button', { name: 'Close request preview', exact: true }).click();
+      await page.getByRole('button', { name: 'Close IMC publication request', exact: true }).click();
 
       await goto('policy-rules', '#postflow-policy-rules');
       const policySearch = page.getByRole('textbox', { name: 'Search policy rules', exact: true });

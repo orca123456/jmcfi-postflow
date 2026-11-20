@@ -13,30 +13,41 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
+import { Colors, Spacing } from '../../constants/theme';
+import { dashboardStyles, dashboardUi, useDashboardLayout } from '../ui/dashboardDesign';
+import { DepartmentCell } from '../../utils/departmentFormatter';
+import { PaginationControl } from '../ui/PaginationControl';
+
+export type ImcPublishingMode = 'direct-imc' | 'in-progress-editing' | 'for-approval' | 'published' | 'requests';
 
 interface ImcPublishingRequestsProps {
   requests: any[];
   onReviewRequest: (req: any) => void;
+  onApproveRequest?: (req: any) => void;
+  onRejectRequest?: (req: any) => void;
   departments?: string[];
-  mode?: 'requests' | 'published';
+  mode?: ImcPublishingMode;
 }
 
 export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
   requests,
   onReviewRequest,
+  onApproveRequest,
+  onRejectRequest,
   departments: propDepartments,
   mode = 'requests',
 }) => {
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
-  const isDesktop = width >= 1024;
+  const { onLayout, isCompact } = useDashboardLayout();
+  const isTablet = !isCompact;
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All Departments');
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days'>('All Time');
+  const [dateFilter, setDateFilter] = useState<'All Time' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'Custom Range'>('All Time');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
   // Pagination
@@ -63,6 +74,19 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
     }
   }, []);
 
+  // Resolve string department safely whether passed as string or backend Department object
+  const resolveDepartmentName = (r: any, fallback = ''): string => {
+    const candidates = [r?.dept, r?.department, r?.requestor?.department, r?.rawPost?.department];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.trim()) return c.trim();
+      if (c && typeof c === 'object') {
+        const name = c.display_name || c.name;
+        if (typeof name === 'string' && name.trim()) return name.trim();
+      }
+    }
+    return fallback;
+  };
+
   // Compute available departments
   const departmentOptions = useMemo(() => {
     const set = new Set<string>();
@@ -71,12 +95,9 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
       propDepartments.forEach((d) => set.add(d));
     }
     requests.forEach((r) => {
-      const dept =
-        r.department ||
-        r.requestor?.department ||
-        (r.rawPost?.department ? (typeof r.rawPost.department === 'string' ? r.rawPost.department : r.rawPost.department.name) : null);
-      if (dept && typeof dept === 'string' && dept.trim()) {
-        set.add(dept.trim());
+      const dept = resolveDepartmentName(r);
+      if (dept) {
+        set.add(dept);
       }
     });
     return Array.from(set);
@@ -93,10 +114,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
 
       // Department filter
       if (selectedDept !== 'All Departments') {
-        const dept =
-          r.department ||
-          r.requestor?.department ||
-          (r.rawPost?.department ? (typeof r.rawPost.department === 'string' ? r.rawPost.department : r.rawPost.department.name) : '');
+        const dept = resolveDepartmentName(r);
         if (dept !== selectedDept) return false;
       }
 
@@ -117,6 +135,17 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
           } else if (dateFilter === 'Last 30 Days') {
             const startOf30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             if (createdAt < startOf30Days) return false;
+          } else if (dateFilter === 'Custom Range') {
+            const start = customStartDate ? new Date(customStartDate) : null;
+            const end = customEndDate ? new Date(customEndDate) : null;
+            if (start && !isNaN(start.getTime())) {
+              const startOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+              if (createdAt < startOfDay) return false;
+            }
+            if (end && !isNaN(end.getTime())) {
+              const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+              if (createdAt > endOfDay) return false;
+            }
           }
         }
       }
@@ -125,7 +154,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const title = (r.title || '').toLowerCase();
-        const dept = (r.department || r.requestor?.department || '').toLowerCase();
+        const dept = resolveDepartmentName(r).toLowerCase();
         const requestedBy = (r.requestedBy || r.requestor?.full_name || '').toLowerCase();
         const caption = (r.caption || r.caption_narrative || '').toLowerCase();
         if (
@@ -140,7 +169,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
 
       return true;
     });
-  }, [requests, mode, selectedDept, dateFilter, searchQuery]);
+  }, [requests, mode, selectedDept, dateFilter, customStartDate, customEndDate, searchQuery]);
 
   // Pagination calculation
   const totalItems = filteredRequests.length;
@@ -203,7 +232,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={onLayout}>
       {/* ================= PAGE HEADER & BREADCRUMB ================= */}
       <View style={styles.pageHeader}>
         <View style={styles.breadcrumbRow}>
@@ -219,12 +248,22 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
         </View>
 
         <Text style={[styles.pageTitle, isDarkMode && styles.pageTitleDark]}>
-          {mode === 'published' ? 'Published Posts' : 'Publishing Requests'}
+          {mode === 'published'
+            ? 'Published Posts'
+            : mode === 'in-progress-editing'
+              ? 'In-Progress Editing'
+              : mode === 'for-approval'
+                ? 'For Approval'
+                : 'Direct to IMC Requests'}
         </Text>
         <Text style={[styles.pageSubtitle, isDarkMode && styles.pageSubtitleDark]}>
           {mode === 'published'
-            ? 'Completed publications and final post records.'
-            : 'Review and prepare submitted publications for release.'}
+            ? 'View and manage published releases across all official platforms.'
+            : mode === 'in-progress-editing'
+              ? 'Requests where raw photos or captions are actively being edited and prepared for publication.'
+              : mode === 'for-approval'
+                ? 'Standard department requests requiring IMC QA clearance. Review, approve, or reject.'
+                : 'Incoming requests sent directly to IMC for editing, refinement, and publication.'}
         </Text>
       </View>
 
@@ -233,13 +272,19 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
         {/* Card Toolbar Row */}
         <View style={[styles.cardToolbar, !isTablet && styles.cardToolbarStacked]}>
           <Text style={[styles.cardTitle, isDarkMode && styles.cardTitleDark]}>
-            {mode === 'published' ? 'Published Posts' : 'Publishing Requests'}
+            {mode === 'published'
+              ? 'Published Content'
+              : mode === 'in-progress-editing'
+                ? 'Currently Editing'
+                : mode === 'for-approval'
+                  ? 'Standard Requests Awaiting Approval'
+                  : 'Direct to IMC Queue'}
           </Text>
 
           {/* Right Toolbar Actions */}
           <View ref={filterDropdownsRef} style={[styles.toolbarActions, !isTablet && styles.toolbarActionsStacked]}>
             {/* 1. Date Range Dropdown */}
-            <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 80 : 30 }}>
+            <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 1000 : 30 }}>
               <TouchableOpacity
                 style={[styles.filterDropdownBtn, isDarkMode && styles.filterDropdownBtnDark]}
                 onPress={() => {
@@ -267,8 +312,8 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
               </TouchableOpacity>
 
               {isDateDropdownOpen && (
-                <View style={[styles.dropdownMenu, isDarkMode && styles.dropdownMenuDark, { width: 140 }]}>
-                  {(['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days'] as const).map((opt) => (
+                <View style={[styles.dropdownMenu, isDarkMode && styles.dropdownMenuDark, { minWidth: 200, width: 210 }]}>
+                  {(['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'] as const).map((opt) => (
                     <TouchableOpacity
                       key={opt}
                       style={[
@@ -278,8 +323,10 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                       ]}
                       onPress={() => {
                         setDateFilter(opt);
-                        setIsDateDropdownOpen(false);
-                        setCurrentPage(1);
+                        if (opt !== 'Custom Range') {
+                          setIsDateDropdownOpen(false);
+                          setCurrentPage(1);
+                        }
                       }}
                     >
                       <Text
@@ -293,12 +340,106 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                       </Text>
                     </TouchableOpacity>
                   ))}
+
+                  {dateFilter === 'Custom Range' && (
+                    <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? Colors.border : '#E2E8F0' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '500', color: isDarkMode ? '#94A3B8' : Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          aria-label="Start Date"
+                          type="date"
+                          style={{
+                            height: 32,
+                            fontSize: 12,
+                            borderRadius: 6,
+                            border: `1px solid ${isDarkMode ? Colors.border : '#CBD5E1'}`,
+                            paddingLeft: 8,
+                            paddingRight: 8,
+                            outline: 'none',
+                            backgroundColor: isDarkMode ? Colors.surface : '#FFFFFF',
+                            color: isDarkMode ? '#F8FAFC' : Colors.textPrimary,
+                            width: '100%',
+                            marginBottom: 8,
+                            boxSizing: 'border-box',
+                          }}
+                          value={customStartDate}
+                          onChange={(e: any) => {
+                            setCustomStartDate(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                        />
+                      ) : (
+                        <TextInput
+                          style={[styles.searchInput, { height: 32, marginBottom: 8, fontSize: 12 }]}
+                          placeholder="YYYY-MM-DD"
+                          value={customStartDate}
+                          onChangeText={(v) => {
+                            setCustomStartDate(v);
+                            setCurrentPage(1);
+                          }}
+                        />
+                      )}
+                      <Text style={{ fontSize: 11, fontWeight: '500', color: isDarkMode ? '#94A3B8' : Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          aria-label="End Date"
+                          type="date"
+                          style={{
+                            height: 32,
+                            fontSize: 12,
+                            borderRadius: 6,
+                            border: `1px solid ${isDarkMode ? Colors.border : '#CBD5E1'}`,
+                            paddingLeft: 8,
+                            paddingRight: 8,
+                            outline: 'none',
+                            backgroundColor: isDarkMode ? Colors.surface : '#FFFFFF',
+                            color: isDarkMode ? '#F8FAFC' : Colors.textPrimary,
+                            width: '100%',
+                            marginBottom: 8,
+                            boxSizing: 'border-box',
+                          }}
+                          value={customEndDate}
+                          onChange={(e: any) => {
+                            setCustomEndDate(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                        />
+                      ) : (
+                        <TextInput
+                          style={[styles.searchInput, { height: 32, marginBottom: 8, fontSize: 12 }]}
+                          placeholder="YYYY-MM-DD"
+                          value={customEndDate}
+                          onChangeText={(v) => {
+                            setCustomEndDate(v);
+                            setCurrentPage(1);
+                          }}
+                        />
+                      )}
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#4D007C',
+                          height: 32,
+                          borderRadius: 6,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: 4,
+                          ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+                        }}
+                        onPress={() => {
+                          setIsDateDropdownOpen(false);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
 
             {/* 2. Department Dropdown */}
-            <View style={{ position: 'relative', zIndex: isDeptDropdownOpen ? 80 : 30 }}>
+            <View style={{ position: 'relative', zIndex: isDeptDropdownOpen ? 1000 : 30 }}>
               <TouchableOpacity
                 style={[styles.filterDropdownBtn, isDarkMode && styles.filterDropdownBtnDark]}
                 onPress={() => {
@@ -310,7 +451,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
               >
                 <Text
                   style={[styles.filterDropdownBtnText, isDarkMode && styles.filterDropdownBtnTextDark]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {selectedDept}
                 </Text>
@@ -345,7 +486,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                             isDarkMode && styles.dropdownMenuItemTextDark,
                             selectedDept === dept && styles.dropdownMenuItemTextActive,
                           ]}
-                          numberOfLines={1}
+                          numberOfLines={2}
                         >
                           {dept}
                         </Text>
@@ -357,7 +498,7 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
             </View>
 
             {/* 3. Search Bar */}
-            <View style={[styles.searchBox, isDarkMode && styles.searchBoxDark]}>
+            <View {...(Platform.OS === 'web' ? { dataSet: { dashboardField: 'search' } } : {})} style={[styles.searchBox, !isTablet && { width: '100%' }, isDarkMode && styles.searchBoxDark]}>
               <Ionicons
                 name="search"
                 size={15}
@@ -384,16 +525,18 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
         </View>
 
         {/* ================= DATA TABLE ================= */}
-        <ScrollView horizontal={!isDesktop} showsHorizontalScrollIndicator={false}>
-          <View style={[styles.tableContainer, !isDesktop && { minWidth: 920 }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ minWidth: dashboardUi.tableMinWidth, flexGrow: 1 }} style={{ width: '100%' }}>
+          <View style={styles.tableContainer}>
             {/* Table Header Row */}
             <View style={[styles.tableHeaderRow, isDarkMode && styles.tableHeaderRowDark]}>
-              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 2.5 }]}>Request Title</Text>
-              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 1.4 }]}>Department</Text>
-              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 1.3 }]}>Requested By</Text>
-              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { flex: 1.1 }]}>Requested On</Text>
-              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { width: 110, textAlign: 'center' }]}>Platforms</Text>
-              <Text style={[styles.tableHeaderCell, mode === 'published' && { textTransform: 'none' }, { width: 100, textAlign: 'right' }]}>Actions</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Request title</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Department</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Requested by</Text>
+              <Text style={[styles.tableHeaderCell, { flex: 1.1 }]}>Date</Text>
+              <Text style={[styles.tableHeaderCell, { width: 125, textAlign: 'left' }]}>Platform</Text>
+              <View style={{ width: mode === 'for-approval' ? 180 : 120, alignItems: 'center', justifyContent: 'center', paddingRight: 0 }}>
+                <Text style={[styles.tableHeaderCell, { paddingRight: 0, textAlign: 'center' }]}>Actions</Text>
+              </View>
             </View>
 
             {/* Table Body Rows */}
@@ -406,12 +549,22 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                   style={{ marginBottom: 10 }}
                 />
                 <Text style={[styles.emptyTableTitle, isDarkMode && styles.emptyTableTitleDark]}>
-                  {mode === 'published' ? 'No published posts yet' : 'No publishing requests found'}
+                  {mode === 'published'
+                    ? 'No published posts yet'
+                    : mode === 'in-progress-editing'
+                      ? 'No requests currently being edited'
+                      : mode === 'for-approval'
+                        ? 'No standard requests awaiting approval'
+                        : 'No Direct to IMC requests found'}
                 </Text>
                 <Text style={[styles.emptyTableSubtitle, isDarkMode && styles.emptyTableSubtitleDark]}>
                   {mode === 'published'
                     ? 'Published announcements will appear here once released.'
-                    : 'Requests submitted directly to IMC for publication will appear here.'}
+                    : mode === 'in-progress-editing'
+                      ? 'When you start editing or download photos from a request, it will appear here.'
+                      : mode === 'for-approval'
+                        ? 'All standard department submissions have been cleared or acted on.'
+                        : 'Requests submitted directly to IMC for publication will appear here.'}
                 </Text>
               </View>
             ) : (
@@ -424,21 +577,21 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                 const hasIg = platformsList.includes('instagram') || platformsList.includes('ig');
                 const hasWeb = platformsList.includes('website') || platformsList.includes('portal') || platformsList.includes('wordpress');
 
-                const departmentName =
-                  req.department ||
-                  req.requestor?.department ||
-                  (req.rawPost?.department ? (typeof req.rawPost.department === 'string' ? req.rawPost.department : req.rawPost.department.name) : 'BSIT Department');
+                const departmentName = resolveDepartmentName(req, 'BSIT Department');
 
                 const requestedByName = req.requestedBy || req.requestor?.full_name || 'Requestor';
                 const requestedDate = formatRequestedDate(req.rawDate || req.created_at);
 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={req.id || idx}
+                    activeOpacity={0.7}
+                    onPress={() => onReviewRequest(req)}
                     style={[
                       styles.tableRow,
                       isDarkMode && styles.tableRowDark,
                       idx === paginatedRequests.length - 1 && { borderBottomWidth: 0 },
+                      Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : undefined,
                     ]}
                   >
                     {/* 1. Request Title Column with Thumbnail */}
@@ -452,12 +605,19 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                       )}
 
                       <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text
-                          style={[styles.rowTitleText, isDarkMode && styles.rowTitleTextDark]}
-                          numberOfLines={1}
-                        >
-                          {req.title || 'Untitled Request'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Text
+                            style={[styles.rowTitleText, isDarkMode && styles.rowTitleTextDark]}
+                            numberOfLines={2}
+                          >
+                            {req.title || 'Untitled Request'}
+                          </Text>
+                          {mode !== 'direct-imc' && mode !== 'in-progress-editing' && (String(req.routing_type || req.rawPost?.routing_type || '').toLowerCase() === 'direct_imc') && (
+                            <View style={styles.directImcRowBadge}>
+                              <Text style={styles.directImcRowBadgeText}>Direct to IMC</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={[styles.rowSubtitleText, isDarkMode && styles.rowSubtitleTextDark]}>
                           {mediaCount > 0 ? `${mediaCount} photo${mediaCount > 1 ? 's' : ''} attached` : 'Text only'}
                         </Text>
@@ -466,19 +626,14 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
 
                     {/* 2. Department Column */}
                     <View style={[styles.tableCell, { flex: 1.4 }]}>
-                      <Text
-                        style={[styles.rowCellText, isDarkMode && styles.rowCellTextDark]}
-                        numberOfLines={1}
-                      >
-                        {departmentName}
-                      </Text>
+                      <DepartmentCell department={departmentName} />
                     </View>
 
                     {/* 3. Requested By Column */}
                     <View style={[styles.tableCell, { flex: 1.3 }]}>
                       <Text
                         style={[styles.rowCellText, isDarkMode && styles.rowCellTextDark]}
-                        numberOfLines={1}
+                        numberOfLines={2}
                       >
                         {requestedByName}
                       </Text>
@@ -492,38 +647,84 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
                     </View>
 
                     {/* 5. Platforms Column */}
-                    <View style={[styles.tableCell, { width: 110, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+                    <View style={[styles.tableCell, { width: 125, gap: 4, justifyContent: 'center' }]}>
                       {hasFb && (
-                        <View style={styles.platformCircleFb}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="logo-facebook" size={14} color="#1877F2" />
+                          <Text style={[styles.rowCellText, { fontSize: 12.5, lineHeight: 18, color: isDarkMode ? '#94A3B8' : '#475569' }]}>Facebook</Text>
                         </View>
                       )}
                       {hasIg && (
-                        <View style={styles.platformCircleIg}>
-                          <Ionicons name="logo-instagram" size={13} color="#E1306C" />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="logo-instagram" size={14} color="#E1306C" />
+                          <Text style={[styles.rowCellText, { fontSize: 12.5, lineHeight: 18, color: isDarkMode ? '#94A3B8' : '#475569' }]}>Instagram</Text>
                         </View>
                       )}
                       {hasWeb && (
-                        <View style={styles.platformCircleWeb}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="globe-outline" size={14} color="#059669" />
+                          <Text style={[styles.rowCellText, { fontSize: 12.5, lineHeight: 18, color: isDarkMode ? '#94A3B8' : '#475569' }]}>Website</Text>
                         </View>
                       )}
                       {!hasFb && !hasIg && !hasWeb && (
-                        <Text style={[styles.rowDateText, { fontSize: 11 }]}>None</Text>
+                        <Text style={{ fontSize: 13, color: isDarkMode ? '#64748B' : '#94A3B8' }}>—</Text>
                       )}
                     </View>
 
                     {/* 6. Actions Column */}
-                    <View style={[styles.tableCell, { width: 100, alignItems: 'flex-end', justifyContent: 'center' }]}>
-                      <TouchableOpacity
-                        style={styles.reviewButton}
-                        onPress={() => onReviewRequest(req)}
-                        activeOpacity={0.82}
-                      >
-                        <Text style={styles.reviewButtonText}>{mode === 'published' ? 'View' : 'Review'}</Text>
-                      </TouchableOpacity>
+                    <View style={[styles.tableCell, { width: mode === 'for-approval' ? 180 : 120, paddingRight: 0, alignItems: 'center', justifyContent: 'center' }]}>
+                      {mode === 'for-approval' ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                          <TouchableOpacity
+                            style={styles.pillApproveBtn}
+                            onPress={(e) => {
+                              (e as any)?.stopPropagation?.();
+                              onApproveRequest ? onApproveRequest(req) : onReviewRequest(req);
+                            }}
+                            activeOpacity={0.82}
+                          >
+                            <Ionicons name="checkmark-sharp" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.pillApproveBtnText}>Approve</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.pillRejectBtn}
+                            onPress={(e) => {
+                              (e as any)?.stopPropagation?.();
+                              onRejectRequest ? onRejectRequest(req) : onReviewRequest(req);
+                            }}
+                            activeOpacity={0.82}
+                          >
+                            <Ionicons name="close-sharp" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.pillRejectBtnText}>Reject</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : mode === 'in-progress-editing' ? (
+                        <TouchableOpacity
+                          style={[styles.pillApproveBtn, { backgroundColor: '#7C3AED', paddingHorizontal: 14 }]}
+                          onPress={(e) => {
+                            (e as any)?.stopPropagation?.();
+                            onReviewRequest(req);
+                          }}
+                          activeOpacity={0.82}
+                        >
+                          <Ionicons name="create-outline" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.pillApproveBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.pillApproveBtn, { backgroundColor: '#7C3AED', paddingHorizontal: 14 }]}
+                          onPress={(e) => {
+                            (e as any)?.stopPropagation?.();
+                            onReviewRequest(req);
+                          }}
+                          activeOpacity={0.82}
+                        >
+                          <Ionicons name="eye-outline" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.pillApproveBtnText}>{mode === 'published' ? 'View' : 'Review'}</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -531,119 +732,25 @@ export const ImcPublishingRequests: React.FC<ImcPublishingRequestsProps> = ({
         </ScrollView>
 
         {/* ================= TABLE FOOTER & PAGINATION ================= */}
-        <View style={[styles.tableFooter, !isTablet && styles.tableFooterStacked]}>
-          <Text style={[styles.footerShowingText, isDarkMode && styles.footerShowingTextDark]}>
-            Showing {startIndex} to {endIndex} of {totalItems} {mode === 'published' ? 'posts' : 'requests'}
-          </Text>
-
-          <View style={styles.paginationControlsRow}>
-            {/* Previous Page Button */}
-            <TouchableOpacity
-              style={[
-                styles.pageArrowBtn,
-                isDarkMode && styles.pageArrowBtnDark,
-                currentPage <= 1 && styles.pageArrowBtnDisabled,
-              ]}
-              onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={14}
-                color={currentPage <= 1 ? (isDarkMode ? '#475569' : '#CBD5E1') : isDarkMode ? '#CBD5E1' : '#334155'}
-              />
-            </TouchableOpacity>
-
-            {/* Next Page Button */}
-            <TouchableOpacity
-              style={[
-                styles.pageArrowBtn,
-                isDarkMode && styles.pageArrowBtnDark,
-                currentPage >= totalPages && styles.pageArrowBtnDisabled,
-              ]}
-              onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={14}
-                color={currentPage >= totalPages ? (isDarkMode ? '#475569' : '#CBD5E1') : isDarkMode ? '#CBD5E1' : '#334155'}
-              />
-            </TouchableOpacity>
-
-            {/* Items Per Page Dropdown */}
-            <View style={{ position: 'relative', zIndex: isPerPageDropdownOpen ? 90 : 20 }}>
-              <TouchableOpacity
-                style={[styles.perPageDropdownBtn, isDarkMode && styles.perPageDropdownBtnDark]}
-                onPress={() => {
-                  setIsPerPageDropdownOpen(!isPerPageDropdownOpen);
-                  setIsDeptDropdownOpen(false);
-                  setIsDateDropdownOpen(false);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.perPageDropdownBtnText, isDarkMode && styles.perPageDropdownBtnTextDark]}>
-                  {itemsPerPage} / page
-                </Text>
-                <Ionicons
-                  name={isPerPageDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                  size={14}
-                  color={isDarkMode ? '#94A3B8' : '#64748B'}
-                  style={{ marginLeft: 6 }}
-                />
-              </TouchableOpacity>
-
-              {isPerPageDropdownOpen && (
-                <View style={[styles.dropdownMenu, isDarkMode && styles.dropdownMenuDark, { width: 110, bottom: 36, top: undefined }]}>
-                  {[10, 20, 50].map((num) => (
-                    <TouchableOpacity
-                      key={num}
-                      style={[
-                        styles.dropdownMenuItem,
-                        itemsPerPage === num && styles.dropdownMenuItemActive,
-                        itemsPerPage === num && isDarkMode && styles.dropdownMenuItemActiveDark,
-                      ]}
-                      onPress={() => {
-                        setItemsPerPage(num);
-                        setIsPerPageDropdownOpen(false);
-                        setCurrentPage(1);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.dropdownMenuItemText,
-                          isDarkMode && styles.dropdownMenuItemTextDark,
-                          itemsPerPage === num && styles.dropdownMenuItemTextActive,
-                        ]}
-                      >
-                        {num} / page
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
+        <PaginationControl
+          currentPage={currentPage}
+          totalItems={filteredRequests.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(newPerPage) => {
+            setItemsPerPage(newPerPage);
+            setCurrentPage(1);
+          }}
+          itemName={mode === 'published' ? 'posts' : 'requests'}
+          pageSizeOptions={[5, 10, 20, 50]}
+        />
       </View>
-
-      {mode === 'published' && (
-        <Text style={[styles.simulatedFootnote, isDarkMode && styles.simulatedFootnoteDark]}>
-          Publication results shown here are simulated. No institutional account is connected.
-        </Text>
-      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    alignSelf: 'stretch',
-    gap: 18,
-  },
+  container: { ...dashboardStyles.workspace },
   pageHeader: {
     width: '100%',
     gap: 4,
@@ -681,121 +788,63 @@ const styles = StyleSheet.create({
   breadcrumbCurrentDark: {
     color: '#E9D5FF',
   },
-  pageTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
+  pageTitle: { ...dashboardStyles.pageTitle },
   pageTitleDark: {
-    color: '#F8FAFC',
+    color: Colors.textPrimary,
   },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
-  },
+  pageSubtitle: { ...dashboardStyles.subtitle },
   pageSubtitleDark: {
-    color: '#94A3B8',
+    color: Colors.textSecondary,
   },
 
   // Main Card
-  mainCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: Platform.select({ web: 28, default: 20 }),
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 1px 4px 0 rgba(15, 23, 42, 0.04)',
-        }
-      : {
-          shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.05,
-          shadowRadius: 16,
-          elevation: 2,
-        }),
-  },
+  mainCard: { ...dashboardStyles.panel, width: '100%' },
   mainCardDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
-  cardToolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 14,
-  },
+  cardToolbar: { ...dashboardStyles.panelHeader, zIndex: 100 },
   cardToolbarStacked: {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: 12,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-  },
+  cardTitle: { ...dashboardStyles.panelTitle },
   cardTitleDark: {
-    color: '#F8FAFC',
+    color: Colors.textPrimary,
   },
-  toolbarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
+  toolbarActions: { ...dashboardStyles.toolbar },
   toolbarActionsStacked: {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: 8,
   },
-  filterDropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    minHeight: 36,
-    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
-  },
+  filterDropdownBtn: { ...dashboardStyles.control },
   filterDropdownBtnDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
-  filterDropdownBtnText: {
-    fontSize: 13,
-    color: '#334155',
-    fontWeight: '500',
-  },
+  filterDropdownBtnText: { ...dashboardStyles.controlText },
   filterDropdownBtnTextDark: {
     color: '#E2E8F0',
   },
   dropdownMenu: {
     position: 'absolute',
-    top: 40,
+    top: dashboardUi.controlHeight + Spacing.xs,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     paddingVertical: 4,
-    zIndex: 99,
+    zIndex: 1001,
     ...(Platform.OS === 'web'
       ? ({ boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)' } as any)
       : { elevation: 5 }),
   },
   dropdownMenuDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
   dropdownMenuItem: {
     paddingHorizontal: 14,
@@ -810,7 +859,7 @@ const styles = StyleSheet.create({
   },
   dropdownMenuItemText: {
     fontSize: 13,
-    color: '#334155',
+    color: Colors.textPrimary,
   },
   dropdownMenuItemTextDark: {
     color: '#E2E8F0',
@@ -819,31 +868,14 @@ const styles = StyleSheet.create({
     color: '#581C87',
     fontWeight: '700',
   },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    minHeight: 36,
-    minWidth: 200,
-  },
+  searchBox: { ...dashboardStyles.search },
   searchBoxDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
-    padding: 0,
-    outlineStyle: 'none' as any,
-  },
+  searchInput: { ...dashboardStyles.searchInput },
   searchInputDark: {
-    color: '#F8FAFC',
+    color: Colors.textPrimary,
   },
 
   // Table Styles
@@ -853,81 +885,102 @@ const styles = StyleSheet.create({
   tableHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
   tableHeaderRowDark: {
-    backgroundColor: '#0F172A',
-    borderBottomColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderBottomColor: Colors.border,
   },
   tableHeaderCell: {
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
     color: '#64748B',
-    letterSpacing: 0.2,
-    textTransform: 'uppercase',
+    paddingRight: Spacing.sm,
   },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 76,
+    paddingHorizontal: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    paddingHorizontal: 8,
+    backgroundColor: '#FFFFFF',
   },
   tableRowDark: {
-    borderBottomColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderBottomColor: Colors.border,
   },
-  tableCell: {
-    justifyContent: 'center',
-  },
+  tableCell: { justifyContent: 'center', minWidth: 0, paddingRight: Spacing.sm },
   rowThumbnail: {
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: 8,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
   },
   rowThumbnailPlaceholder: {
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   rowThumbnailPlaceholderDark: {
-    backgroundColor: '#0F172A',
+    backgroundColor: Colors.surface,
   },
   rowTitleText: {
-    fontSize: 14.5,
-    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
     color: '#0F172A',
-    letterSpacing: -0.1,
   },
   rowTitleTextDark: {
     color: '#F8FAFC',
   },
   rowSubtitleText: {
     fontSize: 12,
+    lineHeight: 16,
     color: '#64748B',
-    marginTop: 3,
+    marginTop: 2,
   },
   rowSubtitleTextDark: {
     color: '#94A3B8',
   },
+  directImcRowBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  directImcRowBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7C3AED',
+  },
   rowCellText: {
     fontSize: 13.5,
-    color: '#334155',
+    lineHeight: 18,
+    fontWeight: '500',
+    color: '#475569',
   },
   rowCellTextDark: {
-    color: '#CBD5E1',
+    color: '#94A3B8',
   },
   rowDateText: {
     fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
     color: '#64748B',
   },
   rowDateTextDark: {
@@ -960,25 +1013,85 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Review Button
-  reviewButton: {
-    backgroundColor: '#4C007C', // JMCFI Purple
-    paddingVertical: 7,
-    paddingHorizontal: 20,
-    borderRadius: 7,
+  // Pill Approve / Reject Buttons
+  pillApproveBtn: {
+    height: 24,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#4D007D',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#4D007D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
     ...(Platform.OS === 'web'
       ? ({
-          cursor: 'pointer',
-          transition: 'background-color 0.15s ease-in-out',
-        } as any)
+        cursor: 'pointer',
+        boxShadow: '0 2px 5px rgba(77, 0, 125, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+      } as any)
       : {}),
+  },
+  pillApproveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  pillRejectBtn: {
+    height: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D91E28',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#D91E28',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 5px rgba(217, 30, 40, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+      } as any)
+      : {}),
+  },
+  pillRejectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+
+  // Review Button
+  reviewButton: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: dashboardUi.purple,
   },
   reviewButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: 16,
     fontWeight: '700',
+    textAlign: 'center',
   },
 
   // Empty State
@@ -990,20 +1103,20 @@ const styles = StyleSheet.create({
   emptyTableTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
     marginBottom: 4,
   },
   emptyTableTitleDark: {
-    color: '#F8FAFC',
+    color: Colors.textPrimary,
   },
   emptyTableSubtitle: {
     fontSize: 13.5,
-    color: '#64748B',
+    color: Colors.textSecondary,
     textAlign: 'center',
     maxWidth: 360,
   },
   emptyTableSubtitleDark: {
-    color: '#94A3B8',
+    color: Colors.textSecondary,
   },
 
   // Footer & Pagination
@@ -1011,10 +1124,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 20,
-    paddingTop: 12,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    flexWrap: 'wrap',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: Colors.border,
     gap: 14,
   },
   tableFooterStacked: {
@@ -1024,67 +1138,29 @@ const styles = StyleSheet.create({
   },
   footerShowingText: {
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   footerShowingTextDark: {
-    color: '#94A3B8',
+    color: Colors.textSecondary,
   },
-  paginationControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  pageArrowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
-  },
+  paginationControlsRow: { ...dashboardStyles.toolbar },
+  pageArrowBtn: { ...dashboardStyles.secondaryButton, width: dashboardUi.controlHeight, paddingHorizontal: 0 },
   pageArrowBtnDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
   pageArrowBtnDisabled: {
     opacity: 0.45,
     ...(Platform.OS === 'web' ? ({ cursor: 'not-allowed' } as any) : {}),
   },
-  perPageDropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minHeight: 32,
-    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
-  },
+  perPageDropdownBtn: { ...dashboardStyles.control },
   perPageDropdownBtnDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
-  perPageDropdownBtnText: {
-    fontSize: 12.5,
-    color: '#334155',
-    fontWeight: '500',
-  },
+  perPageDropdownBtnText: { ...dashboardStyles.controlText },
   perPageDropdownBtnTextDark: {
-    color: '#CBD5E1',
-  },
-  simulatedFootnote: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: -6,
-    paddingHorizontal: 4,
-  },
-  simulatedFootnoteDark: {
-    color: '#94A3B8',
+    color: Colors.textSecondary,
   },
 });
 

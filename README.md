@@ -25,9 +25,17 @@ Open a **second** terminal and run:
 ```bash
 cd frontend-rn
 npm install  # (Only needed if you added new packages)
-npx expo start --web
+npm run web
 ```
-*(This will start the frontend web app. Press `w` in the terminal to open it in your browser if it doesn't open automatically.)*
+*(Open `http://localhost:3000` in your browser after the build finishes.)*
+
+`npm run web` builds the same production frontend used in deployment and serves it at `http://localhost:3000`, with compressed assets, browser caching, and an API proxy to Laravel on port 8000. Refreshes reuse the built JavaScript instead of requesting a development bundle. After changing source files, restart this command to rebuild. To reuse an existing build, run `npm run preview:web`.
+
+For development with live updates, use `npm run dev`. Development bundles are slower to load than the production preview. Recent dashboard data is cached per account in the current browser session for up to five minutes and refreshed in the background; logout clears it.
+
+The web login preserves the school photograph and purple branding. The existing PostFlow chatbot flies into the welcome with an animated cape, then settles above a centered login card containing the JMC logo. The welcome automatically completes in about four and a half seconds, once per browser tab session. Cursor-following eyes activate on the login screen and close while the password field is focused. After successful sign-in, the assistant pushes the card aside before opening the user's dashboard or pending link; failed attempts keep the form visible. Reduced-motion preferences bypass the introduction and motion effects, and signed-in users continue directly to their dashboard.
+
+To check the welcome and login flows after exporting the web app, run `node tests/startup.browser.cjs` from `frontend-rn`. This uses mocked authentication responses and saves desktop and mobile screenshots in `.expo/startup-qa/`.
 
 ---
 
@@ -91,7 +99,7 @@ Make sure the new laptop has installed:
    ```
 3. Start the frontend server:
    ```bash
-   npx expo start --web
+   npm run web
    ```
 
 ---

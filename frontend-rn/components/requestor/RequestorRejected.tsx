@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../ui/Card';
 import { PaginationControl } from '../ui/PaginationControl';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
 import { resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
+import { rq } from './requestorMotion';
 
 type RequestorRejectedProps = {
   requests: any[];
@@ -44,8 +45,20 @@ function titleOf(request: any): string {
 }
 
 function categoryOf(request: any): string {
-  const category = request.other_category_name || request.category?.name || request.category;
-  return typeof category === 'string' && category.trim() ? category.trim() : 'Uncategorized';
+  if (String(request.routing_type || request.routingType || '').toLowerCase() === 'direct_imc') {
+    return 'Direct to IMC';
+  }
+  const catName = request.category?.name || (typeof request.category === 'string' ? request.category : '');
+  const isOther = ['other', 'others'].includes(String(catName || '').trim().toLowerCase());
+  const dept = request.department || request.requestor?.department || '';
+  if (request.other_category_name && typeof request.other_category_name === 'string') {
+    const custom = request.other_category_name.trim();
+    if (isOther) return custom || 'Others';
+    if (!catName && custom.toLowerCase() !== String(dept).toLowerCase()) {
+      return custom;
+    }
+  }
+  return catName || 'Uncategorized';
 }
 
 function reasonOf(request: any): string {
@@ -94,17 +107,17 @@ function platformsOf(request: any): string[] {
   return [...new Map(names.map((name: string) => [name.toLowerCase(), name])).values()] as string[];
 }
 
-function platformDetails(name: string): { label: string; icon: React.ComponentProps<typeof Ionicons>['name'] } {
+function platformDetails(name: string): { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string } {
   switch (name.toLowerCase()) {
-    case 'facebook': return { label: 'Facebook', icon: 'logo-facebook' };
-    case 'instagram': return { label: 'Instagram', icon: 'logo-instagram' };
-    case 'website': case 'web': case 'portal': case 'wordpress': return { label: 'Website', icon: 'globe-outline' };
-    case 'twitter': return { label: 'Twitter', icon: 'logo-twitter' };
-    case 'x': return { label: 'X', icon: 'logo-twitter' };
-    case 'linkedin': return { label: 'LinkedIn', icon: 'logo-linkedin' };
-    case 'tiktok': return { label: 'TikTok', icon: 'logo-tiktok' };
-    case 'youtube': return { label: 'YouTube', icon: 'logo-youtube' };
-    default: return { label: name, icon: 'globe-outline' };
+    case 'facebook': return { label: 'Facebook', icon: 'logo-facebook', color: '#1877F2' };
+    case 'instagram': return { label: 'Instagram', icon: 'logo-instagram', color: '#E1306C' };
+    case 'website': case 'web': case 'portal': case 'wordpress': return { label: 'Website', icon: 'globe-outline', color: '#059669' };
+    case 'twitter': return { label: 'Twitter', icon: 'logo-twitter', color: '#1DA1F2' };
+    case 'x': return { label: 'X', icon: 'logo-twitter', color: '#000000' };
+    case 'linkedin': return { label: 'LinkedIn', icon: 'logo-linkedin', color: '#0A66C2' };
+    case 'tiktok': return { label: 'TikTok', icon: 'logo-tiktok', color: '#000000' };
+    case 'youtube': return { label: 'YouTube', icon: 'logo-youtube', color: '#FF0000' };
+    default: return { label: name, icon: 'globe-outline', color: '#64748B' };
   }
 }
 
@@ -114,6 +127,28 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [rangeOpen, setRangeOpen] = useState(false);
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const dateMenuRef = useRef<any>(null);
+  const dateButtonRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !dateMenuOpen || typeof document === 'undefined') return;
+    const closeOutside = (event: Event) => {
+      if (!dateMenuRef.current?.contains?.(event.target)) setDateMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setDateMenuOpen(false);
+      dateButtonRef.current?.focus?.();
+    };
+    document.addEventListener('mousedown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [dateMenuOpen]);
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const [draftStart, setDraftStart] = useState('');
@@ -193,10 +228,10 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
       {names.length ? names.map((name) => {
         const platform = platformDetails(name);
         return <View key={name.toLowerCase()} style={styles.platform}>
-          <Ionicons name={platform.icon} size={16} color={palette.secondaryText} />
-          <Text style={[styles.smallText, { color: palette.secondaryText, flexShrink: 1 }]}>{platform.label}</Text>
+          <Ionicons name={platform.icon} size={14} color={platform.color} />
+          <Text style={[styles.platformLabel, { color: isDarkMode ? '#CBD5E1' : '#475569' }]}>{platform.label}</Text>
         </View>;
-      }) : <Text style={[styles.smallText, { color: palette.secondaryText }]}>No platforms selected</Text>}
+      }) : <Text style={[styles.smallText, { color: palette.secondaryText }]}>—</Text>}
     </View>;
   };
 
@@ -210,7 +245,13 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
           outline: 2px solid ${actionColor} !important; outline-offset: 2px;
         }
         #requestor-rejected-search:focus-within { border-color: ${actionColor} !important; }
-        #requestor-rejected [id^="requestor-rejected-details-"]:hover,
+        #requestor-rejected #requestor-rejected-search input:focus,
+        #requestor-rejected #requestor-rejected-search input:focus-visible { outline: none !important; box-shadow: none !important; }
+        #requestor-rejected [id^="requestor-rejected-details-"]:hover {
+          filter: brightness(1.12);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(124, 58, 237, 0.42) !important;
+        }
         #requestor-rejected [id^="requestor-rejected-date-"]:hover { filter: brightness(0.96); }
         #requestor-rejected [id^="requestor-rejected-status-revision-"] [dir="auto"] { color: ${palette.revisionText} !important; }
         #requestor-rejected [id^="requestor-rejected-status-rejected-"] [dir="auto"] { color: ${palette.rejectedText} !important; }
@@ -241,58 +282,82 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
                   : `${loadedRequests.length} ${loadedRequests.length === 1 ? 'request' : 'requests'} with feedback`}
             </Text>
           </View>
-          <View nativeID="requestor-rejected-search" style={[styles.search, { backgroundColor: palette.background, borderColor: palette.border }, !wideToolbar && styles.fullWidth, focusStyle('search')]}>
-            <Ionicons name="search-outline" size={18} color={palette.secondaryText} />
-            <TextInput accessibilityLabel="Search requests by title, category, reason, or reviewer" value={search}
-              onChangeText={(value) => { setSearch(value); setCurrentPage(1); }} placeholder="Search requests…"
-              placeholderTextColor={palette.mutedText} autoCapitalize="none" autoCorrect={false} {...focusProps('search')}
-              style={[styles.searchInput, { color: palette.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)]} />
-            {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear request search"
-              onPress={() => { setSearch(''); setCurrentPage(1); }} {...focusProps('clear-search')}
-              style={({ pressed }) => [styles.clearSearch, pressed && styles.pressed, focusStyle('clear-search')]}>
-              <Ionicons name="close" size={18} color={palette.secondaryText} />
-            </Pressable>}
+          <View style={[styles.toolbar, !wideToolbar && styles.fullWidth]}>
+            <View nativeID="requestor-rejected-search" style={[styles.search, { backgroundColor: palette.background, borderColor: palette.border }, !wideToolbar && styles.flexible, focusStyle('search')]}>
+              <Ionicons name="search-outline" size={18} color={palette.secondaryText} />
+              <TextInput accessibilityLabel="Search requests by title, category, reason, or reviewer" value={search}
+                onChangeText={(value) => { setSearch(value); setCurrentPage(1); }} placeholder="Search requests…"
+                placeholderTextColor={palette.mutedText} autoCapitalize="none" autoCorrect={false} {...focusProps('search')}
+                style={[styles.searchInput, { color: palette.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)]} />
+              {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear request search"
+                onPress={() => { setSearch(''); setCurrentPage(1); }} {...focusProps('clear-search')}
+                style={({ pressed }) => [styles.clearSearch, pressed && styles.pressed, focusStyle('clear-search')]}>
+                <Ionicons name="close" size={18} color={palette.secondaryText} />
+              </Pressable>}
+            </View>
+
+            <View ref={dateMenuRef} style={[styles.dropdownHolder, { zIndex: dateMenuOpen ? 30 : 20 }, !wideToolbar && styles.flexible]}>
+              <Pressable ref={dateButtonRef} accessibilityRole="button" accessibilityLabel="Filter request date"
+                {...(Platform.OS === 'web' ? { 'aria-expanded': dateMenuOpen } : {})}
+                accessibilityState={{ expanded: dateMenuOpen }}
+                onPress={() => setDateMenuOpen((prev) => !prev)}
+                {...focusProps('date-menu')}
+                style={({ pressed }) => [styles.filterButton, { borderColor: palette.border, backgroundColor: palette.surface }, pressed && styles.pressed, focusStyle('date-menu')]}>
+                <Ionicons name="calendar-outline" size={16} color={palette.secondaryText} />
+                <Text style={[styles.filterLabel, { color: palette.text }]}>
+                  {dateFilter === 'custom' && rangeStart && rangeEnd ? `${rangeStart} – ${rangeEnd}` : dateLabel}
+                </Text>
+                <Ionicons name={dateMenuOpen ? 'chevron-up' : 'chevron-down'} size={14} color={palette.secondaryText} />
+              </Pressable>
+              {dateMenuOpen && <View style={[styles.dropdown, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                {DATE_OPTIONS.map((option) => <Pressable key={option.value} nativeID={`requestor-rejected-date-${option.value}`}
+                  accessibilityRole="button" accessibilityLabel={`Filter request date: ${option.label}`} accessibilityState={{ selected: dateFilter === option.value }}
+                  onPress={() => {
+                    setDateMenuOpen(false);
+                    if (option.value === 'custom') {
+                      setDraftStart(rangeStart); setDraftEnd(rangeEnd); setRangeOpen(true);
+                    } else {
+                      setDateFilter(option.value); setCurrentPage(1); setRangeOpen(false); dateButtonRef.current?.focus?.();
+                    }
+                  }}
+                  style={[styles.dropdownOption, dateFilter === option.value && { backgroundColor: palette.secondarySurface }]}>
+                  <Text style={[styles.filterLabel, { color: dateFilter === option.value ? actionColor : palette.text }]}>{option.label}</Text>
+                  {dateFilter === option.value && <Ionicons name="checkmark" size={16} color={actionColor} />}
+                </Pressable>)}
+              </View>}
+            </View>
           </View>
         </View>
 
-        <View style={styles.dateFilters}>
-          <View style={styles.dateLabel}>
-            <Ionicons name="calendar-outline" size={16} color={palette.secondaryText} />
-            <Text style={[styles.smallText, { color: palette.secondaryText }]}>Requested on</Text>
+        <Modal visible={rangeOpen} transparent animationType="none" onRequestClose={() => setRangeOpen(false)}>
+          <View style={styles.modalBackdrop}>
+            <Pressable accessibilityLabel="Cancel custom date range" onPress={() => setRangeOpen(false)} style={styles.dismissBackdrop} />
+            <View style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: palette.border, borderTopWidth: 4, borderTopColor: BRAND_PURPLE }]}>
+              <View style={styles.dialogHeading}>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text style={[styles.dialogEyebrow, { color: actionColor }]}>DATE FILTER</Text>
+                  <Text accessibilityRole="header" {...(Platform.OS === 'web' ? { 'aria-level': 2 } : {})} style={[styles.panelTitle, { color: palette.text }]}>Custom date range</Text>
+                </View>
+                <Pressable accessibilityRole="button" accessibilityLabel="Cancel custom date range" onPress={() => setRangeOpen(false)} style={[styles.closeDialog, { borderColor: palette.border, backgroundColor: palette.background }]}>
+                  <Ionicons name="close" size={20} color={palette.secondaryText} />
+                </Pressable>
+              </View>
+              <Text style={[styles.smallText, { color: palette.secondaryText }]}>Choose the requested dates in Manila time.</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md }}>
+                {([{ label: 'Start date', value: draftStart, change: setDraftStart }, { label: 'End date', value: draftEnd, change: setDraftEnd }]).map((field) => <View key={field.label} style={{ flexGrow: 1, flexBasis: 160, minWidth: 0, gap: Spacing.sm }}>
+                  <Text style={[styles.smallText, { color: palette.text, fontWeight: FontWeight.semiBold }]}>{field.label}</Text>
+                  {Platform.OS === 'web' ? <input type="date" aria-label={`Rejected ${field.label.toLowerCase()}`} value={field.value} onChange={(event) => field.change(event.target.value)} style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, height: CONTROL_HEIGHT, padding: Spacing.sm, borderRadius: BorderRadius.md, border: `1px solid ${palette.border}`, color: palette.text, backgroundColor: palette.surface, colorScheme: isDarkMode ? 'dark' : 'light', fontSize: FontSize.sm }} />
+                    : <TextInput accessibilityLabel={`Rejected ${field.label.toLowerCase()}, YYYY-MM-DD`} value={field.value} onChangeText={field.change} placeholder="YYYY-MM-DD" style={{ minHeight: CONTROL_HEIGHT, padding: Spacing.sm, borderWidth: 1, borderColor: palette.border, borderRadius: BorderRadius.md, color: palette.text, backgroundColor: palette.surface }} />}
+                </View>)}
+              </View>
+              {!!draftStart && !!draftEnd && !validRange && <Text accessibilityRole="alert" style={[styles.smallText, { color: palette.error }]}>Choose valid dates with the end date on or after the start date.</Text>}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, justifyContent: 'flex-end', paddingTop: Spacing.xs }}>
+                <Pressable accessibilityRole="button" onPress={() => setRangeOpen(false)} style={styles.textButton}><Text style={[styles.actionText, { color: palette.text }]}>Cancel</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Apply rejected request date range" disabled={!validRange} onPress={() => { if (validRange) { setRangeStart(draftStart); setRangeEnd(draftEnd); setDateFilter('custom'); setCurrentPage(1); setRangeOpen(false); } }} style={[styles.outlineButton, { borderColor: actionColor, opacity: validRange ? 1 : .45 }]}><Text style={[styles.actionText, { color: actionColor }]}>Apply range</Text></Pressable>
+              </View>
+            </View>
           </View>
-          <View style={styles.dateOptions}>
-            {DATE_OPTIONS.map((option) => {
-              const selected = dateFilter === option.value;
-              return <Pressable key={option.value} nativeID={`requestor-rejected-date-${option.value}`}
-                accessibilityRole="button" accessibilityLabel={`Filter request date: ${option.label}`} accessibilityState={{ selected }}
-                {...(Platform.OS === 'web' ? { 'aria-pressed': selected } : {})}
-                onPress={() => {
-                  if (option.value === 'custom') { setDraftStart(rangeStart); setDraftEnd(rangeEnd); setRangeOpen(true); }
-                  else { setDateFilter(option.value); setCurrentPage(1); setRangeOpen(false); }
-                }} {...focusProps(`date-${option.value}`)}
-                style={({ pressed }) => [styles.dateButton, { borderColor: selected ? actionColor : palette.border, backgroundColor: selected ? palette.secondarySurface : palette.surface }, pressed && styles.pressed, focusStyle(`date-${option.value}`)]}>
-                <Text style={[styles.actionText, { color: selected ? actionColor : palette.secondaryText }]}>{option.label}</Text>
-              </Pressable>;
-            })}
-          </View>
-        </View>
-
-        {rangeOpen && <View style={{ gap: Spacing.md, padding: Spacing.md, borderWidth: 1, borderColor: palette.border, borderRadius: BorderRadius.md, backgroundColor: palette.background }}>
-          <Text accessibilityRole="header" style={[styles.actionText, { color: palette.text }]}>Custom date range</Text>
-          <Text style={[styles.smallText, { color: palette.secondaryText }]}>Choose the requested dates in Manila time.</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md }}>
-            {([{ label: 'Start date', value: draftStart, change: setDraftStart }, { label: 'End date', value: draftEnd, change: setDraftEnd }]).map((field) => <View key={field.label} style={{ flexGrow: 1, flexBasis: 160, minWidth: 0, gap: Spacing.sm }}>
-              <Text style={[styles.smallText, { color: palette.text }]}>{field.label}</Text>
-              {Platform.OS === 'web' ? <input type="date" aria-label={`Rejected ${field.label.toLowerCase()}`} value={field.value} onChange={(event) => field.change(event.target.value)} style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, height: CONTROL_HEIGHT, padding: Spacing.sm, borderRadius: BorderRadius.md, border: `1px solid ${palette.border}`, color: palette.text, backgroundColor: palette.surface, colorScheme: isDarkMode ? 'dark' : 'light', fontSize: FontSize.sm }} />
-                : <TextInput accessibilityLabel={`Rejected ${field.label.toLowerCase()}, YYYY-MM-DD`} value={field.value} onChangeText={field.change} placeholder="YYYY-MM-DD" style={{ minHeight: CONTROL_HEIGHT, padding: Spacing.sm, borderWidth: 1, borderColor: palette.border, borderRadius: BorderRadius.md, color: palette.text, backgroundColor: palette.surface }} />}
-            </View>)}
-          </View>
-          {!!draftStart && !!draftEnd && !validRange && <Text accessibilityRole="alert" style={[styles.smallText, { color: palette.error }]}>Choose valid dates with the end date on or after the start date.</Text>}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, justifyContent: 'flex-end' }}>
-            <Pressable accessibilityRole="button" onPress={() => setRangeOpen(false)} style={styles.textButton}><Text style={[styles.actionText, { color: palette.text }]}>Cancel</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Apply rejected request date range" disabled={!validRange} onPress={() => { if (validRange) { setRangeStart(draftStart); setRangeEnd(draftEnd); setDateFilter('custom'); setCurrentPage(1); setRangeOpen(false); } }} style={[styles.outlineButton, { borderColor: actionColor, opacity: validRange ? 1 : .45 }]}><Text style={[styles.actionText, { color: actionColor }]}>Apply range</Text></Pressable>
-          </View>
-        </View>}
+        </Modal>
 
         {hasFilters && <View style={styles.filterSummary}>
           <Text accessibilityLiveRegion="polite" style={[styles.smallText, { color: palette.secondaryText, flexShrink: 1 }]}>
@@ -332,12 +397,12 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
           <Text style={[styles.emptyCopy, { color: palette.secondaryText }]}>Try another search or a wider date range to find your request.</Text>
           {renderClear('empty-clear')}
         </View> : <View style={styles.list}>
-          {isTable && <View style={[styles.tableHeader, { backgroundColor: palette.background, borderColor: palette.border }]}>
+          {isTable && <View style={[styles.tableHeader, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: palette.border }]}>
             <Text style={[styles.columnHeading, styles.titleColumn, { color: palette.secondaryText }]}>Request title</Text>
             <Text style={[styles.columnHeading, styles.feedbackColumn, { color: palette.secondaryText }]}>Status &amp; feedback</Text>
             <Text style={[styles.columnHeading, styles.dateColumn, { color: palette.secondaryText }]}>Requested on</Text>
             <Text style={[styles.columnHeading, styles.platformColumn, { color: palette.secondaryText }]}>Platforms</Text>
-            <Text style={[styles.columnHeading, styles.actionColumn, { color: palette.secondaryText, textAlign: 'right' }]}>Actions</Text>
+            <Text style={[styles.columnHeading, styles.actionColumn, { color: palette.secondaryText, textAlign: 'center' }]}>Actions</Text>
           </View>}
           {visibleRequests.map((request, index) => {
             const title = titleOf(request);
@@ -346,27 +411,51 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
             const imageUrl = resolveImageUrl(request.thumbnailUrl);
             const imageKey = `${request.id}:${imageUrl}`;
             const controlKey = String(request.id ?? index);
-            const statusColor = status.revision ? palette.revisionText : palette.rejectedText;
-            const statusBackground = status.revision ? palette.revisionBackground : palette.rejectedBackground;
-            return <View key={controlKey} style={[isTable ? styles.requestRow : styles.requestCard, { borderColor: palette.border }]}>
+            const isDirect = String(request.routing_type || request.routingType || '').toLowerCase() === 'direct_imc' || categoryOf(request) === 'Direct to IMC';
+            const statusColor = status.revision
+              ? (isDarkMode ? '#FBBF24' : '#D97706')
+              : (isDarkMode ? '#F87171' : '#DC2626');
+            const statusBackground = status.revision
+              ? (isDarkMode ? '#451A03' : '#FEF3C7')
+              : (isDarkMode ? '#450A0A' : '#FEE2E2');
+            const statusBorder = status.revision
+              ? (isDarkMode ? '#78350F' : '#FDE68A')
+              : (isDarkMode ? '#7F1D1D' : '#FECACA');
+            return <View key={controlKey} {...rq('row')} style={[isTable ? styles.requestRow : styles.requestCard, { borderColor: palette.border }]}>
               <View style={[styles.titleCell, isTable && styles.titleColumn]}>
-                <View style={[styles.thumbnail, { backgroundColor: palette.secondarySurface }]}>
+                <View style={[styles.thumbnail, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}>
                   {imageUrl && !failedImages[imageKey] ? <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover"
                     accessible={false} onError={() => setFailedImages((previous) => ({ ...previous, [imageKey]: true }))} />
-                    : <Ionicons name="document-text-outline" size={20} color={palette.secondaryText} />}
+                    : <Ionicons name="document-text-outline" size={20} color={isDarkMode ? '#64748B' : '#94A3B8'} />}
                 </View>
                 <View style={styles.titleCopy}>
-                  <Text style={[styles.requestTitle, { color: palette.text }]}>{title}</Text>
-                  <Text style={[styles.smallText, { color: palette.secondaryText }]}>{categoryOf(request)}</Text>
+                  <Text numberOfLines={2} style={[styles.requestTitle, { color: palette.text }]}>{title}</Text>
+                  {isDirect ? (
+                    <View style={styles.directImcBadge}>
+                      <Ionicons name="flash" size={10} color="#7C3AED" style={{ marginRight: 3 }} />
+                      <Text style={styles.directImcBadgeText}>Direct to IMC</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.smallText, { color: palette.secondaryText }]}>{categoryOf(request)}</Text>
+                  )}
                 </View>
               </View>
               <View style={[styles.feedback, isTable && styles.feedbackColumn, !isTable && styles.feedbackCard, !isTable && { backgroundColor: palette.background, borderColor: palette.border }]}>
-                <View nativeID={`requestor-rejected-status-${status.revision ? 'revision' : 'rejected'}-${controlKey}`} style={[styles.statusPill, { backgroundColor: statusBackground }]}>
-                  <Ionicons name={status.revision ? 'create-outline' : 'close-circle-outline'} size={14} color={statusColor} />
+                <View nativeID={`requestor-rejected-status-${status.revision ? 'revision' : 'rejected'}-${controlKey}`} style={[styles.statusPill, { backgroundColor: statusBackground, borderColor: statusBorder }]}>
+                  <Ionicons name={status.revision ? 'create-outline' : 'close-circle'} size={12} color={statusColor} />
                   <Text style={[styles.statusText, { color: statusColor }]}>{status.label}</Text>
                 </View>
                 <Text style={[styles.reviewer, { color: palette.text }]}>{reviewer ? `Feedback from ${reviewer}` : 'Reviewer not recorded'}</Text>
-                <Text style={[styles.smallText, { color: palette.secondaryText }]}>{reasonOf(request) || 'No feedback was provided.'}</Text>
+                {Boolean(reasonOf(request)) ? (
+                  <View style={[styles.reasonBox, { backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC', borderColor: isDarkMode ? '#334155' : '#E2E8F0' }]}>
+                    <Ionicons name="chatbox-ellipses-outline" size={12} color={isDarkMode ? '#94A3B8' : '#64748B'} style={{ marginTop: 2, marginRight: 5 }} />
+                    <Text numberOfLines={2} style={[styles.reasonText, { color: isDarkMode ? '#CBD5E1' : '#475569' }]}>
+                      {reasonOf(request)}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.smallText, { color: palette.secondaryText, fontStyle: 'italic' }]}>No feedback was provided.</Text>
+                )}
               </View>
               {isTable ? <>
                 <Text style={[styles.smallText, styles.dateColumn, { color: palette.secondaryText }]}>{requestedDate(request)}</Text>
@@ -383,9 +472,9 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
               <View style={[styles.actions, isTable && styles.actionColumn]}>
                 <Pressable nativeID={`requestor-rejected-details-${controlKey}`} accessibilityRole="button"
                   accessibilityLabel={`View request details: ${title}`} onPress={() => onOpen(request)} {...focusProps(`details-${controlKey}`)}
-                  style={({ pressed }) => [styles.outlineButton, { borderColor: palette.border, backgroundColor: palette.surface }, pressed && styles.pressed, focusStyle(`details-${controlKey}`)]}>
-                  <Ionicons name="eye-outline" size={18} color={actionColor} />
-                  <Text style={[styles.actionText, { color: actionColor, flexShrink: 1 }]}>View details</Text>
+                  style={({ pressed }) => [styles.pillViewButton, pressed && styles.pressed, focusStyle(`details-${controlKey}`)]}>
+                  <Ionicons name="eye-outline" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
+                  <Text style={styles.pillViewButtonText}>View details</Text>
                 </Pressable>
               </View>
             </View>;
@@ -424,22 +513,100 @@ const styles = StyleSheet.create({
   heading: { gap: Spacing.sm, minWidth: 0 },
   pageTitle: { fontWeight: FontWeight.bold },
   smallText: { fontSize: FontSize.sm, lineHeight: 20 },
-  panel: { borderWidth: 1, minWidth: 0 },
-  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, marginBottom: Spacing.md },
+  panel: { borderWidth: 1, minWidth: 0, overflow: 'visible', zIndex: 3 },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md, marginBottom: Spacing.md, zIndex: 25 },
   stacked: { flexDirection: 'column', alignItems: 'stretch' },
   panelCopy: { gap: Spacing.xs, minWidth: 0, flexShrink: 1 },
   panelTitle: { fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold },
-  search: { minHeight: CONTROL_HEIGHT, width: 320, minWidth: 0, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: BorderRadius.md, paddingLeft: Spacing.sm, gap: Spacing.sm },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap', minWidth: 0, zIndex: 25 },
+  flexible: { flex: 1 },
   fullWidth: { width: '100%' },
-  searchInput: { flex: 1, minWidth: 0, height: CONTROL_HEIGHT, fontSize: FontSize.sm, paddingVertical: Spacing.sm, paddingRight: Spacing.sm },
-  clearSearch: { width: CONTROL_HEIGHT, height: CONTROL_HEIGHT, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: BorderRadius.sm },
-  dateFilters: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
-  dateLabel: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minHeight: CONTROL_HEIGHT, paddingRight: Spacing.sm },
-  dateOptions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, minWidth: 0, flexShrink: 1 },
-  dateButton: { minHeight: CONTROL_HEIGHT, borderWidth: 1, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, alignItems: 'center', justifyContent: 'center' },
+  search: { minHeight: 38, width: 232, minWidth: 0, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: BorderRadius.md, paddingLeft: Spacing.sm, gap: Spacing.sm },
+  searchInput: { flex: 1, minWidth: 0, height: 36, fontSize: FontSize.sm, paddingVertical: 4, paddingRight: Spacing.sm },
+  clearSearch: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
+  dropdownHolder: { position: 'relative', width: 160, minWidth: 140 },
+  filterButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.sm },
+  filterLabel: { flex: 1, fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.medium },
+  dropdown: { position: 'absolute', top: 44, left: 0, right: 0, borderWidth: 1, borderRadius: BorderRadius.md, padding: Spacing.xs, shadowColor: '#000', shadowOffset: { width: 0, height: Spacing.xs }, shadowOpacity: 0.1, shadowRadius: Spacing.md, elevation: 8, zIndex: 40 },
+  dropdownOption: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm },
+  modalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.5)', padding: Spacing.md },
+  dismissBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  rangeDialog: { width: '100%', maxWidth: 420, padding: Spacing.lg, gap: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1 },
+  dialogHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  dialogEyebrow: { fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
+  closeDialog: { width: 40, height: 40, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   actionText: { fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.semiBold },
   textButton: { minHeight: CONTROL_HEIGHT, paddingHorizontal: Spacing.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: BorderRadius.sm },
   outlineButton: { minHeight: CONTROL_HEIGHT, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.md, maxWidth: '100%' },
+  pillViewButton: {
+    height: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7C3AED',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 5px rgba(124, 58, 237, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'all 120ms ease',
+      } as any)
+      : {}),
+  },
+  pillViewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  directImcBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#D8B4FE',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  directImcBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7C3AED',
+    letterSpacing: 0.2,
+  },
+  reasonBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginTop: 4,
+    maxWidth: '100%',
+  },
+  reasonText: {
+    fontSize: 12,
+    lineHeight: 16,
+    flex: 1,
+    flexShrink: 1,
+  },
+  platformLabel: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
   filterSummary: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
   refreshStatus: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
   refreshError: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, padding: Spacing.sm, borderWidth: 1, borderRadius: BorderRadius.md, marginBottom: Spacing.md },
@@ -448,13 +615,13 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: FontSize.md, lineHeight: 24, fontWeight: FontWeight.semiBold, textAlign: 'center' },
   emptyCopy: { fontSize: FontSize.sm, lineHeight: 20, textAlign: 'center', maxWidth: 360 },
   list: { minWidth: 0 },
-  tableHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, minHeight: CONTROL_HEIGHT, paddingHorizontal: Spacing.sm, borderBottomWidth: 1, borderTopLeftRadius: BorderRadius.md, borderTopRightRadius: BorderRadius.md },
+  tableHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, minHeight: 40, paddingHorizontal: Spacing.sm, borderBottomWidth: 1, borderTopLeftRadius: BorderRadius.md, borderTopRightRadius: BorderRadius.md },
   columnHeading: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold },
-  titleColumn: { flex: 2.2, minWidth: 0 },
+  titleColumn: { flex: 2.3, minWidth: 0 },
   feedbackColumn: { flex: 2.5, minWidth: 0 },
   dateColumn: { flex: 1.1, minWidth: 0 },
   platformColumn: { flex: 1.1, minWidth: 0 },
-  actionColumn: { width: 148, flexShrink: 0 },
+  actionColumn: { width: 130, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   requestRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.md, borderBottomWidth: 1 },
   requestCard: { gap: Spacing.md, borderWidth: 1, borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.sm, minWidth: 0 },
   titleCell: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, minWidth: 0 },
@@ -465,13 +632,13 @@ const styles = StyleSheet.create({
   feedback: { gap: Spacing.sm, minWidth: 0 },
   feedbackCard: { padding: Spacing.md, borderWidth: 1, borderRadius: BorderRadius.md },
   reviewer: { fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.medium },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, alignSelf: 'flex-start', maxWidth: '100%' },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, paddingVertical: 2, alignSelf: 'flex-start', maxWidth: '100%', borderWidth: 1 },
   statusText: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, flexShrink: 1 },
   cardMeta: { gap: Spacing.sm, minWidth: 0 },
   requestedDate: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minWidth: 0 },
-  platforms: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, minWidth: 0 },
-  platform: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, maxWidth: '100%' },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, minWidth: 0 },
+  platforms: { flexDirection: 'column', gap: 4, minWidth: 0, justifyContent: 'center' },
+  platform: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' },
+  actions: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm, minWidth: 0 },
   pagination: { marginTop: Spacing.sm, minWidth: 0 },
   compactPagination: { paddingTop: Spacing.md, borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: Spacing.md },
   compactControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, maxWidth: '100%' },

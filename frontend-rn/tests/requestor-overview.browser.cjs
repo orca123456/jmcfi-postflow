@@ -56,6 +56,7 @@ async function createSession(browser, base, { viewport = { width: 1536, height: 
       if (state.mode === 'error') return route.fulfill({ status: 503, json: { message: 'Request list unavailable' } });
       body = { data: state.mode === 'empty' ? [] : records, meta: { current_page: 1, per_page: 50, total: records.length, last_page: 1 } };
     }
+    if (/^\/posts\/\d+$/.test(endpoint)) body = { data: records.find(record => record.id === Number(endpoint.split('/').pop())) ?? null };
     if (endpoint === '/notifications') body = { notifications: [], unread_count: 0 };
     if (endpoint === '/categories') body = { data: [{ id: 1, name: 'Advisory' }, { id: 2, name: 'Event' }] };
     if (endpoint === '/departments') body = { data: [{ id: 7, name: user.department }] };
@@ -132,7 +133,8 @@ async function run() {
     assert.equal(await rows.count(), 10);
     assert.equal(await overview.getByText(/REQ-\d+|^#\d+$/).count(), 0, 'Request identifiers are not displayed in request rows');
     await page.waitForFunction(() => !document.querySelector('[data-overview-row] img[src*="requestor-preview-missing"]'));
-    for (const title of ['Internal draft', 'Rejected example', 'Revision example', 'Direct IMC example']) assert.equal(await overview.getByText(title, { exact: true }).count(), 0, 'Other workspaces remain separate');
+    for (const title of ['Internal draft', 'Rejected example', 'Revision example']) assert.equal(await overview.getByText(title, { exact: true }).count(), 0, 'Drafts and rejected requests remain separate');
+    assert.equal(await overview.getByText('Direct IMC example', { exact: true }).count(), 1, 'Direct IMC requests appear in dashboard overview');
     await capture(page, 'after-collapsed');
     await expandSidebar(page);
     await page.waitForTimeout(350);
@@ -153,16 +155,19 @@ async function run() {
     assert.equal(await page.getByRole('button', { name: 'In review', exact: true }).count(), 0);
     await page.getByRole('button', { name: /^Filter by status/ }).click();
     await page.getByRole('button', { name: /^In review(?:, selected)?$/ }).click();
-    assert.equal(await rows.count(), 7, 'In-review filtering uses raw approval status');
-    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    assert.equal(await rows.count(), 8, 'In-review filtering uses raw approval status (including Direct IMC)');
+    await page.getByRole('button', { name: /^Filter by status/ }).click();
+    await page.getByRole('button', { name: 'All Status', exact: true }).click();
     await page.getByRole('button', { name: /^Filter by status/ }).click();
     await page.getByRole('button', { name: /^Approved(?:, selected)?$/ }).click();
     assert.equal(await rows.count(), 3, 'Approved is distinct from published and scheduled');
-    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await page.getByRole('button', { name: /^Filter by status/ }).click();
+    await page.getByRole('button', { name: 'All Status', exact: true }).click();
     await page.getByRole('button', { name: /^Filter by date/ }).click();
     await page.getByRole('button', { name: /^Last 7 days(?:, selected)?$/i }).click();
-    assert.equal(await rows.count(), 7, 'Last seven days includes today and the preceding six days');
-    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    assert.equal(await rows.count(), 8, 'Last seven days includes today and the preceding six days');
+    await page.getByRole('button', { name: /^Filter by date/ }).click();
+    await page.getByRole('button', { name: /^All time$/i }).click();
     await page.getByRole('button', { name: /^Filter by date/ }).click();
     await page.getByRole('button', { name: /^Custom range/i }).click();
     await page.locator('#overview-start-date').fill('2026-11-15');
@@ -172,7 +177,8 @@ async function run() {
     await page.locator('#overview-end-date').fill('2026-11-15');
     await page.getByRole('button', { name: 'Apply range', exact: true }).click();
     assert.equal(await rows.count(), 6, 'Custom range includes both calendar boundaries');
-    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await page.getByRole('button', { name: /^Filter by date/ }).click();
+    await page.getByRole('button', { name: /^All time$/i }).click();
     await page.getByRole('button', { name: 'Sort by oldest first', exact: true }).click();
     assert.match(await rows.first().textContent(), /Laboratory maintenance/);
     await page.getByRole('button', { name: 'Sort by newest first', exact: true }).click();
@@ -184,10 +190,10 @@ async function run() {
     await pageSize.selectOption('5');
     assert.equal(await rows.count(), 5);
     await overview.getByRole('button', { name: 'Go to page 2', exact: true }).click();
-    assert.match(await rows.first().textContent(), /Sports festival/);
+    assert.match(await rows.first().textContent(), /Program orientation/);
     await search.fill('Enrollment');
     assert.equal(await rows.count(), 1, 'Changing filters resets a later page');
-    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear search', exact: true }).click();
     await pageSize.selectOption('10');
     const first = page.getByRole('button', { name: 'View request: Enrollment advisory', exact: true });
     await first.focus();
@@ -201,7 +207,7 @@ async function run() {
     await page.getByText('Dashboard', { exact: true }).click();
     await search.waitFor();
     assert.equal(await search.inputValue(), 'Enrollment', 'Overview state survives visiting another requestor tab');
-    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear search', exact: true }).click();
     await context.close();
 
     const mobile = await createSession(browser, base, { viewport: { width: 390, height: 844 } });

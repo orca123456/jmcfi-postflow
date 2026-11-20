@@ -30,6 +30,7 @@ if ($isApiRoute) {
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization, Accept, X-Requested-With, X-XSRF-TOKEN');
     header('Access-Control-Max-Age: 86400');
+    header('Cache-Control: public, max-age=86400');
 
     // Only exit early for OPTIONS on non-API routes (static file preflights)
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

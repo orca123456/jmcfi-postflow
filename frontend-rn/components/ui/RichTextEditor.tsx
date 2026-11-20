@@ -46,19 +46,17 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         disabledIconTint="#9CA3AF"
         style={styles.toolbar}
       />
-      {!hideExtraActions && (
-        <View style={styles.fontToolbar}>
-          <TouchableOpacity style={styles.fontBtn} onPress={() => applyFont('Montserrat')}>
-            <Text style={[styles.fontBtnText, { fontFamily: 'Montserrat', fontWeight: 'bold' }]}>Sans Serif (Montserrat)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.fontBtn} onPress={() => applyFont('Book Antiqua')}>
-            <Text style={[styles.fontBtnText, { fontFamily: 'Book Antiqua' }]}>Serif (Book Antiqua)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.fontBtn} onPress={() => applyFont('Old English Text MT')}>
-            <Text style={[styles.fontBtnText, { fontFamily: 'Old English Text MT' }]}>Headers (Old English)</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={styles.fontToolbar}>
+        <TouchableOpacity style={styles.fontBtn} onPress={() => applyFont('Montserrat')}>
+          <Text style={[styles.fontBtnText, { fontFamily: 'Montserrat', fontWeight: 'bold' }]}>Sans Serif (Montserrat)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.fontBtn} onPress={() => applyFont('Book Antiqua')}>
+          <Text style={[styles.fontBtnText, { fontFamily: 'Book Antiqua' }]}>Serif (Book Antiqua)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.fontBtn} onPress={() => applyFont('Old English Text MT')}>
+          <Text style={[styles.fontBtnText, { fontFamily: 'Old English Text MT' }]}>Headers (Old English)</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView style={styles.editorScroll}>
         <RichEditor
           ref={richText}

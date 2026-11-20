@@ -192,6 +192,7 @@ class DepartmentController extends Controller
         $path = $request->file('logo')->store('department-logos', $disk);
         $department->update(['logo_path' => $path]);
         $department = $department->fresh();
+        \Illuminate\Support\Facades\Cache::forget('dashboard_college_departments');
 
         AuditLogService::log('DEPARTMENT_LOGO_UPDATED', 'Updated department logo: ' . $department->display_name, 'INFO', [
             'department_id' => $department->id,

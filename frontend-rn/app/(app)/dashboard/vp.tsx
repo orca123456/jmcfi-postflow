@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  useWindowDimensions,
   ScrollView,
   Modal,
   Image,
@@ -15,9 +14,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DashboardShell } from '../../../components/DashboardShell';
+import { dashboardStyles, dashboardUi, DashboardUiPolish, useDashboardLayout } from '../../../components/ui/dashboardDesign';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
-import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
 import { Card } from '../../../components/ui/Card';
 import { useAuthStore } from '../../../store/auth';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '../../../constants/theme';
@@ -30,11 +29,12 @@ import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/so
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
 import { ApprovalSuccessModal } from '../../../components/ui/ApprovalSuccessModal';
 import { RejectSuccessModal } from '../../../components/ui/RejectSuccessModal';
+import { DepartmentCell } from '../../../utils/departmentFormatter';
 
 export default function VPDashboard() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isTablet = width > 768;
+  const { width, onLayout, isNarrow, isCompact, isWide } = useDashboardLayout();
+  const isTablet = !isNarrow;
   const { user } = useAuthStore();
   const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Vice President';
 
@@ -64,7 +64,7 @@ export default function VPDashboard() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
-  
+
   const [postsPage, setPostsPage] = useState(1);
   const [postsPerPage, setPostsPerPage] = useState(10);
   const [departmentOptions, setDepartmentOptions] = useState(['All Departments']);
@@ -89,7 +89,7 @@ export default function VPDashboard() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [approvalSuccessPost, setApprovalSuccessPost] = useState<any | null>(null);
   const [rejectSuccessPost, setRejectSuccessPost] = useState<any | null>(null);
-  
+
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<string[]>([]);
 
   // Reject Modal State
@@ -127,13 +127,10 @@ export default function VPDashboard() {
     staleTime: 5000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
-  // Pre-fetch ALL tab data in parallel while skeleton is showing
-  const rawRole = (user?.roles && user.roles[0]) || user?.role || 'vice_president';
-  usePrefetchAllTabs(rawRole, isInitLoading);
 
   useEffect(() => {
     if (initDataRes?.data) {
@@ -149,33 +146,33 @@ export default function VPDashboard() {
             if (rejectionLog.stage === 'office_head') approverTitle = 'Department Head';
             if (rejectionLog.stage === 'vice_president') approverTitle = 'Vice President';
             if (rejectionLog.stage === 'imc_qa') approverTitle = 'QA / Branding Checker';
-            
+
             rejectedBy = `${approverTitle}, ${rejectionLog.approver.full_name}`;
           }
         }
-        
+
         return {
-        ...p,
-        id: p.id.toString(),
-        title: p.title || 'Untitled',
-        category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
-          ? p.other_category_name
-          : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
-        other_category_name: p.other_category_name || null,
-        preferred_schedule_at: p.preferred_schedule_at || null,
-        dept: p.requestor?.department || 'Department',
-        requestedBy: p.requestor?.full_name || 'Unknown',
-        requestedByRole: 'Requestor',
-        date: new Date(p.created_at).toLocaleDateString(),
-        time: new Date(p.created_at).toLocaleTimeString(),
-        rawDate: new Date(p.created_at),
-        platforms: p.target_platforms || [],
-        caption: p.caption_narrative || '',
-        previewBanner: (p.title || '').toUpperCase(),
-        attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
-        attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
-        thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
-          ? (() => {
+          ...p,
+          id: p.id.toString(),
+          title: p.title || 'Untitled',
+          category: (p.other_category_name && ['other', 'others'].includes(String(p.category?.name || p.category || '').toLowerCase()))
+            ? p.other_category_name
+            : (p.other_category_name || p.category?.name || (typeof p.category === 'string' ? p.category : 'Category')),
+          other_category_name: p.other_category_name || null,
+          preferred_schedule_at: p.preferred_schedule_at || null,
+          dept: p.requestor?.department || 'Department',
+          requestedBy: p.requestor?.full_name || 'Unknown',
+          requestedByRole: 'Requestor',
+          date: new Date(p.created_at).toLocaleDateString(),
+          time: new Date(p.created_at).toLocaleTimeString(),
+          rawDate: new Date(p.created_at),
+          platforms: p.target_platforms || [],
+          caption: p.caption_narrative || '',
+          previewBanner: (p.title || '').toUpperCase(),
+          attachment: p.media && p.media.length > 0 ? p.media[0].original_filename : 'No Attachment',
+          attachmentSize: p.media && p.media.length > 0 ? p.media[0].size + 'B' : '',
+          thumbnailUrl: Array.isArray(p.media) && p.media.length > 0
+            ? (() => {
               const getUrl = (m: any) => m?.url || m?.file_url || m?.file_path || null;
               const featured = p.media.find((m: any) => m?.is_featured && getUrl(m));
               if (featured) return getUrl(featured);
@@ -183,11 +180,12 @@ export default function VPDashboard() {
               if (imageMedia) return getUrl(imageMedia);
               return getUrl(p.media[0]);
             })()
-          : null,
-        status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
-        rejectionReason: p.rejection_reason || '',
-        rejectedBy,
-      }};
+            : null,
+          status: p.status ? p.status.toUpperCase() : 'UNKNOWN',
+          rejectionReason: p.rejection_reason || '',
+          rejectedBy,
+        }
+      };
 
       const mapped = posts.map(mapPost);
 
@@ -214,9 +212,17 @@ export default function VPDashboard() {
         approvedStatuses = ['PENDING_VICE_PRESIDENT', 'PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'];
       }
 
-      setRequestsList(mapped.filter((p: any) => pendingStatuses.includes(p.status) && !optimisticallyRemovedIds.includes(p.id)));
-      setApprovedRequests(mapped.filter((p: any) => approvedStatuses.includes(p.status)));
-      setRejectedRequests(mapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
+      const isDirectImc = (p: any) =>
+        String(p.routing_type || p.rawPost?.routing_type || '').toLowerCase() === 'direct_imc' ||
+        String(p.category?.name || p.category || '').toLowerCase() === 'direct to imc' ||
+        String(p.other_category_name || '').toLowerCase() === 'direct to imc';
+
+      // Requests submitted Direct to IMC are exclusively for IMC and must never show in Vice President approver dashboard
+      const filteredMapped = mapped.filter((p: any) => !isDirectImc(p));
+
+      setRequestsList(filteredMapped.filter((p: any) => pendingStatuses.includes(p.status) && !optimisticallyRemovedIds.includes(p.id)));
+      setApprovedRequests(filteredMapped.filter((p: any) => approvedStatuses.includes(p.status)));
+      setRejectedRequests(filteredMapped.filter((p: any) => p.status === 'REJECTED' || p.status === 'RETURNED_FOR_REVISION'));
 
       const statsData = data.stats || {};
       setStats(statsData);
@@ -239,6 +245,14 @@ export default function VPDashboard() {
       postsApi.get(Number(postIdStr)).then((res: any) => {
         const raw = res?.data?.data || res?.data;
         if (raw) {
+          const isDirect =
+            String(raw.routing_type || raw.rawPost?.routing_type || '').toLowerCase() === 'direct_imc' ||
+            String(raw.category?.name || raw.category || '').toLowerCase() === 'direct to imc' ||
+            String(raw.other_category_name || '').toLowerCase() === 'direct to imc';
+          if (isDirect) {
+            alert('This post was submitted Direct to IMC and is handled exclusively by IMC.');
+            return;
+          }
           let rejectedBy = '';
           if ((raw.status === 'rejected' || raw.status === 'returned_for_revision') && raw.approval_workflows && Array.isArray(raw.approval_workflows)) {
             const rejectionLog = raw.approval_workflows.find((w: any) => w.action === 'rejected' || w.action === 'returned_for_revision');
@@ -273,7 +287,7 @@ export default function VPDashboard() {
           });
           router.setParams({ postId: postIdStr });
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [requestsList, approvedRequests, rejectedRequests]);
 
@@ -422,24 +436,6 @@ export default function VPDashboard() {
     }
   };
 
-  const handleRequestRevision = async (req: any) => {
-    const reqId = req.id;
-
-    // Instant optimistic update (0ms UI latency)
-    setRequestsList(prev => prev.filter(r => r.id !== reqId));
-    setOptimisticallyRemovedIds(prev => [...prev, reqId]);
-    setRejectedRequests(prev => [{ ...req, status: 'RETURNED_FOR_REVISION' }, ...prev]);
-    setSelectedRequest(null);
-
-    try {
-      await postsApi.returnRevision(reqId, { reason: 'Revision requested by Vice President' });
-      loadData(false);
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to return for revision.');
-      loadData(false);
-    }
-  };
-
   const getRequestsForTab = () => {
     if (activeTab === 'approved') return approvedRequests;
     if (activeTab === 'rejected') return rejectedRequests;
@@ -462,7 +458,7 @@ export default function VPDashboard() {
       req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.category.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     let matchesDate = true;
     if (dateFilter !== 'All Time') {
       const today = new Date();
@@ -471,7 +467,7 @@ export default function VPDashboard() {
       postDate.setHours(0, 0, 0, 0);
       const diffTime = today.getTime() - postDate.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-      
+
       if (dateFilter === 'Today') {
         matchesDate = diffDays === 0;
       } else if (dateFilter === 'Yesterday') {
@@ -484,7 +480,7 @@ export default function VPDashboard() {
         const start = new Date(customStartDate);
         const end = new Date(customEndDate);
         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-            matchesDate = req.rawDate >= start && req.rawDate <= new Date(end.getTime() + 86400000);
+          matchesDate = req.rawDate >= start && req.rawDate <= new Date(end.getTime() + 86400000);
         }
       }
     }
@@ -501,7 +497,7 @@ export default function VPDashboard() {
     total: requestsList.length + approvedRequests.length + rejectedRequests.length
   }), [requestsList, approvedRequests, rejectedRequests]);
 
-  const isLargeScreen = width > 1024;
+  const isLargeScreen = isWide;
 
   const isPendingStatus = (status: string) => status === 'PENDING_VICE_PRESIDENT';
   const isApprovedStatus = (status: string) => ['PENDING_IMC_QA', 'APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(status);
@@ -509,61 +505,73 @@ export default function VPDashboard() {
   const renderActionBadge = (req: any) => {
     if (activeTab === 'dashboard' || (activeTab === 'all' && isPendingStatus(req.status))) {
       return (
-        <>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'nowrap' }}>
           <TouchableOpacity
             style={styles.btnApproveRow}
+            accessibilityRole="button"
+            accessibilityLabel={`Approve ${req.title}`}
             onPress={() => handleApprove(req)}
+            activeOpacity={0.82}
           >
-            <Ionicons name="checkmark" size={13} color="#16A34A" style={{ marginRight: 3 }} />
+            <Ionicons name="checkmark-sharp" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
             <Text style={styles.btnApproveRowText}>Approve</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.btnRejectRow}
+            accessibilityRole="button"
+            accessibilityLabel={`Reject ${req.title}`}
             onPress={() => handleRejectClick(req)}
+            activeOpacity={0.82}
           >
-            <Ionicons name="close" size={13} color="#DC2626" style={{ marginRight: 3 }} />
+            <Ionicons name="close-sharp" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
             <Text style={styles.btnRejectRowText}>Reject</Text>
           </TouchableOpacity>
-        </>
+        </View>
       );
     }
 
     if (req.status === 'REJECTED' || activeTab === 'rejected') {
       return (
-        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-          <Text style={{ color: '#B91C1C', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
-            Rejected
-          </Text>
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <View style={styles.badgePillRejected}>
+            <Ionicons name="close-sharp" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+            <Text style={styles.badgePillText}>Rejected</Text>
+          </View>
         </View>
       );
     }
 
     if (req.status === 'RETURNED_FOR_REVISION') {
       return (
-        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-          <Text style={{ color: '#D97706', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
-            Revision
-          </Text>
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <View style={styles.badgePillRevision}>
+            <Ionicons name="reload-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+            <Text style={styles.badgePillText}>Revision</Text>
+          </View>
         </View>
       );
     }
 
     if (isApprovedStatus(req.status) || activeTab === 'approved') {
       return (
-        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-          <Text style={{ color: '#15803D', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
-            Approved
-          </Text>
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <View style={styles.badgePillApproved}>
+            <Ionicons name="checkmark-sharp" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+            <Text style={styles.badgePillText}>Approved</Text>
+          </View>
         </View>
       );
     }
 
     return (
-      <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-        <Text style={{ color: '#1E40AF', fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
-          {req.status ? req.status.replace(/_/g, ' ') : 'Pending'}
-        </Text>
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <View style={styles.badgePillPending}>
+          <Ionicons name="time-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+          <Text style={styles.badgePillText}>
+            {req.status ? req.status.replace(/_/g, ' ') : 'Pending'}
+          </Text>
+        </View>
       </View>
     );
   };
@@ -577,984 +585,1078 @@ export default function VPDashboard() {
       userPhotoUrl={profilePhotoUrl}
       onOpenPost={handleOpenPostById}
     >
-      {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
-      {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && (
-        <View style={styles.dashboardContainer}>
-          {/* Header Row with Greeting and Department Filter */}
-          {activeTab === 'dashboard' && (
-            <View style={styles.dashboardHeaderRow}>
-              <View>
-                <Text style={styles.greetingTitle}>Welcome, {greetingUserName}! 👋</Text>
-                <Text style={styles.greetingSubtitle}>
-                  Review and approve content requests from departments.
-                </Text>
+      <View nativeID="vp-workspace" onLayout={onLayout} style={styles.workspace}>
+        <DashboardUiPolish rootId="vp-workspace" />
+        {/* ----------------- DASHBOARD / APPROVED / REJECTED TAB ----------------- */}
+        {(activeTab === 'dashboard' || activeTab === 'approved' || activeTab === 'rejected' || activeTab === 'all') && (
+          <View style={styles.dashboardContainer}>
+            {/* Header Row with Greeting and Department Filter */}
+            {activeTab === 'dashboard' && (
+              <View style={styles.dashboardHeaderRow}>
+                <View style={styles.headerCopy}>
+                  <Text accessibilityRole="header" style={[styles.greetingTitle, isNarrow && styles.pageTitleMobile]}>Welcome, {greetingUserName}! 👋</Text>
+                  <Text style={styles.greetingSubtitle}>
+                    Review and approve content requests from departments.
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
+            )}
 
-          {/* Metric Summary Cards Row (2x2 on Mobile) */}
-          {['dashboard', 'approved', 'rejected', 'all'].includes(activeTab) && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20, justifyContent: 'space-between', width: '100%' }}>
-              {/* Card 1: For My Approval */}
-              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('dashboard')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: Colors.primary }]}>
-                  <View style={styles.metricCardHeader}>
-                    <View style={[styles.metricIconBg, { backgroundColor: '#F3E8FF' }]}>
-                      <Ionicons name="document-text" size={20} color="#7C3AED" />
+            {/* Metric Summary Cards Row (2x2 on Mobile, 4x1 on Tablet/Desktop) */}
+            {['dashboard', 'approved', 'rejected', 'all'].includes(activeTab) && (
+              <View style={styles.metricsGrid}>
+                {/* Card 1: For My Approval */}
+                <TouchableOpacity
+                  style={[styles.metricCardWrapper, isNarrow ? styles.metricCardNarrow : isCompact ? styles.metricCardCompact : styles.metricCardWide]}
+                  onPress={() => setActiveTab('dashboard')}
+                  activeOpacity={0.7}
+                >
+                  <Card style={[styles.metricCard, activeTab === 'dashboard' && { borderColor: dashboardUi.purple }]}>
+                    <View style={styles.metricCardHeader}>
+                      <View style={[styles.metricIconBg, { backgroundColor: '#F3E8FF' }]}>
+                        <Ionicons name="document-text" size={20} color="#7C3AED" />
+                      </View>
+                    </View>
+                    <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">For My Approval</Text>
+                    <Text style={styles.metricCount}>{computedStats.pending}</Text>
+                    <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests awaiting your approval</Text>
+                  </Card>
+                </TouchableOpacity>
+
+                {/* Card 2: Approved */}
+                <TouchableOpacity
+                  style={[styles.metricCardWrapper, isNarrow ? styles.metricCardNarrow : isCompact ? styles.metricCardCompact : styles.metricCardWide]}
+                  onPress={() => setActiveTab('approved')}
+                  activeOpacity={0.7}
+                >
+                  <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: dashboardUi.purple }]}>
+                    <View style={styles.metricCardHeader}>
+                      <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
+                        <Ionicons name="checkmark-circle" size={20} color="#D97706" />
+                      </View>
+                    </View>
+                    <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Approved</Text>
+                    <Text style={styles.metricCount}>{computedStats.approved}</Text>
+                    <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests you approved</Text>
+                  </Card>
+                </TouchableOpacity>
+
+                {/* Card 3: Rejected */}
+                <TouchableOpacity
+                  style={[styles.metricCardWrapper, isNarrow ? styles.metricCardNarrow : isCompact ? styles.metricCardCompact : styles.metricCardWide]}
+                  onPress={() => setActiveTab('rejected')}
+                  activeOpacity={0.7}
+                >
+                  <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: dashboardUi.purple }]}>
+                    <View style={styles.metricCardHeader}>
+                      <View style={[styles.metricIconBg, { backgroundColor: '#FEE2E2' }]}>
+                        <Ionicons name="close-circle" size={20} color="#DC2626" />
+                      </View>
+                    </View>
+                    <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Rejected</Text>
+                    <Text style={styles.metricCount}>{computedStats.rejected}</Text>
+                    <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests rejected</Text>
+                  </Card>
+                </TouchableOpacity>
+
+                {/* Card 4: Total Requests */}
+                <TouchableOpacity
+                  style={[styles.metricCardWrapper, isNarrow ? styles.metricCardNarrow : isCompact ? styles.metricCardCompact : styles.metricCardWide]}
+                  onPress={() => setActiveTab('all')}
+                  activeOpacity={0.7}
+                >
+                  <Card style={[styles.metricCard, activeTab === 'all' && { borderColor: dashboardUi.purple }]}>
+                    <View style={styles.metricCardHeader}>
+                      <View style={[styles.metricIconBg, { backgroundColor: '#DBEAFE' }]}>
+                        <Ionicons name="paper-plane" size={20} color="#2563EB" />
+                      </View>
+                    </View>
+                    <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Total Requests</Text>
+                    <Text style={styles.metricCount}>{computedStats.total}</Text>
+                    <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">All requests</Text>
+                  </Card>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Main Content Card: Requests List */}
+            <Card style={[styles.tableCard, isNarrow && { padding: Spacing.md }]}>
+              {/* Table Control Header */}
+              <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
+                <Text accessibilityRole="header" style={styles.tableTitle}>
+                  {activeTab === 'dashboard' ? 'Requests Awaiting Your Approval' : activeTab === 'approved' ? 'Approved Requests' : activeTab === 'rejected' ? 'Rejected Requests' : 'All Requests'}
+                </Text>
+
+                <View style={[styles.tableControlsRight, { width: isCompact ? '100%' : undefined, alignItems: isCompact ? 'stretch' : 'center', zIndex: 100 }]}>
+                  {/* Filters Row: Date Filter + Department Filter Side-by-Side */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.sm, zIndex: 100, minWidth: 0, width: isCompact ? '100%' : undefined }}>
+                    {/* Date Range Dropdown Selector */}
+                    <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 60 : 40, flex: isNarrow ? 1 : undefined, minWidth: 0 }}>
+                      <TouchableOpacity
+                        style={[styles.departmentDropdown, { minHeight: dashboardUi.controlHeight, paddingVertical: Spacing.sm, minWidth: 120, justifyContent: 'space-between' }]}
+                        onPress={() => {
+                          setIsDateDropdownOpen(!isDateDropdownOpen);
+                          setIsDeptDropdownOpen(false);
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                          <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
+                        </View>
+                        <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+
+                      {isDateDropdownOpen && (
+                        <View style={[styles.dropdownMenu, { left: 0, right: 'auto', minWidth: 200 }]}>
+                          {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
+                            <TouchableOpacity
+                              key={opt}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setDateFilter(opt);
+                                if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
+                            </TouchableOpacity>
+                          ))}
+
+                          {dateFilter === 'Custom Range' && (
+                            <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date</Text>
+                              {Platform.OS === 'web' ? (
+                                <input
+                                  aria-label="Start Date"
+                                  type="date"
+                                  style={{
+                                    height: dashboardUi.controlHeight,
+                                    fontSize: 13,
+                                    borderRadius: 6,
+                                    border: `1px solid ${Colors.border}`,
+                                    paddingLeft: 8,
+                                    paddingRight: 8,
+                                    outline: 'none',
+                                    backgroundColor: Colors.surface,
+                                    color: Colors.textPrimary,
+                                    width: '100%',
+                                    marginBottom: 8,
+                                    boxSizing: 'border-box',
+                                  }}
+                                  value={customStartDate}
+                                  onChange={(e: any) => setCustomStartDate(e.target.value)}
+                                />
+                              ) : (
+                                <TextInput
+                                  style={[styles.textInput, { marginBottom: Spacing.sm }]}
+                                  accessibilityLabel="Start Date"
+                                  placeholder="YYYY-MM-DD"
+                                  value={customStartDate}
+                                  onChangeText={setCustomStartDate}
+                                />
+                              )}
+                              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date</Text>
+                              {Platform.OS === 'web' ? (
+                                <input
+                                  aria-label="End Date"
+                                  type="date"
+                                  style={{
+                                    height: dashboardUi.controlHeight,
+                                    fontSize: 13,
+                                    borderRadius: 6,
+                                    border: `1px solid ${Colors.border}`,
+                                    paddingLeft: 8,
+                                    paddingRight: 8,
+                                    outline: 'none',
+                                    backgroundColor: Colors.surface,
+                                    color: Colors.textPrimary,
+                                    width: '100%',
+                                    marginBottom: 8,
+                                    boxSizing: 'border-box',
+                                  }}
+                                  value={customEndDate}
+                                  onChange={(e: any) => setCustomEndDate(e.target.value)}
+                                />
+                              ) : (
+                                <TextInput
+                                  style={[styles.textInput, { marginBottom: Spacing.sm }]}
+                                  accessibilityLabel="End Date"
+                                  placeholder="YYYY-MM-DD"
+                                  value={customEndDate}
+                                  onChangeText={setCustomEndDate}
+                                />
+                              )}
+                              <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={() => setIsDateDropdownOpen(false)}
+                              >
+                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Department Dropdown Selector */}
+                    <View style={{ position: 'relative', zIndex: isDeptDropdownOpen ? 60 : 50, flex: isNarrow ? 1 : undefined, minWidth: 0 }}>
+                      <TouchableOpacity
+                        style={[styles.departmentDropdown, { minHeight: dashboardUi.controlHeight, paddingVertical: Spacing.sm, justifyContent: 'space-between' }]}
+                        onPress={() => {
+                          setIsDeptDropdownOpen(!isDeptDropdownOpen);
+                          setIsDateDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.departmentDropdownText} numberOfLines={1}>{selectedDepartment}</Text>
+                        <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+
+                      {isDeptDropdownOpen && (
+                        <ScrollView style={[styles.dropdownMenu, { right: 0, left: 'auto', minWidth: 200, maxHeight: 300 }]} nestedScrollEnabled>
+                          {departmentOptions.map((deptOption) => (
+                            <TouchableOpacity
+                              key={deptOption}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setSelectedDepartment(deptOption);
+                                setIsDeptDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={styles.dropdownItemText}>{deptOption}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      )}
                     </View>
                   </View>
-                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">For My Approval</Text>
-                  <Text style={styles.metricCount}>{computedStats.pending}</Text>
-                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests awaiting your approval</Text>
-                </Card>
-              </TouchableOpacity>
 
-              {/* Card 2: Approved */}
-              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('approved')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'approved' && { borderColor: Colors.primary }]}>
-                  <View style={styles.metricCardHeader}>
-                    <View style={[styles.metricIconBg, { backgroundColor: '#FEF3C7' }]}>
-                      <Ionicons name="checkmark-circle" size={20} color="#D97706" />
+                  {/* Search Bar */}
+                  <View {...(Platform.OS === 'web' ? { dataSet: { dashboardField: 'true' } } as any : {})} style={[styles.searchBox, { width: isCompact ? '100%' : 232 }]}>
+                    <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                    <TextInput
+                      style={styles.searchInput}
+                      accessibilityLabel="Search requests"
+                      placeholder="Search requests..."
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Requests Table */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%', minWidth: 0 }} contentContainerStyle={{ minWidth: Math.max(1040, width - (isNarrow ? Spacing.md : Spacing.lg) * 2), flexGrow: 1 }}>
+                <View style={styles.table}>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.tableHeaderCell, styles.flexTitle]}>Request title</Text>
+                    <Text style={[styles.tableHeaderCell, styles.flexDept]}>Department</Text>
+                    <Text style={[styles.tableHeaderCell, styles.flexUser]}>Requested by</Text>
+                    <Text style={[styles.tableHeaderCell, styles.flexDate]}>Date</Text>
+                    <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>Platform</Text>
+                    <View style={[styles.flexActions, { alignItems: 'center', justifyContent: 'center', paddingRight: 0 }]}>
+                      <Text style={[styles.tableHeaderCell, { paddingRight: 0, textAlign: 'center' }]}>Actions</Text>
                     </View>
                   </View>
-                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Approved</Text>
-                  <Text style={styles.metricCount}>{computedStats.approved}</Text>
-                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests you approved</Text>
-                </Card>
-              </TouchableOpacity>
 
-              {/* Card 3: Rejected */}
-              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('rejected')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'rejected' && { borderColor: Colors.primary }]}>
-                  <View style={styles.metricCardHeader}>
-                    <View style={[styles.metricIconBg, { backgroundColor: '#FEE2E2' }]}>
-                      <Ionicons name="close-circle" size={20} color="#DC2626" />
-                    </View>
-                  </View>
-                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Rejected</Text>
-                  <Text style={styles.metricCount}>{computedStats.rejected}</Text>
-                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">Requests rejected</Text>
-                </Card>
-              </TouchableOpacity>
-
-              {/* Card 4: Total Requests */}
-              <TouchableOpacity style={{ width: isTablet ? '23.5%' : '48%', maxWidth: isTablet ? '23.5%' : '48%', marginBottom: 10 }} onPress={() => setActiveTab('all')} activeOpacity={0.7}>
-                <Card style={[styles.metricCard, activeTab === 'all' && { borderColor: Colors.primary }]}>
-                  <View style={styles.metricCardHeader}>
-                    <View style={[styles.metricIconBg, { backgroundColor: '#DBEAFE' }]}>
-                      <Ionicons name="paper-plane" size={20} color="#2563EB" />
-                    </View>
-                  </View>
-                  <Text style={styles.metricLabel} numberOfLines={1} ellipsizeMode="tail">Total Requests</Text>
-                  <Text style={styles.metricCount}>{computedStats.total}</Text>
-                  <Text style={styles.metricSubtext} numberOfLines={1} ellipsizeMode="tail">All requests</Text>
-                </Card>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Main Content Card: Requests List */}
-          <Card style={[styles.tableCard, !isTablet && { padding: 12 }]}>
-            {/* Table Control Header */}
-            <View style={[styles.tableCardHeaderRow, !isTablet && { flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
-              <Text style={styles.tableTitle}>
-                {activeTab === 'dashboard' ? 'Requests Awaiting Your Approval' : activeTab === 'approved' ? 'Approved Requests' : activeTab === 'rejected' ? 'Rejected Requests' : 'All Requests'}
-              </Text>
-
-              <View style={[styles.tableControlsRight, { flexDirection: isTablet ? 'row' : 'column', alignItems: isTablet ? 'center' : 'stretch', gap: 8, zIndex: 100 }]}>
-                {/* Filters Row: Date Filter + Department Filter Side-by-Side */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 100, flex: isTablet ? undefined : 1 }}>
-                  {/* Date Range Dropdown Selector */}
-                  <View style={{ position: 'relative', zIndex: isDateDropdownOpen ? 60 : 40, flex: isTablet ? undefined : 1 }}>
+                  {paginatedRequests.map((req) => (
                     <TouchableOpacity
-                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, minWidth: 120, justifyContent: 'space-between' }]}
+                      key={req.id}
+                      style={styles.tableRow}
+                      activeOpacity={0.7}
                       onPress={() => {
-                        setIsDateDropdownOpen(!isDateDropdownOpen);
-                        setIsDeptDropdownOpen(false);
+                        setSelectedRequest(req);
+                        setModalPlatformTab('facebook');
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                        <Text style={styles.departmentDropdownText}>{dateFilter}</Text>
+                      {/* REQUEST TITLE + CATEGORY TAG */}
+                      <View style={[styles.cellContainer, styles.flexTitle, { flexDirection: 'row', alignItems: 'center' }]}>
+                        <View style={styles.thumbnailBox}>
+                          {req.thumbnailUrl ? (
+                            <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
+                          ) : (
+                            <Ionicons name="document-text-outline" size={20} color={Colors.textSecondary} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.rowTitleText} numberOfLines={2}>{req.title}</Text>
+                          <View style={styles.categoryPill}>
+                            <Text style={styles.categoryPillText}>{req.category}</Text>
+                          </View>
+                        </View>
                       </View>
-                      <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
-                    </TouchableOpacity>
 
-                    {isDateDropdownOpen && (
-                      <View style={[styles.dropdownMenu, { left: 0, right: 'auto', minWidth: 200 }]}>
-                        {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Custom Range'].map((opt: any) => (
-                          <TouchableOpacity
-                            key={opt}
-                            style={styles.dropdownItem}
-                            onPress={() => {
-                              setDateFilter(opt);
-                              if (opt !== 'Custom Range') setIsDateDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={[styles.dropdownItemText, dateFilter === opt && { fontWeight: 'bold', color: Colors.primary }]}>{opt}</Text>
-                          </TouchableOpacity>
-                        ))}
-                        
-                        {dateFilter === 'Custom Range' && (
-                          <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
-                            <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>Start Date (YYYY-MM-DD)</Text>
-                            <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-01" value={customStartDate} onChangeText={setCustomStartDate} />
-                            <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 4 }}>End Date (YYYY-MM-DD)</Text>
-                            <TextInput style={[styles.searchInput, { marginBottom: 8, height: 32 }]} placeholder="e.g. 2026-08-31" value={customEndDate} onChangeText={setCustomEndDate} />
-                            <TouchableOpacity 
-                              style={{ backgroundColor: Colors.primary, padding: 6, borderRadius: 4, alignItems: 'center' }}
-                              onPress={() => setIsDateDropdownOpen(false)}
-                            >
-                              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Apply</Text>
-                            </TouchableOpacity>
+                      {/* DEPARTMENT */}
+                      <View style={[styles.cellContainer, styles.flexDept]}>
+                        <DepartmentCell department={req.dept} />
+                      </View>
+
+                      {/* REQUESTED BY */}
+                      <View style={[styles.cellContainer, styles.flexUser]}>
+                        <Text style={styles.rowUserName}>{req.requestedBy}</Text>
+                        <Text style={styles.rowUserRole}>{req.requestedByRole}</Text>
+                      </View>
+
+                      {/* REQUESTED ON */}
+                      <View style={[styles.cellContainer, styles.flexDate]}>
+                        <Text style={styles.rowDateText}>{req.date}</Text>
+                        <Text style={styles.rowTimeText}>{req.time}</Text>
+                      </View>
+
+                      {/* PLATFORMS */}
+                      <View style={[styles.cellContainer, styles.flexPlatforms, { gap: 4, justifyContent: 'center' }]}>
+                        {req.platforms.includes('facebook') && (
+                          <View style={styles.platformRowItem}>
+                            <Ionicons name="logo-facebook" size={14} color="#1877F2" />
+                            <Text style={styles.platformRowLabel}>Facebook</Text>
                           </View>
                         )}
+                        {req.platforms.includes('instagram') && (
+                          <View style={styles.platformRowItem}>
+                            <Ionicons name="logo-instagram" size={14} color="#E1306C" />
+                            <Text style={styles.platformRowLabel}>Instagram</Text>
+                          </View>
+                        )}
+                        {(req.platforms.includes('website') || req.platforms.includes('portal') || req.platforms.includes('wordpress')) && (
+                          <View style={styles.platformRowItem}>
+                            <Ionicons name="globe-outline" size={14} color="#059669" />
+                            <Text style={styles.platformRowLabel}>Website</Text>
+                          </View>
+                        )}
+                        {!req.platforms?.length && (
+                          <Text style={{ fontSize: 13, color: '#94A3B8' }}>—</Text>
+                        )}
                       </View>
-                    )}
-                  </View>
 
-                  {/* Department Dropdown Selector */}
-                  <View style={{ position: 'relative', zIndex: isDeptDropdownOpen ? 60 : 50, flex: isTablet ? undefined : 1 }}>
-                    <TouchableOpacity
-                      style={[styles.departmentDropdown, { height: 36, paddingVertical: 0, justifyContent: 'space-between' }]}
-                      onPress={() => {
-                        setIsDeptDropdownOpen(!isDeptDropdownOpen);
-                        setIsDateDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={styles.departmentDropdownText} numberOfLines={1}>{selectedDepartment}</Text>
-                      <Ionicons name="chevron-down-outline" size={14} color={Colors.textSecondary} />
+                      {/* ACTIONS */}
+                      <View style={[styles.flexActions, { alignItems: 'center', justifyContent: 'center', paddingRight: 0 }]}>
+                        {renderActionBadge(req)}
+                      </View>
                     </TouchableOpacity>
-
-                    {isDeptDropdownOpen && (
-                      <ScrollView style={[styles.dropdownMenu, { right: 0, left: 'auto', minWidth: 200, maxHeight: 300 }]} nestedScrollEnabled>
-                        {departmentOptions.map((deptOption) => (
-                          <TouchableOpacity
-                            key={deptOption}
-                            style={styles.dropdownItem}
-                            onPress={() => {
-                              setSelectedDepartment(deptOption);
-                              setIsDeptDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={styles.dropdownItemText}>{deptOption}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    )}
-                  </View>
-                </View>
-
-                {/* Search Bar */}
-                <View style={[styles.searchBox, { width: isTablet ? 240 : '100%', height: 36 }]}>
-                  <Ionicons name="search-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search requests..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Requests Table */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ minWidth: isTablet ? '100%' : 920 }}>
-              <View style={styles.table}>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.tableHeaderCell, styles.flexTitle]}>REQUEST TITLE</Text>
-                  <Text style={[styles.tableHeaderCell, styles.flexDept]}>DEPARTMENT</Text>
-                  <Text style={[styles.tableHeaderCell, styles.flexUser]}>REQUESTED BY</Text>
-                  <Text style={[styles.tableHeaderCell, styles.flexDate]}>REQUESTED ON</Text>
-                  <Text style={[styles.tableHeaderCell, styles.flexPlatforms]}>PLATFORMS</Text>
-                  <Text style={[styles.tableHeaderCell, styles.flexActions, styles.alignRight]}>ACTIONS</Text>
-                </View>
-
-              {paginatedRequests.map((req) => (
-                <TouchableOpacity
-                  key={req.id}
-                  style={styles.tableRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    setSelectedRequest(req);
-                    setModalPlatformTab('facebook');
-                  }}
-                >
-                  {/* REQUEST TITLE + CATEGORY TAG */}
-                  <View style={[styles.cellContainer, styles.flexTitle]}>
-                    <View style={styles.thumbnailBox}>
-                      {req.thumbnailUrl ? (
-                        <Image source={{ uri: req.thumbnailUrl }} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="cover" />
-                      ) : (
-                        <Ionicons name="image-outline" size={16} color={Colors.textSecondary} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowTitleText}>{req.title}</Text>
-                      <View style={styles.categoryPill}>
-                        <Text style={styles.categoryPillText}>{req.category}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* DEPARTMENT */}
-                  <View style={[styles.cellContainer, styles.flexDept]}>
-                    <Text style={styles.rowDeptText}>{req.dept}</Text>
-                  </View>
-
-                  {/* REQUESTED BY */}
-                  <View style={[styles.cellContainer, styles.flexUser]}>
-                    <Text style={styles.rowUserName}>{req.requestedBy}</Text>
-                    <Text style={styles.rowUserRole}>{req.requestedByRole}</Text>
-                  </View>
-
-                  {/* REQUESTED ON */}
-                  <View style={[styles.cellContainer, styles.flexDate]}>
-                    <Text style={styles.rowDateText}>{req.date}</Text>
-                    <Text style={styles.rowTimeText}>{req.time}</Text>
-                  </View>
-
-                  {/* PLATFORMS */}
-                  <View style={[styles.cellContainer, styles.flexPlatforms, { flexDirection: 'row', gap: 6, justifyContent: 'flex-start' }]}>
-                    {req.platforms.includes('facebook') && (
-                      <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
-                        <Ionicons name="logo-facebook" size={13} color="#1877F2" />
-                      </View>
-                    )}
-                    {req.platforms.includes('instagram') && (
-                      <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
-                        <Ionicons name="logo-instagram" size={13} color="#E1306C" />
-                      </View>
-                    )}
-                    {(req.platforms.includes('website') || req.platforms.includes('portal') || req.platforms.includes('wordpress')) && (
-                      <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                        <Ionicons name="globe-outline" size={13} color="#059669" />
-                      </View>
-                    )}
-                  </View>
-
-                  {/* ACTIONS */}
-                  <View style={[styles.cellContainer, styles.flexActions, styles.rowActionsGroup]}>
-                    {renderActionBadge(req)}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-
-          <PaginationControl 
-            currentPage={postsPage} 
-            totalItems={filteredRequests.length} 
-            itemsPerPage={postsPerPage} 
-            onPageChange={setPostsPage} 
-            onItemsPerPageChange={setPostsPerPage}
-            itemName="requests" 
-          />
-          </Card>
-        </View>
-      )}
-
-      {/* ----------------- POLICY RULES TAB ----------------- */}
-      {activeTab === 'policy-rules' && (
-        <PolicyRulesView accentColor="#7C3AED" />
-      )}
-
-      {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
-      {activeTab === 'account-settings' && (
-        <View style={styles.dashboardContainer}>
-          <View style={styles.dashboardHeaderRow}>
-            <View>
-              <Text style={styles.greetingTitle}>Account Settings</Text>
-              <Text style={styles.greetingSubtitle}>
-                Manage your institutional profile picture, credentials, and settings.
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-            {/* Left settings card */}
-            <View style={{ flex: 1.5 }}>
-              <Card style={styles.tableCard}>
-                <View style={[styles.tableCardHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.background, paddingBottom: 10, marginBottom: 12 }]}>
-                  <Ionicons name="person-outline" size={18} color="#7C3AED" />
-                  <Text style={styles.tableTitle}>Profile Information</Text>
-                </View>
-
-                {/* Profile Picture Upload Section */}
-                <View style={styles.profilePicUploadContainer}>
-                  <View style={[styles.profilePicLarge, { backgroundColor: '#7C3AED', overflow: 'hidden' }]}>
-                    {profilePhotoUrl ? (
-                      <Image source={{ uri: resolveImageUrl(profilePhotoUrl) || profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
-                    ) : (
-                      <Text style={styles.profilePicLargeText}>
-                        {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'VP'}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.profilePicActionCol}>
-                    <Text style={styles.profilePicTitle}>Profile Picture</Text>
-                    <Text style={styles.profilePicSubtitle}>PNG or JPG formats supported. Max 2MB file size.</Text>
-                    <View style={styles.profilePicButtonsRow}>
-                      <TouchableOpacity style={styles.profilePicUploadBtn} onPress={handleUploadPhoto} disabled={uploadingPhoto}>
-                        <Text style={styles.profilePicUploadBtnText}>{uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}</Text>
-                      </TouchableOpacity>
-                      {profilePhotoUrl && (
-                        <TouchableOpacity style={styles.profilePicRemoveBtn} onPress={handleRemovePhoto} disabled={uploadingPhoto}>
-                          <Text style={styles.profilePicRemoveBtnText}>Remove</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>FULL NAME</Text>
-                  <TextInput style={styles.textInput} value={acctFullName} onChangeText={setAcctFullName} />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.email ?? ''} editable={false} />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>DEPARTMENT / ROLE</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.department || ''} editable={false} />
-                </View>
-
-                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center' }} onPress={handleSaveDetails} disabled={savingAcct}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcct ? 'Saving...' : 'Save Details'}</Text>
-                </TouchableOpacity>
-              </Card>
-            </View>
-
-            {/* Right settings card */}
-            <View style={{ flex: 1 }}>
-              <Card style={styles.tableCard}>
-                <Text style={[styles.tableTitle, { marginBottom: 12 }]}>Update Password</Text>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
-                  <TextInput style={styles.textInput} secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} placeholder="Enter current password" />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>NEW PASSWORD</Text>
-                  <TextInput style={styles.textInput} secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} placeholder="Enter new password" />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                  <TextInput style={styles.textInput} secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
-                </View>
-
-                <TouchableOpacity style={{ backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 4, alignItems: 'center', marginTop: 12 }} onPress={handleChangePw} disabled={savingAcctPw}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{savingAcctPw ? 'Changing...' : 'Change Password'}</Text>
-                </TouchableOpacity>
-              </Card>
-            </View>
-          </View>
-
-          <ProfilePictureCropperModal
-            visible={cropperModalVisible}
-            imageUri={cropImageUri}
-            onClose={() => {
-              setCropperModalVisible(false);
-              setCropImageUri(null);
-            }}
-            onSave={handleSaveCroppedPhoto}
-          />
-        </View>
-      )}
-
-      {/* ----------------- CONTENT REQUEST PREVIEW MODAL ----------------- */}
-      {selectedRequest && (
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={true}
-          onRequestClose={() => {
-            setSelectedRequest(null);
-            router.setParams({ postId: '' });
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              {/* Modal Header */}
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalHeaderTitle}>Content Request Preview</Text>
-                <TouchableOpacity
-                  style={styles.modalCloseIconBtn}
-                  onPress={() => {
-                    setSelectedRequest(null);
-                    setModalError(null);
-                    router.setParams({ postId: '' });
-                  }}
-                >
-                  <Ionicons name="close" size={20} color={Colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Error Banner */}
-              {modalError && (
-                <View style={{ backgroundColor: '#FEE2E2', padding: 12, marginHorizontal: 24, marginTop: 16, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="warning" size={20} color="#DC2626" style={{ marginRight: 8 }} />
-                  <Text style={{ color: '#B91C1C', fontSize: 14, fontWeight: '500', flex: 1 }}>{modalError}</Text>
-                  <TouchableOpacity onPress={() => setModalError(null)}>
-                    <Ionicons name="close" size={16} color="#B91C1C" />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Modal Body Split */}
-              <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
-                { (selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
-                  <View style={{ marginBottom: 16 }}>
-                    <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444' }}>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#EF4444', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Rejected by: {selectedRequest.rejectedBy}</Text>
-                      <Text style={{ fontSize: 15, color: '#EF4444', fontWeight: '500' }}>
-                        {selectedRequest.rejectionReason || 'No reason provided.'}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-                    
-                <View style={{ marginBottom: 16 }}>
-                  <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
-                        {(() => {
-                          const workflows = selectedRequest.approval_workflows || [];
-                          const getStageStatus = (stageName: string) => {
-                            const entry = workflows.find((w: any) => w.stage === stageName);
-                            if (entry) {
-                               if (entry.action === 'approved') return 'Approved';
-                               if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
-                            }
-                            return 'Pending';
-                          };
-
-                          let deptHead = getStageStatus('office_head');
-                          let vpaa = getStageStatus('vice_president');
-                          let imc = getStageStatus('imc_qa');
-                          
-                          const isScheduled = selectedRequest.rawStatus === 'scheduled' ||
-                            selectedRequest.status === 'SCHEDULED' ||
-                            (Boolean(selectedRequest.preferred_schedule_at) &&
-                             new Date(selectedRequest.preferred_schedule_at).getTime() > Date.now() &&
-                             selectedRequest.status !== 'PUBLISHED');
-
-                          if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
-                          if (vpaa === 'Rejected') { imc = 'Waiting'; }
-                          if (imc === 'Approved') {
-                            imc = isScheduled ? 'Scheduled' : 'Published';
-                          }
-
-                          const getIcon = (state: string) => {
-                            if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
-                            if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return { name: 'checkmark-circle', color: '#059669' };
-                            return { name: 'time', color: Colors.textMuted };
-                          };
-                          const getColor = (state: string) => {
-                            if (state === 'Rejected') return '#DC2626';
-                            if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
-                            return Colors.textMuted;
-                          };
-                          const getLineColor = (state: string) => {
-                            if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
-                            if (state === 'Rejected') return '#DC2626';
-                            return Colors.border;
-                          };
-
-                          return (
-                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
-                              
-                              <View style={{ alignItems: 'center', flex: 1.2 }}>
-                                <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
-                                <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
-                                  <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Dept Head</Text>
-                                </View>
-                                <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{deptHead}</Text>
-                              </View>
-                              
-                              <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-                              
-                              <View style={{ alignItems: 'center', flex: 1.2 }}>
-                                <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
-                                <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
-                                  <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>VPAA</Text>
-                                </View>
-                                <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{vpaa}</Text>
-                              </View>
-                              
-                              <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
-                              
-                              <View style={{ alignItems: 'center', flex: 1.2 }}>
-                                <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
-                                <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
-                                  <Text style={{ fontSize: 10, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 12 }}>Integrated Marketing Communications</Text>
-                                </View>
-                                <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imc}</Text>
-                              </View>
-
-                            </View>
-                          );
-                        })()}
-                    </View>
-                  </View>
-                
-                <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                  {/* Left Side: Social Media Mockup Preview */}
-                  <View style={styles.modalLeftColumn}>
-                    {/* Platform Selector Tabs */}
-                    <View style={styles.modalPlatformTabs}>
-                      <TouchableOpacity
-                        style={[
-                          styles.modalPlatformTab,
-                          modalPlatformTab === 'facebook' && styles.modalPlatformTabActive,
-                        ]}
-                        onPress={() => setModalPlatformTab('facebook')}
-                      >
-                        <Ionicons name="logo-facebook" size={14} color={modalPlatformTab === 'facebook' ? '#1877F2' : Colors.textSecondary} />
-                        <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'facebook' && styles.modalPlatformTabTextActive]}>
-                          Facebook
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.modalPlatformTab,
-                          modalPlatformTab === 'instagram' && styles.modalPlatformTabActive,
-                        ]}
-                        onPress={() => setModalPlatformTab('instagram')}
-                      >
-                        <Ionicons name="logo-instagram" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
-                        <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActive]}>
-                          Instagram
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.modalPlatformTab,
-                          modalPlatformTab === 'website' && styles.modalPlatformTabActive,
-                        ]}
-                        onPress={() => setModalPlatformTab('website')}
-                      >
-                        <Ionicons name="globe-outline" size={14} color={modalPlatformTab === 'website' ? '#059669' : Colors.textSecondary} />
-                        <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'website' && styles.modalPlatformTabTextActive]}>
-                          Website
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Interactive Mockup Container */}
-                    {(() => {
-                      const rawList = selectedRequest?.media || selectedRequest?.rawPost?.media || [];
-                      const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
-                      const requestMediaImages = validList.length > 0
-                        ? validList
-                        : (selectedRequest?.thumbnailUrl ? [resolveImageUrl(selectedRequest.thumbnailUrl) || selectedRequest.thumbnailUrl] : []);
-
-                      return (
-                        <>
-                          {modalPlatformTab === 'facebook' && (
-                            <View style={styles.socialMockupCard}>
-                              <View style={styles.socialHeader}>
-                                <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
-                                <View>
-                                  <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
-                                  <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
-                                </View>
-                              </View>
-
-                              <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
-
-                              {requestMediaImages.length > 0 ? (
-                                <FacebookMediaGrid
-                                  images={requestMediaImages}
-                                  onImagePress={(uri) => setFullScreenImage(uri)}
-                                />
-                              ) : (
-                                <View style={styles.socialMediaBanner}>
-                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                                  <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                                </View>
-                              )}
-
-                              <View style={styles.socialFooterActions}>
-                                <View style={styles.socialActionBtn}>
-                                  <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
-                                  <Text style={styles.socialActionText}>Like</Text>
-                                </View>
-                                <View style={styles.socialActionBtn}>
-                                  <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
-                                  <Text style={styles.socialActionText}>Comment</Text>
-                                </View>
-                                <View style={styles.socialActionBtn}>
-                                  <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
-                                  <Text style={styles.socialActionText}>Share</Text>
-                                </View>
-                              </View>
-                            </View>
-                          )}
-
-                          {modalPlatformTab === 'instagram' && (
-                            <View style={styles.socialMockupCard}>
-                              <View style={styles.socialHeader}>
-                                <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
-                                </View>
-                                <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
-                              </View>
-
-                              {requestMediaImages.length > 0 ? (
-                                <InstagramMediaCarousel
-                                  images={requestMediaImages}
-                                  onImagePress={(uri) => setFullScreenImage(uri)}
-                                />
-                              ) : (
-                                <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
-                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                                  <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                                </View>
-                              )}
-
-                              <View style={{ padding: 12 }}>
-                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                                  <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
-                                  <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
-                                  <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
-                                </View>
-                                <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
-                                <FormattedText style={styles.socialCaptionText}>{'<b>Jose Maria College Foundation Inc. </b>' + (selectedRequest.caption || '')}</FormattedText>
-                              </View>
-                            </View>
-                          )}
-
-                          {modalPlatformTab === 'website' && (
-                            <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
-                              {requestMediaImages.length > 0 ? (
-                                <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(requestMediaImages[0])}>
-                                  <Image source={{ uri: requestMediaImages[0] }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
-                                </TouchableOpacity>
-                              ) : (
-                                <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
-                                  <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
-                                  <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
-                                </View>
-                              )}
-                              <View style={{ padding: 16 }}>
-                                <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
-                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedRequest.title}</Text>
-                                <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedRequest.date}</Text>
-                                <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedRequest.caption}</FormattedText>
-                              </View>
-                            </View>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </View>
-
-                  {/* Right Side: Request Details Metadata */}
-                  <View style={styles.modalRightColumn}>
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Title</Text>
-                      <Text style={styles.metaTitleVal}>{selectedRequest.title}</Text>
-                    </View>
-
-                    <View style={styles.metaRowGrid}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.metaLabel}>Department</Text>
-                        <View style={styles.deptBadge}>
-                          <Text style={styles.deptBadgeText}>{selectedRequest.dept}</Text>
-                        </View>
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.metaLabel}>Category</Text>
-                        <Text style={styles.metaVal}>{selectedRequest.category}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.metaRowGrid}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.metaLabel}>Requested By</Text>
-                        <Text style={styles.metaVal}>
-                          {selectedRequest.requestedBy} ({selectedRequest.requestedByRole})
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.metaRowGrid}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.metaLabel}>Requested On</Text>
-                        <Text style={styles.metaVal}>
-                          {selectedRequest.date} {selectedRequest.time}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {selectedRequest.preferred_schedule_at ? (
-                      <View style={styles.metaRowGrid}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.metaLabel}>Requested to Publish On</Text>
-                          <Text style={styles.metaVal}>
-                            {(() => {
-                              try {
-                                const d = new Date(selectedRequest.preferred_schedule_at);
-                                if (isNaN(d.getTime())) return selectedRequest.preferred_schedule_at;
-                                const datePart = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
-                                let hours = d.getHours();
-                                const ampm = hours >= 12 ? 'PM' : 'AM';
-                                hours = hours % 12;
-                                hours = hours ? hours : 12;
-                                const minutes = d.getMinutes().toString().padStart(2, '0');
-                                return `${datePart} • ${hours}:${minutes} ${ampm}`;
-                              } catch {
-                                return selectedRequest.preferred_schedule_at;
-                              }
-                            })()}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : null}
-
-                    <View style={styles.metaRowGrid}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.metaLabel}>Target Platforms</Text>
-                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                          {selectedRequest.platforms.includes('facebook') && (
-                            <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
-                              <Ionicons name="logo-facebook" size={14} color="#1877F2" />
-                            </View>
-                          )}
-                          {selectedRequest.platforms.includes('instagram') && (
-                            <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
-                              <Ionicons name="logo-instagram" size={14} color="#E1306C" />
-                            </View>
-                          )}
-                          {(selectedRequest.platforms.includes('website') || selectedRequest.platforms.includes('portal') || selectedRequest.platforms.includes('wordpress')) && (
-                            <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                              <Ionicons name="globe-outline" size={14} color="#059669" />
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    </View>
-
-
-                    <View style={styles.metaDivider} />
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Caption / Main Text</Text>
-                      <FormattedText style={styles.metaCaptionBox}>{selectedRequest.caption}</FormattedText>
-                    </View>
-
-                    {/* Attachments Section */}
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>Attachments (1)</Text>
-                      <View style={styles.attachmentCard}>
-                        <View style={styles.attachmentThumb}>
-                          <Ionicons name="document-attach-outline" size={18} color="#7C3AED" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.attachmentName}>{selectedRequest.attachment}</Text>
-                          <Text style={styles.attachmentSize}>{selectedRequest.attachmentSize}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
+                  ))}
                 </View>
               </ScrollView>
 
-              {/* Modal Footer Actions */}
-              <View style={styles.modalFooterRow}>
-                <TouchableOpacity
-                  style={styles.btnModalClose}
-                  onPress={() => {
-                    setSelectedRequest(null);
-                    setModalError(null);
-                    router.setParams({ postId: '' });
-                  }}
-                >
-                  <Text style={styles.btnModalCloseText}>Close</Text>
-                </TouchableOpacity>
-
-                {activeTab === 'dashboard' && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.btnModalApprove}
-                      onPress={() => handleApprove(selectedRequest)}
-                    >
-                      <Text style={styles.btnModalApproveText}>Approve</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.btnModalReject}
-                      onPress={() => handleRejectClick(selectedRequest)}
-                    >
-                      <Text style={styles.btnModalRejectText}>Reject</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* Reject Modal */}
-      {isRejectModalVisible && (
-        <Modal
-          visible={isRejectModalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setIsRejectModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContainer, { width: 400, maxWidth: '90%' }]}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalHeaderTitle}>Reject Request</Text>
-                <TouchableOpacity
-                  style={styles.modalCloseIconBtn}
-                  onPress={() => setIsRejectModalVisible(false)}
-                >
-                  <Ionicons name="close" size={20} color={Colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-              <View style={{ padding: 20 }}>
-                <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: 12 }}>
-                  Please provide a reason for rejecting "{requestToReject?.title}".
-                </Text>
-                <TextInput
-                  style={{
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderRadius: BorderRadius.md,
-                    padding: 12,
-                    minHeight: 100,
-                    textAlignVertical: 'top',
-                    fontSize: FontSize.sm,
-                    backgroundColor: '#F9FAFB',
-                    outlineStyle: 'none',
-                  } as any}
-                  placeholder="Enter rejection reason or comment here..."
-                  multiline
-                  value={rejectComment}
-                  onChangeText={setRejectComment}
+              <View {...(Platform.OS === 'web' ? { dataSet: { dashboardPagination: 'true' } } as any : {})}>
+                <PaginationControl
+                  currentPage={postsPage}
+                  totalItems={filteredRequests.length}
+                  itemsPerPage={postsPerPage}
+                  onPageChange={setPostsPage}
+                  onItemsPerPageChange={setPostsPerPage}
+                  itemName="requests"
                 />
               </View>
-              <View style={styles.modalFooterRow}>
-                <TouchableOpacity
-                  style={styles.btnModalClose}
-                  onPress={() => setIsRejectModalVisible(false)}
-                >
-                  <Text style={styles.btnModalCloseText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.btnModalReject}
-                  onPress={confirmReject}
-                >
-                  <Text style={styles.btnModalRejectText}>Confirm Reject</Text>
-                </TouchableOpacity>
+            </Card>
+          </View>
+        )}
+
+        {/* ----------------- POLICY RULES TAB ----------------- */}
+        {activeTab === 'policy-rules' && (
+          <PolicyRulesView accentColor="#7C3AED" />
+        )}
+
+        {/* ----------------- ACCOUNT SETTINGS TAB ----------------- */}
+        {activeTab === 'account-settings' && (
+          <View style={styles.dashboardContainer}>
+            <View style={styles.dashboardHeaderRow}>
+              <View style={styles.headerCopy}>
+                <Text accessibilityRole="header" style={[styles.greetingTitle, isNarrow && styles.pageTitleMobile]}>Account Settings</Text>
+                <Text style={styles.greetingSubtitle}>
+                  Manage your institutional profile picture, credentials, and settings.
+                </Text>
               </View>
             </View>
-          </View>
-        </Modal>
-      )}
 
-      {/* Full Screen Image Modal */}
-      {fullScreenImage && (
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={true}
-          onRequestClose={() => setFullScreenImage(null)}
-        >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
-              onPress={() => setFullScreenImage(null)}
-            >
-              <Ionicons name="close" size={32} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Image
-              source={{ uri: fullScreenImage }}
-              style={{ width: '90%', height: '90%' }}
-              resizeMode="contain"
+            <View style={[styles.splitLayout, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              {/* Left settings card */}
+              <View style={{ flex: 1.5 }}>
+                <Card style={styles.tableCard}>
+                  <View style={[styles.tableCardHeaderRow, { justifyContent: 'flex-start', gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.background, paddingBottom: 10, marginBottom: 12 }]}>
+                    <Ionicons name="person-outline" size={18} color="#7C3AED" />
+                    <Text accessibilityRole="header" style={styles.tableTitle}>Profile Information</Text>
+                  </View>
+
+                  {/* Profile Picture Upload Section */}
+                  <View style={styles.profilePicUploadContainer}>
+                    <View style={[styles.profilePicLarge, { backgroundColor: '#7C3AED', overflow: 'hidden' }]}>
+                      {profilePhotoUrl ? (
+                        <Image source={{ uri: resolveImageUrl(profilePhotoUrl) || profilePhotoUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
+                      ) : (
+                        <Text style={styles.profilePicLargeText}>
+                          {user?.first_name ? (user.first_name[0] + (user.last_name?.[0] || '')).toUpperCase() : 'VP'}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.profilePicActionCol}>
+                      <Text style={styles.profilePicTitle}>Profile Picture</Text>
+                      <Text style={styles.profilePicSubtitle}>PNG or JPG formats supported. Max 2MB file size.</Text>
+                      <View style={styles.profilePicButtonsRow}>
+                        <TouchableOpacity style={styles.profilePicUploadBtn} onPress={handleUploadPhoto} disabled={uploadingPhoto}>
+                          <Text style={styles.profilePicUploadBtnText}>{uploadingPhoto ? 'Uploading...' : 'Upload New Photo'}</Text>
+                        </TouchableOpacity>
+                        {profilePhotoUrl && (
+                          <TouchableOpacity style={styles.profilePicRemoveBtn} onPress={handleRemovePhoto} disabled={uploadingPhoto}>
+                            <Text style={styles.profilePicRemoveBtnText}>Remove</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>FULL NAME</Text>
+                    <TextInput accessibilityLabel="Full name" style={styles.textInput} value={acctFullName} onChangeText={setAcctFullName} />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                    <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.email ?? ''} editable={false} />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>DEPARTMENT / ROLE</Text>
+                    <TextInput style={[styles.textInput, { backgroundColor: Colors.background, color: Colors.textSecondary }]} value={user?.department || ''} editable={false} />
+                  </View>
+
+                  <TouchableOpacity style={styles.primaryButton} onPress={handleSaveDetails} disabled={savingAcct}>
+                    <Text style={styles.primaryButtonText}>{savingAcct ? 'Saving...' : 'Save Details'}</Text>
+                  </TouchableOpacity>
+                </Card>
+              </View>
+
+              {/* Right settings card */}
+              <View style={{ flex: 1 }}>
+                <Card style={styles.tableCard}>
+                  <Text style={[styles.tableTitle, { marginBottom: 12 }]}>Update Password</Text>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                    <TextInput style={styles.textInput} accessibilityLabel="Current password" secureTextEntry value={acctCurrentPw} onChangeText={setAcctCurrentPw} placeholder="Enter current password" />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>NEW PASSWORD</Text>
+                    <TextInput style={styles.textInput} accessibilityLabel="New password" secureTextEntry value={acctNewPw} onChangeText={setAcctNewPw} placeholder="Enter new password" />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                    <TextInput style={styles.textInput} accessibilityLabel="Confirm password" secureTextEntry value={acctConfirmPw} onChangeText={setAcctConfirmPw} placeholder="Confirm new password" />
+                  </View>
+
+                  <TouchableOpacity style={[styles.primaryButton, { marginTop: Spacing.sm }]} onPress={handleChangePw} disabled={savingAcctPw}>
+                    <Text style={styles.primaryButtonText}>{savingAcctPw ? 'Changing...' : 'Change Password'}</Text>
+                  </TouchableOpacity>
+                </Card>
+              </View>
+            </View>
+
+            <ProfilePictureCropperModal
+              visible={cropperModalVisible}
+              imageUri={cropImageUri}
+              onClose={() => {
+                setCropperModalVisible(false);
+                setCropImageUri(null);
+              }}
+              onSave={handleSaveCroppedPhoto}
             />
           </View>
-        </Modal>
-      )}
+        )}
 
-      {/* Approval Success Popup Modal */}
-      <ApprovalSuccessModal
-        visible={Boolean(approvalSuccessPost)}
-        role="vice_president"
-        postTitle={approvalSuccessPost?.title || 'Request'}
-        onClose={() => setApprovalSuccessPost(null)}
-      />
+        {/* ----------------- CONTENT REQUEST PREVIEW MODAL ----------------- */}
+        {selectedRequest && (
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={true}
+            onRequestClose={() => {
+              setSelectedRequest(null);
+              router.setParams({ postId: '' });
+            }}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContainer}>
+                {/* Modal Header */}
+                <View style={styles.modalHeaderRow}>
+                  <Text style={styles.modalHeaderTitle}>Content Request Preview</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseIconBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close dialog"
+                    onPress={() => {
+                      setSelectedRequest(null);
+                      setModalError(null);
+                      router.setParams({ postId: '' });
+                    }}
+                  >
+                    <Ionicons name="close" size={20} color={Colors.textPrimary} />
+                  </TouchableOpacity>
+                </View>
 
-      {/* Rejection Popup Modal */}
-      <RejectSuccessModal
-        visible={Boolean(rejectSuccessPost)}
-        role="vpaa"
-        postTitle={rejectSuccessPost?.title || 'Request'}
-        onClose={() => setRejectSuccessPost(null)}
-      />
+                {/* Error Banner */}
+                {modalError && (
+                  <View style={{ backgroundColor: '#FEE2E2', padding: 12, marginHorizontal: 24, marginTop: 16, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="warning" size={20} color="#DC2626" style={{ marginRight: 8 }} />
+                    <Text style={{ color: '#B91C1C', fontSize: 14, fontWeight: '500', flex: 1 }}>{modalError}</Text>
+                    <TouchableOpacity onPress={() => setModalError(null)}>
+                      <Ionicons name="close" size={16} color="#B91C1C" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Modal Body Split */}
+                <ScrollView style={styles.modalBodyScroll} contentContainerStyle={styles.modalBodyContent}>
+                  {(selectedRequest.status === 'REJECTED' || selectedRequest.status === 'RETURNED_FOR_REVISION') && (
+                    <View style={{ marginBottom: 16 }}>
+                      <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444' }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#EF4444', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Rejected by: {selectedRequest.rejectedBy}</Text>
+                        <Text style={{ fontSize: 15, color: '#EF4444', fontWeight: '500' }}>
+                          {selectedRequest.rejectionReason || 'No reason provided.'}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={{ marginBottom: 16 }}>
+                    <View style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.textPrimary }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Approval Tracking</Text>
+                      {(() => {
+                        const workflows = selectedRequest.approval_workflows || [];
+                        const getStageStatus = (stageName: string) => {
+                          const entry = workflows.find((w: any) => w.stage === stageName);
+                          if (entry) {
+                            if (entry.action === 'approved') return 'Approved';
+                            if (entry.action === 'rejected' || entry.action === 'returned_for_revision') return 'Rejected';
+                          }
+                          return 'Pending';
+                        };
+
+                        let deptHead = getStageStatus('office_head');
+                        let vpaa = getStageStatus('vice_president');
+                        let imc = getStageStatus('imc_qa');
+
+                        const isScheduled = selectedRequest.rawStatus === 'scheduled' ||
+                          selectedRequest.status === 'SCHEDULED' ||
+                          (Boolean(selectedRequest.preferred_schedule_at) &&
+                            new Date(selectedRequest.preferred_schedule_at).getTime() > Date.now() &&
+                            selectedRequest.status !== 'PUBLISHED');
+
+                        if (deptHead === 'Rejected') { vpaa = 'Waiting'; imc = 'Waiting'; }
+                        if (vpaa === 'Rejected') { imc = 'Waiting'; }
+                        if (imc === 'Approved') {
+                          imc = isScheduled ? 'Scheduled' : 'Published';
+                        }
+
+                        const getIcon = (state: string) => {
+                          if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
+                          if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return { name: 'checkmark-circle', color: '#059669' };
+                          return { name: 'time', color: Colors.textMuted };
+                        };
+                        const getColor = (state: string) => {
+                          if (state === 'Rejected') return '#DC2626';
+                          if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
+                          return Colors.textMuted;
+                        };
+                        const getLineColor = (state: string) => {
+                          if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
+                          if (state === 'Rejected') return '#DC2626';
+                          return Colors.border;
+                        };
+
+                        return (
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 }}>
+
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(deptHead).name as any} color={getIcon(deptHead).color} size={22} />
+                              <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Dept Head</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: getColor(deptHead), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{deptHead}</Text>
+                            </View>
+
+                            <View style={{ height: 2, backgroundColor: getLineColor(deptHead), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(vpaa).name as any} color={getIcon(vpaa).color} size={22} />
+                              <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>VPAA</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: getColor(vpaa), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{vpaa}</Text>
+                            </View>
+
+                            <View style={{ height: 2, backgroundColor: getLineColor(vpaa), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
+
+                            <View style={{ alignItems: 'center', flex: 1.2 }}>
+                              <Ionicons name={getIcon(imc).name as any} color={getIcon(imc).color} size={22} />
+                              <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 10, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 12 }}>Integrated Marketing Communications</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: getColor(imc), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{imc}</Text>
+                            </View>
+
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  </View>
+
+                  <View style={[styles.modalSplitRow, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                    {/* Left Side: Social Media Mockup Preview */}
+                    <View style={styles.modalLeftColumn}>
+                      {/* Platform Selector Tabs */}
+                      <View style={styles.modalPlatformTabs}>
+                        <TouchableOpacity
+                          style={[
+                            styles.modalPlatformTab,
+                            modalPlatformTab === 'facebook' && styles.modalPlatformTabActive,
+                          ]}
+                          onPress={() => setModalPlatformTab('facebook')}
+                        >
+                          <Ionicons name="logo-facebook" size={14} color={modalPlatformTab === 'facebook' ? '#1877F2' : Colors.textSecondary} />
+                          <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'facebook' && styles.modalPlatformTabTextActive]}>
+                            Facebook
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.modalPlatformTab,
+                            modalPlatformTab === 'instagram' && styles.modalPlatformTabActive,
+                          ]}
+                          onPress={() => setModalPlatformTab('instagram')}
+                        >
+                          <Ionicons name="logo-instagram" size={14} color={modalPlatformTab === 'instagram' ? '#E1306C' : Colors.textSecondary} />
+                          <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActive]}>
+                            Instagram
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.modalPlatformTab,
+                            modalPlatformTab === 'website' && styles.modalPlatformTabActive,
+                          ]}
+                          onPress={() => setModalPlatformTab('website')}
+                        >
+                          <Ionicons name="globe-outline" size={14} color={modalPlatformTab === 'website' ? '#059669' : Colors.textSecondary} />
+                          <Text style={[styles.modalPlatformTabText, modalPlatformTab === 'website' && styles.modalPlatformTabTextActive]}>
+                            Website
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Interactive Mockup Container */}
+                      {(() => {
+                        const rawList = selectedRequest?.media || selectedRequest?.rawPost?.media || [];
+                        const validList = getImageUrisFromMedia(Array.isArray(rawList) ? rawList : []);
+                        const requestMediaImages = validList.length > 0
+                          ? validList
+                          : (selectedRequest?.thumbnailUrl ? [resolveImageUrl(selectedRequest.thumbnailUrl) || selectedRequest.thumbnailUrl] : []);
+
+                        return (
+                          <>
+                            {modalPlatformTab === 'facebook' && (
+                              <View style={styles.socialMockupCard}>
+                                <View style={styles.socialHeader}>
+                                  <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface }]} resizeMode="contain" />
+                                  <View>
+                                    <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
+                                    <Text style={styles.socialTimeText}>Official Department Post &bull; Public</Text>
+                                  </View>
+                                </View>
+
+                                <FormattedText style={styles.socialCaptionText}>{selectedRequest.caption}</FormattedText>
+
+                                {requestMediaImages.length > 0 ? (
+                                  <FacebookMediaGrid
+                                    images={requestMediaImages}
+                                    onImagePress={(uri) => setFullScreenImage(uri)}
+                                  />
+                                ) : (
+                                  <View style={styles.socialMediaBanner}>
+                                    <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                    <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                                  </View>
+                                )}
+
+                                <View style={styles.socialFooterActions}>
+                                  <View style={styles.socialActionBtn}>
+                                    <Ionicons name="thumbs-up-outline" size={14} color={Colors.textSecondary} />
+                                    <Text style={styles.socialActionText}>Like</Text>
+                                  </View>
+                                  <View style={styles.socialActionBtn}>
+                                    <Ionicons name="chatbubble-outline" size={14} color={Colors.textSecondary} />
+                                    <Text style={styles.socialActionText}>Comment</Text>
+                                  </View>
+                                  <View style={styles.socialActionBtn}>
+                                    <Ionicons name="share-social-outline" size={14} color={Colors.textSecondary} />
+                                    <Text style={styles.socialActionText}>Share</Text>
+                                  </View>
+                                </View>
+                              </View>
+                            )}
+
+                            {modalPlatformTab === 'instagram' && (
+                              <View style={styles.socialMockupCard}>
+                                <View style={styles.socialHeader}>
+                                  <Image source={require('../../../assets/images/jmc_logo.png')} style={[styles.socialAvatar, { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 2, borderColor: '#E1306C', width: 34, height: 34 }]} resizeMode="contain" />
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={[styles.socialAuthorName, { fontWeight: 'bold' }]}>Jose Maria College Foundation Inc.</Text>
+                                  </View>
+                                  <Ionicons name="ellipsis-horizontal" size={16} color={Colors.textSecondary} />
+                                </View>
+
+                                {requestMediaImages.length > 0 ? (
+                                  <InstagramMediaCarousel
+                                    images={requestMediaImages}
+                                    onImagePress={(uri) => setFullScreenImage(uri)}
+                                  />
+                                ) : (
+                                  <View style={[styles.socialMediaBanner, { height: 320, borderRadius: 0 }]}>
+                                    <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                    <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                                  </View>
+                                )}
+
+                                <View style={{ padding: 12 }}>
+                                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+                                    <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
+                                    <Ionicons name="chatbubble-outline" size={20} color={Colors.textPrimary} style={{ transform: [{ scaleX: -1 }] }} />
+                                    <Ionicons name="paper-plane-outline" size={20} color={Colors.textPrimary} />
+                                  </View>
+                                  <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: Colors.textPrimary }}>1,234 likes</Text>
+                                  <FormattedText style={styles.socialCaptionText}>{'<b>Jose Maria College Foundation Inc. </b>' + (selectedRequest.caption || '')}</FormattedText>
+                                </View>
+                              </View>
+                            )}
+
+                            {modalPlatformTab === 'website' && (
+                              <View style={[styles.socialMockupCard, { padding: 0, overflow: 'hidden' }]}>
+                                {requestMediaImages.length > 0 ? (
+                                  <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(requestMediaImages[0])}>
+                                    <Image source={{ uri: requestMediaImages[0] }} style={{ width: '100%', height: 200, backgroundColor: '#F9FAFB', borderTopLeftRadius: 8, borderTopRightRadius: 8 }} resizeMode="cover" />
+                                  </TouchableOpacity>
+                                ) : (
+                                  <View style={[styles.socialMediaBanner, { height: 200, borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}>
+                                    <Ionicons name="image-outline" size={36} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }} />
+                                    <Text style={styles.socialMediaBannerText}>{selectedRequest.previewBanner}</Text>
+                                  </View>
+                                )}
+                                <View style={{ padding: 16 }}>
+                                  <Text style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' }}>News & Updates</Text>
+                                  <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12, lineHeight: 28 }}>{selectedRequest.title}</Text>
+                                  <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 16 }}>Published on {selectedRequest.date}</Text>
+                                  <FormattedText style={[styles.socialCaptionText, { fontSize: 14 }]}>{selectedRequest.caption}</FormattedText>
+                                </View>
+                              </View>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </View>
+
+                    {/* Right Side: Request Details Metadata */}
+                    <View style={styles.modalRightColumn}>
+                      <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Title</Text>
+                        <Text style={styles.metaTitleVal}>{selectedRequest.title}</Text>
+                      </View>
+
+                      <View style={styles.metaRowGrid}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Department</Text>
+                          <View style={styles.deptBadge}>
+                            <Text style={styles.deptBadgeText}>{selectedRequest.dept}</Text>
+                          </View>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Category</Text>
+                          <Text style={styles.metaVal}>{selectedRequest.category}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.metaRowGrid}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Requested By</Text>
+                          <Text style={styles.metaVal}>
+                            {selectedRequest.requestedBy} ({selectedRequest.requestedByRole})
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.metaRowGrid}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Requested On</Text>
+                          <Text style={styles.metaVal}>
+                            {selectedRequest.date} {selectedRequest.time}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {selectedRequest.preferred_schedule_at && String(selectedRequest.routing_type || selectedRequest.rawPost?.routing_type || '').toLowerCase() !== 'direct_imc' && selectedRequest.category !== 'Direct to IMC' ? (
+                        <View style={styles.metaRowGrid}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.metaLabel}>Requested to Publish On</Text>
+                            <Text style={styles.metaVal}>
+                              {(() => {
+                                try {
+                                  const d = new Date(selectedRequest.preferred_schedule_at);
+                                  if (isNaN(d.getTime())) return selectedRequest.preferred_schedule_at;
+                                  const datePart = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                                  let hours = d.getHours();
+                                  const ampm = hours >= 12 ? 'PM' : 'AM';
+                                  hours = hours % 12;
+                                  hours = hours ? hours : 12;
+                                  const minutes = d.getMinutes().toString().padStart(2, '0');
+                                  return `${datePart} • ${hours}:${minutes} ${ampm}`;
+                                } catch {
+                                  return selectedRequest.preferred_schedule_at;
+                                }
+                              })()}
+                            </Text>
+                          </View>
+                        </View>
+                      ) : null}
+
+                      {(selectedRequest.status === 'published' || selectedRequest.published_at) && (
+                        <View style={styles.metaRowGrid}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.metaLabel}>Published On</Text>
+                            <Text style={[styles.metaVal, { color: '#059669', fontWeight: '600' }]}>
+                              {(() => {
+                                try {
+                                  const rawDate = selectedRequest.published_at || selectedRequest.updated_at;
+                                  const d = new Date(rawDate);
+                                  if (isNaN(d.getTime())) return String(rawDate);
+                                  const datePart = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                                  let hours = d.getHours();
+                                  const ampm = hours >= 12 ? 'PM' : 'AM';
+                                  hours = hours % 12;
+                                  hours = hours ? hours : 12;
+                                  const minutes = d.getMinutes().toString().padStart(2, '0');
+                                  return `${datePart} • ${hours}:${minutes} ${ampm}`;
+                                } catch {
+                                  return 'Published';
+                                }
+                              })()}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      <View style={styles.metaRowGrid}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.metaLabel}>Target Platforms</Text>
+                          <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                            {selectedRequest.platforms.includes('facebook') && (
+                              <View style={[styles.platformIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                                <Ionicons name="logo-facebook" size={14} color="#1877F2" />
+                              </View>
+                            )}
+                            {selectedRequest.platforms.includes('instagram') && (
+                              <View style={[styles.platformIconCircle, { backgroundColor: '#FDF2F8' }]}>
+                                <Ionicons name="logo-instagram" size={14} color="#E1306C" />
+                              </View>
+                            )}
+                            {(selectedRequest.platforms.includes('website') || selectedRequest.platforms.includes('portal') || selectedRequest.platforms.includes('wordpress')) && (
+                              <View style={[styles.platformIconCircle, { backgroundColor: '#ECFDF5' }]}>
+                                <Ionicons name="globe-outline" size={14} color="#059669" />
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+
+
+                      <View style={styles.metaDivider} />
+
+                      <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Caption / Main Text</Text>
+                        <FormattedText style={styles.metaCaptionBox}>{selectedRequest.caption}</FormattedText>
+                      </View>
+
+                      {/* Attachments Section */}
+                      <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Attachments (1)</Text>
+                        <View style={styles.attachmentCard}>
+                          <View style={styles.attachmentThumb}>
+                            <Ionicons name="document-attach-outline" size={18} color="#7C3AED" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.attachmentName}>{selectedRequest.attachment}</Text>
+                            <Text style={styles.attachmentSize}>{selectedRequest.attachmentSize}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </ScrollView>
+
+                {/* Modal Footer Actions */}
+                <View style={styles.modalFooterRow}>
+                  <TouchableOpacity
+                    style={styles.btnModalClose}
+                    onPress={() => {
+                      setSelectedRequest(null);
+                      setModalError(null);
+                      router.setParams({ postId: '' });
+                    }}
+                  >
+                    <Text style={styles.btnModalCloseText}>Close</Text>
+                  </TouchableOpacity>
+
+                  {activeTab === 'dashboard' && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.btnModalApprove}
+                        onPress={() => handleApprove(selectedRequest)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.btnModalApproveText}>Approve</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.btnModalReject}
+                        onPress={() => handleRejectClick(selectedRequest)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="close-sharp" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.btnModalRejectText}>Reject</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {/* Reject Modal */}
+        {isRejectModalVisible && (
+          <Modal
+            visible={isRejectModalVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setIsRejectModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContainer, { maxWidth: 440 }]}>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={styles.modalHeaderTitle}>Reject Request</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseIconBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close dialog"
+                    onPress={() => setIsRejectModalVisible(false)}
+                  >
+                    <Ionicons name="close" size={20} color={Colors.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView contentContainerStyle={styles.modalBodyContent}>
+                  <Text style={{ fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: 12 }}>
+                    Please provide remarks for rejecting "{requestToReject?.title}".
+                  </Text>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      borderRadius: BorderRadius.md,
+                      padding: 12,
+                      minHeight: 100,
+                      textAlignVertical: 'top',
+                      fontSize: FontSize.sm,
+                      backgroundColor: Colors.background,
+                      color: Colors.textPrimary,
+                    } as any}
+                    accessibilityLabel="Remarks for rejection"
+                    placeholder="Enter remarks for rejection..."
+                    multiline
+                    value={rejectComment}
+                    onChangeText={setRejectComment}
+                  />
+                </ScrollView>
+                <View style={styles.modalFooterRow}>
+                  <TouchableOpacity
+                    style={styles.btnModalClose}
+                    onPress={() => setIsRejectModalVisible(false)}
+                  >
+                    <Text style={styles.btnModalCloseText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.btnModalReject}
+                    onPress={confirmReject}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="close-sharp" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.btnModalRejectText}>Confirm Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {/* Full Screen Image Modal */}
+        {fullScreenImage && (
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={true}
+            onRequestClose={() => setFullScreenImage(null)}
+          >
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+              <TouchableOpacity
+                style={{ position: 'absolute', top: 40, right: 30, zIndex: 10, padding: 10 }}
+                onPress={() => setFullScreenImage(null)}
+              >
+                <Ionicons name="close" size={32} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Image
+                source={{ uri: fullScreenImage }}
+                style={{ width: '90%', height: '90%' }}
+                resizeMode="contain"
+              />
+            </View>
+          </Modal>
+        )}
+
+        {/* Approval Success Popup Modal */}
+        <ApprovalSuccessModal
+          visible={Boolean(approvalSuccessPost)}
+          role="vice_president"
+          postTitle={approvalSuccessPost?.title || 'Request'}
+          onClose={() => setApprovalSuccessPost(null)}
+        />
+
+        {/* Rejection Popup Modal */}
+        <RejectSuccessModal
+          visible={Boolean(rejectSuccessPost)}
+          role="vpaa"
+          postTitle={rejectSuccessPost?.title || 'Request'}
+          onClose={() => setRejectSuccessPost(null)}
+        />
+      </View>
     </DashboardShell>
   );
 }
 
 const styles = StyleSheet.create({
+  ...dashboardStyles,
   // Outer Container
-  dashboardContainer: {
-    gap: Spacing.lg,
-  },
+  dashboardContainer: { ...dashboardStyles.workspace },
 
   // Header & Greeting
-  dashboardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  greetingTitle: {
-    fontSize: FontSize.xl + 2,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    lineHeight: 28,
-    marginBottom: 4,
-  },
-  greetingSubtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
+  dashboardHeaderRow: { ...dashboardStyles.pageHeader },
+  greetingTitle: { ...dashboardStyles.pageTitle },
+  greetingSubtitle: { ...dashboardStyles.subtitle },
 
   // Department Dropdown
-  departmentDropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  departmentDropdownText: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-  },
+  departmentDropdown: { ...dashboardStyles.control },
+  departmentDropdownText: { ...dashboardStyles.controlText },
   dropdownMenu: {
     position: 'absolute',
-    top: 42,
+    top: dashboardUi.controlHeight + Spacing.xs,
     right: 0,
     minWidth: 240,
     backgroundColor: Colors.surface,
@@ -1569,6 +1671,8 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   dropdownItem: {
+    minHeight: dashboardUi.controlHeight,
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -1580,20 +1684,24 @@ const styles = StyleSheet.create({
   },
 
   // Metrics Grid (4 Cards)
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
+  metricsGrid: { ...dashboardStyles.metrics, width: '100%' },
+  metricCardWrapper: {
+    minWidth: 0,
+    marginBottom: Spacing.sm,
+    ...(Platform.OS === 'web' ? ({ boxSizing: 'border-box' } as any) : {}),
   },
-  metricCard: {
-    padding: 12,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    minHeight: 125,
-    justifyContent: 'space-between',
+  metricCardWide: {
+    flex: 1,
+    minWidth: 0,
   },
+  metricCardCompact: {
+    width: '48%',
+    flexGrow: 1,
+  },
+  metricCardNarrow: {
+    width: '100%',
+  },
+  metricCard: { ...dashboardStyles.metricCard },
   metricCardHeader: {
     marginBottom: 4,
   },
@@ -1604,173 +1712,81 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  metricLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    textTransform: 'uppercase',
-  },
-  metricCount: {
-    fontSize: FontSize.xxl + 4,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    marginVertical: 2,
-  },
-  metricSubtext: {
-    fontSize: FontSize.xs - 1,
-    color: Colors.textMuted,
-  },
+  metricLabel: { ...dashboardStyles.metricLabel },
+  metricCount: { ...dashboardStyles.metricValue },
+  metricSubtext: { ...dashboardStyles.metricHint },
 
   // Main Table Card
-  tableCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.background,
-  },
-  tableCardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-    zIndex: 100,
-  },
-  tableTitle: {
-    fontSize: FontSize.md + 1,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  tableControlsRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 10,
-    height: 36,
-    width: 200,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: FontSize.xs + 1,
-    color: Colors.textPrimary,
-    outlineStyle: 'none',
-  } as any,
-  filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 12,
-    height: 36,
-  },
-  filterBtnText: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-  },
+  tableCard: { ...dashboardStyles.panel },
+  tableCardHeaderRow: { ...dashboardStyles.panelHeader },
+  tableTitle: { ...dashboardStyles.panelTitle },
+  tableControlsRight: { ...dashboardStyles.toolbar },
+  searchBox: { ...dashboardStyles.search },
+  searchInput: { ...dashboardStyles.searchInput },
+  filterBtn: { ...dashboardStyles.control },
+  filterBtnText: { ...dashboardStyles.controlText },
 
   // Table Layout
   table: {
     width: '100%',
+    minWidth: 1040,
   },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: '#F9FAFB',
-    borderRadius: BorderRadius.sm,
-  },
-  tableHeaderCell: {
-    fontSize: FontSize.xs - 1,
-    fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
-    paddingRight: 16,
-  },
+  tableHeaderRow: { ...dashboardStyles.tableHeader },
+  tableHeaderCell: { ...dashboardStyles.columnHeading, paddingRight: Spacing.md },
 
   // Column Flex Multipliers & Min-Widths to Prevent Overlap
   flexTitle: { flex: 2.2, minWidth: 200 },
-  flexDept: { flex: 2.5, minWidth: 220 },
+  flexDept: { flex: 2.5, minWidth: 190 },
   flexUser: { flex: 1.8, minWidth: 140 },
-  flexDate: { flex: 1.2, minWidth: 110 },
+  flexDate: { flex: 1.2, minWidth: 120 },
   flexPlatforms: { flex: 1, minWidth: 90 },
-  flexActions: { flex: 1.5, minWidth: 150 },
+  flexActions: { flex: 1.5, minWidth: 175 },
   alignRight: { textAlign: 'right' },
+  alignCenter: { textAlign: 'center' },
 
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.background,
-  },
+  tableRow: { ...dashboardStyles.tableRow },
   cellContainer: {
+    minWidth: 0,
     justifyContent: 'center',
     paddingRight: 16,
   },
   thumbnailBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: Colors.background,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
+    overflow: 'hidden',
+    flexShrink: 0,
   },
-  rowTitleText: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  categoryPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.background,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 3,
-  },
-  categoryPillText: {
-    fontSize: 10,
-    fontWeight: FontWeight.medium,
-    color: '#4B5563',
-  },
-  rowDeptText: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.bold,
-    color: '#4B5563',
-    lineHeight: 18,
-  },
-  rowUserName: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
+  rowTitleText: { ...dashboardStyles.cellText, fontSize: 14, lineHeight: 20, fontWeight: FontWeight.semiBold },
+  categoryPill: { ...dashboardStyles.statusPill, backgroundColor: Colors.background, marginTop: Spacing.xs },
+  categoryPillText: { ...dashboardStyles.statusText, color: Colors.textSecondary },
+  rowDeptText: { ...dashboardStyles.cellText },
+  rowUserName: { ...dashboardStyles.cellText, fontWeight: FontWeight.medium },
   rowUserRole: {
-    fontSize: FontSize.xs - 1,
+    fontSize: FontSize.xs,
+    lineHeight: 16,
     color: Colors.textSecondary,
   },
-  rowDateText: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-  },
+  rowDateText: { ...dashboardStyles.cellText },
   rowTimeText: {
-    fontSize: FontSize.xs - 1,
+    fontSize: FontSize.xs,
+    lineHeight: 16,
     color: Colors.textMuted,
+  },
+  platformRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  platformRowLabel: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '400',
+    color: '#475569',
   },
   platformIconCircle: {
     width: 24,
@@ -1782,54 +1798,179 @@ const styles = StyleSheet.create({
 
   // Row Action Buttons
   rowActionsGroup: {
+    flexWrap: 'nowrap',
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 6,
   },
   btnViewRow: {
+    minHeight: 30,
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#D1D5DB',
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   btnViewRowText: {
-    fontSize: 11,
-    fontWeight: FontWeight.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: FontWeight.semiBold,
     color: Colors.textPrimary,
   },
   btnApproveRow: {
+    height: 24,
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    backgroundColor: '#F0FDF4',
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#4D007D',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#4D007D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 5px rgba(77, 0, 125, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+      } as any)
+      : {}),
   },
   btnApproveRowText: {
     fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: '#15803D',
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   btnRejectRow: {
+    height: 24,
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#D91E28',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#D91E28',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 5px rgba(217, 30, 40, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+      } as any)
+      : {}),
   },
   btnRejectRowText: {
     fontSize: 11,
-    fontWeight: FontWeight.bold,
-    color: '#B91C1C',
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+
+  // 3D Status Badges (matching action pills)
+  badgePillApproved: {
+    height: 24,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 5px rgba(5, 150, 105, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+      } as any)
+      : {}),
+  },
+  badgePillRejected: {
+    height: 24,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D91E28',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#D91E28',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 5px rgba(217, 30, 40, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+      } as any)
+      : {}),
+  },
+  badgePillRevision: {
+    height: 24,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D97706',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 5px rgba(217, 119, 6, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+      } as any)
+      : {}),
+  },
+  badgePillPending: {
+    height: 24,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#475569',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    shadowColor: '#475569',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 5px rgba(71, 85, 105, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+      } as any)
+      : {}),
+  },
+  badgePillText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
 
   // Table Footer
@@ -1895,49 +2036,15 @@ const styles = StyleSheet.create({
   },
 
   // Modal Overlay & Container
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  modalContainer: {
-    width: '100%',
-    maxWidth: 780,
-    maxHeight: '90%',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.background,
-  },
-  modalHeaderTitle: {
-    fontSize: FontSize.md + 1,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  modalCloseIconBtn: {
-    padding: 4,
-  },
+  modalOverlay: { ...dashboardStyles.modalBackdrop },
+  modalContainer: { ...dashboardStyles.modalCard },
+  modalHeaderRow: { ...dashboardStyles.modalHeader },
+  modalHeaderTitle: { ...dashboardStyles.modalTitle },
+  modalCloseIconBtn: { ...dashboardStyles.secondaryButton, minHeight: 34, width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0 },
   modalBodyScroll: {
-    maxHeight: 520,
+    flexShrink: 1,
   },
-  modalBodyContent: {
-    padding: Spacing.lg,
-  },
+  modalBodyContent: { ...dashboardStyles.modalBody },
 
   // Layout Splits
   splitLayout: {
@@ -1954,20 +2061,25 @@ const styles = StyleSheet.create({
     gap: Spacing.xl,
   },
   modalLeftColumn: {
+    minWidth: 0,
     flex: 1.2,
   },
   modalRightColumn: {
+    minWidth: 0,
     flex: 1,
     gap: 10,
   },
 
   // Social Media Mockup
   modalPlatformTabs: {
+    flexWrap: 'wrap',
     flexDirection: 'row',
     gap: 8,
     marginBottom: Spacing.md,
   },
   modalPlatformTab: {
+    minHeight: dashboardUi.controlHeight,
+    justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -2143,33 +2255,37 @@ const styles = StyleSheet.create({
   },
 
   // Modal Footer (4 Action Buttons)
-  modalFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.background,
-    backgroundColor: '#FAFAFA',
-  },
+  modalFooterRow: { ...dashboardStyles.modalFooter },
   btnModalClose: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.md,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+        transition: 'all 120ms ease',
+      } as any)
+      : {}),
   },
   btnModalCloseText: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#374151',
   },
   btnModalRevision: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: '#FDE68A',
@@ -2177,34 +2293,67 @@ const styles = StyleSheet.create({
   },
   btnModalRevisionText: {
     fontSize: FontSize.xs + 1,
+    lineHeight: 18,
     fontWeight: FontWeight.bold,
     color: '#B45309',
   },
   btnModalApprove: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    backgroundColor: '#ECFDF5',
+    minHeight: 36,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#4D007D',
+    shadowColor: '#4D007D',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 3px 8px rgba(77, 0, 125, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+      } as any)
+      : {}),
   },
   btnModalApproveText: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.bold,
-    color: '#047857',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
   btnModalReject: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
+    minHeight: 36,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#D91E28',
+    shadowColor: '#D91E28',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 3px 8px rgba(217, 34, 42, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+      } as any)
+      : {}),
   },
   btnModalRejectText: {
-    fontSize: FontSize.xs + 1,
-    fontWeight: FontWeight.bold,
-    color: '#B91C1C',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 
   // Policy Styles
@@ -2297,6 +2446,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   profilePicButtonsRow: {
+    flexWrap: 'wrap',
     flexDirection: 'row',
     gap: 10,
     marginTop: 6,
@@ -2304,8 +2454,8 @@ const styles = StyleSheet.create({
   profilePicUploadBtn: {
     backgroundColor: '#FFC72C',
     paddingHorizontal: 12,
-    height: 28,
-    borderRadius: 4,
+    minHeight: dashboardUi.controlHeight,
+    borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2318,8 +2468,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#DC2626',
     paddingHorizontal: 12,
-    height: 28,
-    borderRadius: 4,
+    minHeight: dashboardUi.controlHeight,
+    borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2332,20 +2482,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 6,
   },
-  inputLabel: {
-    fontSize: 10,
-    fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 4,
-    height: 36,
-    paddingHorizontal: 12,
-    fontSize: FontSize.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-  },
+  inputLabel: { ...dashboardStyles.label },
+  textInput: { ...dashboardStyles.input },
 });

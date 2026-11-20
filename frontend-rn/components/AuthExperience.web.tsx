@@ -6,7 +6,7 @@ import { characterStyles } from './postflowCharacterStyles';
 import type { AuthExperienceProps } from './AuthExperience.types';
 
 const INTRO_KEY = 'postflow_welcome_seen_v11';
-const INTRO_DURATION = 3500;
+const INTRO_DURATION = 2600;
 const TRANSITION_DURATION = 950;
 
 function shouldShowIntro() {
@@ -33,6 +33,7 @@ export default function AuthExperience({ children, departing = false, onDepartur
   const root = useRef<HTMLDivElement>(null);
   const loginPanel = useRef<HTMLElement>(null);
   const cargo = useRef<HTMLDivElement>(null);
+  const finishRef = useRef<() => void>(() => {});
 
   // The same mounted actor starts at the hero slot and docks into its own
   // login slot. No body artwork is replaced or crossfaded at the handoff.
@@ -159,11 +160,13 @@ export default function AuthExperience({ children, departing = false, onDepartur
         setLeaving(false);
       }, media.matches ? 0 : TRANSITION_DURATION);
     }
+    finishRef.current = finish;
     const timer = setTimeout(finish, INTRO_DURATION);
     const change = () => { if (media.matches) finish(); };
     media.addEventListener('change', change);
     change();
     return () => {
+      finishRef.current = () => {};
       clearTimeout(timer);
       if (finishTimer) clearTimeout(finishTimer);
       media.removeEventListener('change', change);
@@ -207,7 +210,7 @@ export default function AuthExperience({ children, departing = false, onDepartur
       </main>
     </div>
     {departing && <p className="pfa-sign-in-status" role="status" aria-live="polite">Sign-in successful.</p>}
-    {intro && <section className={`pfa-intro ${leaving ? 'pfa-intro-leaving' : ''}`} aria-label="Welcome to JMCFI PostFlow">
+    {intro && <section className={`pfa-intro ${leaving ? 'pfa-intro-leaving' : ''}`} aria-label="Welcome to JMCFI PostFlow" onClick={() => finishRef.current?.()} style={{ cursor: 'pointer' }}>
       <div className="pfa-intro-backdrop"/>
       <header className="pfa-topbar"><Mark/></header>
       <div className="pfa-intro-center">

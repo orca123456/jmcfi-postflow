@@ -34,27 +34,16 @@ export default function ApprovalScreen() {
 
   const handleReject = async () => {
     if (!notes.trim()) {
-      Alert.alert('Notes Required', 'Please provide a reason for rejection.');
+      Alert.alert('Remarks Required', 'Please provide remarks for rejection.');
       return;
     }
     setLoading(true);
     try {
-      await postsApi.reject(Number(id), { notes });
-      Alert.alert('Rejected', 'Post has been rejected.');
+      await postsApi.reject(Number(id), { reason: notes, remarks: notes });
+      Alert.alert('Rejected', 'Post has been rejected with your remarks.');
       router.back();
     } catch (e: any) {
       Alert.alert('Error', e.response?.data?.message ?? 'Rejection failed.');
-    } finally { setLoading(false); }
-  };
-
-  const handleReturnRevision = async () => {
-    setLoading(true);
-    try {
-      await postsApi.returnRevision(Number(id), { notes });
-      Alert.alert('Returned', 'Post returned to requestor for revision.');
-      router.back();
-    } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.message ?? 'Failed to return.');
     } finally { setLoading(false); }
   };
 
@@ -79,12 +68,12 @@ export default function ApprovalScreen() {
         )}
 
         <Card style={{ gap: Spacing.sm }}>
-          <Text style={styles.label}>REVIEW NOTES</Text>
+          <Text style={styles.label}>REMARKS</Text>
           <TextInput
             style={styles.textarea}
             value={notes}
             onChangeText={setNotes}
-            placeholder="Add notes for approval or rejection..."
+            placeholder="Add remarks for approval or rejection..."
             multiline
             numberOfLines={4}
             textAlignVertical="top"
@@ -101,21 +90,14 @@ export default function ApprovalScreen() {
             icon={<Ionicons name="checkmark-circle-outline" size={16} color="#fff" />}
           />
           <Button
-            title="Return"
-            onPress={handleReturnRevision}
+            title="Reject"
+            onPress={handleReject}
             loading={loading}
-            variant="secondary"
+            variant="danger"
             style={{ flex: 1 }}
-            icon={<Ionicons name="return-down-back-outline" size={16} color={Colors.textPrimary} />}
+            icon={<Ionicons name="close-circle-outline" size={16} color="#fff" />}
           />
         </View>
-        <Button
-          title="Reject Post"
-          onPress={handleReject}
-          loading={loading}
-          variant="danger"
-          icon={<Ionicons name="close-circle-outline" size={16} color="#fff" />}
-        />
       </ScrollView>
     </SafeAreaView>
   );

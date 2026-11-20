@@ -198,9 +198,9 @@ export default function LoginScreen() {
         if (intended) {
           pendingDestination.current = intended;
         } else if (targetPostId) {
-          pendingDestination.current = `${getRoleDashboardPath(user.role)}?postId=${targetPostId}`;
+          pendingDestination.current = `${getRoleDashboardPath(user.role, user.department)}?postId=${targetPostId}`;
         } else {
-          pendingDestination.current = getRoleDashboardPath(user.role);
+          pendingDestination.current = getRoleDashboardPath(user.role, user.department);
         }
         queueAssistantWelcome(user.id);
         setDeparting(true);

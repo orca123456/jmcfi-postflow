@@ -6,63 +6,117 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  ScrollView,
   Image,
-  Platform,
+  ScrollView,
   useWindowDimensions,
+  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
-import { resolveImageUrl, postsApi } from '../../services/api';
-import { FacebookMediaGrid } from '../social/FacebookMediaGrid';
+import RenderHtml from 'react-native-render-html';
+import { postsApi, resolveImageUrl } from '../../services/api';
+import { useThemeStore } from '../../store/theme';
+import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { dashboardStyles, dashboardUi } from '../ui/dashboardDesign';
+import { FacebookMediaGrid, isImageMedia } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
-import { FormattedText } from '../ui/FormattedText';
+
+const BRAND_PURPLE = '#4C007C';
+
+export interface FinalUploadedImage {
+  uri: string;
+  name: string;
+  file?: any;
+}
+
+export interface Photo {
+  uri: string;
+  name: string;
+}
+
+export const isDirectImcRequest = (request: any): boolean =>
+  String(
+    request?.routing_type ?? request?.routingType ??
+    request?.rawPost?.routing_type ?? request?.rawPost?.routingType ?? ''
+  ).trim().toLowerCase() === 'direct_imc';
 
 export interface PublicationReviewModalProps {
   visible: boolean;
-  request: any | null;
+  request: any;
   onClose: () => void;
-  onPublish: (req: any, payload: { finalCaption: string; replacementFiles: any[] }) => Promise<void> | void;
-  onReject: (req: any) => void;
-  onSaveChanges?: (req: any, payload: { finalCaption: string; replacementFiles: any[] }) => Promise<void> | void;
-  onOpenFullScreenImage?: (url: string) => void;
+  onPublish: (finalCaption: string, finalImages: FinalUploadedImage[]) => Promise<void> | void;
+  onReject: (request: any) => void;
+  onDraftSaved?: (savedPost?: any) => void;
+  isPublishing?: boolean;
 }
 
-interface ReplacementImageItem {
-  uri: string;
-  name: string;
-  size: number;
-  mimeType: string;
-  file?: File | Blob;
+const textValue = (value: any): string => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+  return value && typeof value === 'object'
+    ? textValue(value.full_name ?? value.name ?? value.title ?? value.label)
+    : '';
+};
+
+const formatDate = (value: any): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+};
+
+const photosFrom = (media: any): Photo[] => Array.isArray(media)
+  ? media.filter(isImageMedia).flatMap((item: any) => {
+    const path = item.url || item.file_url || item.uri || item.file_path;
+    const uri = resolveImageUrl(path) || path;
+    if (typeof uri !== 'string' || !uri.trim()) return [];
+    let name = textValue(item.original_filename || item.original_name || item.filename || item.name);
+    if (!name) {
+      try { name = decodeURIComponent(uri.split('?')[0].split('/').pop() || ''); } catch { /* fallback */ }
+    }
+    return [{ uri, name: name || 'Image attachment' }];
+  }) : [];
+
+const platformsFrom = (raw: any): { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }[] => {
+  const result: { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }[] = [];
+  const add = (label: string, icon: keyof typeof Ionicons.glyphMap, color: string, bg: string) => {
+    if (!result.some((p) => p.label === label)) result.push({ label, icon, color, bg });
+  };
+  const list = raw?.platforms ?? raw?.target_platforms ?? raw?.targetPlatforms ?? [];
+  const arr = Array.isArray(list) ? list : typeof list === 'string' ? list.split(',').map((s: string) => s.trim()) : [];
+  arr.forEach((p: any) => {
+    const text = (typeof p === 'string' ? p : p?.name ?? p?.platform ?? p?.platform_name ?? '').toLowerCase();
+    if (text.includes('facebook') || text.includes('fb')) add('Facebook', 'logo-facebook', '#1877F2', '#EFF6FF');
+    if (text.includes('instagram') || text.includes('ig')) add('Instagram', 'logo-instagram', '#E1306C', '#FDF2F8');
+    if (text.includes('web') || text.includes('site') || text.includes('portal')) add('Website', 'globe-outline', '#059669', '#ECFDF5');
+  });
+  if (result.length === 0) {
+    if (Boolean(raw?.target_facebook ?? raw?.post_to_facebook)) add('Facebook', 'logo-facebook', '#1877F2', '#EFF6FF');
+    if (Boolean(raw?.target_instagram ?? raw?.post_to_instagram)) add('Instagram', 'logo-instagram', '#E1306C', '#FDF2F8');
+    if (Boolean(raw?.target_website ?? raw?.post_to_website)) add('Website', 'globe-outline', '#059669', '#ECFDF5');
+  }
+  return result.length > 0 ? result : [
+    { label: 'Facebook', icon: 'logo-facebook', color: '#1877F2', bg: '#EFF6FF' },
+    { label: 'Instagram', icon: 'logo-instagram', color: '#E1306C', bg: '#FDF2F8' },
+    { label: 'Website', icon: 'globe-outline', color: '#059669', bg: '#ECFDF5' },
+  ];
+};
+
+function RenderedCaption({ value, dark }: { value: string; dark: boolean }) {
+  const [width, setWidth] = useState(0);
+  if (!value) return null;
+  return (
+    <View style={styles.captionWrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {width > 0 && <RenderHtml
+        contentWidth={width}
+        source={{ html: value.includes('<') ? value : value.replace(/&/g, '&amp;').replace(/\n/g, '<br />') }}
+        baseStyle={{ color: dark ? '#F1F5F9' : Colors.textPrimary, fontSize: 13, lineHeight: 19 }}
+        tagsStyles={{ p: { marginTop: 0, marginBottom: 6 }, body: { margin: 0 }, img: { maxWidth: '100%' } }}
+        defaultTextProps={{ selectable: true, style: Platform.OS === 'web' ? { overflowWrap: 'anywhere' } as any : undefined }}
+      />}
+    </View>
+  );
 }
-
-const stripHtmlTags = (html: string): string => {
-  if (!html) return '';
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .trim();
-};
-
-const formatFileSize = (bytes: number): string => {
-  if (!bytes || bytes <= 0) return '0 KB';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const formatDisplayDate = (rawDate: any): string => {
-  if (!rawDate) return '';
-  const d = new Date(rawDate);
-  if (isNaN(d.getTime())) return String(rawDate);
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-};
 
 export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   visible,
@@ -70,1637 +124,2342 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   onClose,
   onPublish,
   onReject,
-  onSaveChanges,
-  onOpenFullScreenImage,
+  onDraftSaved,
+  isPublishing = false,
 }) => {
-  const { width } = useWindowDimensions();
-  const isTwoColumn = width >= 880;
+  const { width, height } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const isDesktop = width >= 1024;
+  const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
-  const [finalCaption, setFinalCaption] = useState('');
-  const [activeOrigIndex, setActiveOrigIndex] = useState(0);
-  const [replacementFiles, setReplacementFiles] = useState<ReplacementImageItem[]>([]);
+  // Form states
+  const [finalCaption, setFinalCaption] = useState<string>('');
+  const [carouselIndex, setCarouselIndex] = useState<number>(0);
+  const [finalImages, setFinalImages] = useState<FinalUploadedImage[]>([]);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [previewPlatform, setPreviewPlatform] = useState<'facebook' | 'instagram' | 'website'>('facebook');
-  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [isSavingChanges, setIsSavingChanges] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
+  const [websiteActiveIndex, setWebsiteActiveIndex] = useState(0);
+  const [lightbox, setLightbox] = useState<{ photos: Photo[]; index: number } | null>(null);
+  const [lightboxFailed, setLightboxFailed] = useState(false);
+  const [activeMediaFailed, setActiveMediaFailed] = useState(false);
+  const [activeMediaLoading, setActiveMediaLoading] = useState(true);
 
-  // Extract original media items with resolved URLs
-  const originalMedia = useMemo(() => {
-    const sourceMedia =
-      Array.isArray(request?.imc_branding_checklist?.original_media) &&
-      request.imc_branding_checklist.original_media.length > 0
-        ? request.imc_branding_checklist.original_media
-        : request?.media;
-    if (!request || !Array.isArray(sourceMedia)) return [];
-    return sourceMedia
-      .filter((m: any) => {
-        const type = String(m?.type || m?.mime_type || '').toLowerCase();
-        return !type || type === 'image' || type.startsWith('image/');
-      })
-      .map((m: any, idx: number) => {
-        const rawName = m.original_name || m.original_filename || m.name || `photo-${idx + 1}.jpg`;
-        const hasExt = /\.[a-z0-9]{3,4}$/i.test(rawName);
-        const name = hasExt ? rawName : `${rawName}.jpg`;
-        const rawUrl = m.url || m.file_url || m.file_path || '';
-        const url = resolveImageUrl(rawUrl) || '';
-        return {
-          id: m.id || idx,
-          url,
-          rawUrl,
-          name,
-          size: m.size || m.file_size || 0,
-        };
-      })
-      .filter((m: any) => Boolean(m.url));
-  }, [request]);
-
-  // Extract replacement final media items if IMC uploaded edited photos
-  const finalPublishedMedia = useMemo(() => {
-    const checklist = request?.imc_branding_checklist;
-    const source =
-      Array.isArray(checklist?.final_media) && checklist.final_media.length > 0
-        ? checklist.final_media
-        : checklist?.has_replacement_media && Array.isArray(request?.media)
-        ? request.media
-        : [];
-    if (!Array.isArray(source)) return [];
-    return source
-      .map((m: any, idx: number) => ({
-        id: m.id || idx,
-        url: resolveImageUrl(m.url || m.file_url || m.file_path) || '',
-        name: m.original_filename || m.name || `final-${idx + 1}.jpg`,
-        size: m.size || 0,
-      }))
-      .filter((m: any) => Boolean(m.url));
-  }, [request]);
-
-  // Normalized target platforms
-  const targetPlatforms = useMemo(() => {
-    if (!request) return ['facebook'];
-    const raw = request.platforms || request.target_platforms || [];
-    if (!Array.isArray(raw) || raw.length === 0) return ['facebook'];
-    return raw.map((p: string) => {
-      const lp = String(p).toLowerCase();
-      if (lp === 'portal' || lp === 'wp' || lp === 'wordpress') return 'website';
-      return lp;
-    });
-  }, [request]);
-
-  // Reset modal state whenever a new request is opened
-  useEffect(() => {
-    if (visible && request) {
-      const cleanCaption = stripHtmlTags(
-        request.imc_branding_checklist?.refined_caption ||
-          request.caption ||
-          request.caption_narrative ||
-          ''
-      );
-      setFinalCaption(cleanCaption);
-      setActiveOrigIndex(0);
-      setReplacementFiles([]);
-      setIsPublishing(false);
-      setIsSavingChanges(false);
-      setPreviewDevice('mobile');
-      if (targetPlatforms.includes('facebook')) setPreviewPlatform('facebook');
-      else if (targetPlatforms.includes('instagram')) setPreviewPlatform('instagram');
-      else if (targetPlatforms.includes('website')) setPreviewPlatform('website');
-      else setPreviewPlatform('facebook');
+  const openLightbox = (photo: Photo | null, allPhotos?: Photo[], initialIndex?: number) => {
+    if (!photo) {
+      setLightbox(null);
+      return;
     }
-  }, [visible, request?.id]);
+    const list = allPhotos && allPhotos.length > 0 ? allPhotos : [photo];
+    const idx = initialIndex !== undefined && initialIndex >= 0
+      ? initialIndex
+      : Math.max(0, list.findIndex((p) => p.uri === photo.uri));
+    setLightbox({ photos: list, index: idx });
+    setLightboxFailed(false);
+  };
 
-  const isPending = (() => {
-    const s = String(request?.status || request?.rawStatus || '').toUpperCase();
-    return s === 'PENDING' || s === 'PENDING_IMC_QA' || s === 'PENDING_OFFICE_HEAD' || s === 'PENDING_VICE_PRESIDENT' || s === 'PENDING_PRESIDENT';
-  })();
+  const handleLightboxPrev = () => {
+    if (!lightbox || lightbox.photos.length <= 1) return;
+    const newIndex = lightbox.index > 0 ? lightbox.index - 1 : lightbox.photos.length - 1;
+    setLightbox({ photos: lightbox.photos, index: newIndex });
+    setLightboxFailed(false);
+  };
 
-  const submittedDateText = formatDisplayDate(request?.created_at || request?.rawDate || request?.date);
-  const deptName = request?.dept || request?.requestor?.department || request?.other_category_name || 'Department';
-  const requestorName = request?.requestedBy || request?.requestor?.full_name || 'Requestor';
-  const photoCountLabel =
-    originalMedia.length === 0
-      ? 'Text only'
-      : originalMedia.length === 1
-      ? '1 photo'
-      : `${originalMedia.length} photos`;
+  const handleLightboxNext = () => {
+    if (!lightbox || lightbox.photos.length <= 1) return;
+    const newIndex = lightbox.index < lightbox.photos.length - 1 ? lightbox.index + 1 : 0;
+    setLightbox({ photos: lightbox.photos, index: newIndex });
+    setLightboxFailed(false);
+  };
 
-  const additionalInstructions =
-    request?.remarks ||
-    request?.additional_instructions ||
-    (request?.preferred_schedule_at ? `Preferred Schedule: ${formatDisplayDate(request?.preferred_schedule_at)}` : '');
+  const currentLightboxPhoto = lightbox ? (lightbox.photos[lightbox.index] || lightbox.photos[0]) : null;
 
-  // Active preview media (uses final uploaded images if any, otherwise published finals or originals)
-  const previewMediaList =
-    replacementFiles.length > 0
-      ? replacementFiles.map((f, i) => ({ id: `rep-${i}`, url: f.uri, name: f.name }))
-      : finalPublishedMedia.length > 0
-      ? finalPublishedMedia
-      : originalMedia;
+  const raw = request?.rawPost || request || {};
 
-  const handleBrowseFiles = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        type: ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'],
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
-      if (!res.canceled && res.assets && res.assets.length > 0) {
-        const picked: ReplacementImageItem[] = res.assets
-          .slice(0, Math.max(0, 10 - replacementFiles.length))
-          .map((asset) => ({
-            uri: asset.uri,
-            name: asset.name || 'edited-image.jpg',
-            size: asset.size || 0,
-            mimeType: asset.mimeType || 'image/jpeg',
-            file: (asset as any).file,
-          }));
-        setReplacementFiles((prev) => [...prev, ...picked].slice(0, 10));
+  // Extract submitted photos
+  const submittedPhotos = useMemo<Photo[]>(() => {
+    if (!request) return [];
+    const snapshot = raw.submitted_materials || request.submitted_materials;
+    const hasSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot);
+    const media = hasSnapshot && Array.isArray(snapshot.media) && snapshot.media.length > 0
+      ? snapshot.media
+      : (raw.media || request.media || []);
+    const list = photosFrom(media);
+    if (list.length > 0) return list;
+    if (request.thumbnailUrl) {
+      const uri = resolveImageUrl(request.thumbnailUrl) || request.thumbnailUrl;
+      return [{ uri, name: 'Attachment 1' }];
+    }
+    if (request.featured_image) {
+      const uri = resolveImageUrl(request.featured_image) || request.featured_image;
+      return [{ uri, name: 'Attachment 1' }];
+    }
+    return [];
+  }, [request, raw]);
+
+  // Original caption as submitted by requestor
+  const originalCaption = useMemo(() => {
+    if (!request) return '';
+    const snapshot = raw.submitted_materials || request.submitted_materials;
+    const hasSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot);
+    if (hasSnapshot && snapshot.caption_narrative) {
+      return textValue(snapshot.caption_narrative);
+    }
+    return textValue(
+      raw.original_caption || raw.caption || raw.caption_narrative ||
+      request.original_caption || request.caption || request.caption_narrative || ''
+    );
+  }, [request, raw]);
+
+  // Initialize or reset form whenever request changes
+  useEffect(() => {
+    if (request) {
+      const initialCaption = raw.caption_narrative || raw.caption || request.caption || request.caption_narrative || '';
+      setFinalCaption(initialCaption);
+      setCarouselIndex(0);
+      const snapshot = raw.submitted_materials || request.submitted_materials;
+      const hasSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot);
+      const activeMedia = raw.media || request.media || [];
+      if (hasSnapshot && Array.isArray(activeMedia) && activeMedia.length > 0) {
+        setFinalImages(activeMedia.map((m: any, idx: number) => ({
+          uri: resolveImageUrl(m.url || m.file_path) || m.url || m.file_path,
+          name: m.original_filename || m.original_name || `Replacement Photo ${idx + 1}`,
+        })));
+      } else {
+        setFinalImages([]);
       }
-    } catch {
-      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = true;
-        input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
-        input.onchange = (e: any) => {
-          const files = Array.from(e.target.files || []) as File[];
-          const picked: ReplacementImageItem[] = files
-            .filter((f) => f.size <= 15 * 1024 * 1024)
-            .slice(0, Math.max(0, 10 - replacementFiles.length))
-            .map((f) => ({
-              uri: URL.createObjectURL(f),
-              name: f.name,
-              size: f.size,
-              mimeType: f.type || 'image/jpeg',
-              file: f,
-            }));
-          setReplacementFiles((prev) => [...prev, ...picked].slice(0, 10));
-        };
-        input.click();
+      setLightbox(null);
+      setPreviewPlatform('facebook');
+      setWebsiteActiveIndex(0);
+      setActiveMediaFailed(false);
+      setActiveMediaLoading(true);
+
+      if (visible && request.id) {
+        // Form initialized for review
       }
+    }
+  }, [request?.id, visible]);
+
+  useEffect(() => {
+    setActiveMediaFailed(false);
+    setActiveMediaLoading(true);
+  }, [carouselIndex, submittedPhotos]);
+
+  useEffect(() => {
+    setLightboxFailed(false);
+  }, [currentLightboxPhoto?.uri]);
+
+  // Handle keyboard navigation on web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (lightbox) {
+          setLightbox(null);
+        } else {
+          onClose();
+        }
+      } else if (lightbox && lightbox.photos.length > 1) {
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          handleLightboxPrev();
+        } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          handleLightboxNext();
+        }
+      }
+    };
+    window.addEventListener('keyup', onKey, true);
+    return () => window.removeEventListener('keyup', onKey, true);
+  }, [visible, lightbox, onClose]);
+
+  const photoCount = submittedPhotos.length;
+
+  const formattedSubmittedDate = useMemo(() => {
+    if (!request) return '';
+    const dateVal = raw.submitted_at || raw.created_at || raw.rawDate || request.created_at || request.date;
+    return formatDate(dateVal) || 'Nov 17, 2026';
+  }, [request, raw]);
+
+  const departmentName = useMemo(() => {
+    if (!request) return 'Department';
+    const candidates = [raw.dept, raw.department, raw.requestor?.department, request.dept, request.department];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.trim()) return c.trim();
+      if (c && typeof c === 'object') {
+        const name = c.display_name || c.name;
+        if (typeof name === 'string' && name.trim()) return name.trim();
+      }
+    }
+    return 'College of Information Technology Education';
+  }, [request, raw]);
+
+  const requestedByName = useMemo(() => {
+    if (!request) return 'Requestor';
+    return textValue(raw.requestedBy || raw.requestor?.full_name || raw.requestor?.name || request.requestedBy) || 'Requestor';
+  }, [request, raw]);
+
+  const targetPlatforms = useMemo(() => platformsFrom(raw), [raw]);
+
+  // Handle file picker for Upload Final Images
+  const handlePickFinalImages = () => {
+    if (!isDirectImcRequest(request)) return;
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.onchange = (e: any) => {
+        const files = Array.from(e.target.files || []) as File[];
+        if (files.length === 0) return;
+        const newItems: FinalUploadedImage[] = files.map((f) => ({
+          uri: URL.createObjectURL(f),
+          name: f.name,
+          file: f,
+        }));
+        setFinalImages((prev) => [...prev, ...newItems]);
+      };
+      input.click();
     }
   };
 
-  const handleWebDrop = (e: any) => {
-    if (Platform.OS !== 'web') return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const files = Array.from(e.dataTransfer?.files || []) as File[];
-    const valid = files.filter(
-      (f) => ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(f.type) && f.size <= 15 * 1024 * 1024
-    );
-    if (valid.length > 0) {
-      const picked: ReplacementImageItem[] = valid
-        .slice(0, Math.max(0, 10 - replacementFiles.length))
-        .map((f) => ({
-          uri: URL.createObjectURL(f),
-          name: f.name,
-          size: f.size,
-          mimeType: f.type || 'image/jpeg',
-          file: f,
-        }));
-      setReplacementFiles((prev) => [...prev, ...picked].slice(0, 10));
-    }
+  const handleRemoveFinalImage = (idxToRemove: number) => {
+    if (!isDirectImcRequest(request)) return;
+    setFinalImages((prev) => prev.filter((_, idx) => idx !== idxToRemove));
+  };
+
+  // Carousel navigation
+  const handlePrevMedia = () => {
+    if (photoCount <= 1) return;
+    setCarouselIndex((prev) => (prev > 0 ? prev - 1 : photoCount - 1));
+  };
+
+  const handleNextMedia = () => {
+    if (photoCount <= 1) return;
+    setCarouselIndex((prev) => (prev < photoCount - 1 ? prev + 1 : 0));
   };
 
   const handleDownloadAllPhotos = async () => {
-    if (originalMedia.length === 0 || isDownloadingAll) return;
-    setIsDownloadingAll(true);
-    setDownloadProgress('Preparing...');
-
+    if (!request || submittedPhotos.length === 0) return;
     try {
-      // 1. First attempt: Server-side bundled ZIP (or direct attachment) download
-      const postId = request?.id ? Number(request.id) : null;
-      if (postId && !isNaN(postId)) {
-        try {
-          setDownloadProgress('Downloading from server...');
-          const res = await postsApi.downloadAllMedia(postId);
-          if (res?.data) {
-            const contentType = typeof res.headers?.['content-type'] === 'string'
-              ? res.headers['content-type']
-              : (originalMedia.length === 1 ? 'image/jpeg' : 'application/zip');
-            const blob = new Blob([res.data], { type: contentType });
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = blobUrl;
+      await postsApi.startEditing(Number(request.id));
+    } catch { }
 
-            let filename = originalMedia.length === 1
-              ? (originalMedia[0]?.name || 'photo.jpg')
-              : `post_${postId}_photos.zip`;
-            const disposition = typeof res.headers?.['content-disposition'] === 'string'
-              ? res.headers['content-disposition']
-              : '';
-            if (disposition && disposition.includes('filename=')) {
-              const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-              if (match && match[1]) filename = match[1].replace(/['"]/g, '');
-            }
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-              document.body.removeChild(a);
-              URL.revokeObjectURL(blobUrl);
-            }, 3000);
-
-            setDownloadProgress('Done!');
-            setTimeout(() => {
-              setIsDownloadingAll(false);
-              setDownloadProgress(null);
-            }, 1500);
-            return;
-          }
-        } catch (serverErr) {
-          console.warn('Server download endpoint fallback to client-side direct download:', serverErr);
-        }
-      }
-
-      // 2. Client-side sequential direct download fallback
-      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        for (let i = 0; i < originalMedia.length; i++) {
-          const item = originalMedia[i];
-          setDownloadProgress(`Downloading photo ${i + 1} of ${originalMedia.length}...`);
-
-          let fetchTarget = item.url;
-          if (typeof window !== 'undefined' && fetchTarget.includes('/storage/')) {
-            fetchTarget = '/storage/' + fetchTarget.split('/storage/')[1];
-          }
-
-          try {
-            const res = await fetch(fetchTarget, { mode: 'cors' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const blob = await res.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = blobUrl;
-            a.download = item.name || `photo-${i + 1}.jpg`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-              document.body.removeChild(a);
-              URL.revokeObjectURL(blobUrl);
-            }, 3000);
-          } catch (fetchErr) {
-            console.warn(`Direct fetch failed for ${item.url}, opening download link fallback:`, fetchErr);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = fetchTarget;
-            a.download = item.name || `photo-${i + 1}.jpg`;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => document.body.removeChild(a), 2000);
-          }
-
-          if (i < originalMedia.length - 1) {
-            await new Promise((r) => setTimeout(r, 450));
-          }
-        }
-        setDownloadProgress('Done!');
-        setTimeout(() => {
-          setIsDownloadingAll(false);
-          setDownloadProgress(null);
-        }, 1500);
-      }
-    } catch (err: any) {
-      console.error('Download all photos failed:', err);
-      alert('Unable to download photos: ' + (err?.message || 'Download failed'));
-      setIsDownloadingAll(false);
-      setDownloadProgress(null);
-    }
-  };
-
-  const handleDownloadActivePhoto = async () => {
-    if (!activeOrig || !activeOrig.url) return;
-    try {
-      let fetchTarget = activeOrig.url;
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && fetchTarget.includes('/storage/')) {
-        fetchTarget = '/storage/' + fetchTarget.split('/storage/')[1];
-      }
-      const res = await fetch(fetchTarget, { mode: 'cors' });
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = blobUrl;
-      a.download = activeOrig.name || 'photo.jpg';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }, 2000);
-    } catch {
-      window.open(activeOrig.url, '_blank');
-    }
-  };
-
-  const handleSaveChangesPress = async () => {
-    if (!onSaveChanges) return;
-    setIsSavingChanges(true);
-    try {
-      await onSaveChanges(request, {
-        finalCaption: finalCaption.trim(),
-        replacementFiles,
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      submittedPhotos.forEach((photo, idx) => {
+        const link = document.createElement('a');
+        link.href = photo.uri;
+        link.download = `request-${request.id}-${photo.name || `photo-${idx + 1}`}.jpg`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       });
-    } finally {
-      setIsSavingChanges(false);
     }
   };
 
-  const handlePublishPress = async () => {
+  const handleSaveDraft = async () => {
+    if (!request) return;
+    setIsSavingDraft(true);
+    try {
+      const hasNewFiles = finalImages.some((img) => Boolean(img.file));
+      let payload: any = { caption_narrative: finalCaption };
+      if (hasNewFiles) {
+        const formData = new FormData();
+        formData.append('caption_narrative', finalCaption);
+        finalImages.forEach((img) => {
+          if (img.file) {
+            formData.append('media[]', img.file);
+          }
+        });
+        payload = formData;
+      }
+      const res = await postsApi.saveDraftEditing(Number(request.id), payload);
+      alert('Draft saved! This request is now filed under "In-Progress Editing" in Publication Management.');
+      const savedData = res?.data?.data || res?.data;
+      if (onDraftSaved) {
+        onDraftSaved(savedData);
+      }
+      onClose();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Failed to save draft.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const handlePublishClick = () => {
+    if (!isDirectImcRequest(request)) return;
     if (!finalCaption.trim()) {
-      alert('Please provide a Final Caption before publishing.');
+      alert('Please provide a final caption before publishing.');
       return;
     }
-    setIsPublishing(true);
-    try {
-      await onPublish(request, {
-        finalCaption: finalCaption.trim(),
-        replacementFiles,
-      });
-    } finally {
-      setIsPublishing(false);
-    }
+    onPublish(finalCaption, finalImages);
   };
 
-  const renderPlatformBadge = (plat: string, idx: number) => {
-    const lp = plat.toLowerCase();
-    const isFb = lp === 'facebook';
-    const isIg = lp === 'instagram';
-    const iconName = isFb ? 'logo-facebook' : isIg ? 'logo-instagram' : 'globe-outline';
-    const iconColor = isFb ? '#1877F2' : isIg ? '#E4405F' : '#4C007C';
-    const label = isFb ? 'Facebook' : isIg ? 'Instagram' : 'Website';
-    return (
-      <View key={`${plat}-${idx}`} style={styles.platformChip}>
-        <Ionicons name={iconName as any} size={13} color={iconColor} style={{ marginRight: 5 }} />
-        <Text style={styles.platformChipText}>{label}</Text>
-      </View>
-    );
-  };
+  if (!visible || !isDirectImcRequest(request)) return null;
 
-  const activeOrig = originalMedia[activeOrigIndex] || null;
-  const previewCardWidth = previewDevice === 'mobile' ? 370 : Math.min(620, width - 90);
+  // Active photos for live preview: if IMC uploaded replacement images, show replacement; otherwise show original
+  const previewPhotoUris = finalImages.length > 0
+    ? finalImages.map((img) => img.uri)
+    : submittedPhotos.map((p) => p.uri);
 
-  if (!visible || !request) return null;
+  const previewCaptionText = finalCaption || originalCaption;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.modalCard}>
-          {/* ── Top Header ── */}
-          <View style={styles.header}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={styles.headerIconBadge}>
-                <View style={styles.headerIconInner}>
-                  <Ionicons name="newspaper" size={14} color="#4C007C" />
+    <>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={visible}
+        onRequestClose={() => (lightbox ? setLightbox(null) : onClose())}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              isDarkMode && styles.modalCardDark,
+              { maxHeight: Math.max(0, Math.min(height * 0.94, height - 32)) },
+            ]}
+          >
+            {/* ================= MODAL HEADER BAR ================= */}
+            <View style={[styles.modalHeader, isDarkMode && styles.modalHeaderDark]}>
+              <View style={styles.headerLeftRow}>
+                <View style={styles.headerBadge}>
+                  <Ionicons name="document-text" size={17} color={BRAND_PURPLE} />
                 </View>
-                <View style={styles.headerIconCornerBadge}>
-                  <Ionicons name="checkmark-sharp" size={9} color="#FFC72C" />
-                </View>
-              </View>
-              <Text style={styles.headerTitle}>Publication Review</Text>
-            </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
-              <Ionicons name="close" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* ── Scrollable Body ── */}
-          <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator>
-            {/* Title + Date Line */}
-            <View style={styles.titleRow}>
-              <Text style={styles.postTitle}>{request?.title || 'Untitled Request'}</Text>
-              {submittedDateText ? (
-                <Text style={styles.submittedDate}>Submitted {submittedDateText}</Text>
-              ) : null}
-            </View>
-
-            {/* 3 Metadata Cards */}
-            <View style={[styles.metaCardsRow, !isTwoColumn && { flexDirection: 'column' }]}>
-              <View style={styles.metaCard}>
-                <Text style={styles.metaLabel}>DEPARTMENT</Text>
-                <Text style={styles.metaValue} numberOfLines={1}>{deptName}</Text>
-              </View>
-              <View style={styles.metaCard}>
-                <Text style={styles.metaLabel}>REQUESTED BY</Text>
-                <Text style={styles.metaValue} numberOfLines={1}>{requestorName}</Text>
-              </View>
-              <View style={styles.metaCard}>
-                <Text style={styles.metaLabel}>PHOTO ATTACHMENTS</Text>
-                <Text style={styles.metaValue}>{photoCountLabel}</Text>
-              </View>
-            </View>
-
-            {/* 2-Column Workspace */}
-            <View style={[styles.columnsContainer, !isTwoColumn && { flexDirection: 'column' }]}>
-              {/* ── LEFT COLUMN: Submitted Materials ── */}
-              <View style={styles.columnCard}>
-                <Text style={styles.sectionTitle}>Submitted Materials</Text>
-                <Text style={styles.sectionSubtitle}>Original requestor attachments</Text>
-
-                {/* Carousel Frame */}
-                <View style={styles.carouselFrame}>
-                  {activeOrig ? (
-                    <>
-                      <TouchableOpacity
-                        activeOpacity={0.92}
-                        style={styles.carouselImageTouch}
-                        onPress={() => onOpenFullScreenImage?.(activeOrig.url)}
-                      >
-                        <Image
-                          source={{ uri: activeOrig.url }}
-                          style={styles.carouselMainImage}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-
-                      {originalMedia.length > 1 && (
-                        <>
-                          <TouchableOpacity
-                            style={[styles.carouselArrowBtn, { left: 10 }]}
-                            onPress={() =>
-                              setActiveOrigIndex((prev) => (prev - 1 + originalMedia.length) % originalMedia.length)
-                            }
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons name="chevron-back" size={18} color="#1E293B" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.carouselArrowBtn, { right: 10 }]}
-                            onPress={() => setActiveOrigIndex((prev) => (prev + 1) % originalMedia.length)}
-                            activeOpacity={0.85}
-                          >
-                            <Ionicons name="chevron-forward" size={18} color="#1E293B" />
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <View style={styles.emptyMediaBox}>
-                      <Ionicons name="images-outline" size={32} color="#94A3B8" />
-                      <Text style={styles.emptyMediaText}>No photo attachments (Text only)</Text>
+                <View>
+                  <View style={styles.badgeRow}>
+                    <Text style={styles.badgeLabel}>POST REVIEW</Text>
+                    <View style={styles.directBadge}>
+                      <Text style={styles.directBadgeText}>Direct to IMC</Text>
                     </View>
-                  )}
+                  </View>
+                  <Text style={[styles.headerTitle, isDarkMode && styles.headerTitleDark]}>
+                    Publication Review
+                  </Text>
                 </View>
+              </View>
 
-                {/* Thumbnails + Counter */}
-                {originalMedia.length > 0 && (
-                  <>
-                    <View style={styles.thumbRow}>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                        {originalMedia.map((m: any, idx: number) => (
-                          <TouchableOpacity
-                            key={m.id || idx}
-                            onPress={() => setActiveOrigIndex(idx)}
-                            style={[
-                              styles.thumbBox,
-                              idx === activeOrigIndex && styles.thumbBoxActive,
-                            ]}
-                            activeOpacity={0.8}
-                          >
-                            <Image source={{ uri: m.url }} style={styles.thumbImg} resizeMode="cover" />
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                      <Text style={styles.counterText}>
-                        {activeOrigIndex + 1} of {originalMedia.length}
+              {/* Close button */}
+              <TouchableOpacity
+                style={[styles.headerCloseBtn, isDarkMode && styles.headerCloseBtnDark]}
+                onPress={onClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close publication review"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={20} color={isDarkMode ? '#F1F5F9' : Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ================= SCROLLABLE BODY ================= */}
+            <ScrollView
+              style={styles.modalBodyScroll}
+              contentContainerStyle={styles.modalBodyContent}
+              showsVerticalScrollIndicator={true}
+            >
+              {/* Approval Progress Stepper */}
+              <View style={[styles.stepperCard, isDarkMode && styles.stepperCardDark]}>
+                <View style={styles.stepperHeader}>
+                  <Text style={[styles.stepperTitle, isDarkMode && styles.stepperTitleDark]}>
+                    Tracking progress
+                  </Text>
+                </View>
+                <View style={styles.stepsRow}>
+                  {/* Step 1: Submitted */}
+                  <View style={styles.stepItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                    <Text style={[styles.stepName, isDarkMode && styles.stepNameDark]}>Submitted</Text>
+                  </View>
+
+                  <View style={[styles.stepConnector, { backgroundColor: '#059669' }]} />
+
+                  {/* Step 2: IMC Review */}
+                  <View style={styles.stepItem}>
+                    <Ionicons name="time" size={20} color={BRAND_PURPLE} />
+                    <Text style={[styles.stepName, isDarkMode && styles.stepNameDark]}>IMC review</Text>
+                    <Text style={[styles.stepSubText, { color: BRAND_PURPLE }]}>
+                      {isSavingDraft ? 'DRAFT SAVED' : 'REVIEWING'}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.stepConnector, { backgroundColor: isDarkMode ? '#334155' : '#E2E8F0' }]} />
+
+                  {/* Step 3: Publish */}
+                  <View style={styles.stepItem}>
+                    <Ionicons name="time" size={20} color="#94A3B8" />
+                    <Text style={[styles.stepName, isDarkMode && styles.stepNameDark]}>Publish</Text>
+                    <Text style={[styles.stepSubText, { color: '#94A3B8' }]}>WAITING</Text>
+                  </View>
+                </View>
+                <Text style={[styles.stepperGuidance, isDarkMode && styles.stepperGuidanceDark]}>
+                  Review original requestor materials, finalize the caption and replacement graphics, and check the live publication preview before publishing.
+                </Text>
+              </View>
+
+              {/* Main Two-Column Grid */}
+              <View style={[styles.splitGrid, !isDesktop && styles.splitGridStacked]}>
+                {/* ----------------- LEFT COLUMN: REQUEST INFO, ORIGINAL MATERIALS & LIVE PREVIEW ----------------- */}
+                <View style={[styles.leftColumnWrap, { flex: isDesktop ? 1 : undefined }]}>
+                  {/* 1. Request Information Card */}
+                  <View style={[styles.panelCard, isDarkMode && styles.panelCardDark]}>
+                    <View style={styles.panelHeaderRow}>
+                      <Text style={[styles.panelTitle, isDarkMode && styles.panelTitleDark]}>
+                        Request Information
                       </Text>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 2 }}>
-                      <Text style={[styles.filenameText, { flex: 1, marginRight: 8 }]} numberOfLines={1}>
-                        {activeOrig?.name}
+
+                    {/* Request Title */}
+                    <View style={styles.infoField}>
+                      <Text style={styles.fieldHeading}>REQUEST TITLE</Text>
+                      <Text selectable style={[styles.titleText, isDarkMode && styles.titleTextDark]}>
+                        {request.title || raw.title || 'Untitled Request'}
                       </Text>
-                      <TouchableOpacity
-                        onPress={handleDownloadActivePhoto}
-                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 3, paddingHorizontal: 8, backgroundColor: '#F1F5F9', borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0' }}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Download this photo"
-                      >
-                        <Ionicons name="download-outline" size={13} color="#475569" style={{ marginRight: 4 }} />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>Download this photo</Text>
-                      </TouchableOpacity>
                     </View>
 
-                    {/* Download All Photos */}
-                    <TouchableOpacity
-                      style={[styles.downloadAllBtn, isDownloadingAll && { opacity: 0.75 }]}
-                      onPress={handleDownloadAllPhotos}
-                      disabled={isDownloadingAll}
-                      activeOpacity={0.8}
-                    >
-                      {isDownloadingAll ? (
-                        <ActivityIndicator size="small" color="#1E293B" style={{ marginRight: 8 }} />
-                      ) : (
-                        <Ionicons name="download-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
-                      )}
-                      <Text style={styles.downloadAllText}>
-                        {downloadProgress || (originalMedia.length > 1 ? 'Download All Photos (ZIP)' : 'Download Photo')}
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                <View style={styles.divider} />
-
-                {/* Target Platforms */}
-                <Text style={styles.subLabel}>TARGET PLATFORMS</Text>
-                <View style={styles.platformRow}>
-                  {targetPlatforms.map((plat: string, idx: number) => renderPlatformBadge(plat, idx))}
-                </View>
-
-                <View style={styles.divider} />
-
-                {/* Original Caption */}
-                <Text style={styles.subLabel}>CAPTION</Text>
-                <View style={styles.readOnlyBox}>
-                  <FormattedText style={styles.readOnlyText}>
-                    {request?.imc_branding_checklist?.original_caption ||
-                      request?.caption ||
-                      request?.caption_narrative ||
-                      'No caption provided.'}
-                  </FormattedText>
-                </View>
-
-                {/* Additional Instructions */}
-                {Boolean(additionalInstructions) && (
-                  <>
-                    <View style={styles.divider} />
-                    <Text style={styles.subLabel}>ADDITIONAL INSTRUCTIONS</Text>
-                    <View style={styles.readOnlyBox}>
-                      <Text style={styles.readOnlyText}>{additionalInstructions}</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-
-              {/* ── RIGHT COLUMN: Final Preparation ── */}
-              <View style={styles.columnCard}>
-                <Text style={styles.sectionTitle}>
-                  {isPending ? 'Final Preparation' : 'Final Published Content'}
-                </Text>
-                <Text style={styles.sectionSubtitle}>
-                  {isPending
-                    ? 'Prepare the final caption and images'
-                    : 'Final approved caption and images used for publication'}
-                </Text>
-
-                {/* Final Caption */}
-                <Text style={styles.fieldLabel}>
-                  Final Caption {isPending && <Text style={{ color: '#DC2626' }}>*</Text>}
-                </Text>
-                <TextInput
-                  style={[styles.captionInput, !isPending && { backgroundColor: '#F8FAFC', color: '#1E293B' }]}
-                  value={finalCaption}
-                  onChangeText={setFinalCaption}
-                  editable={isPending}
-                  multiline
-                  placeholder="Edit or refine the final caption for publication..."
-                  placeholderTextColor="#94A3B8"
-                  textAlignVertical="top"
-                  maxLength={2200}
-                />
-                {isPending && (
-                  <Text style={styles.charCount}>{finalCaption.length} / 2200</Text>
-                )}
-
-                {isPending ? (
-                  <>
-                    {/* Upload Final Images */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, marginBottom: 8 }}>
-                      <Text style={styles.fieldLabelNoMargin}>Upload Final Images</Text>
-                      <Text style={styles.optionalTag}>Optional</Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.uploadDropzone,
-                        isDragOver && styles.uploadDropzoneActive,
-                      ]}
-                      {...(Platform.OS === 'web'
-                        ? ({
-                            onDragOver: (e: any) => {
-                              e.preventDefault();
-                              setIsDragOver(true);
-                            },
-                            onDragLeave: () => setIsDragOver(false),
-                            onDrop: handleWebDrop,
-                          } as any)
-                        : {})}
-                    >
-                      <View style={styles.uploadIconBox}>
-                        <Ionicons name="cloud-upload-outline" size={22} color="#5B21B6" />
+                    {/* Department & Requested By in 2 cols */}
+                    <View style={styles.gridTwoCols}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.fieldHeading}>DEPARTMENT</Text>
+                        <View style={styles.deptBadge}>
+                          <Text style={styles.deptBadgeText} numberOfLines={1}>
+                            {departmentName}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={styles.uploadTitle}>Upload images</Text>
-                      <Text style={styles.uploadSubtitle}>
-                        Drop your edited photos here, or select files below.
-                      </Text>
-                      <Text style={styles.uploadHint}>
-                        JPG, PNG or WEBP · Up to 10 images · 15 MB per image
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.browseBtn}
-                        onPress={handleBrowseFiles}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.browseBtnText}>Browse Files</Text>
-                      </TouchableOpacity>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.fieldHeading}>REQUESTED BY</Text>
+                        <Text selectable style={[styles.primaryVal, isDarkMode && styles.primaryValDark]} numberOfLines={1}>
+                          {requestedByName}
+                        </Text>
+                        <Text style={styles.secondaryVal}>Requestor</Text>
+                      </View>
                     </View>
 
-                    {/* Selected Images Bar */}
-                    <View style={styles.selectedBar}>
-                      <Text style={styles.selectedBarCount}>
-                        {replacementFiles.length > 0
-                          ? `${replacementFiles.length} image${replacementFiles.length > 1 ? 's' : ''} selected`
-                          : 'Using original attachments'}
-                      </Text>
-                      {replacementFiles.length > 0 && (
-                        <TouchableOpacity onPress={() => setReplacementFiles([])} activeOpacity={0.7}>
-                          <Text style={styles.useOriginalsText}>Use Originals</Text>
+                    {/* Submitted On & Target Platforms */}
+                    <View style={styles.gridTwoCols}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.fieldHeading}>SUBMITTED ON</Text>
+                        <Text selectable style={[styles.dateVal, isDarkMode && styles.dateValDark]}>
+                          {formattedSubmittedDate}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.fieldHeading}>TARGET PLATFORMS</Text>
+                        <View style={styles.platformBadgeRow}>
+                          {targetPlatforms.map((p) => (
+                            <View
+                              key={p.label}
+                              style={[styles.platformPill, { backgroundColor: p.bg }]}
+                            >
+                              <Ionicons name={p.icon} size={12} color={p.color} style={{ marginRight: 3 }} />
+                              <Text style={[styles.platformPillText, { color: p.color }]}>{p.label}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Original Caption (From Requestor) */}
+                    <View style={styles.originalCaptionWrap}>
+                      <View style={styles.captionHeaderRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="chatbox-ellipses-outline" size={15} color={BRAND_PURPLE} />
+                          <Text style={styles.fieldHeading}>ORIGINAL CAPTION</Text>
+                        </View>
+                        <Text style={styles.captionSub}>Submitted by Requestor</Text>
+                      </View>
+                      {originalCaption ? (
+                        <View style={[styles.originalCaptionBox, isDarkMode && styles.originalCaptionBoxDark]}>
+                          <RenderedCaption value={originalCaption} dark={isDarkMode} />
+                        </View>
+                      ) : (
+                        <Text style={[styles.secondaryVal, { fontStyle: 'italic', marginTop: 4 }]}>
+                          No caption submitted by requestor.
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* 2. Submitted Photos / Materials Card */}
+                  <View style={[styles.panelCard, isDarkMode && styles.panelCardDark]}>
+                    <View style={styles.panelHeaderRow}>
+                      <View>
+                        <Text style={[styles.panelTitle, isDarkMode && styles.panelTitleDark]}>
+                          Submitted Photos
+                        </Text>
+                        <Text style={styles.panelSubtitle}>
+                          Original requestor attachments ({photoCount} {photoCount === 1 ? 'photo' : 'photos'})
+                        </Text>
+                      </View>
+                      {photoCount > 0 && (
+                        <TouchableOpacity
+                          onPress={handleDownloadAllPhotos}
+                          style={styles.downloadAllBtn}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="download-outline" size={14} color="#4C007C" style={{ marginRight: 4 }} />
+                          <Text style={styles.downloadAllBtnText}>Download All</Text>
                         </TouchableOpacity>
                       )}
                     </View>
 
-                    {/* Uploaded Replacement Grid */}
-                    {replacementFiles.length > 0 && (
-                      <View style={styles.replacementGrid}>
-                        {replacementFiles.map((file, idx) => (
-                          <View key={`${file.name}-${idx}`} style={styles.replacementCard}>
-                            <Image source={{ uri: file.uri }} style={styles.replacementThumb} resizeMode="cover" />
-                            <View style={styles.replacementInfo}>
-                              <Text style={styles.replacementName} numberOfLines={1}>
-                                {file.name}
+                    {/* Main Photo Preview */}
+                    <View style={[styles.previewArea, isDarkMode && styles.previewAreaDark]}>
+                      {photoCount > 0 ? (
+                        <>
+                          {activeMediaFailed ? (
+                            <View style={styles.fallbackBox}>
+                              <Ionicons name="image-outline" size={34} color="#94A3B8" />
+                              <Text style={[styles.fallbackText, isDarkMode && styles.fallbackTextDark]}>
+                                Image preview could not load.
                               </Text>
-                              <Text style={styles.replacementSize}>{formatFileSize(file.size)}</Text>
+                              <Text style={styles.fallbackSub}>
+                                {submittedPhotos[carouselIndex]?.name || 'Original attachment'}
+                              </Text>
                             </View>
+                          ) : (
                             <TouchableOpacity
-                              style={styles.removeBtn}
-                              onPress={() =>
-                                setReplacementFiles((prev) => prev.filter((_, i) => i !== idx))
-                              }
+                              style={{ width: '100%', height: '100%' }}
+                              activeOpacity={0.9}
+                              onPress={() => openLightbox(submittedPhotos[carouselIndex], submittedPhotos, carouselIndex)}
+                            >
+                              <Image
+                                source={{ uri: submittedPhotos[carouselIndex]?.uri }}
+                                style={styles.mainPreviewImage}
+                                resizeMode="contain"
+                                onError={() => {
+                                  setActiveMediaFailed(true);
+                                  setActiveMediaLoading(false);
+                                }}
+                                onLoadEnd={() => setActiveMediaLoading(false)}
+                              />
+                            </TouchableOpacity>
+                          )}
+
+                          {activeMediaLoading && !activeMediaFailed && (
+                            <ActivityIndicator
+                              size="small"
+                              color={BRAND_PURPLE}
+                              style={styles.loadingSpinner}
+                            />
+                          )}
+
+                          {/* Navigation Arrow: Previous */}
+                          {photoCount > 1 && (
+                            <TouchableOpacity
+                              style={[styles.arrowButton, styles.arrowLeft]}
+                              onPress={handlePrevMedia}
                               activeOpacity={0.8}
                             >
-                              <Text style={styles.removeBtnText}>Remove</Text>
+                              <Ionicons name="chevron-back" size={20} color="#0F172A" />
                             </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </>
-                ) : (
-                  <View style={{ marginTop: 14 }}>
-                    <Text style={styles.fieldLabel}>Final Published Images</Text>
-                    {finalPublishedMedia.length > 0 ? (
-                      <View style={styles.replacementGrid}>
-                        {finalPublishedMedia.map((file, idx) => (
-                          <TouchableOpacity
-                            key={`${file.name}-${idx}`}
-                            style={styles.replacementCard}
-                            activeOpacity={0.85}
-                            onPress={() => onOpenFullScreenImage?.(file.url)}
-                          >
-                            <Image source={{ uri: file.url }} style={styles.replacementThumb} resizeMode="cover" />
-                            <View style={styles.replacementInfo}>
-                              <Text style={styles.replacementName} numberOfLines={1}>
-                                {file.name}
+                          )}
+
+                          {/* Navigation Arrow: Next */}
+                          {photoCount > 1 && (
+                            <TouchableOpacity
+                              style={[styles.arrowButton, styles.arrowRight]}
+                              onPress={handleNextMedia}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons name="chevron-forward" size={20} color="#0F172A" />
+                            </TouchableOpacity>
+                          )}
+
+                          {/* Image Counter Badge */}
+                          {photoCount > 1 && (
+                            <View style={styles.counterBadge}>
+                              <Text style={styles.counterBadgeText}>
+                                {carouselIndex + 1} / {photoCount}
                               </Text>
-                              <Text style={styles.replacementSize}>Final uploaded image</Text>
                             </View>
+                          )}
+                        </>
+                      ) : (
+                        <View style={styles.fallbackBox}>
+                          <Ionicons name="images-outline" size={32} color="#94A3B8" />
+                          <Text style={[styles.fallbackText, isDarkMode && styles.fallbackTextDark]}>
+                            No photos attached to this request.
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Thumbnails Row */}
+                    {photoCount > 1 && (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.thumbnailsRow}
+                      >
+                        {submittedPhotos.map((photo, idx) => {
+                          const isSel = idx === carouselIndex;
+                          return (
+                            <TouchableOpacity
+                              key={idx}
+                              style={[
+                                styles.thumbBox,
+                                isDarkMode && styles.thumbBoxDark,
+                                isSel && styles.thumbBoxActive,
+                              ]}
+                              onPress={() => setCarouselIndex(idx)}
+                              activeOpacity={0.7}
+                            >
+                              <Image source={{ uri: photo.uri }} style={styles.thumbImage} resizeMode="cover" />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                  </View>
+
+                  {/* 3. Live Publication Preview Card (Below Submitted Photos) */}
+                  <View style={[styles.panelCard, isDarkMode && styles.panelCardDark]}>
+                    <View style={styles.panelHeaderRow}>
+                      <View>
+                        <Text style={[styles.panelTitle, isDarkMode && styles.panelTitleDark]}>
+                          Live Publication Preview
+                        </Text>
+                        <Text style={styles.panelSubtitle}>
+                          Real-time rendering of the final publication
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Platform Selector Tabs */}
+                    <View style={styles.platformTabsRow}>
+                      {(['facebook', 'instagram', 'website'] as const).map((platform) => {
+                        const active = previewPlatform === platform;
+                        const pColor = platform === 'facebook' ? '#1877F2' : platform === 'instagram' ? '#E1306C' : '#059669';
+                        const label = platform === 'facebook' ? 'Facebook' : platform === 'instagram' ? 'Instagram' : 'Website';
+                        const icon = platform === 'facebook' ? 'logo-facebook' : platform === 'instagram' ? 'logo-instagram' : 'globe-outline';
+                        return (
+                          <TouchableOpacity
+                            key={platform}
+                            onPress={() => setPreviewPlatform(platform)}
+                            style={[
+                              styles.platformTab,
+                              active && {
+                                backgroundColor: isDarkMode ? '#422006' : '#FEF3C7',
+                                borderColor: isDarkMode ? '#92400E' : '#FDE68A',
+                              },
+                            ]}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name={icon as any} size={14} color={active ? pColor : '#94A3B8'} style={{ marginRight: 6 }} />
+                            <Text style={[styles.platformTabText, active && { color: '#B45309', fontWeight: '700' }]}>
+                              {label}
+                            </Text>
                           </TouchableOpacity>
-                        ))}
+                        );
+                      })}
+                    </View>
+
+                    {/* Post Mockup Card */}
+                    {previewPlatform === 'website' ? (
+                      <View style={[styles.websiteArticleCard, isDarkMode && styles.websiteArticleCardDark]}>
+                        {/* Website Category Badge & URL */}
+                        <View style={styles.websiteBadgeRow}>
+                          <View style={[styles.websiteCategoryPill, isDarkMode && styles.websiteCategoryPillDark]}>
+                            <Ionicons name="globe-outline" size={12} color="#059669" />
+                            <Text style={styles.websiteCategoryText}>Website Article Preview</Text>
+                          </View>
+                          <Text style={[styles.websiteDomainText, isDarkMode && styles.websiteDomainTextDark]}>jmcfi.edu.ph</Text>
+                        </View>
+
+                        {/* Headline Title */}
+                        <Text style={[styles.websiteHeadline, isDarkMode && styles.websiteHeadlineDark]}>
+                          {request.title || raw.title || 'Untitled Content Request'}
+                        </Text>
+
+                        {/* Byline */}
+                        <View style={styles.websiteBylineRow}>
+                          <Image source={require('../../assets/images/jmc_logo.png')} style={styles.websiteBylineLogo} resizeMode="contain" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.websiteAuthorText, isDarkMode && styles.websiteAuthorTextDark]}>
+                              Jose Maria College Foundation Inc.
+                            </Text>
+                            <Text style={styles.websiteBylineSub}>
+                              Official Web Portal • Final IMC Version
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Featured Media / Gallery */}
+                        {previewPhotoUris.length > 0 ? (
+                          <View style={styles.websiteMediaWrap}>
+                            <TouchableOpacity
+                              activeOpacity={0.9}
+                              onPress={() => {
+                                const sourceList = finalImages.length > 0 ? finalImages : submittedPhotos;
+                                const item = sourceList[websiteActiveIndex] || sourceList[0];
+                                openLightbox(item, sourceList, websiteActiveIndex);
+                              }}
+                              style={styles.websiteFeaturedImageBox}
+                              accessibilityRole="button"
+                              accessibilityLabel="View featured image"
+                            >
+                              <Image
+                                source={{ uri: previewPhotoUris[websiteActiveIndex] || previewPhotoUris[0] }}
+                                style={styles.websiteFeaturedImage}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.websiteFeaturedBadge}>
+                                <Ionicons name="globe-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                                <Text style={styles.websiteFeaturedBadgeText}>
+                                  Website Featured Image {previewPhotoUris.length > 1 ? `(${websiteActiveIndex + 1} of ${previewPhotoUris.length})` : ''}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+
+                            {previewPhotoUris.length > 1 && (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.websiteThumbnailsRow}>
+                                {previewPhotoUris.map((uri, idx) => {
+                                  const isSelected = idx === websiteActiveIndex;
+                                  return (
+                                    <TouchableOpacity
+                                      key={`${uri}-${idx}`}
+                                      style={[styles.websiteThumbBox, isSelected && styles.websiteThumbBoxActive]}
+                                      onPress={() => setWebsiteActiveIndex(idx)}
+                                      activeOpacity={0.7}
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Select photo ${idx + 1}`}
+                                    >
+                                      <Image source={{ uri }} style={styles.websiteThumbImage} resizeMode="cover" />
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </ScrollView>
+                            )}
+                          </View>
+                        ) : (
+                          <View style={styles.mockupEmptyMedia}>
+                            <Ionicons name="image-outline" size={24} color="#94A3B8" />
+                            <Text style={styles.mockupEmptyMediaText}>No featured image attached.</Text>
+                          </View>
+                        )}
+
+                        {/* Article Body */}
+                        <View style={styles.websiteArticleBody}>
+                          {previewCaptionText ? (
+                            <RenderedCaption value={previewCaptionText} dark={isDarkMode} />
+                          ) : (
+                            <Text style={styles.mockupCaptionEmpty}>No article caption provided.</Text>
+                          )}
+                        </View>
+
+                        {/* Clean Portal Footer */}
+                        <View style={[styles.websiteFooterBar, isDarkMode && styles.websiteFooterBarDark]}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="link-outline" size={13} color="#059669" />
+                            <Text style={styles.websiteFooterUrl}>
+                              jmcfi.edu.ph/portal/announcements
+                            </Text>
+                          </View>
+                          <View style={[styles.websiteTagPill, isDarkMode && styles.websiteTagPillDark]}>
+                            <Text style={[styles.websiteTagPillText, isDarkMode && styles.websiteTagPillTextDark]}>Portal Release</Text>
+                          </View>
+                        </View>
                       </View>
                     ) : (
-                      <View style={styles.readOnlyBox}>
-                        <Text style={styles.readOnlyText}>
-                          Original submitted photos were used for publication.
-                        </Text>
+                      <View style={[styles.mockupCard, isDarkMode && styles.mockupCardDark]}>
+                        {/* Social Header */}
+                        <View style={styles.mockupHeader}>
+                          <Image
+                            source={require('../../assets/images/jmc_logo.png')}
+                            style={styles.mockupLogo}
+                            resizeMode="contain"
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.mockupAuthor, isDarkMode && styles.mockupAuthorDark]}>
+                              Jose Maria College Foundation Inc.
+                            </Text>
+                            <Text style={styles.mockupPlatformSub}>
+                              {previewPlatform.charAt(0).toUpperCase() + previewPlatform.slice(1)} preview • Final IMC Version
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Caption (Before media on Facebook) */}
+                        {previewPlatform !== 'instagram' && (
+                          <View style={styles.mockupCaptionWrap}>
+                            {previewCaptionText ? (
+                              <RenderedCaption value={previewCaptionText} dark={isDarkMode} />
+                            ) : (
+                              <Text style={styles.mockupCaptionEmpty}>No caption provided.</Text>
+                            )}
+                          </View>
+                        )}
+
+                        {/* Media Display */}
+                        {previewPhotoUris.length > 0 ? (
+                          previewPlatform === 'instagram' ? (
+                            <InstagramMediaCarousel
+                              images={previewPhotoUris}
+                              onImagePress={(uri) => {
+                                const sourceList = finalImages.length > 0 ? finalImages : submittedPhotos;
+                                const idx = sourceList.findIndex((p) => p.uri === uri);
+                                const found = idx >= 0 ? sourceList[idx] : { uri, name: 'Preview Image' };
+                                openLightbox(found, sourceList.length > 0 ? sourceList : [found], Math.max(0, idx));
+                              }}
+                            />
+                          ) : (
+                            <FacebookMediaGrid
+                              images={previewPhotoUris}
+                              onImagePress={(uri) => {
+                                const sourceList = finalImages.length > 0 ? finalImages : submittedPhotos;
+                                const idx = sourceList.findIndex((p) => p.uri === uri);
+                                const found = idx >= 0 ? sourceList[idx] : { uri, name: 'Preview Image' };
+                                openLightbox(found, sourceList.length > 0 ? sourceList : [found], Math.max(0, idx));
+                              }}
+                              containerStyle={{ marginHorizontal: 0 }}
+                            />
+                          )
+                        ) : (
+                          <View style={styles.mockupEmptyMedia}>
+                            <Ionicons name="image-outline" size={24} color="#94A3B8" />
+                            <Text style={styles.mockupEmptyMediaText}>No photos attached.</Text>
+                          </View>
+                        )}
+
+                        {/* Caption (After media on Instagram) */}
+                        {previewPlatform === 'instagram' && (
+                          <View style={styles.mockupCaptionWrap}>
+                            {previewCaptionText ? (
+                              <RenderedCaption value={previewCaptionText} dark={isDarkMode} />
+                            ) : (
+                              <Text style={styles.mockupCaptionEmpty}>No caption provided.</Text>
+                            )}
+                          </View>
+                        )}
+
+                        {/* Social Interactions Bar (Facebook & Instagram only) */}
+                        <View style={[styles.mockupInteractions, isDarkMode && styles.mockupInteractionsDark]}>
+                          <View style={styles.mockupActionBtn}>
+                            <Ionicons name="thumbs-up-outline" size={14} color="#64748B" />
+                            <Text style={styles.mockupActionText}>Like</Text>
+                          </View>
+                          <View style={styles.mockupActionBtn}>
+                            <Ionicons name="chatbubble-outline" size={14} color="#64748B" />
+                            <Text style={styles.mockupActionText}>Comment</Text>
+                          </View>
+                          <View style={styles.mockupActionBtn}>
+                            <Ionicons name="share-social-outline" size={14} color="#64748B" />
+                            <Text style={styles.mockupActionText}>Share</Text>
+                          </View>
+                        </View>
                       </View>
                     )}
                   </View>
+                </View>
+
+                {/* ----------------- RIGHT COLUMN: IMC FINAL PREPARATION ----------------- */}
+                <View style={[styles.rightColumnWrap, { flex: isDesktop ? 1 : undefined }]}>
+                  {/* Preparation Card */}
+                  <View style={[styles.panelCard, styles.imcPanelHighlight, isDarkMode && styles.panelCardDark]}>
+                    <View style={styles.panelHeaderRow}>
+                      <Text style={[styles.panelTitle, isDarkMode && styles.panelTitleDark]}>
+                        Final Preparation
+                      </Text>
+                      <View style={styles.imcActiveBadge}>
+                        <Text style={styles.imcActiveBadgeText}>Active Editor</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.panelSubtitle}>
+                      Refine the caption and attach finalized or replacement artwork for release.
+                    </Text>
+
+                    {/* Final Caption Field */}
+                    <View style={styles.formGroup}>
+                      <View style={styles.labelRow}>
+                        <Text style={[styles.fieldLabel, isDarkMode && styles.fieldLabelDark]}>
+                          Final Caption
+                        </Text>
+                        {finalCaption !== originalCaption && (
+                          <TouchableOpacity
+                            onPress={() => setFinalCaption(originalCaption)}
+                            style={styles.revertBtn}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="refresh-outline" size={12} color="#4C007C" style={{ marginRight: 3 }} />
+                            <Text style={styles.revertBtnText}>Revert to original</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      <TextInput
+                        style={[styles.captionInput, isDarkMode && styles.captionInputDark]}
+                        multiline
+                        numberOfLines={8}
+                        placeholder="Enter or refine the finalized publication caption..."
+                        placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+                        value={finalCaption}
+                        onChangeText={setFinalCaption}
+                        maxLength={2200}
+                        textAlignVertical="top"
+                      />
+
+                      <View style={styles.charCounterRow}>
+                        <Text style={styles.inputHelp}>
+                          Changes update the live preview on the left in real time.
+                        </Text>
+                        <Text style={[styles.charCounter, isDarkMode && styles.charCounterDark]}>
+                          {finalCaption.length} / 2200
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Upload Replacement / Final Images */}
+                    <View style={styles.formGroup}>
+                      <View style={styles.labelRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.fieldLabel, isDarkMode && styles.fieldLabelDark]}>
+                            Upload Final Images
+                          </Text>
+                          <View style={[styles.optionalBadge, isDarkMode && styles.optionalBadgeDark]}>
+                            <Text style={[styles.optionalBadgeText, isDarkMode && styles.optionalBadgeTextDark]}>
+                              Optional
+                            </Text>
+                          </View>
+                        </View>
+                        {finalImages.length > 0 && (
+                          <TouchableOpacity
+                            onPress={() => setFinalImages([])}
+                            style={styles.clearAllImagesBtn}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="trash-outline" size={12} color="#DC2626" style={{ marginRight: 3 }} />
+                            <Text style={styles.clearAllImagesText}>Clear & use original</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      <Text style={styles.uploadHelpText}>
+                        Leave empty to publish the requestor's original submitted photos. Upload new files below to replace or enhance them.
+                      </Text>
+
+                      <TouchableOpacity
+                        style={[styles.uploadDropzone, isDarkMode && styles.uploadDropzoneDark]}
+                        onPress={handlePickFinalImages}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.uploadIconCircle}>
+                          <Ionicons name="cloud-upload-outline" size={24} color="#7C3AED" />
+                        </View>
+                        <Text style={[styles.uploadDropzoneTitle, isDarkMode && styles.uploadDropzoneTitleDark]}>
+                          Click to upload replacement or finalized photos
+                        </Text>
+                        <Text style={styles.uploadDropzoneHint}>
+                          Supports PNG, JPG, or WEBP (up to 20MB)
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Uploaded Final Images Previews */}
+                      {finalImages.length > 0 && (
+                        <View style={styles.uploadedImagesWrap}>
+                          <Text style={[styles.uploadedListTitle, isDarkMode && styles.uploadedListTitleDark]}>
+                            Replacement photos ready to publish ({finalImages.length}):
+                          </Text>
+                          <View style={styles.uploadedPhotoGrid}>
+                            {finalImages.map((img, idx) => (
+                              <View key={idx} style={[styles.uploadedPhotoBox, isDarkMode && styles.uploadedPhotoBoxDark]}>
+                                <TouchableOpacity
+                                  activeOpacity={0.85}
+                                  onPress={() => openLightbox(img, finalImages, idx)}
+                                  style={styles.uploadedPhotoThumbWrap}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Preview ${img.name}`}
+                                >
+                                  <Image source={{ uri: img.uri }} style={styles.uploadedPhotoBoxImage} resizeMode="cover" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.uploadedPhotoRemoveBadge}
+                                  onPress={() => handleRemoveFinalImage(idx)}
+                                  activeOpacity={0.8}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Remove ${img.name}`}
+                                >
+                                  <Ionicons name="close" size={11} color="#FFFFFF" />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* ================= MODAL FOOTER ACTIONS ================= */}
+            <View style={[styles.modalFooter, isDarkMode && styles.modalFooterDark]}>
+              <View style={styles.footerRightActions}>
+                <TouchableOpacity
+                  style={[styles.btnReject, isDarkMode && styles.btnRejectDark]}
+                  onPress={() => onReject(request)}
+                  activeOpacity={0.8}
+                  disabled={isPublishing || isSavingDraft}
+                >
+                  <Text style={styles.btnRejectText}>Reject</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnSaveDraft, isDarkMode && styles.btnSaveDraftDark]}
+                  onPress={handleSaveDraft}
+                  activeOpacity={0.8}
+                  disabled={isPublishing || isSavingDraft}
+                >
+                  {isSavingDraft ? (
+                    <ActivityIndicator size="small" color={BRAND_PURPLE} />
+                  ) : (
+                    <>
+                      <Ionicons name="save-outline" size={15} color={BRAND_PURPLE} style={{ marginRight: 6 }} />
+                      <Text style={styles.btnSaveDraftText}>Save & Continue Later</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnPublish, (isPublishing || isSavingDraft) && { opacity: 0.7 }]}
+                  onPress={handlePublishClick}
+                  activeOpacity={0.85}
+                  disabled={isPublishing || isSavingDraft}
+                >
+                  {isPublishing ? (
+                    <ActivityIndicator size="small" color="#1E293B" />
+                  ) : (
+                    <>
+                      <Ionicons name="paper-plane" size={15} color="#1E293B" style={{ marginRight: 6 }} />
+                      <Text style={styles.btnPublishText}>Publish Now</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Full Screen Lightbox Viewer with Multi-Photo Gallery Navigation */}
+      {!!currentLightboxPhoto && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setLightbox(null)}
+        >
+          <View nativeID="publication-image-preview" accessibilityViewIsModal style={styles.lightbox}>
+            {/* Header Bar */}
+            <View style={styles.lightboxHeader}>
+              <View style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                <Text numberOfLines={1} style={styles.lightboxTitle}>
+                  {currentLightboxPhoto.name || 'Photo Preview'}
+                </Text>
+                {lightbox && lightbox.photos.length > 1 && (
+                  <Text style={styles.lightboxSubtext}>
+                    Photo {lightbox.index + 1} of {lightbox.photos.length} · Use ← and → keys to browse
+                  </Text>
                 )}
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {lightbox && lightbox.photos.length > 1 && (
+                  <View style={styles.lightboxIndexPill}>
+                    <Text style={styles.lightboxIndexPillText}>
+                      {lightbox.index + 1} / {lightbox.photos.length}
+                    </Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Close image preview"
+                  onPress={() => setLightbox(null)}
+                  style={styles.lightboxCloseBtn}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
             </View>
 
-            {/* ── LIVE PREVIEW CARD ── */}
-            <View style={styles.livePreviewSection}>
-              <View style={styles.livePreviewCard}>
-                <View style={styles.livePreviewHeader}>
-                  <View style={styles.livePreviewIcon}>
-                    <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.livePreviewTitle}>Live Preview</Text>
+            {/* Main Stage with Navigation Arrows */}
+            <View style={styles.lightboxStage}>
+              {lightboxFailed ? (
+                <View style={styles.lightboxFallback}>
+                  <Ionicons name="image-outline" size={48} color="#94A3B8" />
+                  <Text style={styles.lightboxFallbackText}>
+                    This image could not load. Please close the preview and try again.
+                  </Text>
                 </View>
+              ) : (
+                <Image
+                  source={{ uri: currentLightboxPhoto.uri }}
+                  style={styles.lightboxImage}
+                  resizeMode="contain"
+                  accessibilityLabel={currentLightboxPhoto.name}
+                  onError={() => setLightboxFailed(true)}
+                />
+              )}
 
-                {/* Platform Switcher */}
-                <View style={styles.platformSwitchBar}>
-                  {(['facebook', 'instagram', 'website'] as const).map((plat) => {
-                    const active = previewPlatform === plat;
-                    const iconName =
-                      plat === 'facebook' ? 'logo-facebook' : plat === 'instagram' ? 'logo-instagram' : 'globe-outline';
-                    const activeColor = plat === 'facebook' ? '#1877F2' : plat === 'instagram' ? '#E4405F' : '#4C007C';
-                    const label = plat === 'facebook' ? 'Facebook' : plat === 'instagram' ? 'Instagram' : 'Website';
+              {/* Previous Photo Arrow */}
+              {lightbox && lightbox.photos.length > 1 && (
+                <TouchableOpacity
+                  style={[styles.lightboxArrow, styles.lightboxArrowLeft]}
+                  onPress={handleLightboxPrev}
+                  accessibilityRole="button"
+                  accessibilityLabel="Previous photo"
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+
+              {/* Next Photo Arrow */}
+              {lightbox && lightbox.photos.length > 1 && (
+                <TouchableOpacity
+                  style={[styles.lightboxArrow, styles.lightboxArrowRight]}
+                  onPress={handleLightboxNext}
+                  accessibilityRole="button"
+                  accessibilityLabel="Next photo"
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Bottom Filmstrip Carousel */}
+            {lightbox && lightbox.photos.length > 1 && (
+              <View style={styles.lightboxFilmstripWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.lightboxFilmstrip}
+                >
+                  {lightbox.photos.map((item, idx) => {
+                    const isActive = idx === lightbox.index;
                     return (
                       <TouchableOpacity
-                        key={plat}
-                        style={[styles.platformTab, active && styles.platformTabActive]}
-                        onPress={() => setPreviewPlatform(plat)}
-                        activeOpacity={0.8}
+                        key={`${item.uri}-${idx}`}
+                        style={[
+                          styles.lightboxThumb,
+                          isActive && styles.lightboxThumbActive,
+                        ]}
+                        onPress={() => {
+                          setLightbox({ photos: lightbox.photos, index: idx });
+                          setLightboxFailed(false);
+                        }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Jump to ${item.name}`}
                       >
-                        <Ionicons
-                          name={iconName as any}
-                          size={14}
-                          color={active ? activeColor : '#64748B'}
-                          style={{ marginRight: 6 }}
-                        />
-                        <Text style={[styles.platformTabText, active && { color: activeColor, fontWeight: '700' }]}>
-                          {label}
-                        </Text>
+                        <Image source={{ uri: item.uri }} style={styles.lightboxThumbImg} resizeMode="cover" />
                       </TouchableOpacity>
                     );
                   })}
-                </View>
-
-                {/* Device Switcher */}
-                <View style={styles.deviceSwitchBar}>
-                  <TouchableOpacity
-                    style={[styles.deviceTab, previewDevice === 'mobile' && styles.deviceTabActive]}
-                    onPress={() => setPreviewDevice('mobile')}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.deviceTabText, previewDevice === 'mobile' && styles.deviceTabTextActive]}>
-                      Mobile
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.deviceTab, previewDevice === 'desktop' && styles.deviceTabActive]}
-                    onPress={() => setPreviewDevice('desktop')}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[styles.deviceTabText, previewDevice === 'desktop' && styles.deviceTabTextActive]}>
-                      Desktop
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Mockup Preview Frame */}
-                <View style={[styles.mockupFrame, { width: previewCardWidth }]}>
-                  {previewPlatform === 'facebook' && (
-                    <View>
-                      <View style={styles.fbHeader}>
-                        <Image
-                          source={require('../../assets/images/jmc_logo_sm.png')}
-                          style={styles.fbAvatar}
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.fbPageName}>Jose Maria College Foundation Inc.</Text>
-                          <Text style={styles.fbMeta}>Just now · Public</Text>
-                        </View>
-                        <Ionicons name="ellipsis-horizontal" size={16} color="#64748B" />
-                      </View>
-                      <Text style={styles.fbCaption}>
-                        {finalCaption.trim() || 'Your final caption will appear here...'}
-                      </Text>
-                      {previewMediaList.length > 0 && (
-                        <View style={{ marginTop: 8 }}>
-                          <FacebookMediaGrid
-                            images={previewMediaList.map((m: any) => m.url)}
-                            onImagePress={(uri: string) => onOpenFullScreenImage?.(uri)}
-                          />
-                        </View>
-                      )}
-                      <View style={styles.fbActionsRow}>
-                        <View style={styles.fbActionBtn}>
-                          <Ionicons name="thumbs-up-outline" size={15} color="#64748B" />
-                          <Text style={styles.fbActionText}>Like</Text>
-                        </View>
-                        <View style={styles.fbActionBtn}>
-                          <Ionicons name="chatbubble-outline" size={15} color="#64748B" />
-                          <Text style={styles.fbActionText}>Comment</Text>
-                        </View>
-                        <View style={styles.fbActionBtn}>
-                          <Ionicons name="arrow-redo-outline" size={15} color="#64748B" />
-                          <Text style={styles.fbActionText}>Share</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {previewPlatform === 'instagram' && (
-                    <View>
-                      <View style={styles.fbHeader}>
-                        <Image
-                          source={require('../../assets/images/jmc_logo_sm.png')}
-                          style={styles.fbAvatar}
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.fbPageName}>jmcfi_official</Text>
-                          <Text style={styles.fbMeta}>Davao City, Philippines</Text>
-                        </View>
-                        <Ionicons name="ellipsis-horizontal" size={16} color="#64748B" />
-                      </View>
-                      {previewMediaList.length > 0 ? (
-                        <InstagramMediaCarousel
-                          images={previewMediaList.map((m: any) => m.url)}
-                          onImagePress={(uri: string) => onOpenFullScreenImage?.(uri)}
-                        />
-                      ) : (
-                        <View style={[styles.emptyMediaBox, { height: 180 }]}>
-                          <Text style={styles.emptyMediaText}>No image for Instagram post</Text>
-                        </View>
-                      )}
-                      <View style={styles.igActionsRow}>
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <Ionicons name="heart-outline" size={20} color="#0F172A" />
-                          <Ionicons name="chatbubble-outline" size={19} color="#0F172A" />
-                          <Ionicons name="paper-plane-outline" size={19} color="#0F172A" />
-                        </View>
-                        <Ionicons name="bookmark-outline" size={19} color="#0F172A" />
-                      </View>
-                      <Text style={styles.igCaption}>
-                        <Text style={{ fontWeight: '700' }}>jmcfi_official </Text>
-                        {finalCaption.trim() || 'Your final caption will appear here...'}
-                      </Text>
-                    </View>
-                  )}
-
-                  {previewPlatform === 'website' && (
-                    <View style={{ padding: 12 }}>
-                      {previewMediaList.length > 0 && (
-                        <Image
-                          source={{ uri: previewMediaList[0].url }}
-                          style={styles.webCoverImg}
-                          resizeMode="cover"
-                        />
-                      )}
-                      <View style={styles.webDeptBadge}>
-                        <Text style={styles.webDeptBadgeText}>{deptName}</Text>
-                      </View>
-                      <Text style={styles.webTitle}>{request?.title || 'Untitled Article'}</Text>
-                      <Text style={styles.webMeta}>Published by IMC · {submittedDateText || 'Today'}</Text>
-                      <Text style={styles.webBody}>
-                        {finalCaption.trim() || 'Your final article content will appear here...'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text style={styles.previewDisclaimer}>
-                  Preview is illustrative; the published layout may vary by platform.
-                </Text>
+                </ScrollView>
               </View>
-            </View>
-          </ScrollView>
-
-          {/* ── Sticky Footer ── */}
-          {isPending && (
-            <View style={styles.footer}>
-              <View style={styles.footerActions}>
-                <TouchableOpacity
-                  style={styles.rejectBtn}
-                  onPress={() => onReject(request)}
-                  disabled={isPublishing || isSavingChanges}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.rejectBtnText}>Reject</Text>
-                </TouchableOpacity>
-
-                {onSaveChanges && (
-                  <TouchableOpacity
-                    style={[styles.saveChangesBtn, (isSavingChanges || isPublishing) && { opacity: 0.7 }]}
-                    onPress={handleSaveChangesPress}
-                    disabled={isSavingChanges || isPublishing}
-                    activeOpacity={0.85}
-                  >
-                    {isSavingChanges ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
-                    ) : (
-                      <Ionicons name="save-outline" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    )}
-                    <Text style={styles.saveChangesBtnText}>Save Changes</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[styles.publishBtn, (isPublishing || isSavingChanges) && { opacity: 0.7 }]}
-                  onPress={handlePublishPress}
-                  disabled={isPublishing || isSavingChanges}
-                  activeOpacity={0.85}
-                >
-                  {isPublishing ? (
-                    <ActivityIndicator size="small" color="#0F172A" />
-                  ) : (
-                    <Text style={styles.publishBtnText}>Publish</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
-    </Modal>
+            )}
+          </View>
+        </Modal>
+      )}
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.58)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+  modalOverlay: {
+    ...dashboardStyles.modalBackdrop,
   },
   modalCard: {
-    width: '100%',
-    maxWidth: 1120,
-    maxHeight: '94%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    ...dashboardStyles.modalCard,
+    width: '96%',
+    maxWidth: 1200,
+    borderTopWidth: 4,
+    borderTopColor: BRAND_PURPLE,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 16,
   },
-  header: {
-    backgroundColor: '#4C007C',
-    paddingHorizontal: 24,
-    paddingVertical: 15,
+  modalCardDark: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
+  },
+  modalHeader: {
+    ...dashboardStyles.modalHeader,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalHeaderDark: {
+    borderBottomColor: '#334155',
+  },
+  headerLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  headerBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: dashboardUi.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  badgeLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.6,
+  },
+  directBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  directBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#7C3AED',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  headerTitleDark: {
+    color: Colors.textPrimary,
+  },
+  headerCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCloseBtnDark: {
+    borderColor: '#334155',
+    backgroundColor: '#1E293B',
+  },
+  modalBodyScroll: {
+    flexShrink: 1,
+    minHeight: 0,
+  },
+  modalBodyContent: {
+    padding: 20,
+    gap: 16,
+  },
+  stepperCard: {
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+  },
+  stepperCardDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  stepperHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  headerIconBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 199, 44, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  headerIconInner: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    backgroundColor: '#FFC72C',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIconCornerBadge: {
-    position: 'absolute',
-    bottom: -3,
-    right: -3,
-    width: 15,
-    height: 15,
-    borderRadius: 7.5,
-    backgroundColor: '#4C007C',
-    borderWidth: 1.5,
-    borderColor: '#FFC72C',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
+  stepperTitle: {
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    color: Colors.textPrimary,
   },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.28)',
-    borderRadius: 8,
+  stepperTitleDark: {
+    color: Colors.textPrimary,
   },
-  bodyScroll: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  bodyContent: {
-    padding: 24,
-    paddingBottom: 32,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  postTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  submittedDate: {
-    fontSize: 13,
+  stepperSub: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#64748B',
   },
-  metaCardsRow: {
+  stepsRow: {
     flexDirection: 'row',
-    gap: 14,
-    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
   },
-  metaCard: {
+  stepItem: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  stepName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginTop: 4,
+  },
+  stepNameDark: {
+    color: Colors.textPrimary,
+  },
+  stepSubText: {
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 2,
+    letterSpacing: 0.4,
+  },
+  stepConnector: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    height: 2,
+    marginHorizontal: 8,
+    marginTop: -16,
+  },
+  stepperGuidance: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 12,
+    lineHeight: 17,
+  },
+  stepperGuidanceDark: {
+    color: '#94A3B8',
+  },
+  splitGrid: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  splitGridStacked: {
+    flexDirection: 'column',
+  },
+  leftColumnWrap: {
+    gap: 16,
+  },
+  rightColumnWrap: {
+    gap: 16,
+  },
+  panelCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 16,
   },
-  metaLabel: {
+  panelCardDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  imcPanelHighlight: {
+    borderColor: '#D8B4FE',
+  },
+  panelHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  panelTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  panelTitleDark: {
+    color: Colors.textPrimary,
+  },
+  panelSubtitle: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  categoryPillText: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#7C3AED',
+  },
+  infoField: {
+    marginBottom: 12,
+  },
+  fieldHeading: {
+    fontSize: 10.5,
+    fontWeight: '800',
     color: '#64748B',
     letterSpacing: 0.5,
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
-  metaValue: {
-    fontSize: 14,
+  titleText: {
+    fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.textPrimary,
+    lineHeight: 21,
   },
-  columnsContainer: {
+  titleTextDark: {
+    color: Colors.textPrimary,
+  },
+  gridTwoCols: {
     flexDirection: 'row',
-    gap: 20,
-    alignItems: 'stretch',
+    gap: 12,
+    marginBottom: 12,
   },
-  columnCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
+  deptBadge: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  deptBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  primaryVal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  primaryValDark: {
+    color: Colors.textPrimary,
+  },
+  secondaryVal: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  dateVal: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  dateValDark: {
+    color: Colors.textPrimary,
+  },
+  platformBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  platformPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
   },
-  sectionTitle: {
-    fontSize: 16,
+  platformPillText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 3,
   },
-  sectionSubtitle: {
-    fontSize: 12.5,
+  originalCaptionWrap: {
+    marginTop: 6,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  captionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  captionSub: {
+    fontSize: 11,
     color: '#64748B',
-    marginBottom: 16,
   },
-  carouselFrame: {
+  originalCaptionBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    maxHeight: 150,
+  },
+  originalCaptionBoxDark: {
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+  },
+  captionWrap: {
     width: '100%',
-    height: 240,
+  },
+  downloadAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1,
+    borderColor: '#D8B4FE',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  downloadAllBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#4C007C',
+  },
+  previewArea: {
+    height: 260,
     backgroundColor: '#F8FAFC',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    position: 'relative',
+    marginTop: 8,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
-  carouselImageTouch: {
+  previewAreaDark: {
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+  },
+  mainPreviewImage: {
     width: '100%',
     height: '100%',
   },
-  carouselMainImage: {
-    width: '100%',
-    height: '100%',
-  },
-  carouselArrowBtn: {
+  loadingSpinner: {
     position: 'absolute',
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  fallbackBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 4,
+    padding: 16,
   },
-  emptyMediaBox: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
+  fallbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 6,
+    textAlign: 'center',
   },
-  emptyMediaText: {
-    fontSize: 13,
+  fallbackTextDark: {
     color: '#94A3B8',
   },
-  thumbRow: {
+  fallbackSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  arrowButton: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -18 }],
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  arrowLeft: {
+    left: 10,
+  },
+  arrowRight: {
+    right: 10,
+  },
+  counterBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  counterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  thumbnailsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 2,
+  },
+  thumbBox: {
+    width: 54,
+    height: 54,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+  },
+  thumbBoxDark: {
+    borderColor: '#334155',
+    backgroundColor: '#0F172A',
+  },
+  thumbBoxActive: {
+    borderColor: BRAND_PURPLE,
+    borderWidth: 2.5,
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  platformTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 10,
+  },
+  platformTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  platformTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  livePhotoStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  livePhotoStatusReplaced: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  livePhotoStatusOriginal: {
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  livePhotoStatusText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  mockupCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    padding: 12,
+  },
+  mockupCardDark: {
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+  },
+  mockupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  mockupLogo: {
+    width: 32,
+    height: 32,
+  },
+  mockupAuthor: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  mockupAuthorDark: {
+    color: Colors.textPrimary,
+  },
+  mockupPlatformSub: {
+    fontSize: 10.5,
+    color: '#64748B',
+  },
+  mockupWebsiteTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: 6,
+  },
+  mockupWebsiteTitleDark: {
+    color: Colors.textPrimary,
+  },
+  websiteArticleCard: {
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    gap: 10,
+  },
+  websiteArticleCardDark: {
+    borderColor: '#334155',
+    backgroundColor: '#0F172A',
+  },
+  websiteBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  websiteCategoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  websiteCategoryPillDark: {
+    backgroundColor: '#064E3B',
+  },
+  websiteCategoryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  websiteDomainText: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  websiteDomainTextDark: {
+    color: '#64748B',
+  },
+  websiteHeadline: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 22,
+  },
+  websiteHeadlineDark: {
+    color: '#F8FAFC',
+  },
+  websiteBylineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 4,
+  },
+  websiteBylineLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  websiteAuthorText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  websiteAuthorTextDark: {
+    color: '#F8FAFC',
+  },
+  websiteBylineSub: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+  },
+  websiteMediaWrap: {
+    width: '100%',
+    gap: 8,
+  },
+  websiteFeaturedImageBox: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  websiteFeaturedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  websiteFeaturedBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  websiteFeaturedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  websiteThumbnailsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  websiteThumbBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+  },
+  websiteThumbBoxActive: {
+    borderColor: '#059669',
+    borderWidth: 2,
+  },
+  websiteThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  websiteArticleBody: {
+    paddingTop: 2,
+  },
+  websiteFooterBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  websiteFooterBarDark: {
+    borderTopColor: '#1E293B',
+  },
+  websiteFooterUrl: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '700',
+  },
+  websiteTagPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  websiteTagPillDark: {
+    backgroundColor: '#1E293B',
+  },
+  websiteTagPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  websiteTagPillTextDark: {
+    color: '#94A3B8',
+  },
+  mockupCaptionWrap: {
+    marginBottom: 8,
+  },
+  mockupCaptionEmpty: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#94A3B8',
+  },
+  mockupEmptyMedia: {
+    height: 120,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginVertical: 4,
+  },
+  mockupEmptyMediaText: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  mockupInteractions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  mockupInteractionsDark: {
+    borderTopColor: '#1E293B',
+  },
+  mockupActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  mockupActionText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  imcActiveBadge: {
+    backgroundColor: '#F3E8FF',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  imcActiveBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7C3AED',
+  },
+  formGroup: {
+    marginTop: 14,
+  },
+  labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
-    gap: 10,
-  },
-  thumbBox: {
-    width: 68,
-    height: 50,
-    borderRadius: 7,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  thumbBoxActive: {
-    borderColor: '#4C007C',
-  },
-  thumbImg: {
-    width: '100%',
-    height: '100%',
-  },
-  counterText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filenameText: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 6,
-  },
-  downloadAllBtn: {
-    marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEF9E7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  downloadAllText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 16,
-  },
-  subLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  platformRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  platformChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  platformChipText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  readOnlyBox: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 12,
-  },
-  readOnlyText: {
-    fontSize: 13.5,
-    color: '#334155',
-    lineHeight: 20,
+    marginBottom: 6,
   },
   fieldLabel: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 8,
+    color: Colors.textPrimary,
   },
-  fieldLabelNoMargin: {
-    fontSize: 13,
+  fieldLabelDark: {
+    color: Colors.textPrimary,
+  },
+  revertBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#F3E8FF',
+  },
+  revertBtnText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#0F172A',
-  },
-  optionalTag: {
-    fontSize: 12,
-    color: '#64748B',
+    color: '#4C007C',
   },
   captionInput: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 8,
-    padding: 12,
-    minHeight: 110,
-    fontSize: 13.5,
-    color: '#0F172A',
     backgroundColor: '#FFFFFF',
-    lineHeight: 20,
+    padding: 10,
+    fontSize: 13,
+    color: Colors.textPrimary,
+    minHeight: 140,
+    lineHeight: 19,
   },
-  charCount: {
+  captionInputDark: {
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+    color: Colors.textPrimary,
+  },
+  charCounterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  inputHelp: {
+    fontSize: 11,
+    color: '#64748B',
+    flex: 1,
+  },
+  charCounter: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  charCounterDark: {
+    color: '#94A3B8',
+  },
+  optionalBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  optionalBadgeDark: {
+    backgroundColor: '#334155',
+  },
+  optionalBadgeText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '700',
+  },
+  optionalBadgeTextDark: {
+    color: '#CBD5E1',
+  },
+  clearAllImagesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  clearAllImagesText: {
+    fontSize: 11,
+    color: '#DC2626',
+    fontWeight: '600',
+  },
+  uploadHelpText: {
     fontSize: 11.5,
     color: '#64748B',
-    textAlign: 'right',
-    marginTop: 5,
+    marginBottom: 8,
+    lineHeight: 16,
   },
   uploadDropzone: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#CBD5E1',
+    borderColor: '#C084FC',
+    backgroundColor: '#FAF5FF',
     borderRadius: 10,
-    backgroundColor: '#FAFAFC',
-    paddingVertical: 22,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  uploadDropzoneActive: {
-    borderColor: '#5B21B6',
-    backgroundColor: '#F5F3FF',
+  uploadDropzoneDark: {
+    borderColor: '#9333EA',
+    backgroundColor: '#1E1B4B',
   },
-  uploadIconBox: {
+  uploadIconCircle: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 20,
     backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
-  uploadTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  uploadSubtitle: {
-    fontSize: 12.5,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  uploadHint: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginBottom: 14,
-  },
-  browseBtn: {
-    backgroundColor: '#4C007C',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 7,
-  },
-  browseBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  selectedBar: {
-    marginTop: 14,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  selectedBarCount: {
-    fontSize: 12.5,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  useOriginalsText: {
-    fontSize: 12.5,
+  uploadDropzoneTitle: {
+    fontSize: 12,
     fontWeight: '700',
     color: '#4C007C',
+    textAlign: 'center',
   },
-  replacementGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 12,
+  uploadDropzoneTitleDark: {
+    color: '#E9D5FF',
   },
-  replacementCard: {
-    width: 145,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 9,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-  },
-  replacementThumb: {
-    width: '100%',
-    height: 98,
-    backgroundColor: '#F1F5F9',
-  },
-  replacementInfo: {
-    padding: 8,
-  },
-  replacementName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  replacementSize: {
-    fontSize: 11,
+  uploadDropzoneHint: {
+    fontSize: 10.5,
     color: '#64748B',
     marginTop: 2,
   },
-  removeBtn: {
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 7,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#FEE2E2',
+  uploadedImagesWrap: {
+    marginTop: 10,
   },
-  removeBtnText: {
-    fontSize: 12,
+  uploadedListTitle: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#059669',
+    marginBottom: 6,
   },
-  livePreviewSection: {
-    marginTop: 24,
-    alignItems: 'center',
+  uploadedListTitleDark: {
+    color: '#86EFAC',
   },
-  livePreviewCard: {
-    width: '100%',
-    maxWidth: 700,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-  livePreviewHeader: {
-    width: '100%',
+  uploadedPhotoGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 16,
+    marginTop: 4,
   },
-  livePreviewIcon: {
-    width: 34,
-    height: 34,
+  uploadedPhotoBox: {
+    position: 'relative',
+    width: 68,
+    height: 68,
     borderRadius: 8,
-    backgroundColor: '#0F172A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  livePreviewTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  platformSwitchBar: {
-    width: '100%',
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 9,
-    padding: 4,
-    marginBottom: 12,
-  },
-  platformTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 7,
-  },
-  platformTabActive: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 1,
   },
-  platformTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  deviceSwitchBar: {
-    width: '100%',
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 9,
-    padding: 3,
-    marginBottom: 16,
-  },
-  deviceTab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 7,
-    borderRadius: 7,
-  },
-  deviceTabActive: {
+  uploadedPhotoBoxDark: {
+    borderColor: '#334155',
     backgroundColor: '#0F172A',
   },
-  deviceTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  deviceTabTextActive: {
-    color: '#FFFFFF',
-  },
-  mockupFrame: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
+  uploadedPhotoThumbWrap: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6.5,
     overflow: 'hidden',
-    paddingVertical: 12,
   },
-  fbHeader: {
+  uploadedPhotoBoxImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6.5,
+  },
+  uploadedPhotoRemoveBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  releaseSummaryBox: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    padding: 12,
+    marginTop: 16,
+  },
+  releaseSummaryBoxDark: {
+    backgroundColor: '#052E16',
+    borderColor: '#166534',
+  },
+  summaryBoxTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  summaryBoxTitleDark: {
+    color: '#86EFAC',
+  },
+  summaryItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    gap: 10,
-    marginBottom: 8,
+    gap: 6,
+    marginTop: 4,
   },
-  fbAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-  },
-  fbPageName: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  fbMeta: {
+  summaryItemText: {
     fontSize: 11.5,
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#166534',
   },
-  fbCaption: {
-    fontSize: 13.5,
-    color: '#1E293B',
-    lineHeight: 19,
-    paddingHorizontal: 14,
+  summaryItemTextDark: {
+    color: '#BBF7D0',
   },
-  fbActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  modalFooter: {
+    ...dashboardStyles.modalFooter,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    marginTop: 10,
-    paddingTop: 10,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
   },
-  fbActionBtn: {
+  modalFooterDark: {
+    backgroundColor: '#0F172A',
+    borderTopColor: '#334155',
+  },
+  footerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
-  fbActionText: {
+  btnReject: {
+    minHeight: 36,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#D91E28',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#D91E28',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 4,
+    elevation: 3,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 6px rgba(217, 30, 40, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+        transition: 'all 120ms ease',
+      } as any)
+      : {}),
+  },
+  btnRejectDark: {
+    backgroundColor: '#B91C1C',
+    shadowColor: '#000000',
+  },
+  btnRejectText: {
     fontSize: 12.5,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
-  igActionsRow: {
+  btnSaveDraft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    minHeight: 36,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 120ms ease' } : {}),
+  },
+  btnSaveDraftDark: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
+  btnSaveDraftText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: BRAND_PURPLE,
+  },
+  btnPublish: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 36,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFC72C',
+    shadowColor: '#FFC72C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 120ms ease' } : {}),
+  },
+  btnPublishText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  lightbox: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.94)',
+    padding: 16,
+  },
+  lightboxHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingBottom: 12,
+    flexShrink: 0,
   },
-  igCaption: {
-    fontSize: 13,
-    color: '#0F172A',
-    lineHeight: 18,
-    paddingHorizontal: 14,
-  },
-  webCoverImg: {
-    width: '100%',
-    height: 180,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  webDeptBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  webDeptBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#5B21B6',
-  },
-  webTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  webMeta: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 8,
-  },
-  webBody: {
-    fontSize: 13.5,
-    color: '#334155',
-    lineHeight: 20,
-  },
-  previewDisclaimer: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  footer: {
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  footerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  rejectBtn: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 40,
-  },
-  rejectBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  saveChangesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4C007C',
-    borderRadius: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  saveChangesBtnText: {
+  lightboxTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  publishBtn: {
-    backgroundColor: '#FFC72C',
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+  lightboxSubtext: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    marginTop: 2,
+  },
+  lightboxIndexPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  lightboxIndexPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lightboxCloseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightboxStage: {
+    flex: 1,
+    width: '100%',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 110,
-    minHeight: 40,
   },
-  publishBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
+  lightboxArrow: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -22 }],
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  lightboxArrowLeft: {
+    left: 16,
+  },
+  lightboxArrowRight: {
+    right: 16,
+  },
+  lightboxImage: {
+    width: '100%',
+    flex: 1,
+    minHeight: 0,
+  },
+  lightboxFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  lightboxFallbackText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  lightboxFilmstripWrap: {
+    height: 64,
+    marginTop: 10,
+    justifyContent: 'center',
+  },
+  lightboxFilmstrip: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  lightboxThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  lightboxThumbActive: {
+    borderColor: '#C084FC',
+    borderWidth: 2.5,
+  },
+  lightboxThumbImg: {
+    width: '100%',
+    height: '100%',
   },
 });

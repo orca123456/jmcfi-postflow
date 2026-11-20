@@ -149,11 +149,9 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 
             $successfulPlatforms = array_merge($completed, array_keys($publishResults));
 
-            // If no target platform succeeded at all, mark as publish failed.
-            // If at least one platform succeeded (e.g. Facebook/Instagram while WordPress was unconfigured), consider the post published.
-            if (empty($successfulPlatforms)) {
-                // If in local/testing environment, fallback to simulated publish so testing works without third-party tokens
-                if (app()->environment('local', 'testing') || config('app.env') === 'local') {
+            if ($publishErrors !== [] || ($publishResults === [] && $completed === [])) {
+                // If in local development environment (and not running unit tests) and nothing was attempted/configured, fallback to simulated publish
+                if (!app()->runningUnitTests() && (app()->environment('local') || config('app.env') === 'local') && empty($publishResults) && empty($publishErrors)) {
                     foreach ($lowerPlatforms as $p) {
                         PublishingRecord::updateOrCreate(
                             ['post_request_id' => $this->postRequest->id, 'platform' => $p],

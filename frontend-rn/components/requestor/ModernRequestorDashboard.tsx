@@ -20,6 +20,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   AccessibilityInfo,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -29,6 +30,7 @@ import { FacebookMediaGrid } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
 import { FormattedText } from '../ui/FormattedText';
 import { RichTextEditor } from '../ui/RichTextEditor';
+import { DirectImcRequestDetailsModal } from './DirectImcRequestDetailsModal';
 import { BorderRadius, FontSize, Spacing } from '../../constants/theme';
 import { useThemeStore } from '../../store/theme';
 
@@ -36,6 +38,8 @@ const BRAND_PURPLE = '#4C007C';
 const BRAND_GOLD = '#FFC72C';
 const GOLD_INK = '#1A1A2E';
 const CONTROL_HEIGHT = 44;
+const FORM_BODY_SIZE = 14;
+const FORM_LABEL_SIZE = 12;
 const getPalette = (isDarkMode: boolean) => ({
   dark: isDarkMode,
   surface: isDarkMode ? '#16213A' : 'rgba(255, 255, 255, 0.94)',
@@ -72,7 +76,7 @@ interface RequestCardData {
   id: string;
   code: string;
   title: string;
-  status: 'Pending' | 'Approved' | 'Reviewing';
+  status: 'Pending' | 'Reviewing' | 'Editing' | 'Published' | 'Rejected';
   rawStatus?: string;
   routingType?: string;
   date: string;
@@ -94,22 +98,28 @@ const isDirectImcPost = (p: any): boolean => {
 
 const mapRawPostToCard = (p: any, fallbackUser?: any): RequestCardData => {
   let st: RequestCardData['status'] = 'Pending';
-  if (p.status === 'approved' || p.status === 'scheduled' || p.status === 'published') {
-    st = 'Approved';
-  } else if (p.status === 'pending_imc_qa' || p.status === 'pending_office_head' || p.status === 'pending_vice_president') {
+  const workflows = p.approval_workflows || p.approvalWorkflows || [];
+  const latestWf = Array.isArray(workflows) && workflows.length > 0 ? workflows[workflows.length - 1] : null;
+  const wfAction = String(latestWf?.action || '').toLowerCase();
+  const rawStatus = String(p.status || '').toLowerCase();
+
+  if (rawStatus === 'published' || rawStatus === 'scheduled' || rawStatus === 'approved' || wfAction === 'approved') {
+    st = 'Published';
+  } else if (rawStatus === 'rejected') {
+    st = 'Rejected';
+  } else if (wfAction === 'editing' || rawStatus === 'editing') {
+    st = 'Editing';
+  } else if (wfAction === 'reviewing' || rawStatus === 'reviewing') {
+    st = 'Reviewing';
+  } else if (rawStatus === 'pending_imc_qa' || rawStatus === 'pending_office_head' || rawStatus === 'pending_vice_president' || rawStatus === 'pending') {
     st = 'Pending';
   } else {
     st = 'Reviewing';
   }
 
-  const checklist = p.imc_branding_checklist || null;
-  const effectiveMedia = (checklist?.has_replacement_media && Array.isArray(checklist?.final_media) && checklist.final_media.length > 0)
-    ? checklist.final_media
-    : (Array.isArray(p.media) ? p.media : []);
-
   let thumb = '';
-  if (Array.isArray(effectiveMedia) && effectiveMedia.length > 0 && effectiveMedia[0]?.url) {
-    thumb = resolveImageUrl(effectiveMedia[0].url) || '';
+  if (Array.isArray(p.media) && p.media.length > 0 && p.media[0]?.url) {
+    thumb = resolveImageUrl(p.media[0].url) || '';
   } else if (p.featured_image) {
     thumb = resolveImageUrl(p.featured_image) || '';
   }
@@ -122,21 +132,21 @@ const mapRawPostToCard = (p: any, fallbackUser?: any): RequestCardData => {
     title: p.title || 'Untitled Request',
     status: st,
     rawStatus: p.status,
-    routingType: p.routing_type || p.routingType || 'direct_imc',
+    routingType: p.routing_type ?? p.routingType ?? 'standard',
     date: p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today',
     time: p.created_at ? new Date(p.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : undefined,
     department: p.requestor?.department || fallbackUser?.department || 'BSIT Department',
     requestedBy: p.requestor?.full_name || fallbackUser?.name || 'Requestor',
-    mediaCount: Array.isArray(effectiveMedia) ? effectiveMedia.length : (p.featured_image ? 1 : 0),
+    mediaCount: Array.isArray(p.media) ? p.media.length : (p.featured_image ? 1 : 0),
     thumbnailUrl: thumb,
-    caption: checklist?.refined_caption || p.caption_narrative || '',
-    media: effectiveMedia,
+    caption: p.caption_narrative || '',
+    media: Array.isArray(p.media) ? p.media : [],
     rawPost: p,
     targetPlatforms: Array.isArray(p.target_platforms)
       ? p.target_platforms
       : typeof p.target_platforms === 'string'
-      ? [p.target_platforms]
-      : ['facebook'],
+        ? [p.target_platforms]
+        : ['facebook'],
   };
 };
 
@@ -153,6 +163,14 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [contentWidth, setContentWidth] = useState(0);
   const [listWidth, setListWidth] = useState(0);
+  const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    setContentWidth((prev) => (Math.abs(prev - next) >= 4 ? next : prev));
+  }, []);
+  const handleListLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    setListWidth((prev) => (Math.abs(prev - next) >= 4 ? next : prev));
+  }, []);
   const [reduceMotion, setReduceMotion] = useState(false);
   const isDesktop = contentWidth >= 1040;
   const isCompact = contentWidth < 600;
@@ -172,7 +190,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
   // View & Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Approved' | 'Reviewing'>('All');
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Reviewing' | 'Editing' | 'Published' | 'Rejected'>('All');
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [selectedPost, setSelectedPost] = useState<RequestCardData | null>(null);
@@ -200,10 +218,78 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
   const [isOptimizingImages, setIsOptimizingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [focusedField, setFocusedField] = useState<'title' | 'caption' | null>(null);
+  const titleInputRef = useRef<TextInput>(null);
+  const captionText = formCaption.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').trim();
+  const selectedPlatformCount = Object.values(targetPlatforms).filter(Boolean).length;
+  const formReady = Boolean(formTitle.trim() && captionText && selectedPlatformCount);
+  const fieldErrors = {
+    title: submitAttempted && !formTitle.trim() ? 'Add a request title.' : '',
+    caption: submitAttempted && !captionText ? 'Write a caption for this request.' : '',
+    platforms: submitAttempted && !selectedPlatformCount ? 'Choose at least one publishing destination.' : '',
+  };
+  const validationSummary = Object.values(fieldErrors).filter(Boolean).join(' ');
+
+  // The shared web editor owns its contenteditable element; label it without changing its API.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const editor = document.getElementById('imc-request-caption')?.querySelector('[contenteditable="true"]');
+    if (!editor) return;
+    editor.setAttribute('role', 'textbox');
+    editor.setAttribute('aria-label', 'Caption, required');
+    editor.setAttribute('aria-multiline', 'true');
+    editor.setAttribute('aria-required', 'true');
+    editor.setAttribute('aria-invalid', String(Boolean(fieldErrors.caption)));
+    if (fieldErrors.caption) editor.setAttribute('aria-describedby', 'imc-caption-error');
+    else editor.removeAttribute('aria-describedby');
+  }, [fieldErrors.caption, isSidePanelOpen]);
+
+  const focusInvalidField = (field: 'title' | 'caption' | 'platforms') => {
+    if (Platform.OS !== 'web') {
+      if (field === 'title') titleInputRef.current?.focus();
+      return;
+    }
+    if (typeof document === 'undefined') return;
+    const holder = document.getElementById(`imc-request-${field}`);
+    const target = field === 'title' ? holder : holder?.querySelector<HTMLElement>(
+      field === 'caption' ? '[contenteditable="true"]' : '[role="checkbox"]',
+    );
+    target?.focus();
+    target?.scrollIntoView({ block: 'center', behavior: 'auto' });
+  };
 
   // Social Preview State
   const [formPreviewPlatform, setFormPreviewPlatform] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [modalPlatformTab, setModalPlatformTab] = useState<'facebook' | 'instagram' | 'website'>('facebook');
+
+  // Close filter dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!isFilterDropdownOpen || Platform.OS !== 'web' || typeof document === 'undefined') return;
+    let timer: any;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest && target.closest('#filter-dropdown-container')) {
+        return;
+      }
+      setIsFilterDropdownOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+    // Delay slightly to prevent the toggle click itself from immediately triggering close
+    timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }, 50);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFilterDropdownOpen]);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
   // Website Featured Image Selection & Drag-to-Scroll State
@@ -394,6 +480,27 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     }
   }, [selectedPost]);
 
+  const currentOpenPostIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (selectedPost?.id && currentOpenPostIdRef.current !== selectedPost.id) {
+      const postId = selectedPost.id;
+      currentOpenPostIdRef.current = postId;
+      postsApi.get(Number(postId)).then((res) => {
+        if (cancelled) return;
+        const fresh = res?.data?.data || res?.data;
+        if (fresh?.id) {
+          setSelectedPost((prev) => (prev && prev.id === postId ? mapRawPostToCard(fresh, user) : prev));
+        }
+      }).catch(() => { });
+    } else if (!selectedPost) {
+      currentOpenPostIdRef.current = null;
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPost?.id, user]);
+
   // AI Compliance Check States
   const [isComplianceModalVisible, setIsComplianceModalVisible] = useState(false);
   const [complianceScore, setComplianceScore] = useState(0);
@@ -425,7 +532,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
           }
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [user?.department]);
 
   // Sync if allRawPosts passed from parent
@@ -499,6 +606,70 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     const start = (currentPage - 1) * itemsPerPage;
     return filteredRequests.slice(start, start + itemsPerPage);
   }, [filteredRequests, currentPage, itemsPerPage]);
+
+  // Pagination Drag-to-Scroll State
+  const paginationScrollRef = useRef<ScrollView>(null);
+  const isDraggingPagination = useRef(false);
+  const dragPaginationStartX = useRef(0);
+  const dragPaginationScrollLeft = useRef(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || filteredRequests.length === 0) return;
+    const cleanupFns: (() => void)[] = [];
+    const timer = setTimeout(() => {
+      const node = (paginationScrollRef.current as any)?.getScrollableNode?.() || (paginationScrollRef.current as any);
+      if (!node || !node.addEventListener) return;
+
+      node.style.cursor = 'grab';
+
+      const onMouseDown = (e: MouseEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest('button, select, option, a, input')) return;
+        isDraggingPagination.current = true;
+        dragPaginationStartX.current = e.pageX;
+        dragPaginationScrollLeft.current = node.scrollLeft;
+        node.style.cursor = 'grabbing';
+        if (typeof document !== 'undefined') {
+          document.body.style.cursor = 'grabbing';
+          document.body.style.userSelect = 'none';
+        }
+      };
+
+      const onMouseMove = (e: MouseEvent) => {
+        if (!isDraggingPagination.current) return;
+        const diff = e.pageX - dragPaginationStartX.current;
+        node.scrollLeft = dragPaginationScrollLeft.current - diff;
+      };
+
+      const onMouseUp = () => {
+        if (isDraggingPagination.current) {
+          isDraggingPagination.current = false;
+          node.style.cursor = 'grab';
+          if (typeof document !== 'undefined') {
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+          }
+        }
+      };
+
+      node.addEventListener('mousedown', onMouseDown);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+      window.addEventListener('mouseleave', onMouseUp);
+
+      cleanupFns.push(() => {
+        node.removeEventListener('mousedown', onMouseDown);
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        window.removeEventListener('mouseleave', onMouseUp);
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      cleanupFns.forEach((fn) => fn());
+    };
+  }, [filteredRequests.length, currentPage]);
 
   const processFiles = async (rawFiles: any[]): Promise<AttachedMediaItem[]> => {
     setIsOptimizingImages(true);
@@ -596,25 +767,6 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     }
   };
 
-  const filterAllowedImages = (items: AttachedMediaItem[]) => {
-    const valid: AttachedMediaItem[] = [];
-    let rejectedVideoOrNonImage = false;
-    for (const item of items) {
-      const mime = String(item.mimeType || '').toLowerCase();
-      const name = String(item.name || '').toLowerCase();
-      const isVideo = mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(name);
-      if (isVideo || (!mime.startsWith('image/') && !/\.(jpe?g|png|webp)$/i.test(name) && !isImageFile(item))) {
-        rejectedVideoOrNonImage = true;
-      } else {
-        valid.push(item);
-      }
-    }
-    if (rejectedVideoOrNonImage) {
-      alert('Video uploads are not allowed. Please select images (JPG, PNG, WebP) only.');
-    }
-    return valid;
-  };
-
   const handlePickMedia = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
@@ -623,17 +775,15 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         copyToCacheDirectory: true,
       });
       if (!res.canceled && res.assets && res.assets.length > 0) {
-        const rawItems = filterAllowedImages(res.assets.map((asset) => ({
+        const rawItems = res.assets.map((asset) => ({
           uri: asset.uri,
           name: asset.name || 'image.jpg',
           file: (asset as any).file,
           mimeType: asset.mimeType || 'image/jpeg',
           size: asset.size || 0,
-        })));
-        if (rawItems.length > 0) {
-          const processed = await processFiles(rawItems);
-          setAttachedFiles((prev) => [...prev, ...processed]);
-        }
+        }));
+        const processed = await processFiles(rawItems);
+        setAttachedFiles((prev) => [...prev, ...processed]);
       }
     } catch {
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -644,17 +794,15 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         input.onchange = async (e: any) => {
           const files = Array.from(e.target.files || []) as File[];
           if (files.length > 0) {
-            const rawItems = filterAllowedImages(files.map((f) => ({
+            const rawItems = files.map((f) => ({
               uri: URL.createObjectURL(f),
               name: f.name,
               file: f,
               mimeType: f.type,
               size: f.size,
-            })));
-            if (rawItems.length > 0) {
-              const processed = await processFiles(rawItems);
-              setAttachedFiles((prev) => [...prev, ...processed]);
-            }
+            }));
+            const processed = await processFiles(rawItems);
+            setAttachedFiles((prev) => [...prev, ...processed]);
           }
         };
         input.click();
@@ -663,12 +811,13 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
   };
 
   const handleSubmit = async () => {
-    if (!formTitle.trim()) {
-      alert('Please enter a content title.');
-      return;
-    }
-    if (!formCaption.replace(/<[^>]*>/g, '').trim()) {
-      alert('Please provide a caption/narrative for the content.');
+    if (isSubmitting) return;
+    setSubmitAttempted(true);
+    const selectedPlatforms = Object.keys(targetPlatforms).filter(
+      (platform) => targetPlatforms[platform as keyof typeof targetPlatforms],
+    );
+    if (!formReady) {
+      focusInvalidField(!formTitle.trim() ? 'title' : !captionText ? 'caption' : 'platforms');
       return;
     }
 
@@ -681,17 +830,6 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         preferredSchedule = `${formDate} ${timePart}`;
       }
 
-      // Collect target platforms
-      const selectedPlatforms: string[] = [];
-      if (targetPlatforms.facebook) selectedPlatforms.push('facebook');
-      if (targetPlatforms.instagram) selectedPlatforms.push('instagram');
-      if (targetPlatforms.website) selectedPlatforms.push('website');
-
-      if (selectedPlatforms.length === 0) {
-        alert('Please select at least one target platform before submitting.');
-        return;
-      }
-
       if (attachedFiles.length > 0) {
         const formData = new FormData();
         formData.append('title', formTitle.trim());
@@ -699,9 +837,6 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         formData.append('routing_type', 'direct_imc');
         for (const p of selectedPlatforms) {
           formData.append('target_platforms[]', p);
-        }
-        if (formDepartment) {
-          formData.append('other_category_name', formDepartment);
         }
         if (preferredSchedule) {
           formData.append('preferred_schedule_at', preferredSchedule);
@@ -756,7 +891,6 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
           caption_narrative: formCaption.trim(),
           routing_type: 'direct_imc',
           target_platforms: selectedPlatforms,
-          other_category_name: formDepartment || undefined,
           preferred_schedule_at: preferredSchedule,
         });
       }
@@ -772,6 +906,8 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       setTimeout(() => setSubmitFeedback(null), 4000);
 
       // Reset fields
+      setSubmitAttempted(false);
+      setFormPreviewPlatform('facebook');
       setFormTitle('');
       setFormCaption('');
       setAttachedFiles([]);
@@ -837,22 +973,36 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       case 'Pending':
         return (
           <View style={[styles.statusBadge, styles.statusPending]}>
-            <Ionicons name="time-outline" size={13} color="#92400E" style={{ marginRight: 4 }} />
-            <Text style={[styles.statusText, { color: '#92400E' }]}>Pending</Text>
+            <Ionicons name="time-outline" size={12} color={palette.dark ? '#FCD34D' : '#92400E'} style={{ marginRight: 4 }} />
+            <Text style={[styles.statusText, { color: palette.dark ? '#FCD34D' : '#92400E' }]}>Pending</Text>
           </View>
         );
-      case 'Approved':
+      case 'Published':
         return (
-          <View style={[styles.statusBadge, styles.statusApproved]}>
-            <Ionicons name="checkmark-circle-outline" size={13} color="#166534" style={{ marginRight: 4 }} />
-            <Text style={[styles.statusText, { color: '#166534' }]}>Approved</Text>
+          <View style={[styles.statusBadge, styles.statusPublished]}>
+            <Ionicons name="checkmark-circle-outline" size={12} color={palette.dark ? '#86EFAC' : '#166534'} style={{ marginRight: 4 }} />
+            <Text style={[styles.statusText, { color: palette.dark ? '#86EFAC' : '#166534' }]}>Published</Text>
           </View>
         );
       case 'Reviewing':
         return (
           <View style={[styles.statusBadge, styles.statusReviewing]}>
-            <Ionicons name="sync-outline" size={13} color="#075985" style={{ marginRight: 4 }} />
-            <Text style={[styles.statusText, { color: '#075985' }]}>Reviewing</Text>
+            <Ionicons name="sync-outline" size={12} color={palette.dark ? '#7DD3FC' : '#075985'} style={{ marginRight: 4 }} />
+            <Text style={[styles.statusText, { color: palette.dark ? '#7DD3FC' : '#075985' }]}>Reviewing</Text>
+          </View>
+        );
+      case 'Editing':
+        return (
+          <View style={[styles.statusBadge, styles.statusEditing]}>
+            <Ionicons name="create-outline" size={12} color={palette.dark ? '#C084FC' : '#7C3AED'} style={{ marginRight: 4 }} />
+            <Text style={[styles.statusText, { color: palette.dark ? '#C084FC' : '#7C3AED' }]}>Editing</Text>
+          </View>
+        );
+      case 'Rejected':
+        return (
+          <View style={[styles.statusBadge, styles.statusRejected]}>
+            <Ionicons name="close-circle-outline" size={12} color={palette.dark ? '#FCA5A5' : '#991B1B'} style={{ marginRight: 4 }} />
+            <Text style={[styles.statusText, { color: palette.dark ? '#FCA5A5' : '#991B1B' }]}>Rejected</Text>
           </View>
         );
     }
@@ -860,7 +1010,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
   return (
     <View nativeID="requestor-imc-workspace" style={styles.container}
-      onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}>
+      onLayout={handleContentLayout}>
       {Platform.OS === 'web' && <style>{`
         #requestor-imc-workspace [role="button"]:focus-visible,
         #requestor-imc-workspace [role="checkbox"]:focus-visible,
@@ -874,6 +1024,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
         #requestor-imc-workspace [role="button"]:hover, #requestor-imc-workspace [role="checkbox"]:hover { opacity: .88; }
         #requestor-imc-workspace [role="button"]:disabled { opacity: .55; }
         #requestor-imc-workspace input { min-width: 0; }
+        #requestor-workspace #requestor-imc-workspace input:focus,
+        #requestor-workspace #requestor-imc-workspace input:focus-visible { outline: none !important; box-shadow: none !important; border-color: ${palette.purple} !important; }
+        #requestor-workspace #requestor-imc-workspace input[aria-invalid="true"] { border-color: ${isDarkMode ? '#FCA5A5' : '#B91C1C'} !important; }
         #requestor-imc-workspace [data-testid="requestor-imc-submit"] *,
         #requestor-imc-workspace [data-testid="requestor-imc-submit"] { color: ${GOLD_INK} !important; }
         @media (prefers-reduced-motion: reduce) {
@@ -883,7 +1036,12 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       {/* ================= TOP SWITCHER & HEADER BAR ================= */}
       <View style={styles.topControlBanner}>
         <View style={styles.topBannerLeft}>
-          <Text style={styles.topBannerTitle}>Create Request to IMC</Text>
+          <View style={styles.topBannerHeaderRow}>
+            <Text style={styles.topBannerTitle}>Create Request to IMC</Text>
+          </View>
+          <Text style={styles.topBannerSubtitle}>
+            Submit and track publication-ready requests directly handled by Integrated Marketing Communications
+          </Text>
         </View>
 
         <View style={styles.topBannerRight}>
@@ -895,7 +1053,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
               onPress={onChangeRequestType}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-back" size={16} color={palette.purple} />
+              <Ionicons name="arrow-back" size={15} color={palette.dark ? '#C4B5FD' : '#7C3AED'} />
               <Text style={styles.switchDashboardBtnText}>Change Request Type</Text>
             </TouchableOpacity>
           )}
@@ -929,14 +1087,15 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
           style={[
             styles.leftSection,
             isDesktop && { flex: 1, width: undefined },
+            isFilterDropdownOpen && { zIndex: 999999 },
           ]}
-          onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}
+          onLayout={handleListLayout}
         >
           {/* Header Row: Title, Search, Filter */}
-          <View style={styles.listHeaderRow}>
+          <View style={[styles.listHeaderRow, isFilterDropdownOpen && { zIndex: 999999 }]}>
             <Text style={styles.sectionHeading}>Content Requests</Text>
 
-            <View style={[styles.searchAndFilterGroup, isCompactCard && styles.fullWidth]}>
+            <View style={[styles.searchAndFilterGroup, isCompactCard && styles.fullWidth, isFilterDropdownOpen && { zIndex: 999999 }]}>
               {/* Search Bar */}
               <View style={[styles.searchBarContainer, isCompactCard && styles.fullWidth]}>
                 <Ionicons name="search-outline" size={16} color={palette.muted} style={{ marginRight: 6 }} />
@@ -956,7 +1115,11 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
               </View>
 
               {/* Filter Button */}
-              <View style={{ position: 'relative' }}>
+              <View
+                nativeID="filter-dropdown-container"
+                {...(Platform.OS === 'web' ? { id: 'filter-dropdown-container' } : {})}
+                style={{ position: 'relative', zIndex: isFilterDropdownOpen ? 999999 : 50 }}
+              >
                 <TouchableOpacity
                   style={styles.filterBtn}
                   accessibilityRole="button"
@@ -970,12 +1133,12 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                   <Text style={styles.filterBtnText}>
                     {activeFilter === 'All' ? 'Filter' : activeFilter}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={palette.muted} />
+                  <Ionicons name={isFilterDropdownOpen ? "chevron-up" : "chevron-down"} size={14} color={palette.muted} />
                 </TouchableOpacity>
 
                 {isFilterDropdownOpen && (
                   <View style={styles.filterDropdownMenu}>
-                    {(['All', 'Pending', 'Approved', 'Reviewing'] as const).map((opt) => (
+                    {(['All', 'Reviewing', 'Editing', 'Published', 'Rejected'] as const).map((opt) => (
                       <TouchableOpacity
                         accessibilityRole="button"
                         key={opt}
@@ -996,6 +1159,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         >
                           {opt}
                         </Text>
+                        {activeFilter === opt && (
+                          <Ionicons name="checkmark" size={14} color={palette.purple} />
+                        )}
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -1033,7 +1199,10 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     />
                   ) : (
                     <View style={[styles.cardThumbnail, styles.cardThumbnailPlaceholder, isCompactCard && styles.cardThumbnailCompact]}>
-                      <Ionicons name="image-outline" size={32} color={palette.muted} />
+                      <View style={styles.thumbnailPlaceholderIconCircle}>
+                        <Ionicons name="images-outline" size={22} color={palette.dark ? '#A78BFA' : '#7C3AED'} />
+                      </View>
+                      <Text style={styles.thumbnailPlaceholderText}>No image</Text>
                     </View>
                   )}
 
@@ -1045,18 +1214,18 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         {item.targetPlatforms && item.targetPlatforms.length > 0 && (
                           <View style={styles.cardPlatformChipsRow}>
                             {item.targetPlatforms.includes('facebook') && (
-                              <View style={[styles.platformChipSmall, { backgroundColor: '#EFF6FF' }]}>
-                                <Ionicons name="logo-facebook" size={11} color="#1877F2" />
+                              <View style={[styles.platformChipSmall, { backgroundColor: palette.dark ? '#1E3A8A' : '#EFF6FF' }]}>
+                                <Ionicons name="logo-facebook" size={12} color="#1877F2" />
                               </View>
                             )}
                             {item.targetPlatforms.includes('instagram') && (
-                              <View style={[styles.platformChipSmall, { backgroundColor: '#FDF2F8' }]}>
-                                <Ionicons name="logo-instagram" size={11} color="#E1306C" />
+                              <View style={[styles.platformChipSmall, { backgroundColor: palette.dark ? '#500724' : '#FDF2F8' }]}>
+                                <Ionicons name="logo-instagram" size={12} color="#E1306C" />
                               </View>
                             )}
                             {(item.targetPlatforms.includes('website') || item.targetPlatforms.includes('portal') || item.targetPlatforms.includes('wordpress')) && (
-                              <View style={[styles.platformChipSmall, { backgroundColor: '#ECFDF5' }]}>
-                                <Ionicons name="globe-outline" size={11} color="#059669" />
+                              <View style={[styles.platformChipSmall, { backgroundColor: palette.dark ? '#064E3B' : '#ECFDF5' }]}>
+                                <Ionicons name="globe-outline" size={12} color="#059669" />
                               </View>
                             )}
                           </View>
@@ -1070,13 +1239,13 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                       {item.title}
                     </Text>
 
-                    {/* Details Info Row: WHEN & WHO */}
+                    {/* Details Info Row: SUBMITTED ON & DEPARTMENT */}
                     <View style={styles.detailsRow}>
-                      {/* WHEN Column */}
+                      {/* Submitted On Column */}
                       <View style={styles.detailCol}>
                         <View style={styles.detailLabelRow}>
-                          <Ionicons name="calendar-outline" size={14} color={palette.muted} style={{ marginRight: 4 }} />
-                          <Text style={styles.detailLabel}>WHEN</Text>
+                          <Ionicons name="calendar-outline" size={13} color={palette.dark ? '#A78BFA' : '#7C3AED'} style={{ marginRight: 4 }} />
+                          <Text style={styles.detailLabel}>SUBMITTED ON</Text>
                         </View>
                         <Text style={styles.detailValue}>{item.date}</Text>
                         {Boolean(item.time) && (
@@ -1086,21 +1255,21 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
                       <View style={styles.detailColDivider} />
 
-                      {/* WHO Column */}
+                      {/* Department Column */}
                       <View style={[styles.detailCol, { flex: 1.3 }]}>
                         <View style={styles.detailLabelRow}>
-                          <Ionicons name="people-outline" size={14} color={palette.muted} style={{ marginRight: 4 }} />
-                          <Text style={styles.detailLabel}>WHO</Text>
+                          <Ionicons name="business-outline" size={13} color={palette.dark ? '#A78BFA' : '#7C3AED'} style={{ marginRight: 4 }} />
+                          <Text style={styles.detailLabel}>DEPARTMENT</Text>
                         </View>
                         <Text style={styles.detailValue} numberOfLines={1}>{item.department}</Text>
-                        <Text style={styles.detailValueSub} numberOfLines={1}>(Requested by: {item.requestedBy})</Text>
+                        <Text style={styles.detailValueSub} numberOfLines={1}>Requested by: {item.requestedBy}</Text>
                       </View>
                     </View>
 
                     {/* Footer Row: Media count & View Request Button */}
                     <View style={styles.cardFooterRow}>
                       <View style={styles.mediaCountBadge}>
-                        <Ionicons name="image-outline" size={13} color="#6D28D9" style={{ marginRight: 5 }} />
+                        <Ionicons name="images-outline" size={13} color={palette.dark ? '#C4B5FD' : '#7C3AED'} style={{ marginRight: 5 }} />
                         <Text style={styles.mediaCountText}>
                           {item.mediaCount} Media Attachment{item.mediaCount > 1 ? 's' : ''}
                         </Text>
@@ -1111,34 +1280,43 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         accessibilityLabel={`View request: ${item.title}`}
                         style={styles.viewRequestBtn}
                         onPress={() => setSelectedPost(item)}
-                        activeOpacity={0.7}
+                        activeOpacity={0.8}
                       >
+                        <Ionicons name="eye-outline" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
                         <Text style={styles.viewRequestBtnText}>View Request</Text>
-                        <Ionicons name="arrow-forward" size={14} color="#6D28D9" style={{ marginLeft: 4 }} />
                       </TouchableOpacity>
                     </View>
                   </View>
                 </View>
               ))
             )}
-          </ScrollView>
 
-          {filteredRequests.length > 0 && (
-            <View style={styles.paginationCard}>
-              <PaginationControl
-                currentPage={currentPage}
-                totalItems={filteredRequests.length}
-                itemsPerPage={itemsPerPage}
-                pageSizeOptions={[5, 10, 15, 20]}
-                onPageChange={setCurrentPage}
-                onItemsPerPageChange={(val) => {
-                  setItemsPerPage(val);
-                  setCurrentPage(1);
-                }}
-                itemName="requests"
-              />
-            </View>
-          )}
+            {filteredRequests.length > 0 && (
+              <View style={styles.paginationCard}>
+                <ScrollView
+                  ref={paginationScrollRef}
+                  horizontal={!isCompactCard}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.paginationScrollInner}
+                >
+                  <PaginationControl
+                    currentPage={currentPage}
+                    totalItems={filteredRequests.length}
+                    itemsPerPage={itemsPerPage}
+                    pageSizeOptions={[5, 10, 15, 20]}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={(val) => {
+                      setItemsPerPage(val);
+                      setCurrentPage(1);
+                    }}
+                    itemName="requests"
+                    noWrap={!isCompactCard}
+                    style={{ borderTopWidth: 0, width: '100%' }}
+                  />
+                </ScrollView>
+              </View>
+            )}
+          </ScrollView>
         </View>
 
         {/* COLUMN: CREATE CONTENT REQUEST PANEL (Rendered on Left via row-reverse) */}
@@ -1147,6 +1325,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
             {/* Panel Purple Header */}
             <View style={styles.panelHeaderPurple}>
               <View style={styles.panelHeaderLeft}>
+                <View style={styles.panelPlusCircle}>
+                  <Ionicons name="create-outline" size={14} color="#FFFFFF" />
+                </View>
                 <Text style={styles.panelHeaderTitle}>Create Content Request</Text>
               </View>
 
@@ -1157,17 +1338,22 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 onPress={() => setIsSidePanelOpen(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close" size={20} color="#FFFFFF" />
+                <Ionicons name="close" size={18} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
             {/* Panel Form Body */}
             <View style={styles.panelFormScrollContent}>
+              {validationSummary ? (
+                <Text accessibilityRole="alert" style={styles.fieldErrorText}>
+                  Check the highlighted fields before submitting.
+                </Text>
+              ) : null}
               {/* SECTION: BASIC INFORMATION */}
               <View style={styles.redesignedSectionCard}>
                 <View style={styles.redesignedSectionHeader}>
                   <View style={styles.redesignedHeaderIconBox}>
-                    <Ionicons name="document-text-outline" size={18} color="#64748B" />
+                    <Ionicons name="document-text-outline" size={16} color={palette.dark ? '#A78BFA' : '#7C3AED'} />
                   </View>
                   <Text style={styles.redesignedSectionTitle}>Basic Information</Text>
                 </View>
@@ -1177,20 +1363,30 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     Request title <Text style={{ color: '#EF4444' }}>*</Text>
                   </Text>
                   <TextInput
-                    style={styles.redesignedTextInput}
+                    ref={titleInputRef}
+                    nativeID="imc-request-title"
+                    style={[styles.redesignedTextInput, focusedField === 'title' && styles.fieldFocused, fieldErrors.title && styles.fieldInvalid]}
                     accessibilityLabel="Request title, required"
+                    {...(Platform.OS === 'web' ? {
+                      'aria-required': true,
+                      'aria-invalid': Boolean(fieldErrors.title),
+                      'aria-describedby': fieldErrors.title ? 'imc-title-error' : undefined,
+                    } : {})}
+                    onFocus={() => setFocusedField('title')}
+                    onBlur={() => setFocusedField(null)}
                     placeholder="e.g., Campus Event Announcement"
                     placeholderTextColor="#94A3B8"
                     value={formTitle}
                     onChangeText={setFormTitle}
                   />
+                  {fieldErrors.title ? <Text nativeID="imc-title-error" style={styles.fieldErrorText}>{fieldErrors.title}</Text> : null}
                 </View>
 
-                <View style={[styles.redesignedFieldGroup, { marginTop: 14 }]}>
+                <View style={[styles.redesignedFieldGroup, { marginTop: Spacing.md }]}>
                   <Text style={styles.redesignedFieldLabel}>Department</Text>
                   <View style={styles.redesignedReadonlyBox}>
-                    <Text style={styles.redesignedReadonlyText} numberOfLines={1}>
-                      {user?.department || formDepartment || 'College of Information Technology Education'}
+                    <Text style={styles.redesignedReadonlyText}>
+                      {user?.department || formDepartment || 'BSIT Department'}
                     </Text>
                   </View>
                 </View>
@@ -1200,23 +1396,33 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
               <View style={styles.redesignedSectionCard}>
                 <View style={styles.redesignedSectionHeader}>
                   <View style={styles.redesignedHeaderIconBox}>
-                    <Ionicons name="document-text-outline" size={18} color="#64748B" />
+                    <Ionicons name="chatbox-ellipses-outline" size={16} color={palette.dark ? '#A78BFA' : '#7C3AED'} />
                   </View>
-                  <Text style={styles.redesignedSectionTitle}>
-                    Caption <Text style={{ color: '#EF4444' }}>*</Text>
-                  </Text>
+                  <Text style={styles.redesignedSectionTitle}>Caption <Text style={styles.fieldErrorText}>*</Text></Text>
                 </View>
 
                 <View style={styles.captionGuideCallout}>
-                  <Text style={styles.captionGuideText}>
-                    Include who is involved, what is happening, when and where it takes place, and why it matters.
-                  </Text>
-                  <Text style={[styles.captionGuideText, { marginTop: 6 }]}>
-                    Example: The JMCFI Student Council invites all students to [event] on [date and time] at [venue] to [purpose].
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                    <Ionicons name="information-circle-outline" size={15} color={palette.dark ? '#A78BFA' : '#7C3AED'} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.captionGuideText}>
+                        Include who is involved, what is happening, when and where it takes place, and why it matters.
+                      </Text>
+                      <Text style={[styles.captionGuideText, { marginTop: 4, fontStyle: 'italic' }]}>
+                        Example: The JMCFI Student Council invites all students to [event] on [date and time] at [venue] to [purpose].
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
-                <View style={{ marginBottom: 10 }}>
+                <View
+                  nativeID="imc-request-caption"
+                  style={[styles.captionEditorShell, focusedField === 'caption' && styles.fieldFocused, fieldErrors.caption && styles.fieldInvalid]}
+                  {...(Platform.OS === 'web' ? {
+                    onFocus: () => setFocusedField('caption'),
+                    onBlur: () => setFocusedField(null),
+                  } : {})}
+                >
                   <RichTextEditor
                     value={formCaption}
                     onChange={(val: string) => {
@@ -1226,10 +1432,11 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                       }
                     }}
                     placeholder="Write a brief caption describing the activity, event, or announcement..."
-                    minHeight={160}
+                    minHeight={180}
                     hideExtraActions
                   />
                 </View>
+                {fieldErrors.caption ? <Text nativeID="imc-caption-error" style={styles.fieldErrorText}>{fieldErrors.caption}</Text> : null}
 
                 <View style={styles.redesignedCaptionFooter}>
                   <Text style={styles.redesignedCharCounter}>
@@ -1238,6 +1445,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
                   <TouchableOpacity
                     accessibilityRole="button"
+                    accessibilityLabel={isCheckingPolicy ? 'Checking policy alignment' : 'Check policy alignment with AI'}
+                    accessibilityState={{ disabled: isCheckingPolicy, busy: isCheckingPolicy }}
+                    {...(Platform.OS === 'web' ? { 'aria-busy': isCheckingPolicy } : {})}
                     style={[
                       styles.redesignedAiPolicyBtn,
                       isCheckingPolicy && { opacity: 0.7 }
@@ -1247,9 +1457,9 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     activeOpacity={0.75}
                   >
                     {isCheckingPolicy ? (
-                      <ActivityIndicator size="small" color="#4C007C" style={{ marginRight: 6 }} />
+                      <ActivityIndicator size="small" color={palette.muted} style={{ marginRight: 6 }} />
                     ) : (
-                      <Ionicons name="shield-checkmark-outline" size={15} color="#4C007C" style={{ marginRight: 6 }} />
+                      <Ionicons name="shield-checkmark-outline" size={18} color={palette.purple} style={{ marginRight: 6 }} />
                     )}
                     <Text style={styles.redesignedAiPolicyBtnText}>
                       {isCheckingPolicy ? 'AI Analyzing...' : 'AI Check Policy Alignment'}
@@ -1292,27 +1502,25 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 )}
               </View>
 
-              {/* TARGET PLATFORMS */}
+              {/* TARGET PLATFORMS & PHOTO RULES */}
               <View style={styles.redesignedSectionCard}>
                 <View style={styles.redesignedSectionHeader}>
                   <View style={styles.redesignedHeaderIconBox}>
-                    <Ionicons name="share-social-outline" size={18} color="#64748B" />
+                    <Ionicons name="share-social-outline" size={16} color={palette.dark ? '#A78BFA' : '#7C3AED'} />
                   </View>
-                  <Text style={styles.redesignedSectionTitle}>
-                    Target Platforms <Text style={{ color: '#EF4444' }}>*</Text>
-                  </Text>
+                  <Text style={styles.redesignedSectionTitle}>Target Platforms <Text style={styles.fieldErrorText}>*</Text></Text>
                 </View>
                 <Text style={styles.platformSectionSub}>
                   Choose where to publish. Photo requirements apply to your selected platforms.
                 </Text>
 
-                <View style={styles.targetPlatformCardsRow}>
+                <View nativeID="imc-request-platforms" style={styles.targetPlatformCardsRow}>
                   {/* Facebook */}
                   <TouchableOpacity
                     accessibilityRole="checkbox"
                     accessibilityLabel="Publish to Facebook"
                     accessibilityState={{ checked: targetPlatforms.facebook }}
-                    {...(Platform.OS === 'web' ? { 'aria-checked': targetPlatforms.facebook } : {})}
+                    {...(Platform.OS === 'web' ? { 'aria-checked': targetPlatforms.facebook, 'aria-invalid': Boolean(fieldErrors.platforms), 'aria-describedby': fieldErrors.platforms ? 'imc-platforms-error' : undefined } : {})}
                     style={[
                       styles.targetPlatformCard,
                       targetPlatforms.facebook && styles.targetPlatformCardActiveFb,
@@ -1327,8 +1535,8 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     activeOpacity={0.75}
                   >
                     <View style={styles.targetPlatformCardTop}>
-                      <View style={[styles.targetPlatformIconWrap, { backgroundColor: '#1877F2' }]}>
-                        <Ionicons name="logo-facebook" size={15} color="#FFFFFF" />
+                      <View style={[styles.targetPlatformIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                        <Ionicons name="logo-facebook" size={16} color="#1877F2" />
                       </View>
                       <View style={[
                         styles.targetPlatformCheckbox,
@@ -1339,9 +1547,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     </View>
                     <Text style={styles.targetPlatformTitle}>Facebook</Text>
                     <Text style={styles.targetPlatformDesc}>Auto HD &bull; Max 4MB</Text>
-                    <Text style={[styles.targetPlatformStatus, targetPlatforms.facebook && { color: '#1877F2', fontWeight: '700' }]}>
-                      {targetPlatforms.facebook ? 'Selected' : 'Not selected'}
-                    </Text>
+                    <Text style={styles.targetPlatformStatus}>{targetPlatforms.facebook ? 'Selected' : 'Not selected'}</Text>
                   </TouchableOpacity>
 
                   {/* Instagram */}
@@ -1349,7 +1555,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     accessibilityRole="checkbox"
                     accessibilityLabel="Publish to Instagram"
                     accessibilityState={{ checked: targetPlatforms.instagram }}
-                    {...(Platform.OS === 'web' ? { 'aria-checked': targetPlatforms.instagram } : {})}
+                    {...(Platform.OS === 'web' ? { 'aria-checked': targetPlatforms.instagram, 'aria-invalid': Boolean(fieldErrors.platforms), 'aria-describedby': fieldErrors.platforms ? 'imc-platforms-error' : undefined } : {})}
                     style={[
                       styles.targetPlatformCard,
                       targetPlatforms.instagram && styles.targetPlatformCardActiveIg,
@@ -1376,9 +1582,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     </View>
                     <Text style={styles.targetPlatformTitle}>Instagram</Text>
                     <Text style={styles.targetPlatformDesc}>4:5 to 1.91:1 Ratio</Text>
-                    <Text style={[styles.targetPlatformStatus, targetPlatforms.instagram && { color: '#E1306C', fontWeight: '700' }]}>
-                      {targetPlatforms.instagram ? 'Selected' : 'Not selected'}
-                    </Text>
+                    <Text style={styles.targetPlatformStatus}>{targetPlatforms.instagram ? 'Selected' : 'Not selected'}</Text>
                   </TouchableOpacity>
 
                   {/* Website */}
@@ -1386,7 +1590,7 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     accessibilityRole="checkbox"
                     accessibilityLabel="Publish to the JMCFI website"
                     accessibilityState={{ checked: targetPlatforms.website }}
-                    {...(Platform.OS === 'web' ? { 'aria-checked': targetPlatforms.website } : {})}
+                    {...(Platform.OS === 'web' ? { 'aria-checked': targetPlatforms.website, 'aria-invalid': Boolean(fieldErrors.platforms), 'aria-describedby': fieldErrors.platforms ? 'imc-platforms-error' : undefined } : {})}
                     style={[
                       styles.targetPlatformCard,
                       targetPlatforms.website && styles.targetPlatformCardActiveWeb,
@@ -1413,29 +1617,33 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                     </View>
                     <Text style={styles.targetPlatformTitle}>Website</Text>
                     <Text style={styles.targetPlatformDesc}>Featured Cover</Text>
-                    <Text style={[styles.targetPlatformStatus, targetPlatforms.website && { color: '#059669', fontWeight: '700' }]}>
-                      {targetPlatforms.website ? 'Selected' : 'Not selected'}
-                    </Text>
+                    <Text style={styles.targetPlatformStatus}>{targetPlatforms.website ? 'Selected' : 'Not selected'}</Text>
                   </TouchableOpacity>
                 </View>
+                {fieldErrors.platforms ? <Text nativeID="imc-platforms-error" style={styles.fieldErrorText}>{fieldErrors.platforms}</Text> : null}
               </View>
 
               {/* SECTION: MEDIA ATTACHMENT */}
               <View style={styles.redesignedSectionCard}>
-                <Text style={styles.cleanSectionHeading}>Media Attachment</Text>
+                <View style={styles.redesignedSectionHeader}>
+                  <View style={styles.redesignedHeaderIconBox}>
+                    <Ionicons name="images-outline" size={16} color={palette.dark ? '#A78BFA' : '#7C3AED'} />
+                  </View>
+                  <Text style={styles.redesignedSectionTitle}>Media Attachment</Text>
+                </View>
 
                 <TouchableOpacity
-                  style={styles.cleanDropzoneContainer}
+                  style={styles.dropzoneContainer}
                   accessibilityRole="button"
-                  accessibilityLabel="Browse images"
+                  accessibilityLabel="Browse JPEG, PNG, or WebP images"
                   onPress={handlePickMedia}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.cleanUploadIconBadge}>
-                    <Ionicons name="images" size={22} color="#7C3AED" />
+                  <View style={styles.uploadIconBadge}>
+                    <Ionicons name="image-outline" size={20} color={palette.dark ? '#C4B5FD' : '#7C3AED'} />
                   </View>
-                  <Text style={styles.cleanDropzoneTitle}>Browse images</Text>
-                  <Text style={styles.cleanDropzoneSubtitle}>JPEG, PNG or WebP · Select one or more images</Text>
+                  <Text style={styles.dropzoneTitle}>Browse images</Text>
+                  <Text style={styles.dropzoneSubtitle}>JPEG, PNG or WebP · Select one or more images</Text>
                 </TouchableOpacity>
 
                 {attachedFiles.length > 0 && (
@@ -1676,693 +1884,292 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
 
               {/* LIVE CONTENT PREVIEW: FACEBOOK / INSTAGRAM / WEBSITE */}
               <View style={styles.redesignedSectionCard}>
-                <Text style={styles.cleanSectionHeading}>Content Preview</Text>
-
-                {/* Platform Selector Tabs */}
-                <View style={styles.cleanPreviewPlatformTabsRow}>
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    style={[
-                      styles.cleanPreviewPlatformTab,
-                      formPreviewPlatform === 'facebook' && styles.cleanPreviewPlatformTabActiveFb,
-                    ]}
-                    onPress={() => setFormPreviewPlatform('facebook')}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="logo-facebook"
-                      size={15}
-                      color={formPreviewPlatform === 'facebook' ? '#1877F2' : '#64748B'}
-                    />
-                    <Text
-                      style={[
-                        styles.cleanPreviewPlatformTabText,
-                        formPreviewPlatform === 'facebook' && styles.cleanPreviewPlatformTabTextActiveFb,
-                      ]}
-                    >
-                      Facebook
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    style={[
-                      styles.cleanPreviewPlatformTab,
-                      formPreviewPlatform === 'instagram' && styles.cleanPreviewPlatformTabActiveIg,
-                    ]}
-                    onPress={() => setFormPreviewPlatform('instagram')}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="logo-instagram"
-                      size={15}
-                      color={formPreviewPlatform === 'instagram' ? '#E1306C' : '#64748B'}
-                    />
-                    <Text
-                      style={[
-                        styles.cleanPreviewPlatformTabText,
-                        formPreviewPlatform === 'instagram' && styles.cleanPreviewPlatformTabTextActiveIg,
-                      ]}
-                    >
-                      Instagram
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    style={[
-                      styles.cleanPreviewPlatformTab,
-                      formPreviewPlatform === 'website' && styles.cleanPreviewPlatformTabActiveWeb,
-                    ]}
-                    onPress={() => setFormPreviewPlatform('website')}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="globe-outline"
-                      size={15}
-                      color={formPreviewPlatform === 'website' ? '#059669' : '#64748B'}
-                    />
-                    <Text
-                      style={[
-                        styles.cleanPreviewPlatformTabText,
-                        formPreviewPlatform === 'website' && styles.cleanPreviewPlatformTabTextActiveWeb,
-                      ]}
-                    >
-                      Website
-                    </Text>
-                  </TouchableOpacity>
+                <View style={styles.redesignedSectionHeader}>
+                  <View style={styles.redesignedHeaderIconBox}>
+                    <Ionicons name="eye-outline" size={16} color={palette.dark ? '#A78BFA' : '#7C3AED'} />
+                  </View>
+                  <Text style={styles.redesignedSectionTitle}>Content Preview</Text>
                 </View>
+                <View nativeID="imc-content-preview" style={styles.formGroup}>
+                  <View style={styles.previewHeaderRow}>
 
-                {/* Mockup Card */}
-                {formPreviewPlatform === 'facebook' && (
-                  <View style={styles.facebookMockupCard}>
-                    <View style={styles.socialHeader}>
-                      <Image
-                        source={require('../../assets/images/jmc_logo.png')}
-                        style={styles.socialAvatar}
-                        resizeMode="contain"
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
-                        <Text style={styles.socialTimeText}>Sponsored &bull; Just now</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color={palette.muted} />
-                    </View>
-
-                    {formCaption ? (
-                      <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                        <Text style={styles.socialCaptionText}>
-                          {formCaption.replace(/<[^>]*>/g, '')}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    {createFormImageUris.length > 0 ? (
-                      <FacebookMediaGrid
-                        images={createFormImageUris}
-                        onImagePress={(uri) => setFullScreenImage(uri)}
-                      />
-                    ) : (
-                      <View style={styles.emptyMockMediaClean}>
-                        <Ionicons name="image-outline" size={36} color="#94A3B8" />
-                        <Text style={styles.emptyMockMediaCleanText}>No image attached</Text>
-                      </View>
-                    )}
-
-                    <View style={styles.socialFooterActions}>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="thumbs-up-outline" size={14} color={palette.muted} />
-                        <Text style={styles.socialActionText}>Like</Text>
-                      </View>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="chatbubble-outline" size={14} color={palette.muted} />
-                        <Text style={styles.socialActionText}>Comment</Text>
-                      </View>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="share-social-outline" size={14} color={palette.muted} />
-                        <Text style={styles.socialActionText}>Share</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {formPreviewPlatform === 'instagram' && (
-                  <View style={styles.instagramMockupCard}>
-                    <View style={styles.instagramHeader}>
-                      <View style={styles.instagramAvatarRing}>
-                        <Image
-                          source={require('../../assets/images/jmc_logo.png')}
-                          style={styles.instagramAvatar}
-                          resizeMode="contain"
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.instagramAuthorName}>jmc_official</Text>
-                        <Text style={styles.instagramLocationText}>Davao City, Philippines</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color="#262626" />
-                    </View>
-
-                    {createFormImageUris.length > 0 ? (
-                      <InstagramMediaCarousel
-                        images={createFormImageUris}
-                        onImagePress={(uri) => setFullScreenImage(uri)}
-                      />
-                    ) : (
-                      <View style={[styles.emptyMockMediaClean, { aspectRatio: 1, height: undefined }]}>
-                        <Ionicons name="image-outline" size={36} color="#94A3B8" />
-                        <Text style={styles.emptyMockMediaCleanText}>No image attached</Text>
-                      </View>
-                    )}
-
-                    <View style={{ padding: 12 }}>
-                      <View style={styles.instagramActionsRow}>
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <Ionicons name="heart" size={20} color="#E1306C" />
-                          <Ionicons name="chatbubble-outline" size={18} color="#262626" />
-                          <Ionicons name="paper-plane-outline" size={18} color="#262626" />
-                        </View>
-                        <Ionicons name="bookmark-outline" size={18} color="#262626" />
-                      </View>
-                      <Text style={styles.instagramLikesText}>Liked by jmcfi_official and others</Text>
-                      {formCaption ? (
-                        <Text style={styles.instagramCaptionText}>
-                          <Text style={{ fontWeight: '700' }}>jmc_official </Text>
-                          {formCaption.replace(/<[^>]*>/g, '')}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                )}
-
-                {formPreviewPlatform === 'website' && (
-                  <View style={styles.websiteMockupCard}>
-                    <View style={styles.websiteBadgeRow}>
-                      <Ionicons name="globe-outline" size={13} color="#059669" />
-                      <Text style={styles.websiteBadgeText}>Website Article Preview</Text>
-                    </View>
-
-                    <Text style={styles.websiteTitleText}>
-                      {formTitle ? formTitle : 'Content Request Title'}
-                    </Text>
-                    <Text style={styles.websiteMetaText}>
-                      By {user?.full_name || 'JMCFI Requestor'} &bull; News & Announcements &bull; Just now
-                    </Text>
-
-                    {activeWebsiteImageUri ? (
+                    {/* Platform Selector Tabs */}
+                    <View style={styles.platformSelectorRow}>
                       <TouchableOpacity
                         accessibilityRole="button"
-                        activeOpacity={0.9}
-                        onPress={() => setFullScreenImage(activeWebsiteImageUri)}
-                        style={{ marginBottom: 10 }}
+                        accessibilityState={{ selected: formPreviewPlatform === 'facebook' }}
+                        style={[
+                          styles.platformSelectorTab,
+                          formPreviewPlatform === 'facebook' && styles.platformSelectorTabActiveFacebook,
+                        ]}
+                        onPress={() => setFormPreviewPlatform('facebook')}
+                        activeOpacity={0.7}
                       >
-                        <Image
-                          source={{ uri: activeWebsiteImageUri }}
-                          style={styles.websiteFeaturedImage}
-                          resizeMode="cover"
+                        <Ionicons
+                          name="logo-facebook"
+                          size={13}
+                          color={formPreviewPlatform === 'facebook' ? '#1877F2' : '#64748B'}
                         />
-                        <View style={styles.websiteImageTag}>
-                          <Ionicons name="globe-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.websiteImageTagText}>
-                            Website Featured Image {createFormImageUris.length > 1 ? `(#${featuredMediaIndex + 1})` : ''}
+                        <Text
+                          style={[
+                            styles.platformSelectorTabText,
+                            formPreviewPlatform === 'facebook' && styles.platformSelectorTabTextActiveFacebook,
+                          ]}
+                        >
+                          Facebook
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: formPreviewPlatform === 'instagram' }}
+                        style={[
+                          styles.platformSelectorTab,
+                          formPreviewPlatform === 'instagram' && styles.platformSelectorTabActiveInstagram,
+                        ]}
+                        onPress={() => setFormPreviewPlatform('instagram')}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="logo-instagram"
+                          size={13}
+                          color={formPreviewPlatform === 'instagram' ? '#E1306C' : '#64748B'}
+                        />
+                        <Text
+                          style={[
+                            styles.platformSelectorTabText,
+                            formPreviewPlatform === 'instagram' && styles.platformSelectorTabTextActiveInstagram,
+                          ]}
+                        >
+                          Instagram
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        style={[
+                          styles.platformSelectorTab,
+                          formPreviewPlatform === 'website' && styles.platformSelectorTabActiveWebsite,
+                        ]}
+                        accessibilityState={{ selected: formPreviewPlatform === 'website' }}
+                        onPress={() => setFormPreviewPlatform('website')}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="globe-outline"
+                          size={13}
+                          color={formPreviewPlatform === 'website' ? '#059669' : '#64748B'}
+                        />
+                        <Text
+                          style={[
+                            styles.platformSelectorTabText,
+                            formPreviewPlatform === 'website' && styles.platformSelectorTabTextActiveWebsite,
+                          ]}
+                        >
+                          Website
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <>
+                    {/* Mockup Card */}
+                    {formPreviewPlatform === 'facebook' && (
+                      <View style={styles.facebookMockupCard}>
+                        <View style={styles.socialHeader}>
+                          <Image
+                            source={require('../../assets/images/jmc_logo.png')}
+                            style={styles.socialAvatar}
+                            resizeMode="contain"
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
+                            <Text style={styles.socialTimeText}>Sponsored &bull; Just now</Text>
+                          </View>
+                          <Ionicons name="ellipsis-horizontal" size={16} color={palette.muted} />
+                        </View>
+
+                        <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                          <Text style={styles.socialCaptionText}>
+                            {formCaption ? formCaption.replace(/<[^>]*>/g, '') : ''}
                           </Text>
                         </View>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={[styles.emptyMockMediaClean, { height: 140, marginBottom: 10 }]}>
-                        <Ionicons name="image-outline" size={36} color="#94A3B8" />
-                        <Text style={styles.emptyMockMediaCleanText}>No image attached</Text>
+
+                        {createFormImageUris.length > 0 ? (
+                          <FacebookMediaGrid
+                            images={createFormImageUris}
+                            onImagePress={(uri) => setFullScreenImage(uri)}
+                          />
+                        ) : (
+                          <View style={[styles.emptyMockMedia, styles.formEmptyMedia]}>
+                            <Ionicons name="image-outline" size={32} color={palette.muted} />
+                            <Text style={styles.emptyMockMediaText}>No image attached</Text>
+                          </View>
+                        )}
+
+                        <View style={styles.socialFooterActions}>
+                          <View style={styles.socialActionBtn}>
+                            <Ionicons name="thumbs-up-outline" size={14} color={palette.muted} />
+                            <Text style={styles.socialActionText}>Like</Text>
+                          </View>
+                          <View style={styles.socialActionBtn}>
+                            <Ionicons name="chatbubble-outline" size={14} color={palette.muted} />
+                            <Text style={styles.socialActionText}>Comment</Text>
+                          </View>
+                          <View style={styles.socialActionBtn}>
+                            <Ionicons name="share-social-outline" size={14} color={palette.muted} />
+                            <Text style={styles.socialActionText}>Share</Text>
+                          </View>
+                        </View>
                       </View>
                     )}
 
-                    {formCaption ? (
-                      <Text style={styles.websiteBodyText}>
-                        {formCaption.replace(/<[^>]*>/g, '')}
-                      </Text>
-                    ) : null}
-                  </View>
-                )}
+                    {formPreviewPlatform === 'instagram' && (
+                      <View style={styles.instagramMockupCard}>
+                        <View style={styles.instagramHeader}>
+                          <View style={styles.instagramAvatarRing}>
+                            <Image
+                              source={require('../../assets/images/jmc_logo.png')}
+                              style={styles.instagramAvatar}
+                              resizeMode="contain"
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.instagramAuthorName}>jmc_official</Text>
+                            <Text style={styles.instagramLocationText}>Davao City, Philippines</Text>
+                          </View>
+                          <Ionicons name="ellipsis-horizontal" size={16} color="#262626" />
+                        </View>
+
+                        {createFormImageUris.length > 0 ? (
+                          <InstagramMediaCarousel
+                            images={createFormImageUris}
+                            onImagePress={(uri) => setFullScreenImage(uri)}
+                          />
+                        ) : (
+                          <View style={[styles.emptyMockMedia, styles.formEmptyMedia]}>
+                            <Ionicons name="image-outline" size={32} color={palette.muted} />
+                            <Text style={styles.emptyMockMediaText}>No image attached</Text>
+                          </View>
+                        )}
+
+                        <View style={{ padding: 12 }}>
+                          <View style={styles.instagramActionsRow}>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                              <Ionicons name="heart" size={20} color="#E1306C" />
+                              <Ionicons name="chatbubble-outline" size={18} color="#262626" />
+                              <Ionicons name="paper-plane-outline" size={18} color="#262626" />
+                            </View>
+                            <Ionicons name="bookmark-outline" size={18} color="#262626" />
+                          </View>
+                          <Text style={styles.instagramLikesText}>Liked by jmcfi_official and others</Text>
+                          <Text style={styles.instagramCaptionText}>
+                            <Text style={{ fontWeight: '700' }}>jmc_official </Text>
+                            {formCaption ? formCaption.replace(/<[^>]*>/g, '') : ''}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {formPreviewPlatform === 'website' && (
+                      <View style={styles.websiteMockupCard}>
+                        <View style={styles.websiteBadgeRow}>
+                          <Ionicons name="globe-outline" size={13} color="#059669" />
+                          <Text style={styles.websiteBadgeText}>Website Article Preview</Text>
+                        </View>
+
+                        <Text style={styles.websiteTitleText}>
+                          {formTitle ? formTitle : 'Content Request Title'}
+                        </Text>
+                        <Text style={styles.websiteMetaText}>
+                          By {user?.full_name || 'JMCFI Requestor'} &bull; News & Announcements &bull; Just now
+                        </Text>
+
+                        {activeWebsiteImageUri ? (
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            activeOpacity={0.9}
+                            onPress={() => setFullScreenImage(activeWebsiteImageUri)}
+                            style={{ marginBottom: 10 }}
+                          >
+                            <Image
+                              source={{ uri: activeWebsiteImageUri }}
+                              style={styles.websiteFeaturedImage}
+                              resizeMode="cover"
+                            />
+                            <View style={styles.websiteImageTag}>
+                              <Ionicons name="globe-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                              <Text style={styles.websiteImageTagText}>
+                                Website Featured Image {createFormImageUris.length > 1 ? `(#${featuredMediaIndex + 1})` : ''}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={[styles.emptyMockMedia, { height: 120, marginBottom: 10 }]}>
+                            <Ionicons name="image-outline" size={28} color={palette.muted} />
+                            <Text style={styles.emptyMockMediaText}>No featured image selected</Text>
+                          </View>
+                        )}
+
+                        <Text style={styles.websiteBodyText}>
+                          {formCaption ? formCaption.replace(/<[^>]*>/g, '') : ''}
+                        </Text>
+                      </View>
+                    )}
+                  </>
+                </View>
               </View>
 
-              {/* PANEL FOOTER BAR: SUMMARY & ACTIONS */}
-              <View style={styles.panelFooterBar}>
-                <View style={styles.footerSummaryCol}>
-                  <Text style={styles.footerSummaryTitle}>Add a title, caption, and publishing destination</Text>
-                  <Text style={styles.footerSummarySub}>
-                    {[targetPlatforms.facebook, targetPlatforms.instagram, targetPlatforms.website].filter(Boolean).length} platforms selected &bull; {attachedFiles.length} images attached &bull; Images are optional
-                  </Text>
-                </View>
+              {/* BUTTONS: CANCEL & SUBMIT */}
+              <View style={styles.readinessFooter}>
+                <Text style={styles.readinessTitle}>
+                  {isSubmitting ? 'Submitting your request to IMC…' : formReady ? 'Ready for IMC review' : 'Add a title, caption, and publishing destination'}
+                </Text>
+                <Text style={styles.readinessDetail}>
+                  {selectedPlatformCount} {selectedPlatformCount === 1 ? 'platform' : 'platforms'} selected · {createFormImageUris.length} {createFormImageUris.length === 1 ? 'image' : 'images'} attached · Images are optional
+                </Text>
+              </View>
+              <View style={[styles.formActionsRow, isCompact && styles.formActionsCompact]}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.cancelBtn, isCompact && styles.formActionCompact]}
+                  onPress={() => {
+                    setSubmitAttempted(false);
+                    setFormPreviewPlatform('facebook');
+                    setFormTitle('');
+                    setFormCaption('');
+                    setTargetPlatforms({ facebook: false, instagram: false, website: false });
+                    setAttachedFiles([]);
+                    setFeaturedMediaIndex(0);
+                    if (!isDesktop) setIsSidePanelOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
 
-                <View style={styles.footerActionsGroup}>
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    style={styles.cleanCancelBtn}
-                    onPress={() => {
-                      setFormTitle('');
-                      setFormCaption('');
-                      setAttachedFiles([]);
-                      setFeaturedMediaIndex(0);
-                      if (!isDesktop) setIsSidePanelOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.cleanCancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.cleanSubmitBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel={isSubmitting ? 'Submitting request to IMC' : 'Submit request to IMC'}
-                    testID="requestor-imc-submit"
-                    onPress={handleSubmit}
-                    activeOpacity={0.85}
-                    disabled={isSubmitting}
-                  >
-                    <Ionicons name="send" size={13} color="#1A1A2E" style={{ marginRight: 6 }} />
-                    <Text style={styles.cleanSubmitBtnText}>{isSubmitting ? "Submitting to IMC..." : "Submit Request"}</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[styles.submitBtn, isCompact && styles.formActionCompact]}
+                  accessibilityRole="button"
+                  accessibilityLabel={isSubmitting ? 'Submitting request to IMC' : 'Submit request to IMC'}
+                  accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
+                  disabled={isSubmitting}
+                  testID="requestor-imc-submit"
+                  onPress={handleSubmit}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="paper-plane" size={16} color={GOLD_INK} style={{ marginRight: 6 }} />
+                  <Text style={styles.submitBtnText}>{isSubmitting ? "Submitting to IMC..." : "Submit Request"}</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
         )}
       </View>
 
-      {/* ================= VIEW REQUEST PREVIEW MODAL ================= */}
+      {/* Direct IMC details use the same layout as the overview. */}
       {selectedPost && (
-        <Modal
-          visible={Boolean(selectedPost)}
-          transparent
-          animationType={reduceMotion ? 'none' : 'fade'}
-          onRequestClose={() => setSelectedPost(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View nativeID="requestor-imc-preview" accessibilityViewIsModal style={[styles.modalCard, { maxWidth: 620, maxHeight: Math.max(0, height - Spacing.xl) }]}>
-              <View style={styles.modalHeader}>
-                <View style={styles.modalHeaderBadges}>
-                  {getStatusBadge(selectedPost.status)}
-                </View>
-                <TouchableOpacity style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Close request preview" onPress={() => setSelectedPost(null)}>
-                  <Ionicons name="close" size={24} color={palette.muted} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Platform Selector Tabs: Facebook / Instagram / Website */}
-              <View style={styles.modalPlatformTabs}>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={[
-                    styles.modalPlatformTab,
-                    modalPlatformTab === 'facebook' && styles.modalPlatformTabActiveFacebook,
-                  ]}
-                  onPress={() => setModalPlatformTab('facebook')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="logo-facebook"
-                    size={14}
-                    color={modalPlatformTab === 'facebook' ? '#1877F2' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.modalPlatformTabText,
-                      modalPlatformTab === 'facebook' && styles.modalPlatformTabTextActiveFacebook,
-                    ]}
-                  >
-                    Facebook
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={[
-                    styles.modalPlatformTab,
-                    modalPlatformTab === 'instagram' && styles.modalPlatformTabActiveInstagram,
-                  ]}
-                  onPress={() => setModalPlatformTab('instagram')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="logo-instagram"
-                    size={14}
-                    color={modalPlatformTab === 'instagram' ? '#E1306C' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.modalPlatformTabText,
-                      modalPlatformTab === 'instagram' && styles.modalPlatformTabTextActiveInstagram,
-                    ]}
-                  >
-                    Instagram
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  style={[
-                    styles.modalPlatformTab,
-                    modalPlatformTab === 'website' && styles.modalPlatformTabActiveWebsite,
-                  ]}
-                  onPress={() => setModalPlatformTab('website')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="globe-outline"
-                    size={14}
-                    color={modalPlatformTab === 'website' ? '#059669' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.modalPlatformTabText,
-                      modalPlatformTab === 'website' && styles.modalPlatformTabTextActiveWebsite,
-                    ]}
-                  >
-                    Website
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={styles.modalBody} contentContainerStyle={styles.modalBodyContent} showsVerticalScrollIndicator>
-                {/* Social Media Mockup Preview */}
-                {modalPlatformTab === 'facebook' && (
-                  <View style={[styles.facebookMockupCard, { marginBottom: 14 }]}>
-                    <View style={styles.socialHeader}>
-                      <Image
-                        source={require('../../assets/images/jmc_logo.png')}
-                        style={styles.socialAvatar}
-                        resizeMode="contain"
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.socialAuthorName}>Jose Maria College Foundation Inc.</Text>
-                        <Text style={styles.socialTimeText}>Sponsored &bull; Public</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color={palette.muted} />
-                    </View>
-
-                    <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-                      <FormattedText style={styles.socialCaptionText}>
-                        {selectedPost.caption || 'No caption provided.'}
-                      </FormattedText>
-                    </View>
-
-                    {modalPostImageUris.length > 0 ? (
-                      <FacebookMediaGrid
-                        images={modalPostImageUris}
-                        onImagePress={(uri) => setFullScreenImage(uri)}
-                      />
-                    ) : (
-                      <View style={styles.emptyMockMedia}>
-                        <Ionicons name="image-outline" size={32} color={palette.muted} />
-                        <Text style={styles.emptyMockMediaText}>No media attached</Text>
-                      </View>
-                    )}
-
-                    <View style={styles.socialFooterActions}>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="thumbs-up-outline" size={14} color={palette.muted} />
-                        <Text style={styles.socialActionText}>Like</Text>
-                      </View>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="chatbubble-outline" size={14} color={palette.muted} />
-                        <Text style={styles.socialActionText}>Comment</Text>
-                      </View>
-                      <View style={styles.socialActionBtn}>
-                        <Ionicons name="share-social-outline" size={14} color={palette.muted} />
-                        <Text style={styles.socialActionText}>Share</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {modalPlatformTab === 'instagram' && (
-                  <View style={[styles.instagramMockupCard, { marginBottom: 14 }]}>
-                    <View style={styles.instagramHeader}>
-                      <View style={styles.instagramAvatarRing}>
-                        <Image
-                          source={require('../../assets/images/jmc_logo.png')}
-                          style={styles.instagramAvatar}
-                          resizeMode="contain"
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.instagramAuthorName}>jmc_official</Text>
-                        <Text style={styles.instagramLocationText}>Davao City, Philippines</Text>
-                      </View>
-                      <Ionicons name="ellipsis-horizontal" size={16} color="#262626" />
-                    </View>
-
-                    {modalPostImageUris.length > 0 ? (
-                      <InstagramMediaCarousel
-                        images={modalPostImageUris}
-                        onImagePress={(uri) => setFullScreenImage(uri)}
-                      />
-                    ) : (
-                      <View style={[styles.emptyMockMedia, { aspectRatio: 1 }]}>
-                        <Ionicons name="image-outline" size={32} color={palette.muted} />
-                        <Text style={styles.emptyMockMediaText}>No media attached</Text>
-                      </View>
-                    )}
-
-                    <View style={{ padding: 12 }}>
-                      <View style={styles.instagramActionsRow}>
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <Ionicons name="heart" size={20} color="#E1306C" />
-                          <Ionicons name="chatbubble-outline" size={18} color="#262626" />
-                          <Ionicons name="paper-plane-outline" size={18} color="#262626" />
-                        </View>
-                        <Ionicons name="bookmark-outline" size={18} color="#262626" />
-                      </View>
-                      <Text style={styles.instagramLikesText}>Liked by jmcfi_official and others</Text>
-                      <FormattedText style={styles.instagramCaptionText}>
-                        {'<b>jmc_official </b>' + (selectedPost.caption || '')}
-                      </FormattedText>
-                    </View>
-                  </View>
-                )}
-
-                {modalPlatformTab === 'website' && (
-                  <View style={[styles.websiteMockupCard, { marginBottom: 14 }]}>
-                    <View style={styles.websiteBadgeRow}>
-                      <Ionicons name="globe-outline" size={13} color="#059669" />
-                      <Text style={styles.websiteBadgeText}>Website Article Preview</Text>
-                    </View>
-
-                    <Text style={styles.websiteTitleText}>{selectedPost.title}</Text>
-                    <Text style={styles.websiteMetaText}>
-                      By {selectedPost.requestedBy} &bull; News & Announcements &bull; {selectedPost.date}
-                    </Text>
-
-                    {modalPostImageUris.length > 0 ? (
-                      <View style={{ marginBottom: 10 }}>
-                        <TouchableOpacity
-                          accessibilityRole="button"
-                          activeOpacity={0.9}
-                          onPress={() => setFullScreenImage(modalPostImageUris[modalViewFeaturedIndex] || modalPostImageUris[0])}
-                        >
-                          <Image
-                            source={{ uri: modalPostImageUris[modalViewFeaturedIndex] || modalPostImageUris[0] }}
-                            style={styles.websiteFeaturedImage}
-                            resizeMode="cover"
-                          />
-                          <View style={styles.websiteImageTag}>
-                            <Ionicons name="globe-outline" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.websiteImageTagText}>
-                              Website Featured Image {modalPostImageUris.length > 1 ? `(#${modalViewFeaturedIndex + 1})` : ''}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-
-                        {modalPostImageUris.length > 1 && (
-                          <View style={{ marginTop: 8 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
-                              Website Featured Image (Tap to preview):
-                            </Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                              {modalPostImageUris.map((uri, idx) => {
-                                const isSel = modalViewFeaturedIndex === idx;
-                                return (
-                                  <TouchableOpacity
-                                    accessibilityRole="button"
-                                    key={idx}
-                                    onPress={() => setModalViewFeaturedIndex(idx)}
-                                    activeOpacity={0.8}
-                                    style={{
-                                      width: 68,
-                                      height: 52,
-                                      borderRadius: 6,
-                                      borderWidth: isSel ? 2 : 1,
-                                      borderColor: isSel ? '#059669' : '#CBD5E1',
-                                      overflow: 'hidden',
-                                      position: 'relative',
-                                    }}
-                                  >
-                                    <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                    {isSel && (
-                                      <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#059669', borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 }}>
-                                        <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFF' }}>Cover</Text>
-                                      </View>
-                                    )}
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </ScrollView>
-                          </View>
-                        )}
-                      </View>
-                    ) : (
-                      <View style={[styles.emptyMockMedia, { height: 120, marginBottom: 10 }]}>
-                        <Ionicons name="image-outline" size={28} color={palette.muted} />
-                        <Text style={styles.emptyMockMediaText}>No media attached for website preview</Text>
-                      </View>
-                    )}
-
-                    <FormattedText style={styles.websiteBodyText}>
-                      {selectedPost.caption || 'No caption provided.'}
-                    </FormattedText>
-                  </View>
-                )}
-
-                <Text style={styles.modalTitle}>{selectedPost.title}</Text>
-
-                <View style={styles.modalInfoRow}>
-                  <Text style={styles.modalInfoLabel}>Date & Time:</Text>
-                  <Text style={styles.modalInfoValue}>
-                    {selectedPost.date} {selectedPost.time || ''}
-                  </Text>
-                </View>
-
-                <View style={styles.modalInfoRow}>
-                  <Text style={styles.modalInfoLabel}>Department:</Text>
-                  <Text style={styles.modalInfoValue}>{selectedPost.department}</Text>
-                </View>
-
-                <View style={styles.modalInfoRow}>
-                  <Text style={styles.modalInfoLabel}>Requested By:</Text>
-                  <Text style={styles.modalInfoValue}>{selectedPost.requestedBy}</Text>
-                </View>
-
-                {/* APPROVAL TRACKING: Request -> IMC -> Publish */}
-                <View style={styles.modalTrackingCard}>
-                  <Text style={styles.modalTrackingTitle}>Approval Tracking</Text>
-                  {(() => {
-                    const isImcApproved = selectedPost.status === 'Approved' || selectedPost.rawStatus === 'approved' || selectedPost.rawStatus === 'published' || selectedPost.rawStatus === 'scheduled';
-                    const isImcRejected = selectedPost.rawStatus === 'rejected' || selectedPost.rawStatus === 'returned_for_revision';
-                    const isPublished = selectedPost.rawStatus === 'published';
-                    const isScheduled = selectedPost.rawStatus === 'scheduled';
-
-                    return (
-                      <View style={styles.modalTrackingStepper}>
-                        {/* Step 1: Request */}
-                        <View style={styles.modalTrackingStep}>
-                          <View style={[styles.modalStepBadge, styles.modalStepBadgeCompleted]}>
-                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                          </View>
-                          <Text style={styles.modalStepName}>Request</Text>
-                          <Text style={[styles.modalStepStatus, { color: '#16A34A' }]}>Submitted</Text>
-                        </View>
-
-                        <View style={[styles.modalStepConnector, isImcApproved || !isImcRejected ? styles.modalStepConnectorActive : null]} />
-
-                        {/* Step 2: IMC */}
-                        <View style={styles.modalTrackingStep}>
-                          <View style={[
-                            styles.modalStepBadge,
-                            isImcApproved
-                              ? styles.modalStepBadgeCompleted
-                              : (isImcRejected ? styles.modalStepBadgeRejected : styles.modalStepBadgeActive)
-                          ]}>
-                            <Ionicons
-                              name={isImcApproved ? "checkmark" : (isImcRejected ? "close" : "time")}
-                              size={14}
-                              color="#FFFFFF"
-                            />
-                          </View>
-                          <Text style={styles.modalStepName}>IMC</Text>
-                          <Text style={[
-                            styles.modalStepStatus,
-                            {
-                              color: isImcApproved
-                                ? '#16A34A'
-                                : (isImcRejected ? '#DC2626' : '#D97706')
-                            }
-                          ]}>
-                            {isImcApproved ? 'Approved' : (selectedPost.rawStatus === 'returned_for_revision' ? 'Revision' : (selectedPost.rawStatus === 'rejected' ? 'Rejected' : 'Reviewing'))}
-                          </Text>
-                        </View>
-
-                        <View style={[styles.modalStepConnector, isPublished || isScheduled ? styles.modalStepConnectorActive : null]} />
-
-                        {/* Step 3: Publish */}
-                        <View style={styles.modalTrackingStep}>
-                          <View style={[
-                            styles.modalStepBadge,
-                            isPublished
-                              ? styles.modalStepBadgeCompleted
-                              : (isScheduled ? styles.modalStepBadgeActive : styles.modalStepBadgeUpcoming)
-                          ]}>
-                            <Ionicons
-                              name={isPublished ? "checkmark" : (isScheduled ? "calendar" : "globe-outline")}
-                              size={14}
-                              color={isPublished || isScheduled ? "#FFFFFF" : "#94A3B8"}
-                            />
-                          </View>
-                          <Text style={styles.modalStepName}>Publish</Text>
-                          <Text style={[
-                            styles.modalStepStatus,
-                            {
-                              color: isPublished
-                                ? '#16A34A'
-                                : (isScheduled ? '#6D28D9' : '#94A3B8')
-                            }
-                          ]}>
-                            {isPublished ? 'Published' : (isScheduled ? 'Scheduled' : 'Waiting')}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-                </View>
-
-                {(() => {
-                  const checklist = selectedPost.rawPost?.imc_branding_checklist;
-                  const originalCaption = checklist?.original_caption;
-                  const refinedCaption = checklist?.refined_caption;
-                  const isRefined = Boolean(originalCaption && refinedCaption && originalCaption.trim() !== refinedCaption.trim());
-                  const displayCaption = refinedCaption || selectedPost.caption;
-
-                  if (!displayCaption && !originalCaption) return null;
-
-                  return (
-                    <View style={{ marginTop: 12, gap: 10 }}>
-                      {Boolean(displayCaption) && (
-                        <View>
-                          <Text style={[styles.modalInfoLabel, { marginBottom: 4 }]}>
-                            {isRefined ? 'Final / Refined Caption:' : 'Caption:'}
-                          </Text>
-                          <Text style={styles.modalCaptionText}>{displayCaption}</Text>
-                        </View>
-                      )}
-                      {isRefined && (
-                        <View style={{ padding: 10, borderRadius: 8, backgroundColor: palette.elevated, borderWidth: 1, borderColor: palette.border }}>
-                          <Text style={[styles.modalInfoLabel, { marginBottom: 4 }]}>Original Submitted Caption:</Text>
-                          <Text style={[styles.modalCaptionText, { color: palette.muted }]}>{originalCaption}</Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })()}
-              </ScrollView>
-
-              <TouchableOpacity
-                accessibilityRole="button"
-                style={styles.modalCloseBtn}
-                onPress={() => setSelectedPost(null)}
-              >
-                <Text style={styles.modalCloseBtnText}>Close Preview</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+        <DirectImcRequestDetailsModal request={selectedPost} onClose={() => setSelectedPost(null)} />
       )}
 
       {/* ================= COMPLIANCE RESULT MODAL ================= */}
@@ -2431,9 +2238,9 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   /* Top Control Banner */
   topControlBanner: {
     gap: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -2444,16 +2251,35 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     borderColor: palette.border,
     ...(Platform.OS === 'web'
       ? {
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
-        }
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: palette.dark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 4px 20px rgba(0, 0, 0, 0.04)',
+      }
       : { elevation: 2 }),
   },
   topBannerLeft: {
     flexShrink: 1,
     minWidth: 0,
     flexDirection: 'column',
+  },
+  topBannerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topBannerIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: palette.dark ? '#2E1065' : '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBannerSubtitle: {
+    fontSize: 12,
+    color: palette.muted,
+    marginTop: 3,
+    lineHeight: 16,
   },
   modernTag: {
     flexDirection: 'row',
@@ -2505,38 +2331,40 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   switchDashboardBtn: {
     flexShrink: 1,
     minWidth: 0,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: palette.purpleTint,
+    backgroundColor: palette.dark ? '#2E1065' : '#FAF5FF',
     borderWidth: 1,
     borderColor: palette.dark ? '#6B21A8' : '#D8B4FE',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 120ms ease' } : {}),
   },
   switchDashboardBtnText: {
     flexShrink: 1,
-    lineHeight: 20,
-    fontSize: FontSize.sm,
+    lineHeight: 18,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: palette.purple,
+    color: palette.dark ? '#C4B5FD' : '#7C3AED',
   },
   openDrawerBtn: {
     flexShrink: 1,
     minWidth: 0,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: BRAND_PURPLE,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   openDrawerBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -2580,8 +2408,10 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     backgroundColor: 'transparent',
     flex: 1,
     width: '100%',
+    position: 'relative',
   },
   listHeaderRow: {
+    position: 'relative',
     marginBottom: Spacing.md,
     gap: Spacing.md,
     flexDirection: 'row',
@@ -2589,6 +2419,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     width: '100%',
+    zIndex: 50,
   },
   sectionHeading: {
     flexShrink: 1,
@@ -2599,19 +2430,22 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     letterSpacing: -0.3,
   },
   searchAndFilterGroup: {
+    position: 'relative',
     flexShrink: 1,
     minWidth: 0,
     gap: Spacing.sm,
     flexWrap: 'wrap',
     flexDirection: 'row',
     alignItems: 'center',
+    zIndex: 50,
   },
   searchBarContainer: {
     flexShrink: 1,
     width: 232,
     paddingVertical: 0,
     paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
+    minHeight: 38,
+    height: 38,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
@@ -2621,9 +2455,8 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     borderRadius: 10,
   },
   searchInput: {
-    paddingVertical: Spacing.sm,
     fontSize: FontSize.sm,
-    height: CONTROL_HEIGHT - 2,
+    height: 36,
     minWidth: 0,
     flex: 1,
     color: palette.text,
@@ -2631,48 +2464,54 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     outlineWidth: 0,
   },
   filterBtn: {
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    minHeight: 38,
+    height: 38,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: palette.field,
     borderWidth: 1,
     borderColor: palette.border,
-    gap: 4,
+    gap: 5,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   filterBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: palette.text,
   },
   filterDropdownMenu: {
-    top: CONTROL_HEIGHT + Spacing.sm,
+    top: 44,
     position: 'absolute',
     right: 0,
-    backgroundColor: palette.field,
-    borderRadius: 8,
+    backgroundColor: palette.dark ? '#1E293B' : '#FFFFFF',
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.border,
     paddingVertical: 4,
-    width: 130,
-    zIndex: 99,
+    width: 148,
+    zIndex: 999999,
+    overflow: 'hidden',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }
-      : { elevation: 4 }),
+      ? { boxShadow: palette.dark ? '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4)' : '0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }
+      : { elevation: 20 }),
   },
   filterDropdownItem: {
-    justifyContent: 'center',
-    minHeight: CONTROL_HEIGHT,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 36,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   filterDropdownItemActive: {
     backgroundColor: palette.purpleTint,
   },
   filterDropdownText: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: palette.text,
   },
   filterDropdownTextActive: {
@@ -2685,6 +2524,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     minWidth: 0,
     flex: 1,
     width: '100%',
+    zIndex: 1,
   },
   cardsScrollContent: {
     paddingBottom: 24,
@@ -2696,41 +2536,50 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.border,
-    marginTop: 10,
+    marginTop: 6,
     overflow: 'hidden',
     ...(Platform.OS === 'web'
       ? {
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
-        }
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+      }
       : {}),
   },
+  paginationScrollInner: {
+    minWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   requestCard: {
-    borderRadius: BorderRadius.lg,
+    borderRadius: 14,
     gap: Spacing.md,
-    padding: Spacing.md,
+    padding: 16,
     minWidth: 0,
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
     width: '100%',
     ...(Platform.OS === 'web'
       ? {
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
-        }
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: palette.dark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 4px 16px rgba(0, 0, 0, 0.04)',
+      }
       : { elevation: 1 }),
   },
   cardThumbnail: {
     flexShrink: 0,
     marginRight: 0,
-    width: 110,
-    height: 110,
+    width: 104,
+    height: 104,
     borderRadius: 12,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: palette.dark ? '#1E293B' : '#F8FAFC',
+    borderWidth: 1,
+    borderColor: palette.border,
+    overflow: 'hidden',
   },
   cardThumbnailPlaceholder: {
     alignItems: 'center',
@@ -2738,6 +2587,22 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     backgroundColor: palette.elevated,
     borderWidth: 1,
     borderColor: palette.border,
+    borderRadius: 12,
+  },
+  thumbnailPlaceholderIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.dark ? '#2E1065' : '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  thumbnailPlaceholderText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: palette.muted,
+    letterSpacing: 0.1,
   },
   cardBody: {
     gap: Spacing.sm,
@@ -2771,18 +2636,34 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
     borderRadius: 999,
   },
   statusPending: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: palette.dark ? '#451A03' : '#FEF3C7',
+    borderWidth: 1,
+    borderColor: palette.dark ? '#78350F' : '#FDE68A',
   },
-  statusApproved: {
-    backgroundColor: '#DCFCE7',
+  statusPublished: {
+    backgroundColor: palette.dark ? '#064E3B' : '#DCFCE7',
+    borderWidth: 1,
+    borderColor: palette.dark ? '#047857' : '#BBF7D0',
   },
   statusReviewing: {
-    backgroundColor: '#E0F2FE',
+    backgroundColor: palette.dark ? '#0C4A6E' : '#E0F2FE',
+    borderWidth: 1,
+    borderColor: palette.dark ? '#0369A1' : '#BAE6FD',
+  },
+  statusEditing: {
+    backgroundColor: palette.dark ? '#3B0764' : '#F3E8FF',
+    borderWidth: 1,
+    borderColor: palette.dark ? '#7C3AED' : '#C084FC',
+  },
+  statusRejected: {
+    backgroundColor: palette.dark ? '#450A0A' : '#FEE2E2',
+    borderWidth: 1,
+    borderColor: palette.dark ? '#7F1D1D' : '#FECACA',
   },
   statusText: {
     fontSize: 11,
@@ -2793,17 +2674,20 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     fontSize: FontSize.md,
     fontWeight: '700',
     color: palette.text,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   detailsRow: {
-    padding: Spacing.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     minWidth: 0,
-    gap: Spacing.sm,
+    gap: Spacing.md,
     flexWrap: 'wrap',
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
     backgroundColor: palette.elevated,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
     marginBottom: 8,
   },
   detailCol: {
@@ -2814,32 +2698,33 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   detailColDivider: {
     width: 1,
     height: '100%',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: palette.border,
   },
   detailLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   detailLabel: {
     lineHeight: 16,
-    fontSize: FontSize.xs,
+    fontSize: 10.5,
     fontWeight: '800',
-    color: palette.text,
-    letterSpacing: 0.5,
+    color: palette.dark ? '#A78BFA' : '#7C3AED',
+    letterSpacing: 0.6,
   },
   detailValue: {
     flexShrink: 1,
-    lineHeight: 20,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
+    lineHeight: 18,
+    fontSize: 12.5,
+    fontWeight: '700',
     color: palette.text,
   },
   detailValueSub: {
     flexShrink: 1,
     lineHeight: 16,
-    fontSize: FontSize.xs,
+    fontSize: 11,
     color: palette.muted,
+    marginTop: 2,
   },
 
   cardFooterRow: {
@@ -2851,38 +2736,52 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     justifyContent: 'space-between',
   },
   mediaCountBadge: {
-    paddingVertical: Spacing.xs,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
     flexShrink: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: palette.purpleTint,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    backgroundColor: palette.dark ? '#2E1065' : '#FAF5FF',
+    borderWidth: 1,
+    borderColor: palette.dark ? '#581C87' : '#E9D5FF',
+    borderRadius: 999,
   },
   mediaCountText: {
     lineHeight: 16,
     flexShrink: 1,
-    fontSize: 11,
-    fontWeight: '600',
-    color: palette.purple,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: palette.dark ? '#C4B5FD' : '#7C3AED',
   },
   viewRequestBtn: {
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    minHeight: 30,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#6D28D9',
-    backgroundColor: palette.field,
+    justifyContent: 'center',
+    backgroundColor: '#7C3AED',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 6px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+        transition: 'all 120ms ease',
+      } as any)
+      : {}),
   },
   viewRequestBtnText: {
-    lineHeight: 20,
-    fontSize: FontSize.sm,
+    lineHeight: 18,
+    fontSize: 12,
     fontWeight: '700',
-    color: palette.purple,
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 
   /* RIGHT SECTION: CREATE REQUEST PANEL */
@@ -2897,16 +2796,16 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     width: '100%',
     ...(Platform.OS === 'web'
       ? {
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-        }
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+      }
       : { elevation: 3 }),
   },
   panelHeaderPurple: {
     gap: Spacing.sm,
-    minHeight: 64,
-    paddingVertical: Spacing.sm,
+    minHeight: 56,
+    paddingVertical: 10,
     backgroundColor: BRAND_PURPLE, // JMCFI Deep Purple
     flexDirection: 'row',
     alignItems: 'center',
@@ -2918,32 +2817,33 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   panelPlusCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   panelHeaderTitle: {
     flexShrink: 1,
-    lineHeight: 20,
+    lineHeight: 22,
     fontSize: FontSize.md,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   panelCloseBtn: {
-    borderRadius: BorderRadius.md,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    height: CONTROL_HEIGHT,
-    width: CONTROL_HEIGHT,
     padding: 2,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 120ms ease' } : {}),
   },
 
   panelFormScroll: {
@@ -2957,13 +2857,17 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
 
   redesignedSectionCard: {
-    paddingBottom: 0,
+    padding: 16,
     minWidth: 0,
-    backgroundColor: 'transparent',
+    backgroundColor: palette.elevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 14,
   },
   redesignedSectionHeader: {
-    marginBottom: Spacing.md,
-    paddingBottom: Spacing.sm,
+    marginBottom: 12,
+    paddingBottom: 10,
     gap: Spacing.sm,
     minWidth: 0,
     flexDirection: 'row',
@@ -2972,17 +2876,17 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     borderBottomColor: palette.border,
   },
   redesignedHeaderIconBox: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     borderRadius: 8,
-    backgroundColor: palette.elevated,
+    backgroundColor: palette.dark ? '#2E1065' : '#F3E8FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   redesignedSectionTitle: {
     flexShrink: 1,
-    lineHeight: 24,
-    fontSize: FontSize.md,
+    lineHeight: 22,
+    fontSize: 15,
     fontWeight: '800',
     color: palette.text,
   },
@@ -2991,14 +2895,13 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     minWidth: 0,
   },
   redesignedFieldLabel: {
-    lineHeight: 16,
-    fontSize: FontSize.xs,
+    lineHeight: 20,
+    fontSize: FORM_LABEL_SIZE,
     fontWeight: '700',
     color: palette.muted,
-    letterSpacing: 0.5,
   },
   redesignedTextInput: {
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     minWidth: 0,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
@@ -3010,6 +2913,32 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     color: palette.text,
     outlineWidth: 0,
   },
+  fieldFocused: {
+    borderColor: palette.purple,
+    ...(Platform.OS === 'web' ? { outlineWidth: 2, outlineStyle: 'solid', outlineColor: palette.purple, outlineOffset: 2 } : {}),
+  },
+  fieldInvalid: { borderColor: palette.dark ? '#FCA5A5' : '#B91C1C' },
+  fieldErrorText: {
+    color: palette.dark ? '#FCA5A5' : '#B91C1C',
+    fontSize: FORM_LABEL_SIZE,
+    lineHeight: 20,
+    flexShrink: 1,
+  },
+  captionEditorShell: {
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: BorderRadius.md,
+  },
+  readinessFooter: {
+    gap: Spacing.xs,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    minWidth: 0,
+  },
+  readinessTitle: { color: palette.text, fontSize: FORM_BODY_SIZE, lineHeight: 20, fontWeight: '600' },
+  readinessDetail: { color: palette.muted, fontSize: FORM_LABEL_SIZE, lineHeight: 20 },
   redesignedReadonlyBox: {
     minWidth: 0,
     borderRadius: BorderRadius.md,
@@ -3023,27 +2952,32 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
   redesignedReadonlyText: {
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     color: palette.text,
   },
   captionGuideCallout: {
     marginBottom: Spacing.md,
-    borderLeftWidth: Spacing.xs,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
     backgroundColor: palette.elevated,
-    borderLeftColor: BRAND_PURPLE,
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
+    borderRadius: BorderRadius.md,
   },
   captionGuideText: {
     lineHeight: 20,
-    fontSize: FontSize.sm,
-    color: palette.text,
+    fontSize: FORM_BODY_SIZE,
+    color: palette.muted,
   },
-  captionGuideBold: {
-    fontWeight: '700',
-    color: palette.text,
+  captionExampleToggle: {
+    minHeight: CONTROL_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  captionExampleToggleText: {
+    fontSize: FORM_LABEL_SIZE,
+    fontWeight: '600',
+    color: palette.purple,
   },
   redesignedCaptionFooter: {
     gap: Spacing.sm,
@@ -3056,7 +2990,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
   redesignedCharCounter: {
     lineHeight: 16,
-    fontSize: FontSize.xs,
+    fontSize: FORM_LABEL_SIZE,
     color: palette.muted,
   },
   redesignedAiPolicyBtn: {
@@ -3075,7 +3009,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   redesignedAiPolicyBtnText: {
     flexShrink: 1,
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     fontWeight: '700',
     color: palette.text,
   },
@@ -3303,35 +3237,34 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   dropzoneContainer: {
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: palette.dark ? '#6B21A8' : '#D8B4FE',
-    backgroundColor: palette.purpleTint,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.elevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   uploadIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.md,
     backgroundColor: palette.purpleTint,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: Spacing.sm,
   },
   dropzoneTitle: {
     textAlign: 'center',
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     fontWeight: '700',
     color: palette.text,
   },
   dropzoneSubtitle: {
     textAlign: 'center',
     lineHeight: 16,
-    fontSize: FontSize.xs,
+    fontSize: FORM_LABEL_SIZE,
     color: palette.muted,
-    marginTop: 2,
+    marginTop: Spacing.xs,
   },
 
   attachedFilesList: {
@@ -3362,41 +3295,58 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     alignItems: 'center',
   },
   cancelBtn: {
-    flexBasis: 88,
+    flexBasis: 90,
     minWidth: 0,
-    borderRadius: BorderRadius.md,
+    borderRadius: 999,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
-    flex: 1,
+    paddingHorizontal: Spacing.md,
+    minHeight: 40,
+    flexGrow: 1,
+    flexShrink: 1,
     backgroundColor: palette.elevated,
+    borderWidth: 1,
+    borderColor: palette.border,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: FORM_BODY_SIZE,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.muted,
   },
   submitBtn: {
     backgroundColor: BRAND_GOLD,
     flexBasis: 160,
     minWidth: 0,
-    borderRadius: BorderRadius.md,
+    borderRadius: 999,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    minHeight: CONTROL_HEIGHT,
-    flex: 1.6,
+    paddingHorizontal: Spacing.md,
+    minHeight: 40,
+    flexGrow: 1.6,
+    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: BRAND_GOLD,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        transition: 'all 120ms ease',
+      } as any)
+      : {}),
   },
   submitBtnText: {
     textAlign: 'center',
     flexShrink: 1,
     color: GOLD_INK,
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     fontWeight: '700',
   },
 
@@ -3584,6 +3534,16 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
 
   /* Social Mockup Tabs & Cards */
+  formPreviewEmpty: {
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.elevated,
+    alignItems: 'center',
+  },
+  formEmptyMedia: { height: 96 },
   previewHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3603,6 +3563,11 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     alignItems: 'center',
   },
   platformSelectorTab: {
+    flexBasis: 120,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    justifyContent: 'center',
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
@@ -3628,7 +3593,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
   platformSelectorTabText: {
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     fontWeight: '600',
     color: palette.muted,
   },
@@ -3982,10 +3947,10 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     position: 'relative',
     ...(Platform.OS === 'web'
       ? {
-          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-        }
+        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+      }
       : { elevation: 1 }),
   },
   featuredThumbCardActive: {
@@ -4093,9 +4058,9 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     justifyContent: 'center',
     ...(Platform.OS === 'web'
       ? {
-          pointerEvents: 'none',
-          userSelect: 'none',
-        }
+        pointerEvents: 'none',
+        userSelect: 'none',
+      }
       : {}),
   },
   featuredThumbImage: {
@@ -4103,10 +4068,10 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     height: '100%',
     ...(Platform.OS === 'web'
       ? {
-          pointerEvents: 'none',
-          userSelect: 'none',
-          WebkitUserDrag: 'none',
-        }
+        pointerEvents: 'none',
+        userSelect: 'none',
+        WebkitUserDrag: 'none',
+      }
       : {}),
   },
   featuredThumbName: {
@@ -4117,8 +4082,8 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     width: '100%',
     ...(Platform.OS === 'web'
       ? {
-          userSelect: 'none',
-        }
+        userSelect: 'none',
+      }
       : {}),
   },
   featuredThumbNameActive: {
@@ -4131,8 +4096,8 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     textAlign: 'center',
     ...(Platform.OS === 'web'
       ? {
-          userSelect: 'none',
-        }
+        userSelect: 'none',
+      }
       : {}),
   },
   featuredThumbStatusActive: {
@@ -4148,12 +4113,12 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   cardPlatformChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   platformChipSmall: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -4161,7 +4126,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   /* Target Platforms & Rules Form Step */
   platformSectionSub: {
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     color: palette.muted,
     marginBottom: 8,
   },
@@ -4177,7 +4142,7 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     padding: Spacing.sm,
     flexShrink: 1,
     flexGrow: 1,
-    flexBasis: 120,
+    flexBasis: 144,
     minWidth: 0,
     backgroundColor: palette.field,
     borderWidth: 1.5,
@@ -4233,15 +4198,22 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
   targetPlatformTitle: {
     lineHeight: 20,
-    fontSize: FontSize.sm,
+    fontSize: FORM_BODY_SIZE,
     fontWeight: '700',
     color: palette.text,
   },
   targetPlatformDesc: {
     lineHeight: 16,
-    fontSize: FontSize.xs,
+    fontSize: FORM_LABEL_SIZE,
     color: palette.muted,
     marginTop: 2,
+  },
+  targetPlatformStatus: {
+    marginTop: Spacing.sm,
+    fontSize: FORM_LABEL_SIZE,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: palette.text,
   },
 
   /* Photo Quality & Size Rules Status Banners */
@@ -4339,179 +4311,6 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
     color: palette.dark ? '#93C5FD' : '#1E40AF',
     fontWeight: '600',
     flex: 1,
-  },
-
-  targetPlatformStatus: {
-    lineHeight: 14,
-    fontSize: 11,
-    color: palette.muted,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  cleanSectionHeading: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: palette.text,
-    marginBottom: 10,
-  },
-  cleanDropzoneContainer: {
-    backgroundColor: palette.dark ? '#1E293B' : '#F8FAFC',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 12,
-    paddingVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
-  },
-  cleanUploadIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#F3E8FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  cleanDropzoneTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: palette.text,
-    marginBottom: 4,
-  },
-  cleanDropzoneSubtitle: {
-    fontSize: 11.5,
-    color: palette.muted,
-  },
-  cleanPreviewPlatformTabsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  cleanPreviewPlatformTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.field,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.15s ease' } : {}),
-  },
-  cleanPreviewPlatformTabActiveFb: {
-    borderColor: '#BFDBFE',
-    backgroundColor: palette.dark ? '#172554' : '#EFF6FF',
-  },
-  cleanPreviewPlatformTabActiveIg: {
-    borderColor: '#FBCFE8',
-    backgroundColor: palette.dark ? '#500724' : '#FDF2F8',
-  },
-  cleanPreviewPlatformTabActiveWeb: {
-    borderColor: '#A7F3D0',
-    backgroundColor: palette.dark ? '#052E2B' : '#ECFDF5',
-  },
-  cleanPreviewPlatformTabText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: palette.muted,
-  },
-  cleanPreviewPlatformTabTextActiveFb: {
-    color: '#1877F2',
-    fontWeight: '700',
-  },
-  cleanPreviewPlatformTabTextActiveIg: {
-    color: '#E1306C',
-    fontWeight: '700',
-  },
-  cleanPreviewPlatformTabTextActiveWeb: {
-    color: '#059669',
-    fontWeight: '700',
-  },
-  emptyMockMediaClean: {
-    height: 160,
-    backgroundColor: palette.dark ? '#0F172A' : '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 8,
-  },
-  emptyMockMediaCleanText: {
-    fontSize: 12.5,
-    color: '#94A3B8',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  panelFooterBar: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  footerSummaryCol: {
-    flex: 1,
-    minWidth: 220,
-  },
-  footerSummaryTitle: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: palette.text,
-    marginBottom: 4,
-  },
-  footerSummarySub: {
-    fontSize: 12,
-    color: palette.muted,
-  },
-  footerActionsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  cleanCancelBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.field,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
-  },
-  cleanCancelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: palette.text,
-  },
-  cleanSubmitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-    backgroundColor: '#FFC72C',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
-  },
-  cleanSubmitBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1A1A2E',
   },
 
   lightboxOverlay: {

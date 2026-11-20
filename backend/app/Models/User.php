@@ -36,11 +36,6 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $appends = ['full_name', 'photo_url', 'department_logo_url', 'assigned_program'];
 
-    private bool $deptLogoResolved = false;
-    private ?string $cachedDeptLogoUrl = null;
-    private bool $assignedProgramResolved = false;
-    private ?string $cachedAssignedProgram = null;
-
     protected function casts(): array
     {
         return [
@@ -92,18 +87,75 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function getDepartmentLogoUrlAttribute(): ?string
     {
+        if ($this->program_head_id) {
+            $ph = $this->relationLoaded('programHead') ? $this->programHead : $this->programHead()->first();
+            if ($ph && $ph->department && $ph->department->logo_url) {
+                return $ph->department->logo_url;
+            }
+        }
         if (!$this->department) {
             return null;
         }
-        if ($this->deptLogoResolved) {
-            return $this->cachedDeptLogoUrl;
-        }
+
+        // 1. Exact match by name or display_name
         $dept = \App\Models\Department::where('name', $this->department)
                                       ->orWhere('display_name', $this->department)
                                       ->first();
-        $this->cachedDeptLogoUrl = $dept ? $dept->logo_url : null;
-        $this->deptLogoResolved = true;
-        return $this->cachedDeptLogoUrl;
+        if ($dept && $dept->logo_url) {
+            return $dept->logo_url;
+        }
+
+        // 2. Case-insensitive / normalized match across departments with a logo
+        $deptClean = strtolower(trim($this->department));
+        $allDepts = \App\Models\Department::whereNotNull('logo_path')
+            ->where('logo_path', '!=', '')
+            ->get();
+
+        foreach ($allDepts as $d) {
+            $dName = strtolower(trim($d->name));
+            $dDisplay = strtolower(trim($d->display_name));
+            if ($dName === $deptClean || $dDisplay === $deptClean) {
+                return $d->logo_url;
+            }
+        }
+
+        // 3. Known Institutional Aliases & Keyword matching
+        $isIT = str_contains($deptClean, 'bsit') || str_contains($deptClean, 'information technology') || str_contains($deptClean, 'computer') || str_contains($deptClean, 'cite');
+        $isAgri = str_contains($deptClean, 'agri');
+        $isEng = str_contains($deptClean, 'engineer');
+        $isBsa = str_contains($deptClean, 'bsa') || str_contains($deptClean, 'accountan');
+        $isPsyc = str_contains($deptClean, 'psyc');
+
+        foreach ($allDepts as $d) {
+            $target = strtolower($d->name . ' ' . $d->display_name);
+            if ($isIT && (str_contains($target, 'information technology') || str_contains($target, 'computer') || str_contains($target, 'bsit') || str_contains($target, 'cite'))) {
+                return $d->logo_url;
+            }
+            if ($isAgri && str_contains($target, 'agri')) {
+                return $d->logo_url;
+            }
+            if ($isEng && str_contains($target, 'engineer')) {
+                return $d->logo_url;
+            }
+            if ($isBsa && (str_contains($target, 'bsa') || str_contains($target, 'accountan'))) {
+                return $d->logo_url;
+            }
+            if ($isPsyc && str_contains($target, 'psyc')) {
+                return $d->logo_url;
+            }
+        }
+
+        // 4. Substring / partial match fallback
+        foreach ($allDepts as $d) {
+            $dDisplay = strtolower(trim($d->display_name));
+            $dName = strtolower(trim($d->name));
+            if (str_contains($deptClean, $dDisplay) || str_contains($dDisplay, $deptClean) ||
+                str_contains($deptClean, $dName) || str_contains($dName, $deptClean)) {
+                return $d->logo_url;
+            }
+        }
+
+        return null;
     }
 
     public function programHead(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -117,6 +169,10 @@ class User extends Authenticatable implements MustVerifyEmail
             return (int) $this->program_head_id;
         }
 
+        if (!\Illuminate\Support\Facades\Schema::hasTable('program_heads')) {
+            return null;
+        }
+
         $phByUser = ProgramHead::where('user_id', $this->id)->first();
         if ($phByUser) {
             return (int) $phByUser->id;
@@ -127,28 +183,18 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function getAssignedProgramAttribute(): ?string
     {
-        if ($this->assignedProgramResolved) {
-            return $this->cachedAssignedProgram;
-        }
-
-        if ($this->relationLoaded('roles')) {
-            $primaryRole = $this->roles->first()?->name;
-            if (in_array($primaryRole, ['it_admin', 'it_publisher', 'admin'], true) && !$this->program_head_id) {
-                $this->assignedProgramResolved = true;
-                return $this->cachedAssignedProgram = null;
-            }
+        if (!\Illuminate\Support\Facades\Schema::hasTable('program_heads')) {
+            return null;
         }
 
         $ph = $this->relationLoaded('programHead') ? $this->programHead : $this->programHead()->first();
         if ($ph && !empty($ph->program_name)) {
-            $this->assignedProgramResolved = true;
-            return $this->cachedAssignedProgram = $ph->program_name;
+            return $ph->program_name;
         }
 
         $phByUser = ProgramHead::where('user_id', $this->id)->first();
         if ($phByUser && !empty($phByUser->program_name)) {
-            $this->assignedProgramResolved = true;
-            return $this->cachedAssignedProgram = $phByUser->program_name;
+            return $phByUser->program_name;
         }
 
         if ($this->department) {
@@ -167,8 +213,7 @@ class User extends Authenticatable implements MustVerifyEmail
                     if (!$deptPh->user_id) {
                         $deptPh->update(['user_id' => $this->id]);
                     }
-                    $this->assignedProgramResolved = true;
-                    return $this->cachedAssignedProgram = $deptPh->program_name;
+                    return $deptPh->program_name;
                 }
             }
         }
@@ -176,13 +221,11 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!empty($this->position) && str_contains($this->position, 'Program Head')) {
             $extracted = trim(str_replace('Program Head', '', $this->position));
             if ($extracted !== '') {
-                $this->assignedProgramResolved = true;
-                return $this->cachedAssignedProgram = $extracted;
+                return $extracted;
             }
         }
 
-        $this->assignedProgramResolved = true;
-        return $this->cachedAssignedProgram = null;
+        return null;
     }
 
     public function getDisplayNameAttribute(): string
@@ -243,9 +286,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function workflowRole(): ?string
     {
-        $role = $this->relationLoaded('roles')
-            ? $this->roles->first()?->name
-            : $this->getRoleNames()->first();
+        $role = $this->getRoleNames()->first();
         $department = strtolower($this->department ?? '');
 
         if ($role === 'it_admin' || $role === 'admin') {

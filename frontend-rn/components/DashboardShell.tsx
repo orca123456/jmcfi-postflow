@@ -12,6 +12,7 @@ import {
   Animated,
   TouchableWithoutFeedback,
   ImageBackground,
+  Easing,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ import { departmentsApi, authApi, notificationsApi, programHeadsApi } from '../s
 import { topLoadingBar } from '../store/loadingBar';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const MAX_SIDEBAR_WIDTH = 275;
 
 interface SidebarSubItem {
   id: string;
@@ -74,6 +76,7 @@ export function DashboardShell({
   const [isHamburgerHovered, setIsHamburgerHovered] = React.useState(false);
   const [sidebarOpenedByHover, setSidebarOpenedByHover] = React.useState(false);
   const [photoLoadFailed, setPhotoLoadFailed] = React.useState(false);
+  const [deptLogoLoadFailed, setDeptLogoLoadFailed] = React.useState(false);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
 
   // Notifications State & Logic
@@ -142,7 +145,7 @@ export function DashboardShell({
     }
 
     const currentRole = user?.roles?.[0] || user?.role || 'requestor';
-    const targetDashboard = getRoleDashboardPath(currentRole);
+    const targetDashboard = getRoleDashboardPath(currentRole, user?.department);
     router.push({
       pathname: targetDashboard as any,
       params: { postId: String(postId) },
@@ -151,6 +154,8 @@ export function DashboardShell({
 
   // Expandable sidebar submenus (default closed)
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({});
+  const [hoveredNavId, setHoveredNavId] = React.useState<string | null>(null);
+  const [pressedNavId, setPressedNavId] = React.useState<string | null>(null);
 
   const toggleSubMenu = React.useCallback((menuId: string) => {
     setExpandedMenus((prev) => ({
@@ -161,6 +166,11 @@ export function DashboardShell({
 
   React.useEffect(() => {
     if (
+      activeTab === 'publication' ||
+      activeTab === 'publication-management' ||
+      activeTab === 'direct-imc' ||
+      activeTab === 'in-progress-editing' ||
+      activeTab === 'for-approval' ||
       activeTab === 'publishing-requests' ||
       activeTab === 'published-posts'
     ) {
@@ -217,22 +227,73 @@ export function DashboardShell({
   }, [mobileDrawerAnim, mobileBackdropAnim]);
 
   // Auto-fetch department logo for the current user
-  const [autoDeptLogo, setAutoDeptLogo] = React.useState<string | undefined>(undefined);
+  const [autoDeptLogo, setAutoDeptLogo] = React.useState<string | undefined>(
+    (user as any)?.department_logo_url || undefined
+  );
+
+  React.useEffect(() => {
+    if ((user as any)?.department_logo_url) {
+      setAutoDeptLogo((user as any).department_logo_url);
+    }
+  }, [(user as any)?.department_logo_url]);
+
   React.useEffect(() => {
     const deptName = user?.department;
     if (!deptName) return;
-    const timer = setTimeout(() => {
-      departmentsApi.list().then(res => {
+
+    let cancelled = false;
+    const fetchLogo = () => {
+      departmentsApi.listFresh().then(res => {
+        if (cancelled) return;
         const depts = res.data?.data || [];
-        const match = depts.find((d: any) =>
-          d.display_name === deptName || d.name === deptName
+        const deptLower = (deptName || '').toLowerCase().trim();
+
+        // 1. Direct match by display_name or name
+        let match = depts.find((d: any) =>
+          d.display_name === deptName || d.name === deptName ||
+          (d.display_name && d.display_name.toLowerCase() === deptLower) ||
+          (d.name && d.name.toLowerCase() === deptLower)
         );
-        if (match?.logo_url) {
+
+        // 2. Keyword & Alias match across departments with logo
+        if (!match) {
+          const isIT = deptLower.includes('bsit') || deptLower.includes('information technology') || deptLower.includes('computer') || deptLower.includes('cite');
+          const isAgri = deptLower.includes('agri');
+          const isEng = deptLower.includes('engineer');
+          const isBsa = deptLower.includes('bsa') || deptLower.includes('accountan');
+          const isPsyc = deptLower.includes('psyc');
+
+          match = depts.find((d: any) => {
+            if (!d.logo_url && !d.logo_path) return false;
+            const target = `${d.name || ''} ${d.display_name || ''}`.toLowerCase();
+            if (isIT && (target.includes('information technology') || target.includes('computer') || target.includes('bsit') || target.includes('cite'))) return true;
+            if (isAgri && target.includes('agri')) return true;
+            if (isEng && target.includes('engineer')) return true;
+            if (isBsa && (target.includes('bsa') || target.includes('accountan'))) return true;
+            if (isPsyc && target.includes('psyc')) return true;
+            return target.includes(deptLower) || deptLower.includes((d.display_name || '').toLowerCase());
+          });
+        }
+
+        if (match?.logo_url && !cancelled) {
           setAutoDeptLogo(match.logo_url);
         }
-      }).catch(() => {});
-    }, 6000); // Delay so it doesn't block dashboard init on single-threaded dev server
-    return () => clearTimeout(timer);
+      }).catch(() => { });
+    };
+
+    const timer = setTimeout(fetchLogo, 100);
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('postflow:department-updated', fetchLogo);
+    }
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('postflow:department-updated', fetchLogo);
+      }
+    };
   }, [user?.department]);
 
   // Live user profile and assigned program state
@@ -269,7 +330,7 @@ export function DashboardShell({
       ) {
         useAuthStore.getState().setUser({ ...current, ...userData });
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [user?.id]);
 
   // Sync state if user in auth store changes
@@ -281,12 +342,9 @@ export function DashboardShell({
     }
   }, [user]);
 
-  // Refresh user data after initial dashboard load, on interval, and on window focus
+  // Refresh user data immediately on mount, on activeTab change, on window focus, and on interval
   React.useEffect(() => {
-    const hasInitialProfile = Boolean(user?.department && user?.role);
-    const initialTimer = setTimeout(() => {
-      refreshProfile();
-    }, hasInitialProfile ? 2500 : 0);
+    refreshProfile();
     const interval = setInterval(refreshProfile, 60000);
     let handleFocus: (() => void) | null = null;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -294,47 +352,101 @@ export function DashboardShell({
       window.addEventListener('focus', handleFocus);
     }
     return () => {
-      clearTimeout(initialTimer);
       clearInterval(interval);
       if (handleFocus && typeof window !== 'undefined') {
         window.removeEventListener('focus', handleFocus);
       }
     };
-  }, [refreshProfile, activeTab, user?.department, user?.role]);
+  }, [refreshProfile, activeTab]);
 
-  // Fallback: Query department program heads only if program assignment is not yet known
+  // Check if current user is eligible for program indicator (Requestors and Department Head / Office Head Approvers with an assigned Program Head)
+  const canHaveProgramIndicator = React.useMemo(() => {
+    if (!user) return false;
+    const roles = Array.isArray(user.roles) ? user.roles : (user.roles ? [user.roles] : []);
+    const primaryRole = roles[0] || user.role || '';
+    const dept = (user.department || '').toLowerCase();
+
+    // Exclude Admin, Publisher, Vice President, and IMC QA
+    if (
+      primaryRole === 'it_admin' ||
+      primaryRole === 'admin' ||
+      roles.includes('admin') ||
+      roles.includes('it_admin') ||
+      primaryRole === 'it_publisher' ||
+      roles.includes('it_publisher') ||
+      primaryRole === 'vice_president' ||
+      roles.includes('vice_president') ||
+      dept.includes('vice president') ||
+      primaryRole === 'imc_qa_checker' ||
+      roles.includes('imc_qa_checker') ||
+      dept.includes('integrated marketing') ||
+      dept.includes('institutional marketing') ||
+      dept.includes('imc')
+    ) {
+      return false;
+    }
+
+    // Eligible for requestors and department head / office head approvers
+    return (
+      primaryRole === 'requestor' ||
+      primaryRole === 'content_requestor' ||
+      primaryRole === 'office_head' ||
+      primaryRole === 'department_head' ||
+      primaryRole === 'approver' ||
+      roles.includes('requestor') ||
+      roles.includes('content_requestor') ||
+      roles.includes('office_head') ||
+      roles.includes('department_head') ||
+      roles.includes('approver')
+    );
+  }, [user]);
+
+  // Fallback: Query department program heads for eligible users who have a program_head_id or user_id link
   React.useEffect(() => {
+    if (!canHaveProgramIndicator) {
+      setLiveAssignedProgram(null);
+      return;
+    }
     if (propAssignedProgram || liveAssignedProgram || (user as any)?.assigned_program || (user as any)?.program_head?.program_name) {
       return;
     }
+    const phId = (user as any)?.program_head_id;
     const deptName = user?.department;
     if (!deptName) return;
+
+    let cancelled = false;
     departmentsApi.list().then(res => {
       const depts = res.data?.data || [];
       const match = depts.find((d: any) =>
         d.display_name === deptName || d.name === deptName
       );
-      if (match?.id) {
-        programHeadsApi.byDepartment(match.id).then(phRes => {
-          const heads = phRes.data?.data || [];
-          const myHead = heads.find((h: any) =>
-            ((user as any)?.program_head_id && Number(h.id) === Number((user as any).program_head_id)) ||
-            (h.user_id && Number(h.user_id) === Number(user?.id)) ||
-            (h.email && user?.email && h.email.toLowerCase() === user.email.toLowerCase()) ||
-            (h.name && user?.name && h.name.toLowerCase() === user.name.toLowerCase()) ||
-            (h.name && user?.first_name && h.name.toLowerCase() === user.first_name.toLowerCase())
-          );
-          if (myHead?.program_name) {
-            setLiveAssignedProgram(myHead.program_name);
-          }
-        }).catch(() => {});
-      }
-    }).catch(() => {});
-  }, [user?.department, user?.id, user?.email, user?.name, user?.first_name, propAssignedProgram, liveAssignedProgram]);
+      if (!match?.id) return;
+      programHeadsApi.byDepartment(match.id).then(phRes => {
+        if (cancelled) return;
+        const heads = phRes.data?.data || [];
+        const myHead = heads.find((h: any) =>
+          (phId && Number(h.id) === Number(phId)) ||
+          (h.user_id && Number(h.user_id) === Number(user?.id))
+        );
+        if (myHead?.program_name) {
+          setLiveAssignedProgram(myHead.program_name);
+        }
+      }).catch(() => { });
+    }).catch(() => { });
+    return () => { cancelled = true; };
+  }, [canHaveProgramIndicator, user?.department, (user as any)?.program_head_id, user?.id, propAssignedProgram, liveAssignedProgram]);
 
-  const finalDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
+  const rawDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
+  const resolvedDeptLogo = resolveImageUrl(rawDeptLogo);
+  const finalDeptLogo = resolvedDeptLogo && !deptLogoLoadFailed ? resolvedDeptLogo : null;
+  React.useEffect(() => {
+    setDeptLogoLoadFailed(false);
+  }, [resolvedDeptLogo]);
   const finalDeptName = departmentName || user?.department || 'JMCFI';
   const finalAssignedProgram = React.useMemo(() => {
+    // Only show program subtitle if user is eligible and has a program indicated by admin
+    if (!canHaveProgramIndicator) return null;
+
     if (liveAssignedProgram && liveAssignedProgram.trim()) {
       return liveAssignedProgram.trim();
     }
@@ -357,7 +469,7 @@ export function DashboardShell({
       if (extracted) return extracted;
     }
     return null;
-  }, [propAssignedProgram, liveAssignedProgram, user]);
+  }, [canHaveProgramIndicator, propAssignedProgram, liveAssignedProgram, user]);
   const photoFromUser = (user as any)?.photo_url;
   const rawPhoto = userPhotoUrl || apiUserPhoto || (photoFromUser && photoFromUser !== '' ? photoFromUser : null);
   const finalPhotoUrl = resolveImageUrl(rawPhoto);
@@ -379,7 +491,7 @@ export function DashboardShell({
     setIsSidebarOpen(true);
     Animated.spring(sidebarWidthAnim, {
       toValue: MAX_WIDTH,
-      useNativeDriver: false, // width animation doesn't support native driver
+      useNativeDriver: false,
       tension: 70,
       friction: 12,
     }).start();
@@ -643,7 +755,7 @@ export function DashboardShell({
       setIsProfileDropdownOpen(false);
       closeMobileDrawer();
       await logout();
-    } catch (_) {}
+    } catch (_) { }
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.location.href = '/(auth)/login';
     } else {
@@ -714,15 +826,27 @@ export function DashboardShell({
         { id: 'dashboard', label: 'Dashboard', icon: 'home' as const, active: active === 'dashboard' },
         {
           id: 'publication-management',
-          label: 'Publication Management',
+          label: 'Publication',
           icon: 'folder-outline' as const,
-          active: active === 'publication-management' || active === 'publishing-requests' || active === 'published-posts',
+          active: active === 'publication-management' || active === 'direct-imc' || active === 'publishing-requests' || active === 'in-progress-editing' || active === 'for-approval' || active === 'published-posts',
           subItems: [
             {
-              id: 'publishing-requests',
-              label: 'Publishing Requests',
+              id: 'direct-imc',
+              label: 'Direct to IMC',
               icon: 'mail-outline' as const,
-              active: active === 'publishing-requests' || active === 'publication-management',
+              active: active === 'direct-imc' || active === 'publishing-requests' || active === 'publication-management',
+            },
+            {
+              id: 'in-progress-editing',
+              label: 'In-Progress Editing',
+              icon: 'brush-outline' as const,
+              active: active === 'in-progress-editing',
+            },
+            {
+              id: 'for-approval',
+              label: 'For Approval',
+              icon: 'shield-checkmark-outline' as const,
+              active: active === 'for-approval',
             },
             {
               id: 'published-posts',
@@ -774,7 +898,7 @@ export function DashboardShell({
 
   return (
     <SafeAreaView style={styles.safe}>
-        {/* Top Header */}
+      {/* Top Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {/* Hamburger with hover ripple */}
@@ -799,16 +923,16 @@ export function DashboardShell({
           <TouchableOpacity
             onPress={() => {
               if (user?.role) {
-                router.push(getRoleDashboardPath(user.role) as any);
+                router.push(getRoleDashboardPath(user.role, user.department) as any);
               }
             }}
             accessibilityRole="button"
             accessibilityLabel="JMCFI PostFlow dashboard"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 }}
           >
-            <Image 
-              source={require('../assets/images/jmc_logo.png')} 
-              style={{ width: 28, height: 28, borderRadius: 14 }} 
+            <Image
+              source={require('../assets/images/jmc_logo.png')}
+              style={{ width: 28, height: 28 }}
               resizeMode="contain"
             />
             <Text style={styles.logoText} numberOfLines={1}>
@@ -827,7 +951,7 @@ export function DashboardShell({
           )}
 
           {/* NOTIFICATION TRIGGER */}
-          <TouchableOpacity 
+          <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             accessibilityState={{ expanded: isNotificationDropdownOpen }}
@@ -849,12 +973,12 @@ export function DashboardShell({
           </TouchableOpacity>
 
           {/* PROFILE TRIGGER */}
-          <TouchableOpacity 
+          <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Account menu"
             accessibilityState={{ expanded: isProfileDropdownOpen }}
             {...(Platform.OS === 'web' ? { 'aria-expanded': isProfileDropdownOpen } : {})}
-            style={styles.profileTrigger} 
+            style={styles.profileTrigger}
             onPress={() => {
               setIsNotificationDropdownOpen(false);
               setIsProfileDropdownOpen(!isProfileDropdownOpen);
@@ -949,8 +1073,8 @@ export function DashboardShell({
                             backgroundColor: (n.type?.includes('Approved') || n.data?.type === 'post_approved')
                               ? '#DCFCE7'
                               : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
-                              ? '#FEE2E2'
-                              : '#EFF6FF',
+                                ? '#FEE2E2'
+                                : '#EFF6FF',
                           },
                         ]}
                       >
@@ -959,16 +1083,16 @@ export function DashboardShell({
                             (n.type?.includes('Approved') || n.data?.type === 'post_approved')
                               ? 'checkmark-circle'
                               : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
-                              ? 'close-circle'
-                              : 'information-circle'
+                                ? 'close-circle'
+                                : 'information-circle'
                           }
                           size={18}
                           color={
                             (n.type?.includes('Approved') || n.data?.type === 'post_approved')
                               ? '#16A34A'
                               : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
-                              ? '#DC2626'
-                              : '#2563EB'
+                                ? '#DC2626'
+                                : '#2563EB'
                           }
                         />
                       </View>
@@ -1005,14 +1129,14 @@ export function DashboardShell({
                 <Text style={styles.dropdownEmailText}>{user?.email ?? 'estherhoward@gmail.com'}</Text>
               </View>
             </View>
-            
+
             <View style={[styles.dropdownDivider, isDarkMode && { backgroundColor: '#334155' }]} />
-            
+
             {/* Menu items */}
             <ScrollView style={styles.dropdownItemsList} keyboardShouldPersistTaps="handled">
-              {(userRole === 'admin' || userRole === 'it_publisher' || userRole === 'it_admin') && (
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
+              {userRole === 'it_publisher' && (
+                <TouchableOpacity
+                  style={styles.dropdownItem}
                   onPress={() => { setIsProfileDropdownOpen(false); if (onTabChange) onTabChange('user-management'); }}
                 >
                   <Ionicons name="people-outline" size={18} color="#4B5563" />
@@ -1022,16 +1146,16 @@ export function DashboardShell({
                   </View>
                 </TouchableOpacity>
               )}
-              
+
               {/* DARK MODE TOGGLE (Available in profile dropdown, especially for mobile/iOS) */}
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
+              <TouchableOpacity
+                style={styles.dropdownItem}
                 onPress={toggleDarkMode}
               >
-                <Ionicons 
-                  name={isDarkMode ? "sunny-outline" : "moon-outline"} 
-                  size={18} 
-                  color={isDarkMode ? "#EAB308" : "#4B5563"} 
+                <Ionicons
+                  name={isDarkMode ? "sunny-outline" : "moon-outline"}
+                  size={18}
+                  color={isDarkMode ? "#EAB308" : "#4B5563"}
                 />
                 <View style={styles.itemTextContainer}>
                   <Text style={styles.itemTitle}>{isDarkMode ? 'Light appearance' : 'Dark appearance'}</Text>
@@ -1048,10 +1172,10 @@ export function DashboardShell({
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
-                onPress={() => { 
-                  setIsProfileDropdownOpen(false); 
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setIsProfileDropdownOpen(false);
                   if (onTabChange) onTabChange('account-settings');
                 }}
               >
@@ -1062,8 +1186,8 @@ export function DashboardShell({
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.dropdownItem} 
+              <TouchableOpacity
+                style={styles.dropdownItem}
                 onPress={handleLogout}
                 activeOpacity={0.7}
               >
@@ -1103,13 +1227,16 @@ export function DashboardShell({
           >
             {/* Inner fixed width container to prevent text wrapping during animation */}
             <View style={[styles.sidebarInner, { width: MAX_WIDTH }]}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <View style={styles.sidebarHeaderContainer}>
-                  <Image
-                    source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
-                    style={{ width: 40, height: 40, borderRadius: 20 }}
-                    resizeMode="contain"
-                  />
+                  <View style={styles.sidebarLogoRing}>
+                    <Image
+                      source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
+                      style={{ width: 40, height: 40, borderRadius: 20 }}
+                      resizeMode="contain"
+                      onError={() => setDeptLogoLoadFailed(true)}
+                    />
+                  </View>
                   <Animated.View style={[styles.sidebarHeader, {
                     opacity: sidebarWidthAnim.interpolate({
                       inputRange: [MIN_WIDTH, MAX_WIDTH],
@@ -1143,118 +1270,30 @@ export function DashboardShell({
                 <View style={styles.sidebarNav}>
                   {sidebarNavItems.map((item, idx) => {
                     const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
-                    const isExpanded = hasSubItems ? (expandedMenus[item.id] ?? true) : false;
-
+                    const isParentActive = hasSubItems && item.active;
+                    const isExpanded = hasSubItems ? (expandedMenus[item.id] !== undefined ? expandedMenus[item.id] : isParentActive) : false;
                     return (
-                      <View key={item.id || idx}>
-                        <AnimatedTouchable
-                          style={[
-                            styles.sidebarNavItem,
-                            (!hasSubItems && item.active) && styles.sidebarNavItemActivePurple,
-                            {
-                              width: sidebarWidthAnim.interpolate({
-                                inputRange: [MIN_WIDTH, MAX_WIDTH],
-                                outputRange: [48, MAX_WIDTH - 16]
-                              })
-                            }
-                          ]}
-                          onPress={() => {
-                            if (hasSubItems) {
-                              if (!isSidebarOpen) {
-                                openSidebar();
-                                setExpandedMenus((prev) => ({ ...prev, [item.id]: true }));
-                              } else {
-                                toggleSubMenu(item.id);
-                              }
-                            } else {
-                              handleTabPress(item.id);
-                              if (sidebarOpenedByHover) closeSidebar();
-                            }
-                          }}
-                        >
-                          <View style={styles.sidebarNavIconWrapper}>
-                            <Ionicons name={item.icon} size={22} color="#FFFFFF" />
-                          </View>
-                          <Animated.View style={{ 
-                            flex: 1,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingRight: 8,
-                            opacity: sidebarWidthAnim.interpolate({
-                              inputRange: [MIN_WIDTH, MAX_WIDTH],
-                              outputRange: [0, 1]
-                            }) 
-                          }}>
-                            <Text
-                              style={[
-                                styles.sidebarNavLabel,
-                                item.active && styles.sidebarNavLabelActivePurple,
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {item.label}
-                            </Text>
-                            {hasSubItems && (
-                              <Ionicons
-                                name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                size={15}
-                                color="rgba(255, 255, 255, 0.85)"
-                                style={{ marginLeft: 4 }}
-                              />
-                            )}
-                          </Animated.View>
-                        </AnimatedTouchable>
-
-                        {/* Sub-items dropdown */}
-                        {hasSubItems && isExpanded && (isSidebarOpen || sidebarOpenedByHover) && (
-                          <Animated.View
-                            style={{
-                              paddingLeft: 10,
-                              paddingTop: 2,
-                              paddingBottom: 4,
-                              opacity: sidebarWidthAnim.interpolate({
-                                inputRange: [MIN_WIDTH, MIN_WIDTH + 45, MAX_WIDTH],
-                                outputRange: [0, 0, 1],
-                              }),
-                            }}
-                          >
-                            {item.subItems!.map((sub: any) => (
-                              <TouchableOpacity
-                                key={sub.id}
-                                style={[
-                                  styles.sidebarSubNavItem,
-                                  sub.active && styles.sidebarSubNavItemActive,
-                                ]}
-                                onPress={() => {
-                                  handleTabPress(sub.id);
-                                  if (sidebarOpenedByHover) closeSidebar();
-                                }}
-                                activeOpacity={0.8}
-                              >
-                                <View style={styles.sidebarSubNavIconWrapper}>
-                                  <Ionicons name={sub.icon} size={18} color="#FFFFFF" />
-                                </View>
-                                <Text
-                                  style={[
-                                    styles.sidebarSubNavLabel,
-                                    sub.active && styles.sidebarSubNavLabelActive,
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {sub.label}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </Animated.View>
-                        )}
-                      </View>
+                      <SidebarNavGroup
+                        key={item.id || idx}
+                        item={item}
+                        isExpanded={isExpanded}
+                        onToggleSubMenu={toggleSubMenu}
+                        onTabPress={handleTabPress}
+                        hoveredNavId={hoveredNavId}
+                        setHoveredNavId={setHoveredNavId}
+                        pressedNavId={pressedNavId}
+                        setPressedNavId={setPressedNavId}
+                        sidebarWidthAnim={sidebarWidthAnim}
+                        closeSidebar={closeSidebar}
+                        sidebarOpenedByHover={sidebarOpenedByHover}
+                        MIN_WIDTH={MIN_WIDTH}
+                        MAX_WIDTH={MAX_WIDTH}
+                      />
                     );
                   })}
 
                 </View>
               </View>
-
 
             </View>
           </Animated.View>
@@ -1263,8 +1302,8 @@ export function DashboardShell({
         {/* Content Wrapper — full width always since sidebar overlays */}
         <View style={[styles.contentWrapper, isDarkMode && { backgroundColor: '#0B1329' }]}>
           {backgroundImage ? (
-            <ImageBackground 
-              source={backgroundImage} 
+            <ImageBackground
+              source={backgroundImage}
               style={{ flex: 1, width: '100%', height: '100%', backgroundColor: isDarkMode ? 'rgba(11, 19, 41, 0.94)' : 'rgba(255, 255, 255, 0.85)' }}
               imageStyle={{ opacity: isDarkMode ? 0.05 : 0.15 }}
               resizeMode="cover"
@@ -1303,11 +1342,14 @@ export function DashboardShell({
           <Animated.View style={[styles.mobileDrawerPanel, { left: mobileDrawerAnim }]}>
             {/* Drawer Header */}
             <View style={styles.mobileDrawerHeader}>
-              <Image
-                source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
-                style={{ width: 44, height: 44, borderRadius: 22 }}
-                resizeMode="contain"
-              />
+              <View style={styles.sidebarLogoRing}>
+                <Image
+                  source={finalDeptLogo ? { uri: finalDeptLogo } : require('../assets/images/jmc_logo.png')}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                  resizeMode="contain"
+                  onError={() => setDeptLogoLoadFailed(true)}
+                />
+              </View>
               <View style={{ flex: 1, marginLeft: 12, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={[styles.mobileDrawerDeptName, { textAlign: 'center' }]} numberOfLines={2}>{finalDeptName}</Text>
               </View>
@@ -1345,11 +1387,18 @@ export function DashboardShell({
                         }
                       }}
                     >
-                      <Ionicons
-                        name={item.icon}
-                        size={22}
-                        color={item.active ? '#FFC72C' : '#FFFFFF'}
-                      />
+                      <View
+                        style={[
+                          styles.sidebarNavIconTile,
+                          item.active && styles.sidebarNavIconTileActive,
+                        ]}
+                      >
+                        <Ionicons
+                          name={item.icon}
+                          size={19}
+                          color={item.active ? '#3B0061' : '#FFFFFF'}
+                        />
+                      </View>
                       <Text
                         style={[
                           styles.mobileDrawerNavLabel,
@@ -1686,10 +1735,10 @@ const styles = StyleSheet.create({
   },
 
   // Left edge hover detection zone (REMOVED)
-  
+
   // Backdrop overlay (REMOVED)
-  
-  // Sidebar — now inline, animated width
+
+  // Sidebar — solid brand purple with tactile, physical (3D keycap) controls
   sidebar: {
     backgroundColor: '#4C007C',
     overflow: 'hidden',
@@ -1698,16 +1747,23 @@ const styles = StyleSheet.create({
   },
   sidebarInner: {
     flex: 1,
-    paddingTop: Spacing.md,
+    paddingTop: 18,
     justifyContent: 'space-between',
   },
   sidebarHeaderContainer: {
     flexDirection: 'row',
-    alignItems: 'center', // Centers vertically
-    paddingHorizontal: 12, // Exactly 12px padding centers the 40px logo within the 64px collapsed sidebar
+    alignItems: 'center',
+    paddingHorizontal: 12,
     gap: 12,
-    marginBottom: Spacing.sm,
-    minHeight: 56, // Ensure container has enough height
+    marginBottom: 14,
+    minHeight: 52,
+  },
+  sidebarLogoRing: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   schoolIconContainer: {
     width: 32,
@@ -1718,19 +1774,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sidebarHeader: {
-    flex: 1, // Fill remaining space
+    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingRight: 4,
+    alignItems: 'flex-start',
+    paddingRight: 14,
   },
   sidebarTitle: {
     fontSize: 14.5,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-    textAlignVertical: 'center',
+    letterSpacing: 0.1,
     lineHeight: 19,
+    ...(Platform.OS === 'web' ? ({ textShadow: '0 1px 0 rgba(0, 0, 0, 0.35)' } as any) : {}),
   },
   sidebarProgramSubtitleContainer: {
     paddingHorizontal: 14,
@@ -1746,78 +1801,250 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     letterSpacing: 0.15,
   },
+  // Engraved groove divider
   sidebarDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    marginBottom: Spacing.md,
-    marginTop: 4,
-    marginHorizontal: Spacing.md,
+    height: 2,
+    marginBottom: 14,
+    marginHorizontal: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#33004F',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
   },
   sidebarNav: {
     flex: 1,
     gap: 6,
     paddingHorizontal: 8,
+    paddingBottom: 12,
   },
   sidebarNavItem: {
-    height: 48,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 24, // Rounded pill shape matching screenshot
-    overflow: 'hidden',
+    borderRadius: 13,
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        userSelect: 'none',
+        transform: 'translateY(0px)',
+        boxShadow: '0 0 0 rgba(0,0,0,0)',
+        transition: 'transform 140ms cubic-bezier(.3,.7,.4,1), box-shadow 140ms ease, background-color 160ms ease',
+      } as any)
+      : {}),
+  },
+  sidebarNavItemHovered: {
+    backgroundColor: '#5A0F8F',
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(-1px)',
+        boxShadow: '0 3px 0 #2E004B, inset 0 1px 0 rgba(255, 255, 255, 0.10)',
+      } as any)
+      : {}),
+  },
+  // Raised keycap for the current page
+  sidebarNavItemActivePurple: {
+    backgroundColor: '#6A1BA6',
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 0 #2A0046, 0 9px 16px rgba(20, 0, 35, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+      } as any)
+      : { borderBottomWidth: 4, borderBottomColor: '#2A0046' }),
+  },
+  // Key pushed down while pressing
+  sidebarNavItemPressed: {
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(2px)',
+        boxShadow: '0 1px 0 #2A0046, inset 0 2px 4px rgba(0, 0, 0, 0.25)',
+        transition: 'transform 60ms ease, box-shadow 60ms ease',
+      } as any)
+      : { transform: [{ translateY: 2 }], borderBottomWidth: 1 }),
   },
   sidebarNavIconWrapper: {
-    width: 44,
+    width: 46,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sidebarNavItemActivePurple: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)', // Lighter purple pill fill for active tab
+  sidebarNavIconTile: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#5C1491',
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 0 #2E004B, inset 0 1px 0 rgba(255, 255, 255, 0.16)',
+        transition: 'transform 140ms cubic-bezier(.3,.7,.4,1), box-shadow 140ms ease, background-color 160ms ease',
+      } as any)
+      : { borderBottomWidth: 2, borderBottomColor: '#2E004B' }),
+  },
+  sidebarNavIconTileHovered: {
+    backgroundColor: '#6E22A8',
+    ...(Platform.OS === 'web'
+      ? ({ transform: 'translateY(-1px) rotate(-4deg)', boxShadow: '0 3px 0 #2A0046, inset 0 1px 0 rgba(255, 255, 255, 0.2)' } as any)
+      : {}),
+  },
+  sidebarNavIconTileActive: {
+    backgroundColor: '#FFC72C',
+    ...(Platform.OS === 'web'
+      ? ({ transform: 'translateY(0px)', boxShadow: '0 3px 0 #B8860B, inset 0 1px 0 rgba(255, 255, 255, 0.65)' } as any)
+      : { borderBottomWidth: 3, borderBottomColor: '#B8860B' }),
+  },
+  sidebarNavIconTilePressed: {
+    ...(Platform.OS === 'web'
+      ? ({ transform: 'translateY(1px) scale(0.96)', boxShadow: '0 1px 0 #2A0046, inset 0 1px 2px rgba(0, 0, 0, 0.2)' } as any)
+      : { borderBottomWidth: 1 }),
   },
   sidebarNavLabel: {
     fontSize: 14.5,
-    color: '#FFFFFF',
-    fontWeight: FontWeight.medium,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '600',
     letterSpacing: 0.1,
+    marginLeft: 4,
   },
   sidebarNavLabelActivePurple: {
     color: '#FFFFFF',
-    fontWeight: FontWeight.bold,
+    fontWeight: '800',
+    ...(Platform.OS === 'web' ? ({ textShadow: '0 1px 0 rgba(0, 0, 0, 0.3)' } as any) : {}),
   },
   sidebarSubNavItem: {
-    height: 42,
+    height: 38,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 21,
-    paddingLeft: 8,
+    borderRadius: 10,
+    paddingLeft: 6,
     marginVertical: 2,
-    overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'transform 140ms cubic-bezier(.3,.7,.4,1), box-shadow 140ms ease, background-color 160ms ease',
+      } as any)
+      : {}),
+  },
+  sidebarSubNavItemHovered: {
+    backgroundColor: '#5A0F8F',
+    ...(Platform.OS === 'web' ? ({ transform: 'translateX(2px)' } as any) : {}),
   },
   sidebarSubNavItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: '#6A1BA6',
+    ...(Platform.OS === 'web'
+      ? ({ transform: 'translateY(-1px)', boxShadow: '0 3px 0 #2A0046, inset 0 1px 0 rgba(255, 255, 255, 0.18)' } as any)
+      : { borderBottomWidth: 3, borderBottomColor: '#2A0046' }),
+  },
+  sidebarSubNavItemUnified: {
+    height: 35,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 11,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        userSelect: 'none',
+        transform: 'translateY(0px)',
+        transition: 'background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease',
+      } as any)
+      : {}),
+  },
+  sidebarSubNavItemActiveDirect: {
+    backgroundColor: '#6A1BA6',
+    borderRadius: 11,
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(-1px)',
+        boxShadow: '0 2px 0 #2A0046, 0 4px 10px rgba(20, 0, 35, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.20)',
+      } as any)
+      : { borderBottomWidth: 2, borderBottomColor: '#2A0046' }),
+  },
+  sidebarSubNavItemPressedDirect: {
+    backgroundColor: '#5A1290',
+    borderRadius: 11,
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(1px)',
+        boxShadow: '0 1px 0 #2A0046, 0 2px 4px rgba(20, 0, 35, 0.22), inset 0 1px 2px rgba(0, 0, 0, 0.25)',
+      } as any)
+      : { borderBottomWidth: 1, borderBottomColor: '#2A0046' }),
+  },
+  sidebarSubNavItemHoveredDirect: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 11,
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateX(2px)',
+      } as any)
+      : {}),
   },
   sidebarSubNavIconWrapper: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 35,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
+    paddingLeft: 4,
   },
-  sidebarSubNavLabel: {
+  sidebarSubNavLabelDirect: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.88)',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500' as const,
+    marginLeft: 2,
+    letterSpacing: 0.1,
   },
-  sidebarSubNavLabelActive: {
-    color: '#FFFFFF',
+  sidebarSubNavLabelActiveDirect: {
+    color: '#FFC72C',
     fontWeight: '700' as const,
   },
-  sidebarFooter: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: 8,
-    gap: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  sidebarMiniSubIconTile: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web'
+      ? ({
+        cursor: 'pointer',
+        transition: 'transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease',
+      } as any)
+      : {}),
+  },
+  sidebarMiniSubIconTileInactive: {
+    backgroundColor: '#521080',
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 0 #2A0046, inset 0 1px 0 rgba(255, 255, 255, 0.14)',
+      } as any)
+      : { borderBottomWidth: 2, borderBottomColor: '#2A0046' }),
+  },
+  sidebarMiniSubIconTileHovered: {
+    backgroundColor: '#681B9E',
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(-1px)',
+        boxShadow: '0 3px 0 #24003C, inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+      } as any)
+      : {}),
+  },
+  sidebarMiniSubIconTileActive: {
+    backgroundColor: '#6A1BA6',
+    borderWidth: 1.5,
+    borderColor: '#FFC72C',
+    ...(Platform.OS === 'web'
+      ? ({
+        boxShadow: '0 2px 0 #2A0046, 0 3px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+      } as any)
+      : { borderBottomWidth: 2, borderBottomColor: '#2A0046' }),
+  },
+  sidebarMiniSubIconTilePressed: {
+    ...(Platform.OS === 'web'
+      ? ({
+        transform: 'translateY(1px) scale(0.96)',
+        boxShadow: '0 1px 0 #24003C',
+      } as any)
+      : { transform: [{ translateY: 1 }] }),
   },
   sidebarFooterLabel: {
     fontSize: FontSize.sm,
@@ -1904,22 +2131,26 @@ const styles = StyleSheet.create({
   mobileDrawerNavItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 4,
+    gap: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
+    marginBottom: 6,
+    position: 'relative',
   },
   mobileDrawerNavItemActive: {
-    backgroundColor: 'rgba(255, 199, 44, 0.15)',
+    backgroundColor: '#6A1BA6',
+    ...(Platform.OS === 'web'
+      ? ({ transform: 'translateY(-2px)', boxShadow: '0 4px 0 #2A0046, 0 9px 16px rgba(20, 0, 35, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22)' } as any)
+      : { borderBottomWidth: 4, borderBottomColor: '#2A0046' }),
   },
   mobileDrawerNavLabel: {
     fontSize: 15,
-    color: '#FFFFFF',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontWeight: '500' as const,
   },
   mobileDrawerNavLabelActive: {
-    color: '#FFC72C',
+    color: '#FFFFFF',
     fontWeight: '700' as const,
   },
   mobileDrawerFooter: {
@@ -2015,3 +2246,263 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 });
+
+interface SidebarNavGroupProps {
+  item: SidebarNavItem;
+  isExpanded: boolean;
+  onToggleSubMenu: (id: string) => void;
+  onTabPress: (id: string) => void;
+  hoveredNavId: string | null;
+  setHoveredNavId: (id: string | null) => void;
+  pressedNavId: string | null;
+  setPressedNavId: (id: string | null) => void;
+  sidebarWidthAnim: Animated.Value;
+  closeSidebar: () => void;
+  sidebarOpenedByHover: boolean;
+  MIN_WIDTH: number;
+  MAX_WIDTH: number;
+}
+
+function SidebarNavGroup({
+  item,
+  isExpanded,
+  onToggleSubMenu,
+  onTabPress,
+  hoveredNavId,
+  setHoveredNavId,
+  pressedNavId,
+  setPressedNavId,
+  sidebarWidthAnim,
+  closeSidebar,
+  sidebarOpenedByHover,
+  MIN_WIDTH,
+  MAX_WIDTH,
+}: SidebarNavGroupProps) {
+  const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
+  const isParentActive = hasSubItems && item.active;
+  const isActiveItem = !hasSubItems && item.active;
+  const isHovered = hoveredNavId === item.id;
+  const isPressed = pressedNavId === item.id;
+
+  const submenuAnim = React.useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(submenuAnim, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 220,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: false,
+    }).start();
+  }, [isExpanded]);
+
+  return (
+    <View>
+      <AnimatedTouchable
+        activeOpacity={1}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        accessibilityState={{ selected: item.active }}
+        onPressIn={() => setPressedNavId(item.id)}
+        onPressOut={() => setPressedNavId(null)}
+        {...(Platform.OS === 'web'
+          ? {
+              // @ts-ignore
+              onMouseEnter: () => setHoveredNavId(item.id),
+              onMouseLeave: () => setHoveredNavId(null),
+            }
+          : {})}
+        style={[
+          styles.sidebarNavItem,
+          isHovered && !isActiveItem && styles.sidebarNavItemHovered,
+          isActiveItem && styles.sidebarNavItemActivePurple,
+          isPressed && styles.sidebarNavItemPressed,
+          {
+            width: sidebarWidthAnim.interpolate({
+              inputRange: [MIN_WIDTH, MAX_WIDTH],
+              outputRange: [48, MAX_WIDTH - 24],
+            }),
+          },
+        ]}
+        onPress={() => {
+          if (hasSubItems) {
+            onToggleSubMenu(item.id);
+            if (!isParentActive && item.subItems && item.subItems.length > 0) {
+              onTabPress(item.subItems[0].id);
+            }
+          } else {
+            onTabPress(item.id);
+            if (sidebarOpenedByHover) closeSidebar();
+          }
+        }}
+      >
+        <View style={styles.sidebarNavIconWrapper}>
+          <View
+            style={[
+              styles.sidebarNavIconTile,
+              isHovered && !isActiveItem && styles.sidebarNavIconTileHovered,
+              (isActiveItem || isParentActive) && styles.sidebarNavIconTileActive,
+              isPressed && styles.sidebarNavIconTilePressed,
+            ]}
+          >
+            <Ionicons
+              name={item.icon}
+              size={19}
+              color={isActiveItem || isParentActive ? '#3B0061' : '#FFFFFF'}
+            />
+          </View>
+        </View>
+        <Animated.View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingRight: 12,
+            opacity: sidebarWidthAnim.interpolate({
+              inputRange: [MIN_WIDTH, MAX_WIDTH],
+              outputRange: [0, 1],
+            }),
+          }}
+        >
+          <Text
+            style={[
+              styles.sidebarNavLabel,
+              item.active && styles.sidebarNavLabelActivePurple,
+            ]}
+            numberOfLines={1}
+          >
+            {item.label}
+          </Text>
+          {hasSubItems ? (
+            <Ionicons
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={15}
+              color="rgba(255, 255, 255, 0.85)"
+              style={{ marginLeft: 4 }}
+            />
+          ) : null}
+        </Animated.View>
+      </AnimatedTouchable>
+
+      {/* Sub-items: Unified smooth animated rail & expanded list */}
+      {hasSubItems && (
+        <Animated.View
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            opacity: submenuAnim,
+            maxHeight: submenuAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 240],
+            }),
+            transform: [
+              {
+                translateY: submenuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-6, 0],
+                }),
+              },
+            ],
+            marginTop: 3,
+            marginBottom: 3,
+            gap: 3,
+          }}
+        >
+          {/* Vertical tree hierarchy line on the left, visible when sidebar expands */}
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: 2,
+              bottom: 4,
+              width: 1.5,
+              backgroundColor: 'rgba(255, 255, 255, 0.22)',
+              borderRadius: 1,
+              opacity: sidebarWidthAnim.interpolate({
+                inputRange: [MIN_WIDTH, MIN_WIDTH + 45, MAX_WIDTH],
+                outputRange: [0, 0, 1],
+              }),
+            }}
+          />
+
+          {item.subItems!.map((sub: any) => {
+            const isSubHovered = hoveredNavId === sub.id;
+            const isSubPressed = pressedNavId === sub.id;
+            return (
+              <AnimatedTouchable
+                key={sub.id}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={sub.label}
+                accessibilityState={{ selected: sub.active }}
+                onPressIn={() => setPressedNavId(sub.id)}
+                onPressOut={() => setPressedNavId(null)}
+                {...(Platform.OS === 'web'
+                  ? {
+                      // @ts-ignore
+                      title: sub.label,
+                      onMouseEnter: () => setHoveredNavId(sub.id),
+                      onMouseLeave: () => setHoveredNavId(null),
+                    }
+                  : {})}
+                onPress={() => {
+                  onTabPress(sub.id);
+                  if (sidebarOpenedByHover) closeSidebar();
+                }}
+                style={[
+                  styles.sidebarSubNavItemUnified,
+                  sub.active && styles.sidebarSubNavItemActiveDirect,
+                  !sub.active && isSubHovered && styles.sidebarSubNavItemHoveredDirect,
+                  isSubPressed && styles.sidebarSubNavItemPressedDirect,
+                  {
+                    marginLeft: sidebarWidthAnim.interpolate({
+                      inputRange: [MIN_WIDTH, MAX_WIDTH],
+                      outputRange: [0, 20],
+                    }),
+                    width: sidebarWidthAnim.interpolate({
+                      inputRange: [MIN_WIDTH, MAX_WIDTH],
+                      outputRange: [46, MAX_WIDTH - 24 - 20],
+                    }),
+                  },
+                ]}
+              >
+                {/* Left: Icon Wrapper */}
+                <View style={styles.sidebarSubNavIconWrapper}>
+                  <Ionicons
+                    name={sub.icon}
+                    size={15}
+                    color={sub.active ? '#FFC72C' : '#FFFFFF'}
+                  />
+                </View>
+
+                {/* Right: Text Label (fades in smoothly as sidebar expands) */}
+                <Animated.View
+                  style={{
+                    flex: 1,
+                    opacity: sidebarWidthAnim.interpolate({
+                      inputRange: [MIN_WIDTH, MIN_WIDTH + 45, MAX_WIDTH],
+                      outputRange: [0, 0, 1],
+                    }),
+                    paddingRight: 10,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.sidebarSubNavLabelDirect,
+                      sub.active && styles.sidebarSubNavLabelActiveDirect,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {sub.label}
+                  </Text>
+                </Animated.View>
+              </AnimatedTouchable>
+            );
+          })}
+        </Animated.View>
+      )}
+    </View>
+  );
+}

@@ -220,8 +220,8 @@ const SKELETON_HTML = `
       }
       // PRIMARY: wait for React to fire 'postflow-ready' (dispatched when data loads or view mounts)
       window.addEventListener('postflow-ready', dismiss, { once: true });
-      // FALLBACK: hide after 3 seconds max regardless
-      setTimeout(dismiss, 3000);
+      // FALLBACK: hide after 1.2 seconds max regardless
+      setTimeout(dismiss, 1200);
     })();
   </script>`;
 

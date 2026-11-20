@@ -9,15 +9,7 @@ class AuditLog extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'user_id',
-        'event_type',
-        'description',
-        'ip_address',
-        'device',
-        'severity',
-        'payload',
-    ];
+    protected $guarded = ['id'];
 
     protected $casts = [
         'payload' => 'array',

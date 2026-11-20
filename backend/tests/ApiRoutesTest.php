@@ -79,6 +79,8 @@ final class ApiRoutesTest extends TestCase
             $table->string('position')->nullable();
             $table->string('status')->default('active');
             $table->string('photo_path')->nullable();
+            $table->unsignedBigInteger('program_head_id')->nullable();
+            $table->string('assigned_program')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
@@ -156,6 +158,16 @@ final class ApiRoutesTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('program_heads', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('department_id')->nullable();
+            $table->string('program_name')->nullable();
+            $table->string('head_name')->nullable();
+            $table->integer('order_index')->default(0);
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
         Schema::create('system_settings', function (Blueprint $table) {
             $table->id();
             $table->string('key')->unique();
@@ -184,6 +196,8 @@ final class ApiRoutesTest extends TestCase
             $table->string('other_category_name')->nullable();
             $table->unsignedBigInteger('department_id')->nullable();
             $table->unsignedBigInteger('requestor_id')->nullable();
+            $table->unsignedBigInteger('program_head_id')->nullable();
+            $table->string('routing_type')->default('standard');
             $table->string('status')->default('draft');
             $table->json('target_platforms')->nullable();
             $table->timestamp('preferred_schedule_at')->nullable();
@@ -361,6 +375,26 @@ final class ApiRoutesTest extends TestCase
         ]);
 
         $this->assertTrue(in_array($response->status(), [401, 422]));
+    }
+
+    public function test_third_failed_login_locks_for_59_seconds_then_allows_retry(): void
+    {
+        (require database_path('migrations/2026_08_26_000001_create_login_lockouts_table.php'))->up();
+        $this->freezeTime();
+        $user = $this->createTestUser('requestor');
+        $credentials = ['email' => $user->email, 'password' => 'wrong-password'];
+
+        $this->postJson('/api/auth/login', $credentials)->assertStatus(422);
+        $this->postJson('/api/auth/login', $credentials)->assertStatus(422);
+        $this->postJson('/api/auth/login', $credentials)
+            ->assertStatus(429)->assertJsonPath('retry_after', 59);
+
+        $this->travel(58)->seconds();
+        $this->postJson('/api/auth/login', $credentials)
+            ->assertStatus(429)->assertJsonPath('retry_after', 1);
+        $this->travel(1)->seconds();
+        $this->postJson('/api/auth/login', $credentials)->assertStatus(422);
+        $this->travelBack();
     }
 
     public function test_register_validation_rejects_empty_payload(): void
@@ -827,6 +861,66 @@ final class ApiRoutesTest extends TestCase
 
         $response = $this->getJson('/api/dashboard/init');
         $response->assertStatus(200);
+    }
+
+    public static function approverDashboardQueues(): array
+    {
+        return [
+            'department head, more than one preview page' => ['office_head', PostRequest::STATUS_PENDING_OFFICE_HEAD, 27],
+            'vice president stage' => ['vice_president', PostRequest::STATUS_PENDING_VICE_PRESIDENT, 4],
+            'IMC stage' => ['imc_qa_checker', PostRequest::STATUS_PENDING_IMC_QA, 8],
+            'empty IMC queue' => ['imc_qa_checker', PostRequest::STATUS_PENDING_IMC_QA, 0],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('approverDashboardQueues')]
+    public function test_fast_dashboard_returns_current_approver_counts(string $role, string $status, int $expected): void
+    {
+        Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+        $approver = $this->createTestUser($role);
+        $approver->forceFill(['program_head_id' => 41])->save();
+        $requestor = $this->createTestUser();
+        $requestor->forceFill(['program_head_id' => 41])->save();
+        $rows = [];
+        for ($index = 0; $index < $expected; $index++) {
+            $rows[] = [
+                'title' => 'Awaiting review ' . $index,
+                'requestor_id' => $requestor->id,
+                'program_head_id' => 41,
+                'status' => $status,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+        if ($rows) \Illuminate\Support\Facades\DB::table('post_requests')->insert($rows);
+        \Illuminate\Support\Facades\DB::table('post_requests')->insert([
+            'title' => 'Waiting at a different approval stage',
+            'requestor_id' => $requestor->id,
+            'program_head_id' => 41,
+            'status' => $status === PostRequest::STATUS_PENDING_OFFICE_HEAD
+                ? PostRequest::STATUS_PENDING_VICE_PRESIDENT : PostRequest::STATUS_PENDING_OFFICE_HEAD,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        if ($role === 'office_head') {
+            $otherRequestor = $this->createTestUser();
+            $otherRequestor->forceFill(['department' => 'Another college', 'program_head_id' => 77])->save();
+            \Illuminate\Support\Facades\DB::table('post_requests')->insert([
+                'title' => 'Outside this program head’s queue',
+                'requestor_id' => $otherRequestor->id, 'program_head_id' => 77,
+                'status' => $status, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        Sanctum::actingAs($approver);
+        $response = $this->getJson('/api/dashboard/init');
+        $response->assertOk()->assertJsonPath('init_mode', 'fast')
+            ->assertJsonPath('stats.pending_review', $expected)->assertJsonPath('stats.pending', $expected);
+        self::assertLessThanOrEqual(15, count($response->json('posts.data')));
+
+        if ($expected > 0) {
+            $id = \Illuminate\Support\Facades\DB::table('post_requests')->where('status', $status)->where('requestor_id', $requestor->id)->value('id');
+            \Illuminate\Support\Facades\DB::table('post_requests')->where('id', $id)->update(['status' => PostRequest::STATUS_APPROVED]);
+            $this->getJson('/api/dashboard/init')->assertOk()->assertJsonPath('stats.pending_review', $expected - 1);
+        }
     }
 
     public function test_dashboard_recent_activity_endpoint(): void

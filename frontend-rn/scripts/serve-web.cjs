@@ -109,8 +109,28 @@ if (require.main === module) {
   const port = Number(portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT || 3000);
   const server = createWebServer({ backend: process.env.POSTFLOW_BACKEND_URL || 'http://127.0.0.1:8000' });
   server.on('error', error => {
-    console.error(error.code === 'EADDRINUSE'
-      ? `Port ${port} is in use. Stop the old Expo server or pass --port 3001.` : error.message);
+    if (error.code === 'EADDRINUSE') {
+      try {
+        const { execSync } = require('node:child_process');
+        const netstat = execSync('netstat -ano -p tcp', { encoding: 'utf8' });
+        for (const line of netstat.split('\n')) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 5 && parts[1].endsWith(`:${port}`) && parts[3] === 'LISTENING') {
+            const pid = parseInt(parts[4], 10);
+            if (pid && pid !== process.pid) {
+              execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
+              console.log(`Port ${port} was occupied by stale PID ${pid}. Terminated and retrying...`);
+              setTimeout(() => listenWebServer(server, port, () => console.log(`PostFlow production preview: http://localhost:${port}\nBrowser asset cache enabled. API proxy: ${process.env.POSTFLOW_BACKEND_URL || 'http://127.0.0.1:8000'}`)), 600);
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+      console.error(`Port ${port} is in use. Stop the old Expo server or pass --port 3001.`);
+      process.exitCode = 1;
+      return;
+    }
+    console.error(error.message);
     process.exitCode = 1;
   });
   listenWebServer(server, port, () => console.log(`PostFlow production preview: http://localhost:${port}\nBrowser asset cache enabled. API proxy: ${process.env.POSTFLOW_BACKEND_URL || 'http://127.0.0.1:8000'}`));

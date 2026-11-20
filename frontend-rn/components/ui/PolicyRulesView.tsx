@@ -3,13 +3,14 @@
  * Used across all role dashboards (Requestor, Office Head, VP, IMC/QA, Publisher)
  * to display the same rich card layout as the IT Admin edit view.
  */
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from './Card';
@@ -23,15 +24,19 @@ interface PolicyRulesViewProps {
   accentColor?: string;
 }
 
-export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProps) {
+export function PolicyRulesView({ accentColor = '#4C007C' }: PolicyRulesViewProps) {
   const { policySections, effectiveDate, lastUpdatedDate } = usePolicyStore();
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [contentWidth, setContentWidth] = useState(0);
+  const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    setContentWidth((prev) => (Math.abs(prev - next) >= 4 ? next : prev));
+  }, []);
   const isLarge = contentWidth >= 900;
 
   const SECTION_COLORS: Record<string, { badgeBg: string; iconBg: string; iconColor: string; accent: string; iconName: any }> = {
-    '1': { badgeBg: isDarkMode ? '#2563EB' : '#0B2545', iconBg: isDarkMode ? '#1E293B' : '#EFF6FF', iconColor: isDarkMode ? '#60A5FA' : '#2563EB', accent: '#2563EB', iconName: 'book-outline' },
+    '1': { badgeBg: isDarkMode ? '#7C3AED' : '#4C007C', iconBg: isDarkMode ? '#2E1065' : '#F3E8FF', iconColor: isDarkMode ? '#C084FC' : '#4C007C', accent: '#4C007C', iconName: 'book-outline' },
     '2': { badgeBg: '#7C3AED', iconBg: isDarkMode ? '#2E1065' : '#F3E8FF', iconColor: isDarkMode ? '#C084FC' : '#7C3AED', accent: '#7C3AED', iconName: 'shield-checkmark-outline' },
     '3': { badgeBg: '#16A34A', iconBg: isDarkMode ? '#064E3B' : '#DCFCE7', iconColor: isDarkMode ? '#4ADE80' : '#16A34A', accent: '#16A34A', iconName: 'checkmark-circle-outline' },
     '4': { badgeBg: '#DC2626', iconBg: isDarkMode ? '#7F1D1D' : '#FEE2E2', iconColor: isDarkMode ? '#F87171' : '#DC2626', accent: '#DC2626', iconName: 'close-circle-outline' },
@@ -53,7 +58,7 @@ export function PolicyRulesView({ accentColor = '#0B2545' }: PolicyRulesViewProp
   });
 
   return (
-    <View nativeID="postflow-policy-rules" onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)} style={styles.container}>
+    <View nativeID="postflow-policy-rules" onLayout={handleContentLayout} style={styles.container}>
       {/* ── Header ── */}
       <View style={[styles.headerRow, { flexDirection: isLarge ? 'row' : 'column', gap: isLarge ? 0 : 12 }]}>
         <View style={{ flex: 1 }}>

@@ -91,7 +91,7 @@ class DashboardController extends Controller
                 'approvalWorkflows.approver:id,first_name,middle_name,last_name,email',
             ])
             ->orderByDesc('updated_at')
-            ->limit(100)
+            ->limit(15)
             ->get();
 
         $stats = [];
@@ -99,6 +99,10 @@ class DashboardController extends Controller
             $stats = Cache::remember('dashboard_stats_user_' . $user->id, 60, function () use ($baseQuery, $category, $role) {
                 return $this->buildStats($baseQuery, $category, $role);
             });
+        } elseif ($category === 'approver') {
+            // Count the whole visible queue, including requests beyond the 15-row preview.
+            // Keep approvals current when the dashboard polls after a review action.
+            $stats = $this->buildStats($baseQuery, $category, $role);
         }
 
         $departments = collect();
@@ -121,7 +125,7 @@ class DashboardController extends Controller
                 'meta' => [
                     'current_page' => 1,
                     'last_page' => 1,
-                    'per_page' => 100,
+                    'per_page' => 15,
                     'total' => $posts->count(),
                 ],
             ],
@@ -139,6 +143,14 @@ class DashboardController extends Controller
 
         if ($category !== 'approver') {
             return $query;
+        }
+
+        // Direct to IMC requests must only show in IMC QA
+        if ($role !== 'imc_qa_checker') {
+            $query->where(function ($q) {
+                $q->whereNull('routing_type')
+                  ->orWhere('routing_type', '!=', PostRequest::ROUTING_DIRECT_IMC);
+            });
         }
 
         if ($role === 'vice_president') {
@@ -277,6 +289,7 @@ class DashboardController extends Controller
             'title' => $post->title,
             'slug' => $post->slug,
             'caption_narrative' => $post->caption_narrative,
+            'submitted_materials' => $post->submittedMaterialsForDisplay(),
             'other_category_name' => $post->other_category_name,
             'category' => $post->category ? [
                 'id' => $post->category->id,
@@ -301,7 +314,6 @@ class DashboardController extends Controller
             ] : null,
             'status' => $post->status,
             'routing_type' => $post->routing_type ?? 'standard',
-            'imc_branding_checklist' => $post->imc_branding_checklist ?? null,
             'status_label' => $statusLabels[$post->status] ?? $post->status,
             'target_platforms' => $post->target_platforms ?? [],
             'preferred_schedule_at' => $post->preferred_schedule_at?->toISOString(),
@@ -387,6 +399,12 @@ class DashboardController extends Controller
             if ($category === 'requestor') {
                 $query->where('requestor_id', $user->id);
             } elseif ($category === 'approver') {
+                if ($role !== 'imc_qa_checker') {
+                    $query->where(function ($q) {
+                        $q->whereNull('routing_type')
+                          ->orWhere('routing_type', '!=', PostRequest::ROUTING_DIRECT_IMC);
+                    });
+                }
                 if ($role === 'vice_president') {
                     $query->whereNotIn('status', ['draft']);
                 } elseif ($role === 'imc_qa_checker') {
@@ -493,6 +511,12 @@ class DashboardController extends Controller
             if ($category === 'requestor') {
                 $query->where('requestor_id', $user->id);
             } elseif ($category === 'approver') {
+                if ($role !== 'imc_qa_checker') {
+                    $query->where(function ($q) {
+                        $q->whereNull('routing_type')
+                          ->orWhere('routing_type', '!=', PostRequest::ROUTING_DIRECT_IMC);
+                    });
+                }
                 if ($role === 'vice_president') {
                     $query->whereNotIn('status', ['draft']);
                 } elseif ($role === 'imc_qa_checker') {

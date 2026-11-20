@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class PostRequest extends Model
 {
@@ -65,6 +66,7 @@ class PostRequest extends Model
             'ai_compliance_result' => 'array',
             'ai_suggested_caption' => 'array',
             'imc_branding_checklist' => 'array',
+            'submitted_materials' => 'array',
         ];
     }
 
@@ -118,6 +120,19 @@ class PostRequest extends Model
     }
 
     public function media(): HasMany
+    {
+        $relation = $this->mediaIncludingOriginals();
+        $cacheKey = 'postflow.media.has_submission_original_flag';
+        if (!app()->bound($cacheKey)) {
+            app()->instance($cacheKey, Schema::hasColumn('post_media', 'is_submission_original'));
+        }
+        if (app($cacheKey)) {
+            $relation->where('is_submission_original', false);
+        }
+        return $relation;
+    }
+
+    public function mediaIncludingOriginals(): HasMany
     {
         return $this->hasMany(PostMedia::class)->orderBy('sort_order');
     }
@@ -195,20 +210,53 @@ class PostRequest extends Model
 
     public function canBeEditedBy(User $user): bool
     {
-        $isAdmin = $user->roleCategory() === 'admin' || $user->hasAnyRole(['it_admin', 'it_publisher', 'admin']);
-        if ($isAdmin) {
-            return true;
-        }
-
-        // IMC QA Checker can edit if the post is pending IMC QA review
+        // Only direct-to-IMC requests allow final content preparation by IMC.
         if ($this->status === self::STATUS_PENDING_IMC_QA && $user->workflowRole() === 'imc_qa_checker') {
-            return true;
+            return $this->routing_type === self::ROUTING_DIRECT_IMC;
         }
 
         if ($this->status !== 'draft' && $this->status !== 'returned_for_revision') {
             return false;
         }
-        return $this->requestor_id === $user->id;
+        return $this->requestor_id === $user->id || $user->hasRole('admin');
+    }
+
+    public function captureSubmittedMaterials(): void
+    {
+        if ($this->routing_type !== self::ROUTING_DIRECT_IMC
+            || $this->submitted_materials !== null
+            || in_array($this->status, [self::STATUS_PUBLISHED, self::STATUS_SCHEDULED, self::STATUS_REJECTED], true)
+            || !Schema::hasColumn($this->getTable(), 'submitted_materials')) {
+            return;
+        }
+
+        $this->forceFill(['submitted_materials' => [
+            'caption_narrative' => $this->caption_narrative,
+            'media' => $this->media()->orderBy('sort_order')->get()->map(fn ($media) => [
+                'id' => $media->id,
+                'type' => $media->type,
+                'original_filename' => $media->original_name,
+                'file_path' => $media->file_path,
+                'mime_type' => $media->mime_type,
+                'size' => $media->file_size,
+            ])->all(),
+        ]])->save();
+    }
+
+    public function submittedMaterialsForDisplay(): ?array
+    {
+        $materials = $this->submitted_materials;
+        if (!is_array($materials)) {
+            return null;
+        }
+        $materials['media'] = array_map(function ($media) {
+            if (!empty($media['file_path'])) {
+                $media['url'] = (new PostMedia(['file_path' => $media['file_path']]))->url;
+            }
+            unset($media['file_path']);
+            return $media;
+        }, $materials['media'] ?? []);
+        return $materials;
     }
 
     public function canBeApprovedBy(User $user): bool
@@ -239,6 +287,11 @@ class PostRequest extends Model
 
         // Only approver roles may approve (office_head / vice_president / imc_qa_checker)
         if (!in_array($role, ['office_head', 'vice_president', 'imc_qa_checker'], true)) {
+            return false;
+        }
+
+        // Direct to IMC requests are exclusively handled by IMC QA and Admins
+        if ($this->routing_type === self::ROUTING_DIRECT_IMC && $role !== 'imc_qa_checker') {
             return false;
         }
 

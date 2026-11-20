@@ -13,7 +13,13 @@ const getToken = async (): Promise<string | null> => {
 
 export const resolveImageUrl = (url?: string | null): string | null => {
   if (!url || typeof url !== 'string' || url.trim() === '') return null;
-  const trimmed = url.trim();
+  let trimmed = url.trim();
+
+  // Normalize localhost:8000 to 127.0.0.1:8000 to avoid Windows IPv6 resolution latency
+  if (trimmed.includes('localhost:8000')) {
+    trimmed = trimmed.replace('localhost:8000', '127.0.0.1:8000');
+  }
+
   if (
     trimmed.startsWith('data:') ||
     trimmed.startsWith('blob:') ||
@@ -22,7 +28,7 @@ export const resolveImageUrl = (url?: string | null): string | null => {
   ) {
     return trimmed;
   }
-  const base = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const base = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
   const hostBase = base.replace(/\/api\/?$/, '');
   const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 
@@ -35,7 +41,7 @@ export const resolveImageUrl = (url?: string | null): string | null => {
 
 const API_BASE_URL = Platform.OS === 'web' && process.env.NODE_ENV === 'production'
   ? '/api'
-  : (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api');
+  : (process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -49,9 +55,11 @@ const api = axios.create({
 // Attach Bearer token to every request; only trigger top loading bar for user mutations, never silent background polling
 api.interceptors.request.use(async (config) => {
   const method = (config.method || 'get').toLowerCase();
-  const isMutation = ['post', 'put', 'patch', 'delete'].includes(method);
+  const url = (config.url || '').toLowerCase();
+  const isChatbot = url.includes('/chatbot') || url.includes('chatbot');
+  const isMutation = ['post', 'put', 'patch', 'delete'].includes(method) && !isChatbot;
   const isExplicit = (config as any).showLoadingBar === true;
-  const isSilent = (config as any).silent === true || config.headers?.['X-Silent-Poll'];
+  const isSilent = (config as any).silent === true || config.headers?.['X-Silent-Poll'] || isChatbot;
 
   if ((isMutation || isExplicit) && !isSilent) {
     (config as any)._triggeredLoadingBar = true;
@@ -150,13 +158,9 @@ export const postsApi = {
   aiCheck: (id: number) => api.post(`/posts/${id}/ai-check`),
   aiCheckDraft: (data: object) => api.post(`/posts/ai-check-draft`, data),
   setFeaturedMedia: (id: number, mediaId: number) => api.post(`/posts/${id}/featured-media`, { media_id: mediaId }),
-  downloadAllMedia: (id: number) => api.get(`/posts/${id}/download-media`, { responseType: 'blob' }),
-  saveImcChanges: (id: number | string, data: any) => {
-    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
-    return api.post(`/posts/${id}/save-imc-changes`, data, {
-      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
-    });
-  },
+  startReview: (id: number) => api.post(`/posts/${id}/start-review`),
+  startEditing: (id: number) => api.post(`/posts/${id}/start-editing`),
+  saveDraftEditing: (id: number, data: object = {}) => api.post(`/posts/${id}/save-draft-editing`, data),
   adminBypassApprove: (id: number, data: object = {}) => api.post(`/posts/${id}/admin-bypass-approve`, data),
 };
 
@@ -255,7 +259,7 @@ export const programHeadsApi = {
 // ── Chatbot endpoints ───────────────────────────────────────────────────────
 export const chatbotApi = {
   sendMessage: (messages: { role: string; content: string }[]) =>
-    api.post('/chatbot/message', { messages }),
+    api.post('/chatbot/message', { messages }, { silent: true } as any),
 };
 
 // ── Roles management endpoints ──────────────────────────────────────────────

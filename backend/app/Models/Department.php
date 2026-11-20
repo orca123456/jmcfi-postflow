@@ -39,8 +39,10 @@ class Department extends Model
         }
 
         $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        $url = Storage::disk($disk)->url($this->logo_path);
+        $version = $this->updated_at?->getTimestamp();
 
-        return Storage::disk($disk)->url($this->logo_path);
+        return $version ? $url . '?v=' . $version : $url;
     }
 
     public function programHeads(): \Illuminate\Database\Eloquent\Relations\HasMany

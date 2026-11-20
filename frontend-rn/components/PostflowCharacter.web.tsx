@@ -4,7 +4,7 @@ const ASSETS = '/postflow-chatbot/assets';
 const FLIGHT_CAPE = 'M493 464C551 456 593 493 632 521C716 526 789 575 810 659C768 613 721 629 682 665C625 707 552 715 492 697L494 651C560 659 587 615 568 577C548 540 518 502 493 464Z';
 
 /** The original character gets a vector visor so its pupils can move independently. */
-function PostflowCharacter({ privateMode = false, tracking = true, decorative = false, flightPose = false, arrival = false, articulated = false }: { privateMode?: boolean; tracking?: boolean; decorative?: boolean; flightPose?: boolean; arrival?: boolean; articulated?: boolean }) {
+export default function PostflowCharacter({ privateMode = false, tracking = true, decorative = false, flightPose = false, arrival = false, articulated = false }: { privateMode?: boolean; tracking?: boolean; decorative?: boolean; flightPose?: boolean; arrival?: boolean; articulated?: boolean }) {
   const character = useRef<HTMLDivElement>(null);
   const svgId = useId().replace(/:/g, '');
   const rigged = flightPose || articulated;
@@ -75,12 +75,6 @@ function PostflowCharacter({ privateMode = false, tracking = true, decorative = 
     let currentY = 0;
     let targetX = 0;
     let targetY = 0;
-    let cachedRect: DOMRect | null = null;
-    let cachedAt = 0;
-
-    function invalidateRect() {
-      cachedRect = null;
-    }
 
     function update() {
       currentX += (targetX - currentX) * .16;
@@ -100,12 +94,7 @@ function PostflowCharacter({ privateMode = false, tracking = true, decorative = 
 
     function follow(event: PointerEvent) {
       if (event.pointerType === 'touch' || motion.matches || privateMode) return;
-      const now = performance.now();
-      if (!cachedRect || now - cachedAt > 200) {
-        cachedRect = node!.getBoundingClientRect();
-        cachedAt = now;
-      }
-      const rect = cachedRect;
+      const rect = node!.getBoundingClientRect();
       const faceX = rect.left + rect.width * .51;
       const faceY = rect.top + rect.height * .34;
       targetX = Math.max(-1, Math.min(1, (event.clientX - faceX) / (window.innerWidth * .36))) * 12;
@@ -116,21 +105,16 @@ function PostflowCharacter({ privateMode = false, tracking = true, decorative = 
     function reset() {
       targetX = 0;
       targetY = 0;
-      invalidateRect();
       schedule();
     }
 
     window.addEventListener('pointermove', follow, { passive: true });
-    window.addEventListener('resize', invalidateRect, { passive: true });
-    window.addEventListener('scroll', invalidateRect, { passive: true });
     document.documentElement.addEventListener('pointerleave', reset);
     window.addEventListener('blur', reset);
     motion.addEventListener('change', reset);
     reset();
     return () => {
       window.removeEventListener('pointermove', follow);
-      window.removeEventListener('resize', invalidateRect);
-      window.removeEventListener('scroll', invalidateRect);
       document.documentElement.removeEventListener('pointerleave', reset);
       window.removeEventListener('blur', reset);
       motion.removeEventListener('change', reset);
@@ -295,6 +279,4 @@ function PostflowCharacter({ privateMode = false, tracking = true, decorative = 
     </div>
   </div>;
 }
-
-export default React.memo(PostflowCharacter);
 

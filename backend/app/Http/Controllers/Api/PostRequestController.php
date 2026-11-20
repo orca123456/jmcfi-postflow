@@ -121,6 +121,9 @@ class PostRequestController extends Controller
 
                 $programHeadId = $request->input('program_head_id') ?: $request->user()->program_head_id;
                 $routingType = $request->input('routing_type', PostRequest::ROUTING_STANDARD);
+                if ($routingType !== PostRequest::ROUTING_DIRECT_IMC) {
+                    $routingType = PostRequest::ROUTING_STANDARD;
+                }
                 $isDirectImc = $routingType === PostRequest::ROUTING_DIRECT_IMC;
                 $initialStatus = $request->is_draft 
                     ? PostRequest::STATUS_DRAFT 
@@ -250,6 +253,9 @@ class PostRequestController extends Controller
         }
 
         return DB::transaction(function () use ($request, $postRequest) {
+            if ($request->user()->workflowRole() === 'imc_qa_checker') {
+                $postRequest->captureSubmittedMaterials();
+            }
             $postRequest->update([
                 'title' => $request->title ?? $postRequest->title,
                 'caption_narrative' => $request->caption_narrative ?? $postRequest->caption_narrative,
@@ -264,10 +270,8 @@ class PostRequestController extends Controller
             if ($request->hasFile('media')) {
                 // Delete old media not in keep list
                 $keepIds = $request->input('keep_media_ids', []);
-                $postRequest->media()->whereNotIn('id', $keepIds)->each(function ($media) {
-                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-                    Storage::disk($disk)->delete($media->file_path);
-                    $media->delete();
+                $postRequest->media()->whereNotIn('id', $keepIds)->each(function ($media) use ($postRequest) {
+                    $this->removeReplacedMedia($postRequest, $media, true);
                 });
 
                 // Add new media
@@ -316,33 +320,20 @@ class PostRequestController extends Controller
 
     public function destroy(PostRequest $postRequest): JsonResponse
     {
-        $user = request()->user();
-        $isAdmin = $user && ($user->roleCategory() === 'admin' || $user->hasAnyRole(['it_admin', 'it_publisher', 'admin']));
-
-        if (!$isAdmin && !$postRequest->canBeEditedBy($user)) {
+        if (!$postRequest->canBeEditedBy(request()->user())) {
             return response()->json(['message' => 'Cannot delete this post'], 403);
         }
 
-        // Delete media files from storage
-        foreach ($postRequest->media as $media) {
+        // Delete media files
+        foreach ($postRequest->mediaIncludingOriginals()->get() as $media) {
             $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
             Storage::disk($disk)->delete($media->file_path);
         }
 
-        $postId = $postRequest->id;
-        $postTitle = $postRequest->title;
+        $postRequest->delete();
 
-        DB::transaction(function () use ($postRequest) {
-            $postRequest->approvalWorkflows()->delete();
-            $postRequest->publishingRecords()->delete();
-            $postRequest->aiComplianceCheck()->delete();
-            $postRequest->policyViolations()->delete();
-            $postRequest->media()->delete();
-            $postRequest->delete();
-        });
-
-        AuditLogService::log('CONTENT_DELETED', 'Deleted content request: ' . $postTitle, 'WARNING', [
-            'post_id' => $postId,
+        AuditLogService::log('CONTENT_DELETED', 'Deleted content request: ' . $postRequest->title, 'WARNING', [
+            'post_id' => $postRequest->id,
         ]);
 
         $this->clearDashboardCache();
@@ -432,7 +423,7 @@ class PostRequestController extends Controller
     public function adminBypassApprove(Request $request, PostRequest $postRequest): JsonResponse
     {
         $user = $request->user();
-        if ($user->roleCategory() !== 'admin' && !$user->hasAnyRole(['it_publisher', 'it_admin', 'admin'])) {
+        if (!$user->hasAnyRole(['it_publisher', 'it_admin'])) {
             return response()->json(['message' => 'Unauthorized. Only IT Admin can bypass approvals.'], 403);
         }
 
@@ -441,13 +432,12 @@ class PostRequestController extends Controller
                 ? ['imc_qa']
                 : ['office_head', 'vice_president', 'imc_qa'];
 
-            foreach ($stages as $index => $stage) {
+            foreach ($stages as $stage) {
                 $wf = $postRequest->approvalWorkflows()->firstOrNew(['stage' => $stage]);
                 $wf->action = 'approved';
                 $wf->approver_id = $user->id;
                 $wf->remarks = $request->input('remarks', 'Bypassed and approved directly by Administrator');
                 $wf->acted_at = now();
-                $wf->stage_order = $wf->stage_order ?: ($index + 1);
                 $wf->save();
             }
 
@@ -494,6 +484,16 @@ class PostRequestController extends Controller
             return response()->json(['message' => 'Unauthorized to approve this post'], 403);
         }
 
+        // Standard requests can be reviewed by IMC, but their submitted content
+        // must remain unchanged. Enforce this for approval payloads as well as edits.
+        if ($user->workflowRole() === 'imc_qa_checker'
+            && $postRequest->routing_type !== PostRequest::ROUTING_DIRECT_IMC
+            && ($request->hasAny(['caption_narrative', 'title']) || $request->hasFile('media'))) {
+            return response()->json([
+                'message' => 'IMC can edit captions and images only for Direct to IMC requests.',
+            ], 403);
+        }
+
         return DB::transaction(function () use ($request, $postRequest, $user) {
             $currentStage = $postRequest->currentApprovalStage();
             
@@ -517,19 +517,8 @@ class PostRequestController extends Controller
                 }
             }
 
-            // Preserve original requestor submission snapshot before applying reviewer edits/replacements
-            $existingChecklist = is_array($postRequest->imc_branding_checklist) ? $postRequest->imc_branding_checklist : [];
-            $originalCaption = $existingChecklist['original_caption'] ?? $postRequest->caption_narrative;
-            $originalMedia = $existingChecklist['original_media'] ?? $postRequest->media->map(fn ($m) => [
-                'id' => $m->id,
-                'type' => $m->type,
-                'original_filename' => $m->original_name,
-                'file_path' => $m->file_path,
-                'url' => $m->url,
-                'mime_type' => $m->mime_type,
-                'size' => $m->file_size,
-            ])->values()->all();
-            $hasReplacementMedia = $existingChecklist['has_replacement_media'] ?? false;
+            // Keep the requestor's submission before IMC prepares final content.
+            $postRequest->captureSubmittedMaterials();
 
             // Apply any edits submitted by reviewer (e.g. from [Edit & Approve])
             $updateData = [];
@@ -543,49 +532,23 @@ class PostRequestController extends Controller
                 $postRequest->update($updateData);
             }
 
-            // Handle replacement media file(s) if uploaded during approval
+            // Keep every final image selected by IMC, in the selected order.
             if ($request->hasFile('media')) {
                 $files = $request->file('media');
                 $files = is_array($files) ? $files : [$files];
-                $validFiles = array_values(array_filter($files, fn($f) => $f instanceof \Illuminate\Http\UploadedFile));
-                if (!empty($validFiles)) {
-                    $hasReplacementMedia = true;
+                $files = array_values(array_filter($files, fn ($file) => $file instanceof \Illuminate\Http\UploadedFile));
+                if (count($files) > 0) {
                     $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-                    $postRequest->media()->delete();
-                    foreach ($validFiles as $index => $file) {
+                    foreach ($postRequest->media()->get() as $media) {
+                        $this->removeReplacedMedia($postRequest, $media);
+                    }
+                    foreach ($files as $index => $file) {
                         $path = $file->store('post-media/' . $postRequest->id, $disk);
                         $mime = $file->getMimeType() ?: 'image/jpeg';
                         $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), $index, $index === 0);
                     }
-                    $postRequest->load('media');
                 }
             }
-
-            $refinedCaption = ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative)))
-                ? $request->caption_narrative
-                : ($existingChecklist['refined_caption'] ?? $postRequest->caption_narrative);
-
-            $finalMedia = $hasReplacementMedia
-                ? $postRequest->media()->get()->map(fn ($m) => [
-                    'id' => $m->id,
-                    'type' => $m->type,
-                    'original_filename' => $m->original_name,
-                    'file_path' => $m->file_path,
-                    'url' => $m->url,
-                    'mime_type' => $m->mime_type,
-                    'size' => $m->file_size,
-                ])->values()->all()
-                : ($existingChecklist['final_media'] ?? []);
-
-            $postRequest->update([
-                'imc_branding_checklist' => array_merge($existingChecklist, [
-                    'original_caption' => $originalCaption,
-                    'refined_caption' => $refinedCaption,
-                    'original_media' => $originalMedia,
-                    'has_replacement_media' => $hasReplacementMedia,
-                    'final_media' => $finalMedia,
-                ]),
-            ]);
 
             $nextStage = $postRequest->getNextStage();
             $approvedStageName = $currentStage?->stage;
@@ -627,9 +590,13 @@ class PostRequestController extends Controller
             } else {
                 // All approvals done — IMC gave final sign-off
                 $isScheduled = $postRequest->preferred_schedule_at && \Carbon\Carbon::parse($postRequest->preferred_schedule_at)->isFuture();
-                $postRequest->update([
-                    'status' => $isScheduled ? PostRequest::STATUS_SCHEDULED : PostRequest::STATUS_APPROVED,
-                ]);
+                $updateData = [
+                    'status' => $isScheduled ? PostRequest::STATUS_SCHEDULED : PostRequest::STATUS_PUBLISHED,
+                ];
+                if (Schema::hasColumn($postRequest->getTable(), 'published_at')) {
+                    $updateData['published_at'] = $isScheduled ? null : now();
+                }
+                $postRequest->update($updateData);
             }
 
             $this->clearDashboardCache();
@@ -657,9 +624,11 @@ class PostRequestController extends Controller
                                 ->onQueue('publishing')
                                 ->delay(\Carbon\Carbon::parse($post->preferred_schedule_at));
                         } else {
-                            AutoPublishJob::dispatch($post, $userId)
-                                ->onQueue('publishing')
-                                ->delay(now()->addSeconds(10));
+                            try {
+                                AutoPublishJob::dispatchSync($post, $userId);
+                            } catch (\Throwable $publishErr) {
+                                logger()->warning('Immediate auto-publish failed: ' . $publishErr->getMessage());
+                            }
                         }
                     }
 
@@ -848,6 +817,126 @@ class PostRequestController extends Controller
         });
     }
 
+    public function startReview(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || (!$user->hasRole('imc_qa_checker') && !$user->hasRole('it_admin') && !$user->hasRole('it_publisher'))) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $workflow = $postRequest->approvalWorkflows()->firstOrNew(['stage' => 'imc_qa']);
+
+        if (!in_array($workflow->action, ['approved', 'rejected', 'returned_for_revision', 'editing'])) {
+            $workflow->action = 'reviewing';
+            $workflow->approver_id = $user->id;
+            $workflow->acted_at = now();
+            if (!$workflow->stage_order) {
+                $workflow->stage_order = 3;
+            }
+            $workflow->save();
+            $this->clearDashboardCache();
+        }
+
+        return response()->json([
+            'message' => 'Post review started',
+            'data' => new PostRequestResource($postRequest->load([
+                'category', 'requestor', 'media', 'approvalWorkflows.approver'
+            ])),
+        ]);
+    }
+
+    public function startEditing(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || (!$user->hasRole('imc_qa_checker') && !$user->hasRole('it_admin') && !$user->hasRole('it_publisher'))) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $workflow = $postRequest->approvalWorkflows()->firstOrNew(['stage' => 'imc_qa']);
+
+        if (!in_array($workflow->action, ['approved', 'rejected', 'returned_for_revision'])) {
+            $workflow->action = 'editing';
+            $workflow->approver_id = $user->id;
+            $workflow->acted_at = now();
+            if (!$workflow->stage_order) {
+                $workflow->stage_order = 3;
+            }
+            $workflow->save();
+            $this->clearDashboardCache();
+        }
+
+        return response()->json([
+            'message' => 'Post editing started',
+            'data' => new PostRequestResource($postRequest->load([
+                'category', 'requestor', 'media', 'approvalWorkflows.approver'
+            ])),
+        ]);
+    }
+
+    public function saveDraftEditing(Request $request, PostRequest $postRequest): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || (!$user->hasRole('imc_qa_checker') && !$user->hasRole('it_admin') && !$user->hasRole('it_publisher'))) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return DB::transaction(function () use ($request, $postRequest, $user) {
+            // Keep the requestor's submission before IMC prepares final content.
+            $postRequest->captureSubmittedMaterials();
+
+            if ($request->has('caption_narrative')) {
+                $postRequest->caption_narrative = $request->input('caption_narrative');
+                $postRequest->save();
+            } else {
+                $postRequest->touch();
+            }
+
+            // Save uploaded replacement photos
+            if ($request->hasFile('media')) {
+                $files = $request->file('media');
+                $files = is_array($files) ? $files : [$files];
+                $files = array_values(array_filter($files, fn ($file) => $file instanceof \Illuminate\Http\UploadedFile));
+                if (count($files) > 0) {
+                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+                    foreach ($postRequest->media()->get() as $media) {
+                        $this->removeReplacedMedia($postRequest, $media);
+                    }
+                    foreach ($files as $index => $file) {
+                        $path = $file->store('post-media/' . $postRequest->id, $disk);
+                        $mime = $file->getMimeType() ?: 'image/jpeg';
+                        $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), $index, $index === 0);
+                    }
+                }
+            }
+
+            $workflow = $postRequest->approvalWorkflows()->firstOrNew(['stage' => 'imc_qa']);
+            if (!in_array($workflow->action, ['approved', 'rejected', 'returned_for_revision'])) {
+                $workflow->action = 'editing';
+                $workflow->approver_id = $user->id;
+                $workflow->acted_at = now();
+                if (!$workflow->stage_order) {
+                    $workflow->stage_order = 3;
+                }
+                if ($request->has('remarks')) {
+                    $workflow->remarks = $request->input('remarks');
+                }
+                $workflow->save();
+            }
+
+            $this->clearDashboardCache();
+
+            return response()->json([
+                'message' => 'Draft edits saved successfully',
+                'data' => new PostRequestResource($postRequest->fresh()->load([
+                    'category', 'requestor', 'media', 'approvalWorkflows.approver'
+                ])),
+            ]);
+        });
+    }
+
     public function sendReminder(Request $request, PostRequest $postRequest): JsonResponse
     {
         $user = $request->user();
@@ -900,185 +989,6 @@ class PostRequestController extends Controller
             'data' => $result,
             'message' => 'AI draft compliance check completed',
         ]);
-    }
-
-    public function downloadAllMedia(PostRequest $postRequest)
-    {
-        $media = $postRequest->media()->where(function ($q) {
-            $q->where('type', 'image')->orWhereNull('type');
-        })->get();
-
-        if ($media->isEmpty()) {
-            return response()->json(['message' => 'No photos available for download.'], 404);
-        }
-
-        $getFileData = function (PostMedia $item) {
-            $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-            $fullPath = Storage::disk($disk)->path($item->file_path);
-            if (!file_exists($fullPath)) {
-                $fullPath = storage_path('app/public/' . ltrim($item->file_path, '/'));
-            }
-            if (file_exists($fullPath)) {
-                return ['type' => 'file', 'path' => $fullPath];
-            }
-            $dbFile = $item->file;
-            if ($dbFile && $dbFile->content) {
-                return ['type' => 'binary', 'content' => $dbFile->content];
-            }
-            return null;
-        };
-
-        if ($media->count() === 1) {
-            $first = $media->first();
-            $data = $getFileData($first);
-            if ($data) {
-                $filename = $first->original_name ?: basename($first->file_path);
-                if (!pathinfo($filename, PATHINFO_EXTENSION)) {
-                    $filename .= '.jpg';
-                }
-                if ($data['type'] === 'file') {
-                    return response()->download($data['path'], $filename);
-                } else {
-                    return response($data['content'])
-                        ->header('Content-Type', $first->mime_type ?: 'image/jpeg')
-                        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
-                }
-            }
-        }
-
-        $cleanTitle = Str::slug($postRequest->title ?: 'request_' . $postRequest->id, '_');
-        $zipFileName = 'post_' . $postRequest->id . '_' . $cleanTitle . '_photos.zip';
-        $tempDir = storage_path('app/temp');
-        if (!file_exists($tempDir)) {
-            @mkdir($tempDir, 0755, true);
-        }
-        $zipPath = $tempDir . '/' . uniqid('photos_', true) . '.zip';
-
-        $zip = new \ZipArchive();
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
-            $usedNames = [];
-            foreach ($media as $idx => $item) {
-                $data = $getFileData($item);
-                if ($data) {
-                    $rawName = $item->original_name ?: basename($item->file_path);
-                    $nameInfo = pathinfo($rawName);
-                    $ext = !empty($nameInfo['extension']) ? '.' . $nameInfo['extension'] : '.jpg';
-                    $baseName = !empty($nameInfo['filename']) ? $nameInfo['filename'] : 'photo_' . ($idx + 1);
-                    $finalName = $baseName . $ext;
-
-                    $counter = 1;
-                    while (in_array(strtolower($finalName), $usedNames, true)) {
-                        $finalName = $baseName . '_' . $counter . $ext;
-                        $counter++;
-                    }
-                    $usedNames[] = strtolower($finalName);
-
-                    if ($data['type'] === 'file') {
-                        $zip->addFile($data['path'], $finalName);
-                    } else {
-                        $zip->addFromString($finalName, $data['content']);
-                    }
-                }
-            }
-            $zip->close();
-
-            if (file_exists($zipPath) && filesize($zipPath) > 0) {
-                return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
-            }
-        }
-
-        return response()->json(['message' => 'Failed to bundle photos into zip.'], 500);
-    }
-
-    public function saveImcChanges(Request $request, PostRequest $postRequest): JsonResponse
-    {
-        $user = $request->user();
-
-        return DB::transaction(function () use ($request, $postRequest, $user) {
-            // Preserve original requestor submission snapshot before applying reviewer edits/replacements
-            $existingChecklist = is_array($postRequest->imc_branding_checklist) ? $postRequest->imc_branding_checklist : [];
-            $originalCaption = $existingChecklist['original_caption'] ?? $postRequest->caption_narrative;
-            $originalMedia = $existingChecklist['original_media'] ?? $postRequest->media->map(fn ($m) => [
-                'id' => $m->id,
-                'type' => $m->type,
-                'original_filename' => $m->original_name,
-                'file_path' => $m->file_path,
-                'url' => $m->url,
-                'mime_type' => $m->mime_type,
-                'size' => $m->file_size,
-            ])->values()->all();
-            $hasReplacementMedia = $existingChecklist['has_replacement_media'] ?? false;
-
-            // Apply caption/title edits if provided
-            $updateData = [];
-            if ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative))) {
-                $updateData['caption_narrative'] = $request->caption_narrative;
-            }
-            if ($request->has('title') && !empty(trim((string) $request->title))) {
-                $updateData['title'] = $request->title;
-            }
-            if (!empty($updateData)) {
-                $postRequest->update($updateData);
-            }
-
-            // Handle replacement media file(s) if uploaded
-            if ($request->hasFile('media')) {
-                $files = $request->file('media');
-                $files = is_array($files) ? $files : [$files];
-                $validFiles = array_values(array_filter($files, fn($f) => $f instanceof \Illuminate\Http\UploadedFile));
-                if (!empty($validFiles)) {
-                    $hasReplacementMedia = true;
-                    $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
-                    $postRequest->media()->delete();
-                    foreach ($validFiles as $index => $file) {
-                        $path = $file->store('post-media/' . $postRequest->id, $disk);
-                        $mime = $file->getMimeType() ?: 'image/jpeg';
-                        $this->createMediaRecord($postRequest, $file, $path, $this->getMediaType($mime), $index, $index === 0);
-                    }
-                    $postRequest->load('media');
-                }
-            }
-
-            $refinedCaption = ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative)))
-                ? $request->caption_narrative
-                : ($existingChecklist['refined_caption'] ?? $postRequest->caption_narrative);
-
-            $finalMedia = $hasReplacementMedia
-                ? $postRequest->media()->get()->map(fn ($m) => [
-                    'id' => $m->id,
-                    'type' => $m->type,
-                    'original_filename' => $m->original_name,
-                    'file_path' => $m->file_path,
-                    'url' => $m->url,
-                    'mime_type' => $m->mime_type,
-                    'size' => $m->file_size,
-                ])->values()->all()
-                : ($existingChecklist['final_media'] ?? []);
-
-            $postRequest->update([
-                'imc_branding_checklist' => array_merge($existingChecklist, [
-                    'original_caption' => $originalCaption,
-                    'refined_caption' => $refinedCaption,
-                    'original_media' => $originalMedia,
-                    'has_replacement_media' => $hasReplacementMedia,
-                    'final_media' => $finalMedia,
-                ]),
-            ]);
-
-            $this->recordAuditTrail(
-                $postRequest,
-                'IMC_QA_CHANGES_SAVED',
-                $user,
-                'IMC saved caption and/or media preparation changes.'
-            );
-
-            $this->clearDashboardCache();
-
-            return response()->json([
-                'message' => 'Changes saved successfully.',
-                'data' => new PostRequestResource($postRequest->load(['category', 'requestor', 'media', 'approvalWorkflows.approver'])),
-            ]);
-        });
     }
 
     public function getDashboardStats(Request $request): JsonResponse
@@ -1198,6 +1108,10 @@ class PostRequestController extends Controller
 
         // Approvers: VP and IMC can see all non-draft posts; dept heads can see their own department's posts
         if ($category === 'approver') {
+            // Direct to IMC requests are exclusively visible to IMC QA and Admins
+            if ($post->routing_type === PostRequest::ROUTING_DIRECT_IMC && $role !== 'imc_qa_checker') {
+                return false;
+            }
             if (in_array($role, ['vice_president', 'imc_qa_checker'])) {
                 return $post->status !== 'draft';
             }
@@ -1229,6 +1143,14 @@ class PostRequestController extends Controller
             // Requestors should only see their own requests
             $query->where('requestor_id', $user->id);
         } elseif ($category === 'approver') {
+            // Direct to IMC requests must only be visible to IMC QA
+            if ($role !== 'imc_qa_checker') {
+                $query->where(function ($q) {
+                    $q->whereNull('routing_type')
+                      ->orWhere('routing_type', '!=', PostRequest::ROUTING_DIRECT_IMC);
+                });
+            }
+
             if ($role === 'vice_president') {
                 // VP sees posts that have passed Dept Head, so they don't see Pending Dept Head or Rejected by Dept Head
                 $query->whereNotIn('status', [
@@ -1291,6 +1213,14 @@ class PostRequestController extends Controller
         }
         $role = $user->workflowRole();
 
+        // Direct to IMC requests must only be visible to IMC QA
+        if ($role !== 'imc_qa_checker') {
+            $query->where(function ($q) {
+                $q->whereNull('routing_type')
+                  ->orWhere('routing_type', '!=', PostRequest::ROUTING_DIRECT_IMC);
+            });
+        }
+
         if ($role === 'vice_president') {
             $query->where('status', PostRequest::STATUS_PENDING_VICE_PRESIDENT);
         } elseif ($role === 'imc_qa_checker') {
@@ -1326,6 +1256,22 @@ class PostRequestController extends Controller
             'message' => 'WordPress featured image updated successfully.',
             'data' => new PostRequestResource($postRequest->load('media')),
         ]);
+    }
+
+    private function removeReplacedMedia(PostRequest $post, PostMedia $media, bool $deleteFile = false): void
+    {
+        $originalIds = array_column($post->submitted_materials['media'] ?? [], 'id');
+        if (in_array($media->id, $originalIds, true) && Schema::hasColumn('post_media', 'is_submission_original')) {
+            // Keep the row and its database file backup available to /storage,
+            // while excluding it from the final publication's media relation.
+            $media->forceFill(['is_submission_original' => true, 'is_featured' => false])->save();
+            return;
+        }
+        if ($deleteFile) {
+            $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+            Storage::disk($disk)->delete($media->file_path);
+        }
+        $media->delete();
     }
 
     private function getMediaType(string $mimeType): string
