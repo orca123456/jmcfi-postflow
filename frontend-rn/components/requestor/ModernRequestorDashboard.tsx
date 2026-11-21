@@ -3384,7 +3384,9 @@ const createStyles = (palette: ReturnType<typeof getPalette>) => StyleSheet.crea
   },
   modalCard: {
     flexShrink: 1,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4D027D',
     padding: Spacing.md,
     minWidth: 0,
     backgroundColor: palette.field,

@@ -469,6 +469,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4D027D',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },

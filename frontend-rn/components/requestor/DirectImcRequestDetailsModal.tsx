@@ -475,7 +475,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
     `)}
     <Modal visible transparent animationType="fade" onRequestClose={() => lightbox ? setLightbox(null) : onClose()}>
       <View style={styles.backdrop}>
-        <View nativeID="requestor-imc-preview" accessibilityViewIsModal style={[styles.modal, { width: modalWidth, maxHeight: Math.max(0, Math.min(height * 0.9, height - Spacing.xl)), backgroundColor: palette.surface, borderColor: palette.border, borderTopColor: BRAND_PURPLE }]}>
+        <View nativeID="requestor-imc-preview" accessibilityViewIsModal style={[styles.modal, { width: modalWidth, maxHeight: Math.max(0, Math.min(height * 0.9, height - Spacing.xl)), backgroundColor: palette.surface, borderColor: '#4D027D', borderWidth: 2 }]}>
           {/* Header Row: Title on the left, X button on the far right */}
           <View nativeID="direct-imc-details-header" style={[styles.header, { borderColor: palette.border }]}>
             <View style={[styles.headerTop, { justifyContent: 'space-between', alignItems: 'center', width: '100%' }]}>
@@ -1081,7 +1081,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, padding: Spacing.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,24,39,0.5)' },
-  modal: { minWidth: 0, borderRadius: 16, borderWidth: 1, borderTopWidth: 4, borderTopColor: BRAND_PURPLE, overflow: 'hidden', flexShrink: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },
+  modal: { minWidth: 0, borderRadius: 16, borderWidth: 2, borderColor: '#4D027D', overflow: 'hidden', flexShrink: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },
   header: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, flexShrink: 0 },
   headerTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   flexible: { flex: 1, minWidth: 0 },

@@ -332,7 +332,7 @@ export function RequestorRejected({ requests, loading, error, onOpen, onRetry }:
         <Modal visible={rangeOpen} transparent animationType="none" onRequestClose={() => setRangeOpen(false)}>
           <View style={styles.modalBackdrop}>
             <Pressable accessibilityLabel="Cancel custom date range" onPress={() => setRangeOpen(false)} style={styles.dismissBackdrop} />
-            <View style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: palette.border, borderTopWidth: 4, borderTopColor: BRAND_PURPLE }]}>
+            <View style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: '#4D027D', borderWidth: 2 }]}>
               <View style={styles.dialogHeading}>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text style={[styles.dialogEyebrow, { color: actionColor }]}>DATE FILTER</Text>
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   dropdownOption: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm },
   modalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.5)', padding: Spacing.md },
   dismissBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  rangeDialog: { width: '100%', maxWidth: 420, padding: Spacing.lg, gap: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1 },
+  rangeDialog: { width: '100%', maxWidth: 420, padding: Spacing.lg, gap: Spacing.md, borderRadius: 16, borderWidth: 2, borderColor: '#4D027D' },
   dialogHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   dialogEyebrow: { fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
   closeDialog: { width: 40, height: 40, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

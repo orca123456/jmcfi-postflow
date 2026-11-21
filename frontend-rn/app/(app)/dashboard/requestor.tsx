@@ -2939,7 +2939,6 @@ export default function RequestorDashboard() {
                                 <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                                   <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
                                 </View>
-                                <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                               </View>
 
                               <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 0.8, marginTop: 10, marginHorizontal: -4 }} />
@@ -3330,7 +3329,6 @@ export default function RequestorDashboard() {
                           <View style={{ minHeight: 38, justifyContent: 'center', alignItems: 'center', marginTop: 6, paddingHorizontal: 2 }}>
                             <Text style={{ fontSize: 11, textAlign: 'center', fontWeight: 'bold', color: Colors.textPrimary }}>Submitted</Text>
                           </View>
-                          <Text style={{ fontSize: 10, color: getColor(submitted), fontWeight: 'bold', textTransform: 'uppercase', marginTop: 4 }}>{submitted}</Text>
                         </View>
 
                         <View style={{ height: 2, backgroundColor: getLineColor(submitted), flex: 1, marginTop: 11, marginHorizontal: -4 }} />
@@ -3458,7 +3456,7 @@ export default function RequestorDashboard() {
           onRequestClose={() => setIsPreviewModalOpen(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 440 : 800, padding: 16, backgroundColor: Colors.surface, borderRadius: 12 }]}>
+            <View style={[styles.modalContent, { maxWidth: previewMode === 'mobile' ? 440 : 800, padding: 16, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 2, borderColor: '#4D027D' }]}>
 
               {/* Header */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -4823,7 +4821,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500,
     backgroundColor: Colors.surface,
-    borderRadius: 6,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4D027D',
     padding: Spacing.lg,
     gap: Spacing.md,
     maxHeight: '80%',
@@ -5301,10 +5301,8 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderTopWidth: 4,
-    borderTopColor: '#4C007C',
+    borderWidth: 2,
+    borderColor: '#4D027D',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },

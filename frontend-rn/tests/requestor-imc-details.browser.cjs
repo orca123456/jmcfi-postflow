@@ -63,7 +63,7 @@ const { createWebServer } = require('../scripts/serve-web.cjs');
           await modal.getByText('Request Details', { exact: true }).waitFor();
           const frame = await modal.evaluate(el => ({ width: el.getBoundingClientRect().width, background: getComputedStyle(el).backgroundColor, topBorder: getComputedStyle(el).borderTopColor }));
           assert.ok(frame.width <= 820 && frame.width <= width - 31, 'Direct window keeps the standard compact width');
-          assert.equal(frame.topBorder, 'rgb(76, 0, 124)');
+          assert.equal(frame.topBorder, 'rgb(77, 2, 125)');
           if (standardFrame) assert.deepEqual(frame, standardFrame, 'Direct and standard windows share width, surface and purple top border');
           await modal.getByText('Submitted materials', { exact: true }).waitFor();
           await modal.getByText('Request information', { exact: true }).waitFor();

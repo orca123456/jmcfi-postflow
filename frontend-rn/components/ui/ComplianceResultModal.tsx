@@ -205,6 +205,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4D027D',
     width: '100%',
     maxWidth: 480,
     maxHeight: '90%',

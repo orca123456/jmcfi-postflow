@@ -534,7 +534,7 @@ export function RequestorOverview({
       <Modal visible={rangeOpen} transparent animationType="none" onRequestClose={closeRange}>
         <View nativeID="requestor-overview-range" style={styles.modalBackdrop}>
           <Pressable accessibilityLabel="Cancel custom date range" onPress={closeRange} style={styles.dismissBackdrop} />
-          <View {...rq('modal')} accessibilityViewIsModal style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: palette.border, borderTopWidth: 4, borderTopColor: BRAND_PURPLE }]}>
+          <View {...rq('modal')} accessibilityViewIsModal style={[styles.rangeDialog, { backgroundColor: palette.surface, borderColor: '#4D027D', borderWidth: 2 }]}>
             <View style={styles.dialogHeading}>
               <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                 <Text style={[styles.dialogEyebrow, { color: actionColor }]}>DATE FILTER</Text>
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.md, flexWrap: 'wrap' },
   pagination: { marginTop: Spacing.sm, minWidth: 0 },
   modalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.5)', padding: Spacing.md },
-  rangeDialog: { width: '100%', maxWidth: 420, padding: Spacing.lg, gap: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1 },
+  rangeDialog: { width: '100%', maxWidth: 420, padding: Spacing.lg, gap: Spacing.md, borderRadius: 16, borderWidth: 2, borderColor: '#4D027D' },
   dialogHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   dialogEyebrow: { fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
   closeDialog: { width: 40, height: 40, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

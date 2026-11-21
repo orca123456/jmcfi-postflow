@@ -43,7 +43,7 @@ export const dashboardStyles = {
   label: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, color: Colors.textSecondary },
   input: { minHeight: 44, minWidth: 0, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background, color: Colors.textPrimary, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, fontSize: FontSize.sm },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(17,24,39,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.md },
-  modalCard: { width: '100%', maxWidth: 820, maxHeight: '90%', minWidth: 0, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border, borderTopWidth: 4, borderTopColor: '#4C007C', overflow: 'hidden' },
+  modalCard: { width: '100%', maxWidth: 820, maxHeight: '90%', minWidth: 0, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 2, borderColor: '#4D027D', overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
   modalTitle: { fontSize: FontSize.md + 2, lineHeight: 24, fontWeight: FontWeight.bold, color: Colors.textPrimary, flexShrink: 1 },
   modalBody: { padding: Spacing.lg, gap: Spacing.md },
