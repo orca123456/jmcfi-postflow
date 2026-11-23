@@ -193,18 +193,20 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             $allResults = PublishingRecord::where('post_request_id', $this->postRequest->id)
                 ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
                 ->pluck('platform_response', 'platform')->all();
-            $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults));
+            $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults), 'success');
 
             // Notify the requestor that their post was published
             try {
                 $freshPost = $this->postRequest->fresh(['requestor', 'category']);
                 if ($freshPost && $freshPost->requestor) {
-                    $freshPost->requestor->notify(
-                        new PostPublishedRequestorNotification($freshPost, $allResults)
-                    );
+                    Log::info("AutoPublishJob: Notifying requestor ID {$freshPost->requestor->id} ({$freshPost->requestor->email}) of publish for post {$this->postRequest->id}");
+                    Notification::sendNow($freshPost->requestor, new PostPublishedRequestorNotification($freshPost, $allResults));
+                    Log::info("AutoPublishJob: Successfully notified requestor of publish for post ID {$this->postRequest->id}");
+                } else {
+                    Log::warning("AutoPublishJob: Post ID {$this->postRequest->id} has no requestor attached to notify of publish");
                 }
             } catch (\Throwable $e) {
-                Log::warning("AutoPublishJob: Failed to notify requestor of publish for post ID {$this->postRequest->id}: {$e->getMessage()}");
+                Log::error("AutoPublishJob: Failed to notify requestor of publish for post ID {$this->postRequest->id}: {$e->getMessage()}\n" . $e->getTraceAsString());
             }
 
             Log::info("AutoPublishJob: Completed for post ID {$this->postRequest->id}");
@@ -212,7 +214,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             Log::error("AutoPublishJob: FAILED for post ID {$this->postRequest->id}. Error: {$e->getMessage()}");
 
             $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
-            $this->notifyITAdmins(new PostPublishingFailedNotification($this->postRequest, $e->getMessage()));
+            $this->notifyITAdmins(new PostPublishingFailedNotification($this->postRequest, $e->getMessage()), 'failure');
             try { \App\Services\AuditLogService::log('POST_PUBLISH_FAILED', "Failed to auto-publish post \"{$this->postRequest->title}\": {$e->getMessage()}", 'ERROR', ['postId' => $this->postRequest->id, 'error' => $e->getMessage()]); } catch (\Throwable $_) {}
 
             throw $e;
@@ -229,7 +231,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         $this->notifyITAdmins(new PostPublishingFailedNotification(
             $this->postRequest,
             'All automatic retry attempts failed. Manual publishing required. Error: ' . $exception->getMessage()
-        ));
+        ), 'failure');
     }
 
     private function recordPublishingResults(array $results, array $errors): void
@@ -341,12 +343,12 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         return $metaMessage;
     }
 
-    private function notifyITAdmins(object $notification): void
+    private function notifyITAdmins(object $notification, string $type = 'failure'): void
     {
         try {
-            $cacheKey = 'post_publish_failed_alert_sent_' . $this->postRequest->id;
+            $cacheKey = "post_publish_{$type}_alert_sent_" . $this->postRequest->id;
             if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
-                Log::info("Skipping duplicate failure notification for post {$this->postRequest->id}");
+                Log::info("Skipping duplicate {$type} admin notification for post {$this->postRequest->id}");
                 return;
             }
             \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addHours(2));
@@ -355,7 +357,8 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 ->get();
 
             if ($itAdmins->isNotEmpty()) {
-                Notification::send($itAdmins, $notification);
+                Notification::sendNow($itAdmins, $notification);
+                Log::info("AutoPublishJob: Sent {$type} admin notification to " . $itAdmins->pluck('email')->implode(', ') . " for post {$this->postRequest->id}");
             }
         } catch (Exception $e) {
             Log::error('AutoPublishJob: Failed to send admin notification. Error: ' . $e->getMessage());

@@ -14,6 +14,7 @@ if [ -n "${REDIS_URL:-}" ] || [ -n "${REDIS_HOST:-}" ]; then
     export SESSION_DRIVER="${SESSION_DRIVER:-redis}"
 fi
 
+export LOG_CHANNEL="${LOG_CHANNEL:-stderr}"
 export QUEUE_WORKER_ENABLED=true
 if [ "$QUEUE_CONNECTION" = "sync" ]; then
     export QUEUE_WORKER_ENABLED=false
