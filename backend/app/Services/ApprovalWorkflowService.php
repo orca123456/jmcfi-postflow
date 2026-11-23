@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\PostApprovedNotification;
 use App\Notifications\PostRejectedNotification;
 use App\Notifications\PostReturnedForRevisionNotification;
+use App\Notifications\DirectImcStatusNotification;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Exceptions\RoleDoesNotExist;
 
@@ -144,6 +145,11 @@ class ApprovalWorkflowService
     public function notifyApprovers(PostRequest $postRequest): void
     {
         try {
+            if ($postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                $this->notifyDirectImcSubmitted($postRequest);
+                return;
+            }
+
             $firstStage = $postRequest->approvalWorkflows()
                 ->where('stage_order', 1)
                 ->first();
@@ -156,6 +162,46 @@ class ApprovalWorkflowService
             }
         } catch (\Throwable $e) {
             Log::warning("Failed to notify first stage approver. Error: " . $e->getMessage());
+        }
+    }
+
+    public function notifyDirectImcSubmitted(PostRequest $postRequest): void
+    {
+        try {
+            // Notify IMC Checkers
+            $imcCheckers = User::role('imc_qa_checker')->where('status', 'active')->get();
+            if ($imcCheckers->isNotEmpty()) {
+                \Illuminate\Support\Facades\Notification::send($imcCheckers, new \App\Notifications\ApprovalNeededNotification($postRequest, 'imc_qa'));
+            }
+
+            // Notify Requestor confirmation
+            if ($postRequest->requestor) {
+                $postRequest->requestor->notify(new DirectImcStatusNotification($postRequest, 'submitted'));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to dispatch notifyDirectImcSubmitted: " . $e->getMessage());
+        }
+    }
+
+    public function notifyDirectImcReviewing(PostRequest $postRequest, ?string $actorName = null): void
+    {
+        try {
+            if ($postRequest->requestor) {
+                $postRequest->requestor->notify(new DirectImcStatusNotification($postRequest, 'reviewing', $actorName));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to dispatch notifyDirectImcReviewing: " . $e->getMessage());
+        }
+    }
+
+    public function notifyDirectImcEditing(PostRequest $postRequest, ?string $actorName = null): void
+    {
+        try {
+            if ($postRequest->requestor) {
+                $postRequest->requestor->notify(new DirectImcStatusNotification($postRequest, 'editing', $actorName));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to dispatch notifyDirectImcEditing: " . $e->getMessage());
         }
     }
 

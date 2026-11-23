@@ -174,6 +174,9 @@ class PostRequestController extends Controller
                 // Create approval workflow stages
                 if (!$request->is_draft) {
                     $this->workflowService->initializeWorkflow($post);
+                    if ($post->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                        $post->captureSubmittedMaterials(true);
+                    }
                 }
 
                 $postId = $post->id;
@@ -186,7 +189,11 @@ class PostRequestController extends Controller
                     try {
                         $p = PostRequest::find($postId);
                         if ($p && !$isDraft) {
-                            $workflowService->notifyApprovers($p);
+                            if ($p->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                                $workflowService->notifyDirectImcSubmitted($p);
+                            } else {
+                                $workflowService->notifyApprovers($p);
+                            }
                         }
                         AuditLogService::log(
                             $isDraft ? 'CONTENT_DRAFT_CREATED' : 'CONTENT_SUBMITTED',
@@ -375,6 +382,9 @@ class PostRequestController extends Controller
             ]);
 
             $this->workflowService->initializeWorkflow($postRequest);
+            if ($postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                $postRequest->captureSubmittedMaterials(true);
+            }
             $this->clearDashboardCache();
 
             $aiService = $this->aiService;
@@ -387,7 +397,11 @@ class PostRequestController extends Controller
                 try {
                     $post = PostRequest::find($postId);
                     if ($post) {
-                        $workflowService->notifyApprovers($post);
+                        if ($post->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                            $workflowService->notifyDirectImcSubmitted($post);
+                        } else {
+                            $workflowService->notifyApprovers($post);
+                        }
                         $aiService->checkCompliance($post);
                     }
                     AuditLogService::log('CONTENT_SUBMITTED', 'Submitted draft for approval: ' . $postTitle, 'INFO', [
@@ -528,6 +542,16 @@ class PostRequestController extends Controller
             if ($request->has('title') && !empty(trim((string) $request->title))) {
                 $updateData['title'] = $request->title;
             }
+            if ($request->has('target_platforms')) {
+                $platforms = $request->input('target_platforms');
+                if (is_string($platforms)) {
+                    $decoded = json_decode($platforms, true);
+                    $platforms = is_array($decoded) ? $decoded : array_map('trim', explode(',', $platforms));
+                }
+                if (is_array($platforms) && !empty($platforms)) {
+                    $updateData['target_platforms'] = array_values(array_filter($platforms));
+                }
+            }
             if (!empty($updateData)) {
                 $postRequest->update($updateData);
             }
@@ -636,7 +660,16 @@ class PostRequestController extends Controller
                         $workflowService->notifyNextApprover($post, $nextStageName);
                         $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
                     } else {
-                        $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
+                        if ($post->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                            $isScheduled = $post->preferred_schedule_at && \Carbon\Carbon::parse($post->preferred_schedule_at)->isFuture();
+                            if ($isScheduled && $post->requestor) {
+                                $post->requestor->notify(new \App\Notifications\DirectImcStatusNotification($post, 'scheduled', $userName));
+                            } else {
+                                $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
+                            }
+                        } else {
+                            $workflowService->notifyRequestorOfStageApproval($post, $approvedStageName, $userName);
+                        }
                         $workflowService->notifyITPublisher($post);
                     }
 
@@ -836,6 +869,10 @@ class PostRequestController extends Controller
             }
             $workflow->save();
             $this->clearDashboardCache();
+
+            if ($postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                $this->workflowService->notifyDirectImcReviewing($postRequest, $user->full_name);
+            }
         }
 
         return response()->json([
@@ -865,6 +902,10 @@ class PostRequestController extends Controller
             }
             $workflow->save();
             $this->clearDashboardCache();
+
+            if ($postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                $this->workflowService->notifyDirectImcEditing($postRequest, $user->full_name);
+            }
         }
 
         return response()->json([
@@ -924,6 +965,10 @@ class PostRequestController extends Controller
                     $workflow->remarks = $request->input('remarks');
                 }
                 $workflow->save();
+
+                if ($postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+                    $this->workflowService->notifyDirectImcEditing($postRequest, $user->full_name);
+                }
             }
 
             $this->clearDashboardCache();
@@ -1260,6 +1305,14 @@ class PostRequestController extends Controller
 
     private function removeReplacedMedia(PostRequest $post, PostMedia $media, bool $deleteFile = false): void
     {
+        // For Direct IMC requests, NEVER delete original media — always preserve it.
+        if ($post->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+            if (Schema::hasColumn('post_media', 'is_submission_original')) {
+                $media->forceFill(['is_submission_original' => true, 'is_featured' => false])->save();
+            }
+            return;
+        }
+
         $originalIds = array_column($post->submitted_materials['media'] ?? [], 'id');
         if (in_array($media->id, $originalIds, true) && Schema::hasColumn('post_media', 'is_submission_original')) {
             // Keep the row and its database file backup available to /storage,
@@ -1272,6 +1325,68 @@ class PostRequestController extends Controller
             Storage::disk($disk)->delete($media->file_path);
         }
         $media->delete();
+    }
+
+    /**
+     * Download all original submitted photos for a Direct IMC request as a ZIP archive.
+     * Only accessible by IMC QA checkers, IT admins, and IT publishers.
+     */
+    public function downloadPhotos(Request $request, PostRequest $postRequest): \Symfony\Component\HttpFoundation\Response
+    {
+        // Only Direct IMC requests support bulk download
+        if ($postRequest->routing_type !== PostRequest::ROUTING_DIRECT_IMC) {
+            return response()->json(['message' => 'Download All Photos is only available for Direct IMC requests.'], 403);
+        }
+
+        // Collect original submitted media (images only)
+        $submittedMaterials = $postRequest->submitted_materials;
+        $mediaItems = [];
+        if (is_array($submittedMaterials) && isset($submittedMaterials['media']) && is_array($submittedMaterials['media'])) {
+            $ids = array_column($submittedMaterials['media'], 'id');
+            $mediaItems = PostMedia::whereIn('id', $ids)
+                ->where('type', 'image')
+                ->get();
+        }
+        // Fallback: query all original submission media flagged or all media
+        if ($mediaItems instanceof \Illuminate\Database\Eloquent\Collection && $mediaItems->isEmpty()) {
+            $mediaItems = $postRequest->media()
+                ->where('type', 'image')
+                ->get();
+        }
+
+        if ($mediaItems->isEmpty()) {
+            return response()->json(['message' => 'No photos found for this request.'], 404);
+        }
+
+        $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
+        $zipFileName = 'direct-imc-photos-' . $postRequest->id . '.zip';
+        $zipTempPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $zipFileName;
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipTempPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            return response()->json(['message' => 'Failed to create ZIP archive.'], 500);
+        }
+
+        foreach ($mediaItems as $index => $media) {
+            $filePath = $media->file_path;
+            $ext = pathinfo($media->original_name ?? 'photo.jpg', PATHINFO_EXTENSION) ?: 'jpg';
+            $archiveName = ($index + 1) . '_' . ($media->original_name ?: "photo-{$index}.{$ext}");
+            $archiveName = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $archiveName);
+
+            if (Storage::disk($disk)->exists($filePath)) {
+                $zip->addFromString($archiveName, Storage::disk($disk)->get($filePath));
+            }
+        }
+        $zip->close();
+
+        if (!file_exists($zipTempPath)) {
+            return response()->json(['message' => 'ZIP archive could not be created.'], 500);
+        }
+
+        return response()->download($zipTempPath, $zipFileName, [
+            'Content-Type' => 'application/zip',
+            'Content-Disposition' => 'attachment; filename="' . $zipFileName . '"',
+        ])->deleteFileAfterSend(true);
     }
 
     private function getMediaType(string $mimeType): string

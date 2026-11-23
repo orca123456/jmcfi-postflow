@@ -476,7 +476,11 @@ export default function ImcQaDashboard() {
 
   const [isPublishingDirectImc, setIsPublishingDirectImc] = useState(false);
 
-  const handlePublishDirectImc = async (finalCaptionText: string, finalUploadedImages: FinalUploadedImage[]) => {
+  const handlePublishDirectImc = async (
+    finalCaptionText: string,
+    finalUploadedImages: FinalUploadedImage[],
+    selectedPlatforms?: string[]
+  ) => {
     if (!selectedRequest) return;
     const reqId = selectedRequest.id;
     const isScheduled = selectedRequest.rawStatus === 'scheduled' ||
@@ -488,7 +492,13 @@ export default function ImcQaDashboard() {
     // Instant optimistic UI update (0ms delay)
     setRequestsList(prev => prev.filter(r => r.id !== reqId));
     setOptimisticallyRemovedIds(prev => [...prev, reqId]);
-    setAllPostsList(prev => [{ ...selectedRequest, caption: finalCaptionText, status: isScheduled ? 'SCHEDULED' : 'PUBLISHED', rawStatus: isScheduled ? 'scheduled' : 'published' }, ...prev.filter(r => r.id !== reqId)]);
+    setAllPostsList(prev => [{
+      ...selectedRequest,
+      caption: finalCaptionText,
+      status: isScheduled ? 'SCHEDULED' : 'PUBLISHED',
+      rawStatus: isScheduled ? 'scheduled' : 'published',
+      ...(selectedPlatforms && selectedPlatforms.length > 0 ? { target_platforms: selectedPlatforms } : {}),
+    }, ...prev.filter(r => r.id !== reqId)]);
     setSelectedRequest(null);
     router.setParams({ postId: '' });
 
@@ -498,6 +508,9 @@ export default function ImcQaDashboard() {
         const formData = new FormData();
         formData.append('caption_narrative', finalCaptionText);
         formData.append('remarks', 'Direct to IMC publication finalized and released by IMC.');
+        if (selectedPlatforms && selectedPlatforms.length > 0) {
+          selectedPlatforms.forEach((p) => formData.append('target_platforms[]', p));
+        }
         finalUploadedImages.forEach((img) => {
           if (img.file) {
             formData.append('media[]', img.file);
@@ -508,6 +521,7 @@ export default function ImcQaDashboard() {
         await postsApi.approve(reqId, {
           caption_narrative: finalCaptionText,
           remarks: 'Direct to IMC publication finalized and released by IMC.',
+          ...(selectedPlatforms && selectedPlatforms.length > 0 ? { target_platforms: selectedPlatforms } : {}),
         });
       }
       loadData(false);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { postsApi, departmentsApi, resolveImageUrl } from '../../services/api';
+import { postsApi, departmentsApi, platformAvailabilityApi, resolveImageUrl } from '../../services/api';
 import { useAuthStore } from '../../store/auth';
 import {
   optimizeImageForUpload,
@@ -215,6 +215,31 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     instagram: false,
     website: false,
   });
+  const [platformAvailability, setPlatformAvailability] = useState<{
+    facebook?: { configured: boolean; verified?: boolean };
+    instagram?: { configured: boolean; verified?: boolean };
+    wordpress?: { configured: boolean; verified?: boolean };
+  }>({});
+
+  useEffect(() => {
+    platformAvailabilityApi.get().then((res: any) => {
+      const data = res?.data?.data || res?.data || {};
+      setPlatformAvailability({
+        facebook: {
+          configured: Boolean(data.facebook?.configured ?? data.facebook?.page_id),
+          verified: Boolean(data.facebook?.verified),
+        },
+        instagram: {
+          configured: Boolean(data.instagram?.configured ?? data.instagram?.account_id),
+          verified: Boolean(data.instagram?.verified),
+        },
+        wordpress: {
+          configured: Boolean(data.wordpress?.configured ?? data.wordpress?.url),
+          verified: Boolean(data.wordpress?.verified),
+        },
+      });
+    }).catch(() => {});
+  }, []);
   const [isOptimizingImages, setIsOptimizingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
@@ -1545,7 +1570,18 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         {targetPlatforms.facebook && <Ionicons name="checkmark" size={11} color="#FFFFFF" />}
                       </View>
                     </View>
-                    <Text style={styles.targetPlatformTitle}>Facebook</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2, marginBottom: 2 }}>
+                      <Text style={styles.targetPlatformTitle}>Facebook</Text>
+                      {platformAvailability.facebook?.configured === false ? (
+                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                          <Text style={{ fontSize: 9, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                          <Text style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>Ready</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.targetPlatformDesc}>Auto HD &bull; Max 4MB</Text>
                     <Text style={styles.targetPlatformStatus}>{targetPlatforms.facebook ? 'Selected' : 'Not selected'}</Text>
                   </TouchableOpacity>
@@ -1580,7 +1616,18 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         {targetPlatforms.instagram && <Ionicons name="checkmark" size={11} color="#FFFFFF" />}
                       </View>
                     </View>
-                    <Text style={styles.targetPlatformTitle}>Instagram</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2, marginBottom: 2 }}>
+                      <Text style={styles.targetPlatformTitle}>Instagram</Text>
+                      {platformAvailability.instagram?.configured === false ? (
+                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                          <Text style={{ fontSize: 9, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                          <Text style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>Ready</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.targetPlatformDesc}>4:5 to 1.91:1 Ratio</Text>
                     <Text style={styles.targetPlatformStatus}>{targetPlatforms.instagram ? 'Selected' : 'Not selected'}</Text>
                   </TouchableOpacity>
@@ -1615,7 +1662,18 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                         {targetPlatforms.website && <Ionicons name="checkmark" size={11} color="#FFFFFF" />}
                       </View>
                     </View>
-                    <Text style={styles.targetPlatformTitle}>Website</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2, marginBottom: 2 }}>
+                      <Text style={styles.targetPlatformTitle}>Website</Text>
+                      {platformAvailability.wordpress?.configured === false ? (
+                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                          <Text style={{ fontSize: 9, color: '#92400E', fontWeight: '700' }}>Setup Required</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                          <Text style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>Ready</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.targetPlatformDesc}>Featured Cover</Text>
                     <Text style={styles.targetPlatformStatus}>{targetPlatforms.website ? 'Selected' : 'Not selected'}</Text>
                   </TouchableOpacity>

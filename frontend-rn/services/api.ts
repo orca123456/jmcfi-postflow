@@ -162,6 +162,21 @@ export const postsApi = {
   startEditing: (id: number) => api.post(`/posts/${id}/start-editing`),
   saveDraftEditing: (id: number, data: object = {}) => api.post(`/posts/${id}/save-draft-editing`, data),
   adminBypassApprove: (id: number, data: object = {}) => api.post(`/posts/${id}/admin-bypass-approve`, data),
+  downloadDirectImcPhotos: (id: number): Promise<any> => {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
+      const url = `${baseUrl}/posts/${id}/download-photos`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `direct-imc-photos-${id}.zip`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return Promise.resolve();
+    }
+    return api.get(`/posts/${id}/download-photos`, { responseType: 'blob' });
+  },
 };
 
 
@@ -320,6 +335,11 @@ export const apiTokensApi = {
   list: () => api.get('/api-tokens', { cache: false } as any),
   create: (name: string) => api.post('/api-tokens', { name }),
   revoke: (tokenId: number) => api.delete(`/api-tokens/${tokenId}`),
+};
+
+// ── Platform Availability endpoints ──────────────────────────────────────
+export const platformAvailabilityApi = {
+  get: () => api.get('/platform-availability'),
 };
 
 // ── Notifications endpoints ────────────────────────────────────────────────

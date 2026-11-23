@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import RenderHtml from 'react-native-render-html';
-import { postsApi, resolveImageUrl } from '../../services/api';
+import { postsApi, platformAvailabilityApi, resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
 import { dashboardStyles, dashboardUi } from '../ui/dashboardDesign';
@@ -44,7 +44,7 @@ export interface PublicationReviewModalProps {
   visible: boolean;
   request: any;
   onClose: () => void;
-  onPublish: (finalCaption: string, finalImages: FinalUploadedImage[]) => Promise<void> | void;
+  onPublish: (finalCaption: string, finalImages: FinalUploadedImage[], selectedPlatforms?: string[]) => Promise<void> | void;
   onReject: (request: any) => void;
   onDraftSaved?: (savedPost?: any) => void;
   isPublishing?: boolean;
@@ -144,6 +144,37 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   const [activeMediaFailed, setActiveMediaFailed] = useState(false);
   const [activeMediaLoading, setActiveMediaLoading] = useState(true);
 
+  // Platform availability
+  const [platformAvail, setPlatformAvail] = useState<{
+    facebook?: { configured: boolean };
+    instagram?: { configured: boolean };
+    wordpress?: { configured: boolean };
+  }>({});
+
+  // Publishing platform selection
+  const [selectedPlatforms, setSelectedPlatforms] = useState<{
+    facebook: boolean;
+    instagram: boolean;
+    website: boolean;
+  }>({
+    facebook: true,
+    instagram: true,
+    website: false,
+  });
+
+  // Load platform availability when modal opens
+  useEffect(() => {
+    if (!visible) return;
+    platformAvailabilityApi.get().then((res: any) => {
+      const data = res?.data?.data || res?.data || {};
+      setPlatformAvail({
+        facebook: { configured: Boolean(data.facebook?.configured ?? data.facebook?.page_id) },
+        instagram: { configured: Boolean(data.instagram?.configured ?? data.instagram?.account_id) },
+        wordpress: { configured: Boolean(data.wordpress?.configured ?? data.wordpress?.url) },
+      });
+    }).catch(() => { /* silently ignore */ });
+  }, [visible]);
+
   const openLightbox = (photo: Photo | null, allPhotos?: Photo[], initialIndex?: number) => {
     if (!photo) {
       setLightbox(null);
@@ -232,6 +263,24 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
       setWebsiteActiveIndex(0);
       setActiveMediaFailed(false);
       setActiveMediaLoading(true);
+
+      const rawPlats = raw.target_platforms || raw.platforms || request.target_platforms || request.platforms || [];
+      const platArr = Array.isArray(rawPlats)
+        ? rawPlats.map((p: any) => String(p).toLowerCase())
+        : (typeof rawPlats === 'string' ? rawPlats.toLowerCase().split(',') : []);
+      if (platArr.length > 0) {
+        setSelectedPlatforms({
+          facebook: platArr.some((p: string) => p.includes('facebook') || p.includes('fb')),
+          instagram: platArr.some((p: string) => p.includes('instagram') || p.includes('ig')),
+          website: platArr.some((p: string) => p.includes('web') || p.includes('site') || p.includes('portal') || p.includes('wordpress')),
+        });
+      } else {
+        setSelectedPlatforms({
+          facebook: true,
+          instagram: true,
+          website: false,
+        });
+      }
 
       if (visible && request.id) {
         // Form initialized for review
@@ -367,19 +416,21 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   const handleDownloadAllPhotos = async () => {
     if (!request || submittedPhotos.length === 0) return;
     try {
-      await postsApi.startEditing(Number(request.id));
-    } catch { }
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      submittedPhotos.forEach((photo, idx) => {
-        const link = document.createElement('a');
-        link.href = photo.uri;
-        link.download = `request-${request.id}-${photo.name || `photo-${idx + 1}`}.jpg`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
+      // Use the ZIP download endpoint for a single-action download of all photos
+      await postsApi.downloadDirectImcPhotos(Number(request.id));
+    } catch {
+      // Fallback: download photos individually via anchor tags
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        submittedPhotos.forEach((photo, idx) => {
+          const link = document.createElement('a');
+          link.href = photo.uri;
+          link.download = `request-${request.id}-${photo.name || `photo-${idx + 1}`}.jpg`;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+      }
     }
   };
 
@@ -419,7 +470,12 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
       alert('Please provide a final caption before publishing.');
       return;
     }
-    onPublish(finalCaption, finalImages);
+    const chosen = (['facebook', 'instagram', 'website'] as const).filter((p) => selectedPlatforms[p]);
+    if (chosen.length === 0) {
+      alert('Please select at least one publishing platform.');
+      return;
+    }
+    onPublish(finalCaption, finalImages, [...chosen]);
   };
 
   if (!visible || !isDirectImcRequest(request)) return null;
@@ -573,15 +629,33 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.fieldHeading}>TARGET PLATFORMS</Text>
                         <View style={styles.platformBadgeRow}>
-                          {targetPlatforms.map((p) => (
-                            <View
-                              key={p.label}
-                              style={[styles.platformPill, { backgroundColor: p.bg }]}
-                            >
-                              <Ionicons name={p.icon} size={12} color={p.color} style={{ marginRight: 3 }} />
-                              <Text style={[styles.platformPillText, { color: p.color }]}>{p.label}</Text>
-                            </View>
-                          ))}
+                          {targetPlatforms.map((p) => {
+                            const isReady = p.label === 'Facebook'
+                              ? platformAvail.facebook?.configured !== false
+                              : (p.label === 'Instagram'
+                                ? platformAvail.instagram?.configured !== false
+                                : platformAvail.wordpress?.configured === true);
+                            return (
+                              <View
+                                key={p.label}
+                                style={[styles.platformPill, { backgroundColor: p.bg }]}
+                              >
+                                <Ionicons name={p.icon} size={12} color={p.color} style={{ marginRight: 3 }} />
+                                <Text style={[styles.platformPillText, { color: p.color }]}>{p.label}</Text>
+                                <View style={{
+                                  marginLeft: 4,
+                                  backgroundColor: isReady ? '#ECFDF5' : '#FEF3C7',
+                                  paddingHorizontal: 4,
+                                  paddingVertical: 1,
+                                  borderRadius: 3,
+                                }}>
+                                  <Text style={{ fontSize: 8.5, fontWeight: '700', color: isReady ? '#065F46' : '#92400E' }}>
+                                    {isReady ? 'Ready' : 'Setup Required'}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })}
                         </View>
                       </View>
                     </View>
@@ -994,8 +1068,147 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                       </View>
                     </View>
                     <Text style={styles.panelSubtitle}>
-                      Refine the caption and attach finalized or replacement artwork for release.
+                      Refine the caption, choose publishing platforms, and attach finalized or replacement artwork for release.
                     </Text>
+
+                    {/* Platform Availability & Publishing Destination Selection */}
+                    <View style={styles.formGroup}>
+                      <View style={styles.labelRow}>
+                        <Text style={[styles.fieldLabel, isDarkMode && styles.fieldLabelDark]}>
+                          Publishing Platforms & Readiness
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                        {/* Facebook */}
+                        <TouchableOpacity
+                          accessibilityRole="checkbox"
+                          accessibilityLabel="Publish to Facebook"
+                          onPress={() => setSelectedPlatforms(p => ({ ...p, facebook: !p.facebook }))}
+                          style={{
+                            flex: 1,
+                            minWidth: 130,
+                            padding: 10,
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: selectedPlatforms.facebook ? '#1877F2' : (isDarkMode ? '#334155' : '#E2E8F0'),
+                            backgroundColor: selectedPlatforms.facebook ? (isDarkMode ? '#1E293B' : '#EFF6FF') : (isDarkMode ? '#0F172A' : '#FAFAFA'),
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Ionicons name="logo-facebook" size={17} color="#1877F2" />
+                            <View>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A' }}>Facebook</Text>
+                              <View style={{
+                                marginTop: 2,
+                                backgroundColor: platformAvail.facebook?.configured !== false ? '#ECFDF5' : '#FEF3C7',
+                                paddingHorizontal: 4,
+                                paddingVertical: 1,
+                                borderRadius: 3,
+                                alignSelf: 'flex-start',
+                              }}>
+                                <Text style={{ fontSize: 8.5, fontWeight: '700', color: platformAvail.facebook?.configured !== false ? '#065F46' : '#92400E' }}>
+                                  {platformAvail.facebook?.configured !== false ? 'Ready' : 'Setup Required'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <Ionicons
+                            name={selectedPlatforms.facebook ? "checkbox" : "square-outline"}
+                            size={18}
+                            color={selectedPlatforms.facebook ? "#1877F2" : "#94A3B8"}
+                          />
+                        </TouchableOpacity>
+
+                        {/* Instagram */}
+                        <TouchableOpacity
+                          accessibilityRole="checkbox"
+                          accessibilityLabel="Publish to Instagram"
+                          onPress={() => setSelectedPlatforms(p => ({ ...p, instagram: !p.instagram }))}
+                          style={{
+                            flex: 1,
+                            minWidth: 130,
+                            padding: 10,
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: selectedPlatforms.instagram ? '#E1306C' : (isDarkMode ? '#334155' : '#E2E8F0'),
+                            backgroundColor: selectedPlatforms.instagram ? (isDarkMode ? '#1E293B' : '#FDF2F8') : (isDarkMode ? '#0F172A' : '#FAFAFA'),
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Ionicons name="logo-instagram" size={17} color="#E1306C" />
+                            <View>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A' }}>Instagram</Text>
+                              <View style={{
+                                marginTop: 2,
+                                backgroundColor: platformAvail.instagram?.configured !== false ? '#ECFDF5' : '#FEF3C7',
+                                paddingHorizontal: 4,
+                                paddingVertical: 1,
+                                borderRadius: 3,
+                                alignSelf: 'flex-start',
+                              }}>
+                                <Text style={{ fontSize: 8.5, fontWeight: '700', color: platformAvail.instagram?.configured !== false ? '#065F46' : '#92400E' }}>
+                                  {platformAvail.instagram?.configured !== false ? 'Ready' : 'Setup Required'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <Ionicons
+                            name={selectedPlatforms.instagram ? "checkbox" : "square-outline"}
+                            size={18}
+                            color={selectedPlatforms.instagram ? "#E1306C" : "#94A3B8"}
+                          />
+                        </TouchableOpacity>
+
+                        {/* Website */}
+                        <TouchableOpacity
+                          accessibilityRole="checkbox"
+                          accessibilityLabel="Publish to Website"
+                          onPress={() => setSelectedPlatforms(p => ({ ...p, website: !p.website }))}
+                          style={{
+                            flex: 1,
+                            minWidth: 130,
+                            padding: 10,
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: selectedPlatforms.website ? '#059669' : (isDarkMode ? '#334155' : '#E2E8F0'),
+                            backgroundColor: selectedPlatforms.website ? (isDarkMode ? '#1E293B' : '#ECFDF5') : (isDarkMode ? '#0F172A' : '#FAFAFA'),
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Ionicons name="globe-outline" size={17} color="#059669" />
+                            <View>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A' }}>Website</Text>
+                              <View style={{
+                                marginTop: 2,
+                                backgroundColor: platformAvail.wordpress?.configured === true ? '#ECFDF5' : '#FEF3C7',
+                                paddingHorizontal: 4,
+                                paddingVertical: 1,
+                                borderRadius: 3,
+                                alignSelf: 'flex-start',
+                              }}>
+                                <Text style={{ fontSize: 8.5, fontWeight: '700', color: platformAvail.wordpress?.configured === true ? '#065F46' : '#92400E' }}>
+                                  {platformAvail.wordpress?.configured === true ? 'Ready' : 'Setup Required'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <Ionicons
+                            name={selectedPlatforms.website ? "checkbox" : "square-outline"}
+                            size={18}
+                            color={selectedPlatforms.website ? "#059669" : "#94A3B8"}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
 
                     {/* Final Caption Field */}
                     <View style={styles.formGroup}>

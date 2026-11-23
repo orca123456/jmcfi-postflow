@@ -6,6 +6,7 @@ use App\Models\ApprovalWorkflow;
 use App\Models\PostRequest;
 use App\Models\User;
 use App\Notifications\ApprovalNeededNotification;
+use App\Notifications\DirectImcStatusNotification;
 use App\Notifications\PostApprovedNotification;
 use App\Notifications\PostRejectedNotification;
 use App\Notifications\PostReturnedForRevisionNotification;
@@ -88,12 +89,60 @@ class WorkflowService
 
     public function notifyApprovers(PostRequest $postRequest): void
     {
+        if ($postRequest->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
+            $imcCheckers = User::role('imc_qa_checker')->where('status', 'active')->get();
+            if ($imcCheckers->isNotEmpty()) {
+                Notification::send($imcCheckers, new ApprovalNeededNotification($postRequest, 'imc_qa'));
+            }
+            return;
+        }
+
         $currentStage = $postRequest->currentApprovalStage();
         if (!$currentStage) return;
 
         $approver = $currentStage->approver;
         if ($approver) {
             Notification::send($approver, new ApprovalNeededNotification($postRequest));
+        }
+    }
+
+    public function notifyDirectImcSubmitted(PostRequest $postRequest): void
+    {
+        // Notify IMC Checkers
+        $imcCheckers = User::role('imc_qa_checker')->where('status', 'active')->get();
+        if ($imcCheckers->isNotEmpty()) {
+            Notification::send($imcCheckers, new ApprovalNeededNotification($postRequest, 'imc_qa'));
+        }
+
+        // Notify Requestor confirmation
+        if ($postRequest->requestor) {
+            $postRequest->requestor->notify(new DirectImcStatusNotification($postRequest, 'submitted'));
+        }
+    }
+
+    public function notifyDirectImcReviewing(PostRequest $postRequest, ?string $actorName = null): void
+    {
+        if ($postRequest->requestor) {
+            $postRequest->requestor->notify(new DirectImcStatusNotification($postRequest, 'reviewing', $actorName));
+        }
+    }
+
+    public function notifyDirectImcEditing(PostRequest $postRequest, ?string $actorName = null): void
+    {
+        if ($postRequest->requestor) {
+            $postRequest->requestor->notify(new DirectImcStatusNotification($postRequest, 'editing', $actorName));
+        }
+    }
+
+    public function notifyRequestorOfStageApproval(PostRequest $postRequest, ?string $stage, ?string $approverName = null): void
+    {
+        $requestor = $postRequest->requestor;
+        if (!$requestor) return;
+
+        try {
+            $requestor->notify(new PostApprovedNotification($postRequest, $stage, $approverName));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to notify requestor of stage approval: " . $e->getMessage());
         }
     }
 

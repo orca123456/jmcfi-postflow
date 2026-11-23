@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import RenderHtml from 'react-native-render-html';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
-import { resolveImageUrl } from '../../services/api';
+import { postsApi, resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
 import { FacebookMediaGrid, isImageMedia } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
@@ -309,10 +309,10 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
   const finalized = !draft && (['approved', 'scheduled', 'publishing', 'published', 'publish_failed'].includes(status)
     || (action === 'approved' && !rejected && !revision));
   const snapshot = raw.submitted_materials ?? request?.submitted_materials;
-  const hasSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot);
-  const originalCaption = hasSnapshot ? textValue(snapshot.caption_narrative) : finalized ? '' : textValue(raw.caption_narrative ?? request?.caption);
+  const hasSnapshot = Boolean(snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) && Array.isArray((snapshot as any).media) && (snapshot as any).media.length > 0);
+  const originalCaption = hasSnapshot ? textValue((snapshot as any).caption_narrative) : textValue(raw.original_caption ?? raw.caption_narrative ?? request?.caption);
   const currentMedia = raw.media ?? request?.media ?? [];
-  const originalPhotos = photosFrom(hasSnapshot ? snapshot.media : finalized ? [] : currentMedia);
+  const originalPhotos = photosFrom(hasSnapshot ? (snapshot as any).media : (raw.submission_originals ?? currentMedia));
   const finalPhotos = photosFrom(currentMedia);
   const finalCaption = textValue(raw.caption_narrative ?? request?.caption);
   const captionChanged = !!hasSnapshot && textValue(snapshot.caption_narrative) !== finalCaption;
@@ -701,13 +701,35 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                 <View style={[styles.infoCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                   <View style={styles.sectionHeaderRow}>
                     <Text accessibilityRole="header" style={headingStyle}>Original photos</Text>
-                    <View style={[styles.tagBadge, { backgroundColor: palette.mutedSurface, borderColor: palette.border }]}>
-                      <Text style={[styles.tagBadgeText, { color: palette.muted }]}>{(!finalized || hasSnapshot) ? `${originalPhotos.length} ${originalPhotos.length === 1 ? 'photo' : 'photos'} attached` : 'Raw uploads'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      {originalPhotos.length > 0 && (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel="Download all photos"
+                          onPress={() => postsApi.downloadDirectImcPhotos(Number(raw.id ?? request?.id))}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                            backgroundColor: palette.purpleBadgeBg,
+                            borderWidth: 1,
+                            borderColor: palette.purple,
+                          }}
+                        >
+                          <Ionicons name="download-outline" size={12} color={palette.purple} style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: palette.purple }}>Download All</Text>
+                        </TouchableOpacity>
+                      )}
+                      <View style={[styles.tagBadge, { backgroundColor: palette.mutedSurface, borderColor: palette.border }]}>
+                        <Text style={[styles.tagBadgeText, { color: palette.muted }]}>{`${originalPhotos.length} ${originalPhotos.length === 1 ? 'photo' : 'photos'} attached`}</Text>
+                      </View>
                     </View>
                   </View>
                   <Text style={[styles.metaText, { color: palette.muted, marginBottom: 8 }]}>Original photos attached with your initial submission</Text>
                   <Photos photos={originalPhotos} palette={palette} onView={openLightbox}
-                    empty={finalized && !hasSnapshot ? 'Original photos were not saved for this request.' : 'No photos were submitted.'} />
+                    empty="No original photos were attached." />
                 </View>
 
                 {/* 3. Publication Preview Mockup (at the bottom, below Original Photos) */}

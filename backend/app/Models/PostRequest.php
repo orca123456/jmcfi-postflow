@@ -221,18 +221,27 @@ class PostRequest extends Model
         return $this->requestor_id === $user->id || $user->hasRole('admin');
     }
 
-    public function captureSubmittedMaterials(): void
+    public function captureSubmittedMaterials(bool $force = false): void
     {
         if ($this->routing_type !== self::ROUTING_DIRECT_IMC
-            || $this->submitted_materials !== null
-            || in_array($this->status, [self::STATUS_PUBLISHED, self::STATUS_SCHEDULED, self::STATUS_REJECTED], true)
+            || (!$force && $this->submitted_materials !== null)
+            || (!$force && in_array($this->status, [self::STATUS_PUBLISHED, self::STATUS_SCHEDULED, self::STATUS_REJECTED], true))
             || !Schema::hasColumn($this->getTable(), 'submitted_materials')) {
+            return;
+        }
+
+        $hasOriginals = $this->mediaIncludingOriginals()->where('is_submission_original', true)->exists();
+        $items = $hasOriginals
+            ? $this->mediaIncludingOriginals()->where('is_submission_original', true)->orderBy('sort_order')->get()
+            : $this->mediaIncludingOriginals()->orderBy('sort_order')->get();
+
+        if ($items->isEmpty() && !$force && $this->submitted_materials !== null) {
             return;
         }
 
         $this->forceFill(['submitted_materials' => [
             'caption_narrative' => $this->caption_narrative,
-            'media' => $this->media()->orderBy('sort_order')->get()->map(fn ($media) => [
+            'media' => $items->map(fn ($media) => [
                 'id' => $media->id,
                 'type' => $media->type,
                 'original_filename' => $media->original_name,
@@ -247,6 +256,26 @@ class PostRequest extends Model
     {
         $materials = $this->submitted_materials;
         if (!is_array($materials)) {
+            if ($this->routing_type === self::ROUTING_DIRECT_IMC) {
+                $hasOriginals = $this->mediaIncludingOriginals()->where('is_submission_original', true)->exists();
+                $items = $hasOriginals
+                    ? $this->mediaIncludingOriginals()->where('is_submission_original', true)->orderBy('sort_order')->get()
+                    : $this->mediaIncludingOriginals()->orderBy('sort_order')->get();
+
+                if ($items->isNotEmpty()) {
+                    return [
+                        'caption_narrative' => $this->caption_narrative,
+                        'media' => $items->map(fn ($m) => [
+                            'id' => $m->id,
+                            'type' => $m->type,
+                            'original_filename' => $m->original_name,
+                            'url' => $m->url,
+                            'mime_type' => $m->mime_type,
+                            'size' => $m->file_size,
+                        ])->all(),
+                    ];
+                }
+            }
             return null;
         }
         $materials['media'] = array_map(function ($media) {

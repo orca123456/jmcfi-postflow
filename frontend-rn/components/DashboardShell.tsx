@@ -1077,7 +1077,7 @@ export function DashboardShell({
                         style={[
                           styles.notifIconCircle,
                           {
-                            backgroundColor: (n.type?.includes('Approved') || n.data?.type === 'post_approved')
+                            backgroundColor: (n.type?.includes('Approved') || n.data?.type === 'post_approved' || n.data?.type === 'post_published_success')
                               ? '#DCFCE7'
                               : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
                                 ? '#FEE2E2'
@@ -1087,7 +1087,7 @@ export function DashboardShell({
                       >
                         <Ionicons
                           name={
-                            (n.type?.includes('Approved') || n.data?.type === 'post_approved')
+                            (n.type?.includes('Approved') || n.data?.type === 'post_approved' || n.data?.type === 'post_published_success')
                               ? 'checkmark-circle'
                               : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
                                 ? 'close-circle'
@@ -1095,7 +1095,7 @@ export function DashboardShell({
                           }
                           size={18}
                           color={
-                            (n.type?.includes('Approved') || n.data?.type === 'post_approved')
+                            (n.type?.includes('Approved') || n.data?.type === 'post_approved' || n.data?.type === 'post_published_success')
                               ? '#16A34A'
                               : (n.type?.includes('Rejected') || n.data?.type === 'post_rejected')
                                 ? '#DC2626'

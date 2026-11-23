@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\PostRequest;
 use App\Models\PublishingRecord;
 use App\Models\User;
+use App\Notifications\PostPublishedRequestorNotification;
 use App\Notifications\PostPublishedSuccessNotification;
 use App\Notifications\PostPublishingFailedNotification;
 use App\Services\FacebookPublishingService;
@@ -193,6 +194,19 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
                 ->pluck('platform_response', 'platform')->all();
             $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults));
+
+            // Notify the requestor that their post was published
+            try {
+                $freshPost = $this->postRequest->fresh(['requestor', 'category']);
+                if ($freshPost && $freshPost->requestor) {
+                    $freshPost->requestor->notify(
+                        new PostPublishedRequestorNotification($freshPost, $allResults)
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning("AutoPublishJob: Failed to notify requestor of publish for post ID {$this->postRequest->id}: {$e->getMessage()}");
+            }
+
             Log::info("AutoPublishJob: Completed for post ID {$this->postRequest->id}");
         } catch (Exception $e) {
             Log::error("AutoPublishJob: FAILED for post ID {$this->postRequest->id}. Error: {$e->getMessage()}");
