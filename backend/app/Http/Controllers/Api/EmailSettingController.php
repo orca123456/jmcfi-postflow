@@ -169,6 +169,9 @@ class EmailSettingController extends Controller
                     $label = trim((string)($row['label'] ?? ''));
                     $val   = trim((string)($row['value'] ?? ''));
                     if ($label !== '') {
+                        if (preg_match('/^(.)\1{3,}$/', $val) || str_contains($val, 'AAAAAA')) {
+                            $val = 'Annual Student Orientation 2026';
+                        }
                         $tableDetails[$label] = $val;
                     }
                 }
@@ -176,9 +179,9 @@ class EmailSettingController extends Controller
         }
         if (empty($tableDetails)) {
             $tableDetails = [
-                'Title'               => 'Annual Campus Activity Request 2026',
+                'Title'               => 'Annual Student Orientation 2026',
                 'Category'            => 'Announcement',
-                'Published Platforms' => 'Facebook',
+                'Published Platforms' => 'Facebook, Instagram',
                 'Published At'        => now()->format('M d, Y h:i A'),
                 'Facebook Post ID'    => '122125475451447703',
             ];
@@ -230,11 +233,11 @@ class EmailSettingController extends Controller
                             'email' => $fromAddr ?: 'postflow@jmc.edu.ph',
                             'name'  => $fromName ?: 'JMCFI PostFlow'
                         ],
-                        'subject' => "[{$fromName}] ✅ Email Template Test — Configuration Verified!",
+                        'subject' => "[{$fromName}] Notification: System Publishing Setup Verified",
                         'content' => [
                             [
                                 'type'  => 'text/plain',
-                                'value' => "Hello {$adminName},\n\nThis is a test email sent via Twilio SendGrid API from JMCFI PostFlow with custom template styling.\n\n— JMCFI PostFlow System"
+                                'value' => "Hello {$adminName},\n\nThis is an official notification confirming that the JMCFI PostFlow publishing integration is active and operating normally.\n\nSincerely,\nJMCFI PostFlow System"
                             ],
                             [
                                 'type'  => 'text/html',
@@ -276,9 +279,9 @@ class EmailSettingController extends Controller
                     'json' => [
                         'from'    => $fromHeader,
                         'to'      => [$adminEmail],
-                        'subject' => "[{$fromName}] ✅ Email Template Test — Configuration Verified!",
+                        'subject' => "[{$fromName}] Notification: System Publishing Setup Verified",
                         'html'    => $htmlContent,
-                        'text'    => "Hello {$adminName},\n\nThis is a test email sent via Resend API from JMCFI PostFlow with custom template styling.\n\n— JMCFI PostFlow System",
+                        'text'    => "Hello {$adminName},\n\nThis is an official notification confirming that the JMCFI PostFlow publishing integration is active and operating normally.\n\nSincerely,\nJMCFI PostFlow System",
                     ],
                     'timeout' => 12,
                 ]);
@@ -305,7 +308,7 @@ class EmailSettingController extends Controller
         try {
             Mail::send('emails.custom-template', $viewData, function ($message) use ($adminEmail, $adminName, $fromName) {
                 $message->to($adminEmail, $adminName)
-                        ->subject("[{$fromName}] ✅ Email Template Test — Configuration Verified!");
+                        ->subject("[{$fromName}] Notification: System Publishing Setup Verified");
             });
 
             Log::info("Test email sent successfully to {$adminEmail}");

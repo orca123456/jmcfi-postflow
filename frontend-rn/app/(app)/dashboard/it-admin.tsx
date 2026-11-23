@@ -207,7 +207,7 @@ const ANALYTICS_PERIOD_OPTIONS = [
 ];
 
 const DEFAULT_EMAIL_TEMPLATE_ROWS: { label: string; value: string }[] = [
-  { label: 'Title', value: 'AAAAAAAAAAAAAAAAAAAAAA' },
+  { label: 'Title', value: 'Annual Student Orientation 2026' },
   { label: 'Category', value: 'Announcement' },
   { label: 'Published Platforms', value: 'Facebook' },
   { label: 'Published At', value: 'Nov 17, 2026 08:32 PM' },
