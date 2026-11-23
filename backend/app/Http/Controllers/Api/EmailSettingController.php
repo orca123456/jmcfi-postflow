@@ -363,6 +363,7 @@ class EmailSettingController extends Controller
 
         $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
         $isResend   = str_contains(strtolower($host), 'resend')   || str_starts_with($cleanPassword, 're_');
+        $isBrevo    = str_contains(strtolower($host), 'brevo')    || str_contains(strtolower($host), 'sendinblue') || str_starts_with($cleanPassword, 'xkeysib-');
 
         if ($isSendGrid) {
             Config::set('mail.default', 'sendgrid');
@@ -372,6 +373,10 @@ class EmailSettingController extends Controller
             Config::set('mail.default', 'resend');
             Config::set('mail.mailers.resend.transport', 'resend');
             Config::set('mail.mailers.resend.key', $cleanPassword);
+        } elseif ($isBrevo) {
+            Config::set('mail.default', 'brevo');
+            Config::set('mail.mailers.brevo.transport', 'brevo');
+            Config::set('mail.mailers.brevo.key', $cleanPassword);
         } else {
             Config::set('mail.default', $mailer);
             Config::set('mail.mailers.smtp.transport', 'smtp');
@@ -396,6 +401,7 @@ class EmailSettingController extends Controller
         // Purge mailer instances so Laravel rebuilds transport with new config
         Mail::purge('sendgrid');
         Mail::purge('resend');
+        Mail::purge('brevo');
         Mail::purge('smtp');
         Mail::purge($mailer);
         Mail::purge();

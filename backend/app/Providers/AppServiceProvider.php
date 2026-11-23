@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\SystemSetting;
 use App\Mail\SendGridTransport;
 use App\Mail\ResendTransport;
+use App\Mail\BrevoTransport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
@@ -69,6 +70,12 @@ class AppServiceProvider extends ServiceProvider
             return new ResendTransport((string) $apiKey);
         });
 
+        // Register custom Brevo HTTP Transport
+        Mail::extend('brevo', function (array $config = []) {
+            $apiKey = $config['key'] ?? (Schema::hasTable('system_settings') ? SystemSetting::where('key', 'mail_password')->value('value') : '') ?? '';
+            return new BrevoTransport((string) $apiKey);
+        });
+
         // Apply system-wide runtime mail configuration for all system notifications
         try {
             if (Schema::hasTable('system_settings')) {
@@ -84,6 +91,7 @@ class AppServiceProvider extends ServiceProvider
                 $cleanPassword = str_replace(' ', '', $password);
                 $isSendGrid = str_contains(strtolower($host), 'sendgrid') || str_starts_with($cleanPassword, 'SG.');
                 $isResend   = str_contains(strtolower($host), 'resend')   || str_starts_with($cleanPassword, 're_');
+                $isBrevo    = str_contains(strtolower($host), 'brevo')    || str_contains(strtolower($host), 'sendinblue') || str_starts_with($cleanPassword, 'xkeysib-');
 
                 if ($isSendGrid && !empty($cleanPassword)) {
                     Config::set('mail.default', 'sendgrid');
@@ -93,6 +101,10 @@ class AppServiceProvider extends ServiceProvider
                     Config::set('mail.default', 'resend');
                     Config::set('mail.mailers.resend.transport', 'resend');
                     Config::set('mail.mailers.resend.key', $cleanPassword);
+                } elseif ($isBrevo && !empty($cleanPassword)) {
+                    Config::set('mail.default', 'brevo');
+                    Config::set('mail.mailers.brevo.transport', 'brevo');
+                    Config::set('mail.mailers.brevo.key', $cleanPassword);
                 } elseif (!empty($username) && !empty($cleanPassword)) {
                     Config::set('mail.default', $customMailer ?: 'smtp');
                     Config::set('mail.mailers.smtp.transport', 'smtp');
