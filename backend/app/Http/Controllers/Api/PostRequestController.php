@@ -64,7 +64,7 @@ class PostRequestController extends Controller
             $this->applyPendingApprovalScope($query, $request->user());
         }
 
-        // Role-based scoping — only when not explicitly asking for own requests.
+        // Role-based scoping â€” only when not explicitly asking for own requests.
         // Locks each role to its own data using the REAL DB role names
         // (office_head / vice_president / imc_qa_checker / content_requestor /
         // it_publisher) so URL/API manipulation can't leak other roles' posts.
@@ -612,7 +612,7 @@ class PostRequestController extends Controller
                     }
                 }
             } else {
-                // All approvals done — IMC gave final sign-off
+                // All approvals done â€” IMC gave final sign-off
                 $isScheduled = $postRequest->preferred_schedule_at && \Carbon\Carbon::parse($postRequest->preferred_schedule_at)->isFuture();
                 $updateData = [
                     'status' => $isScheduled ? PostRequest::STATUS_SCHEDULED : PostRequest::STATUS_PUBLISHED,
@@ -1245,7 +1245,7 @@ class PostRequestController extends Controller
                       });
             }
         } elseif ($category === 'admin') {
-            // Admin sees everything — no filter
+            // Admin sees everything â€” no filter
         }
     }
 
@@ -1306,7 +1306,7 @@ class PostRequestController extends Controller
 
     private function removeReplacedMedia(PostRequest $post, PostMedia $media, bool $deleteFile = false): void
     {
-        // For Direct IMC requests, NEVER delete original media — always preserve it.
+        // For Direct IMC requests, NEVER delete original media â€” always preserve it.
         if ($post->routing_type === PostRequest::ROUTING_DIRECT_IMC) {
             if (Schema::hasColumn('post_media', 'is_submission_original')) {
                 $media->forceFill(['is_submission_original' => true, 'is_featured' => false])->save();
@@ -1330,29 +1330,51 @@ class PostRequestController extends Controller
 
     /**
      * Download all original submitted photos for a Direct IMC request as a ZIP archive.
-     * Only accessible by IMC QA checkers, IT admins, and IT publishers.
+     * Accessible by IMC QA checkers, IT admins, publishers, approvers, and the request owner.
      */
     public function downloadPhotos(Request $request, PostRequest $postRequest): \Symfony\Component\HttpFoundation\Response
     {
-        // Only Direct IMC requests support bulk download
-        if ($postRequest->routing_type !== PostRequest::ROUTING_DIRECT_IMC) {
-            return response()->json(['message' => 'Download All Photos is only available for Direct IMC requests.'], 403);
+        $user = $request->user();
+        $isStaff = $user && $user->hasAnyRole(['imc_qa_checker', 'it_admin', 'it_publisher', 'admin', 'approver_dept_head', 'approver_vp']);
+        $isAuthor = $user && ((int) $postRequest->requestor_id === (int) $user->id);
+
+        if (!$isStaff && !$isAuthor) {
+            return response()->json(['message' => 'Unauthorized to download photos for this request.'], 403);
         }
 
         // Collect original submitted media (images only)
         $submittedMaterials = $postRequest->submitted_materials;
-        $mediaItems = [];
+        $mediaItems = collect();
         if (is_array($submittedMaterials) && isset($submittedMaterials['media']) && is_array($submittedMaterials['media'])) {
-            $ids = array_column($submittedMaterials['media'], 'id');
-            $mediaItems = PostMedia::whereIn('id', $ids)
+            $ids = array_filter(array_column($submittedMaterials['media'], 'id'));
+            if (!empty($ids)) {
+                $mediaItems = PostMedia::whereIn('id', $ids)
+                    ->where('type', 'image')
+                    ->orderBy('sort_order')
+                    ->get();
+            }
+        }
+
+        // Fallback 1: media flagged as submission original
+        if ($mediaItems->isEmpty()) {
+            $mediaItems = $postRequest->mediaIncludingOriginals()
+                ->where('is_submission_original', true)
                 ->where('type', 'image')
+                ->orderBy('sort_order')
                 ->get();
         }
-        // Fallback: query all original submission media flagged or all media
-        if ($mediaItems instanceof \Illuminate\Database\Eloquent\Collection && $mediaItems->isEmpty()) {
-            $mediaItems = $postRequest->media()
+
+        // Fallback 2: all media including originals for this post
+        if ($mediaItems->isEmpty()) {
+            $mediaItems = $postRequest->mediaIncludingOriginals()
                 ->where('type', 'image')
+                ->orderBy('sort_order')
                 ->get();
+        }
+
+        // Fallback 3: any media linked
+        if ($mediaItems->isEmpty()) {
+            $mediaItems = $postRequest->media()->where('type', 'image')->get();
         }
 
         if ($mediaItems->isEmpty()) {
@@ -1361,32 +1383,84 @@ class PostRequestController extends Controller
 
         $disk = config('filesystems.default') === 'local' ? 'public' : config('filesystems.default');
         $zipFileName = 'direct-imc-photos-' . $postRequest->id . '.zip';
-        $zipTempPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $zipFileName;
+        $zipTempPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'zip_' . $postRequest->id . '_' . uniqid() . '.zip';
 
         $zip = new \ZipArchive();
         if ($zip->open($zipTempPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             return response()->json(['message' => 'Failed to create ZIP archive.'], 500);
         }
 
+        $filesAdded = 0;
         foreach ($mediaItems as $index => $media) {
-            $filePath = $media->file_path;
+            $filePath = str_replace('\\', '/', (string) $media->file_path);
             $ext = pathinfo($media->original_name ?? 'photo.jpg', PATHINFO_EXTENSION) ?: 'jpg';
             $archiveName = ($index + 1) . '_' . ($media->original_name ?: "photo-{$index}.{$ext}");
             $archiveName = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $archiveName);
 
-            if (Storage::disk($disk)->exists($filePath)) {
-                $zip->addFromString($archiveName, Storage::disk($disk)->get($filePath));
+            $content = null;
+
+            // Priority 1: Storage disk (configured disk, 'public', or local storage path)
+            try {
+                if (Storage::disk($disk)->exists($filePath)) {
+                    $content = Storage::disk($disk)->get($filePath);
+                } elseif (Storage::disk('public')->exists($filePath)) {
+                    $content = Storage::disk('public')->get($filePath);
+                } elseif (file_exists(public_path('storage/' . $filePath))) {
+                    $content = file_get_contents(public_path('storage/' . $filePath));
+                } elseif (file_exists(storage_path('app/public/' . $filePath))) {
+                    $content = file_get_contents(storage_path('app/public/' . $filePath));
+                }
+            } catch (\Throwable $_) {}
+
+            // Priority 2: Database backup in post_media_files table (for ephemeral containers like Railway)
+            if ($content === null && Schema::hasTable('post_media_files')) {
+                try {
+                    $media->loadMissing('file:id,post_media_id,content');
+                    $dbContent = $media->file?->content;
+
+                    if (is_resource($dbContent)) {
+                        $dbContent = stream_get_contents($dbContent);
+                    }
+
+                    if (is_string($dbContent) && str_starts_with($dbContent, '\\x')) {
+                        $dbContent = hex2bin(substr($dbContent, 2)) ?: null;
+                    }
+
+                    if (!empty($dbContent)) {
+                        $content = $dbContent;
+                    }
+                } catch (\Throwable $_) {}
+            }
+
+            // Priority 3: Public media URL if available
+            if ($content === null && !empty($media->url) && filter_var($media->url, FILTER_VALIDATE_URL)) {
+                try {
+                    $res = Http::timeout(10)->withoutVerifying()->get($media->url);
+                    if ($res->successful()) {
+                        $content = $res->body();
+                    }
+                } catch (\Throwable $_) {}
+            }
+
+            if ($content !== null) {
+                $zip->addFromString($archiveName, $content);
+                $filesAdded++;
             }
         }
         $zip->close();
 
-        if (!file_exists($zipTempPath)) {
-            return response()->json(['message' => 'ZIP archive could not be created.'], 500);
+        if ($filesAdded === 0 || !file_exists($zipTempPath)) {
+            if (file_exists($zipTempPath)) {
+                @unlink($zipTempPath);
+            }
+            return response()->json(['message' => 'No accessible photo files found to download.'], 404);
         }
 
         return response()->download($zipTempPath, $zipFileName, [
             'Content-Type' => 'application/zip',
             'Content-Disposition' => 'attachment; filename="' . $zipFileName . '"',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
         ])->deleteFileAfterSend(true);
     }
 

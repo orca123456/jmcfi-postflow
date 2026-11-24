@@ -135,4 +135,59 @@ final class ImcSubmittedMaterialsTest extends TestCase
         self::assertNotNull($fallback);
         self::assertSame('original image bytes', $fallback->file->content);
     }
+
+    public function testDownloadPhotosGeneratesZipEvenWhenDiskIsWiped(): void
+    {
+        $post = $this->post();
+        $post->requestor_id = 10;
+        $post->save();
+
+        // Delete disk file to simulate ephemeral container restart
+        Storage::disk('public')->delete('post-media/submitted.png');
+        self::assertFalse(Storage::disk('public')->exists('post-media/submitted.png'));
+
+        $user = Mockery::mock(User::class)->makePartial();
+        $user->id = 10; // requestor
+        $user->shouldReceive('hasAnyRole')->andReturn(false);
+
+        $request = Request::create("/api/posts/{$post->id}/download-photos", 'GET');
+        $request->setUserResolver(fn () => $user);
+
+        $controller = new PostRequestController(Mockery::mock(AIComplianceService::class), Mockery::mock(ApprovalWorkflowService::class));
+        $response = $controller->downloadPhotos($request, $post);
+
+        self::assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $response);
+        self::assertSame('application/zip', $response->headers->get('Content-Type'));
+        self::assertStringContainsString("direct-imc-photos-{$post->id}.zip", $response->headers->get('Content-Disposition'));
+
+        // Inspect zip file content
+        $zipPath = $response->getFile()->getPathname();
+        self::assertFileExists($zipPath);
+
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($zipPath));
+        self::assertSame(1, $zip->numFiles);
+        self::assertStringContainsString('submitted', $zip->getNameIndex(0));
+        self::assertSame('original image bytes', $zip->getFromIndex(0));
+        $zip->close();
+    }
+
+    public function testDownloadPhotosRejectsUnauthorizedUser(): void
+    {
+        $post = $this->post();
+        $post->requestor_id = 10;
+        $post->save();
+
+        $stranger = Mockery::mock(User::class)->makePartial();
+        $stranger->id = 999;
+        $stranger->shouldReceive('hasAnyRole')->andReturn(false);
+
+        $request = Request::create("/api/posts/{$post->id}/download-photos", 'GET');
+        $request->setUserResolver(fn () => $stranger);
+
+        $controller = new PostRequestController(Mockery::mock(AIComplianceService::class), Mockery::mock(ApprovalWorkflowService::class));
+        $response = $controller->downloadPhotos($request, $post);
+
+        self::assertSame(403, $response->getStatusCode());
+    }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import RenderHtml from 'react-native-render-html';
@@ -143,6 +144,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   const [lightboxFailed, setLightboxFailed] = useState(false);
   const [activeMediaFailed, setActiveMediaFailed] = useState(false);
   const [activeMediaLoading, setActiveMediaLoading] = useState(true);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   // Platform availability
   const [platformAvail, setPlatformAvail] = useState<{
@@ -414,11 +416,12 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
   };
 
   const handleDownloadAllPhotos = async () => {
-    if (!request || submittedPhotos.length === 0) return;
+    if (!request || submittedPhotos.length === 0 || isDownloadingAll) return;
+    setIsDownloadingAll(true);
     try {
       // Use the ZIP download endpoint for a single-action download of all photos
       await postsApi.downloadDirectImcPhotos(Number(request.id));
-    } catch {
+    } catch (err: any) {
       // Fallback: download photos individually via anchor tags
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         submittedPhotos.forEach((photo, idx) => {
@@ -430,7 +433,11 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
           link.click();
           document.body.removeChild(link);
         });
+      } else {
+        Alert.alert('Download Failed', err?.message || 'Unable to download photos.');
       }
+    } finally {
+      setIsDownloadingAll(false);
     }
   };
 
@@ -706,11 +713,12 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                       {photoCount > 0 && (
                         <TouchableOpacity
                           onPress={handleDownloadAllPhotos}
-                          style={styles.downloadAllBtn}
+                          disabled={isDownloadingAll}
+                          style={[styles.downloadAllBtn, isDownloadingAll && { opacity: 0.7 }]}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="download-outline" size={14} color="#4C007C" style={{ marginRight: 4 }} />
-                          <Text style={styles.downloadAllBtnText}>Download All</Text>
+                          <Ionicons name={isDownloadingAll ? "hourglass-outline" : "download-outline"} size={14} color="#4C007C" style={{ marginRight: 4 }} />
+                          <Text style={styles.downloadAllBtnText}>{isDownloadingAll ? 'Downloading...' : 'Download All'}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -893,7 +901,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                               Jose Maria College Foundation Inc.
                             </Text>
                             <Text style={styles.websiteBylineSub}>
-                              Official Web Portal • Final IMC Version
+                              Official Web Portal â€¢ Final IMC Version
                             </Text>
                           </View>
                         </View>
@@ -988,7 +996,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                               Jose Maria College Foundation Inc.
                             </Text>
                             <Text style={styles.mockupPlatformSub}>
-                              {previewPlatform.charAt(0).toUpperCase() + previewPlatform.slice(1)} preview • Final IMC Version
+                              {previewPlatform.charAt(0).toUpperCase() + previewPlatform.slice(1)} preview â€¢ Final IMC Version
                             </Text>
                           </View>
                         </View>
@@ -1410,7 +1418,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                 </Text>
                 {lightbox && lightbox.photos.length > 1 && (
                   <Text style={styles.lightboxSubtext}>
-                    Photo {lightbox.index + 1} of {lightbox.photos.length} · Use ← and → keys to browse
+                    Photo {lightbox.index + 1} of {lightbox.photos.length} Â· Use â† and â†’ keys to browse
                   </Text>
                 )}
               </View>

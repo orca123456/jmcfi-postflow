@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { topLoadingBar } from '../store/loadingBar';
@@ -109,7 +109,7 @@ api.interceptors.response.use(
   }
 );
 
-// ── Auth endpoints ─────────────────────────────────────────────────────────
+// â”€â”€ Auth endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
@@ -126,7 +126,7 @@ export const authApi = {
   removePhoto: () => api.delete('/auth/profile-photo'),
 };
 
-// ── Posts endpoints ────────────────────────────────────────────────────────
+// â”€â”€ Posts endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const postsApi = {
   list: (params?: object) => api.get('/posts', { params }),
   create: (data: object) => api.post('/posts', data),
@@ -162,30 +162,46 @@ export const postsApi = {
   startEditing: (id: number) => api.post(`/posts/${id}/start-editing`),
   saveDraftEditing: (id: number, data: object = {}) => api.post(`/posts/${id}/save-draft-editing`, data),
   adminBypassApprove: (id: number, data: object = {}) => api.post(`/posts/${id}/admin-bypass-approve`, data),
-  downloadDirectImcPhotos: (id: number): Promise<any> => {
+  downloadDirectImcPhotos: async (id: number): Promise<any> => {
+    const res = await api.get(`/posts/${id}/download-photos`, {
+      responseType: 'blob',
+    });
+
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
-      const url = `${baseUrl}/posts/${id}/download-photos`;
+      // Check if response is actually a JSON error payload disguised as a blob
+      if (res.data && res.data.type === 'application/json') {
+        const text = await (res.data as Blob).text();
+        let message = 'Failed to download ZIP file.';
+        try {
+          const parsed = JSON.parse(text);
+          message = parsed.message || message;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const blob = new Blob([res.data], { type: 'application/zip' });
+      const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = blobUrl;
       a.download = `direct-imc-photos-${id}.zip`;
-      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      return Promise.resolve();
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+      return;
     }
-    return api.get(`/posts/${id}/download-photos`, { responseType: 'blob' });
+
+    return res;
   },
 };
 
 
-// ── Categories endpoints ───────────────────────────────────────────────────
+// â”€â”€ Categories endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const categoriesApi = {
   list: () => api.get('/categories'),
 };
 
-// ── Dashboard endpoints ────────────────────────────────────────────────────
+// â”€â”€ Dashboard endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const dashboardApi = {
   getInitData: () => api.get('/dashboard/init'),
   getStats: () => api.get('/dashboard/stats'),
@@ -193,7 +209,7 @@ export const dashboardApi = {
   getAnalyticsOverview: (params?: any) => api.get('/dashboard/analytics', { params }),
 };
 
-// ── Publishing endpoints ───────────────────────────────────────────────────
+// â”€â”€ Publishing endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const platformApi = {
   getAvailability: () => api.get('/platform-availability'),
 };
@@ -205,13 +221,13 @@ export const publishingApi = {
   cancel: (id: number) => api.post(`/publishing/${id}/cancel`),
 };
 
-// ── Policy Settings endpoints ──────────────────────────────────────────────
+// â”€â”€ Policy Settings endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const policyApi = {
   get: () => api.get('/policy-settings'),
   update: (data: object) => api.post('/policy-settings', data),
 };
 
-// ── Users endpoints ────────────────────────────────────────────────────────
+// â”€â”€ Users endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const usersApi = {
   list: () => api.get('/users'),
   create: (data: object) => api.post('/users', data),
@@ -221,10 +237,10 @@ export const usersApi = {
   downloadTemplate: (data?: object) => api.post('/users/template', data || {}, { responseType: 'blob' }),
 };
 
-// ── Departments endpoints ───────────────────────────────────────────────────
+// â”€â”€ Departments endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const departmentsApi = {
   list: () => api.get('/departments'),
-  // Bypass the 30s GET cache — used right after an add/delete so the UI shows
+  // Bypass the 30s GET cache â€” used right after an add/delete so the UI shows
   // the freshly persisted department list without needing a page reload.
   listFresh: () => api.get('/departments'),
   create: (data: { name: string; display_name: string; description?: string; role_categories?: string[] }) =>
@@ -242,7 +258,7 @@ export const departmentsApi = {
   removeLogo: (id: number) => api.delete(`/departments/${id}/logo`),
 };
 
-// ── Program Heads endpoints ─────────────────────────────────────────────────
+// â”€â”€ Program Heads endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export interface ProgramHeadData {
   id: number;
   department_id: number;
@@ -271,13 +287,13 @@ export const programHeadsApi = {
     api.delete(`/program-heads/${id}`),
 };
 
-// ── Chatbot endpoints ───────────────────────────────────────────────────────
+// â”€â”€ Chatbot endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const chatbotApi = {
   sendMessage: (messages: { role: string; content: string }[]) =>
     api.post('/chatbot/message', { messages }, { silent: true } as any),
 };
 
-// ── Roles management endpoints ──────────────────────────────────────────────
+// â”€â”€ Roles management endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const rolesApi = {
   list: () => api.get('/roles/list'),
   create: (data: { name: string; display_name: string; description?: string }) =>
@@ -285,12 +301,12 @@ export const rolesApi = {
   delete: (id: number | string) => api.delete(`/roles/list/${id}`),
 };
 
-// ── Audit Logs endpoints ────────────────────────────────────────────────────
+// â”€â”€ Audit Logs endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const auditLogsApi = {
   list: (params?: object) => api.get('/audit-logs', { params }),
 };
 
-// ── Token Settings endpoints ────────────────────────────────────────────────
+// â”€â”€ Token Settings endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let inFlightTokenSettingsPromise: Promise<any> | null = null;
 let inFlightAiSettingsPromise: Promise<any> | null = null;
 
@@ -315,7 +331,7 @@ export const tokenSettingsApi = {
   validate: (data: object) => api.post('/token-settings/validate', data),
 };
 
-// ── Email Settings endpoints ────────────────────────────────────────────────
+// â”€â”€ Email Settings endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const emailSettingsApi = {
   get: () => api.get('/email-settings'),
   update: (data: object) => api.post('/email-settings', data),
@@ -330,19 +346,19 @@ export const emailSettingsApi = {
     api.delete('/email-settings/logo', { params: { type } }),
 };
 
-// ── API Tokens endpoints (Developer API) ──────────────────────────────────
+// â”€â”€ API Tokens endpoints (Developer API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const apiTokensApi = {
   list: () => api.get('/api-tokens', { cache: false } as any),
   create: (name: string) => api.post('/api-tokens', { name }),
   revoke: (tokenId: number) => api.delete(`/api-tokens/${tokenId}`),
 };
 
-// ── Platform Availability endpoints ──────────────────────────────────────
+// â”€â”€ Platform Availability endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const platformAvailabilityApi = {
   get: () => api.get('/platform-availability'),
 };
 
-// ── Notifications endpoints ────────────────────────────────────────────────
+// â”€â”€ Notifications endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const notificationsApi = {
   getNotifications: () => api.get('/notifications'),
   markAsRead: (id: string) => api.post(`/notifications/${id}/read`),

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Image, Modal, Platform, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text,
   TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -294,6 +294,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
   const [websiteActiveIndex, setWebsiteActiveIndex] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryFeedback, setRetryFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isDownloadingPhotos, setIsDownloadingPhotos] = useState(false);
   const modalWidth = Math.min(820, Math.max(0, width - Spacing.xl));
   const columns = width >= 1080;
   const raw = request?.rawPost ?? request ?? {};
@@ -328,7 +329,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
     : rejected ? 'These changes were not approved for publication.'
       : revision ? 'These changes are awaiting your requested revisions.'
         : draft ? 'Saved changes are awaiting submission.'
-          : 'Updates in progress · Not yet approved for publication.';
+          : 'Updates in progress Â· Not yet approved for publication.';
   const noUpdatesDescription = draft ? 'Submit this draft to start IMC review.'
     : rejected ? 'No publication changes were approved for this request.'
       : revision ? 'IMC is waiting for the requested revisions.'
@@ -414,6 +415,18 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
       setRetryFeedback({ type: 'error', message: 'Retry failed: ' + (err.response?.data?.message || err.message || 'Unknown error') });
     } finally {
       setIsRetrying(false);
+    }
+  };
+
+  const handleDownloadPhotos = async () => {
+    if (isDownloadingPhotos) return;
+    setIsDownloadingPhotos(true);
+    try {
+      await postsApi.downloadDirectImcPhotos(Number(raw.id ?? request?.id));
+    } catch (err: any) {
+      Alert.alert('Download Failed', err?.message || 'Unable to download photos.');
+    } finally {
+      setIsDownloadingPhotos(false);
     }
   };
 
@@ -668,7 +681,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={labelStyle}>{draft ? 'Created on' : 'Submitted on'}</Text>
-                      <Text selectable style={[styles.bodyText, { color: palette.text }]}>{submittedAt || '—'}</Text>
+                      <Text selectable style={[styles.bodyText, { color: palette.text }]}>{submittedAt || 'â€”'}</Text>
                     </View>
                   </View>
 
@@ -777,7 +790,8 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                         <TouchableOpacity
                           accessibilityRole="button"
                           accessibilityLabel="Download all photos"
-                          onPress={() => postsApi.downloadDirectImcPhotos(Number(raw.id ?? request?.id))}
+                          disabled={isDownloadingPhotos}
+                          onPress={handleDownloadPhotos}
                           style={{
                             flexDirection: 'row',
                             alignItems: 'center',
@@ -787,10 +801,11 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                             backgroundColor: palette.purpleBadgeBg,
                             borderWidth: 1,
                             borderColor: palette.purple,
+                            opacity: isDownloadingPhotos ? 0.7 : 1,
                           }}
                         >
-                          <Ionicons name="download-outline" size={12} color={palette.purple} style={{ marginRight: 3 }} />
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: palette.purple }}>Download All</Text>
+                          <Ionicons name={isDownloadingPhotos ? "hourglass-outline" : "download-outline"} size={12} color={palette.purple} style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: palette.purple }}>{isDownloadingPhotos ? 'Downloading...' : 'Download All'}</Text>
                         </TouchableOpacity>
                       )}
                       <View style={[styles.tagBadge, { backgroundColor: palette.mutedSurface, borderColor: palette.border }]}>
@@ -854,7 +869,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                             Jose Maria College Foundation Inc.
                           </Text>
                           <Text style={[styles.metaText, { color: palette.muted }]}>
-                            Official Web Portal {captionChanged || photosChanged ? '• Final IMC Version' : '• Original Submission'}
+                            Official Web Portal {captionChanged || photosChanged ? 'â€¢ Final IMC Version' : 'â€¢ Original Submission'}
                           </Text>
                         </View>
                       </View>
@@ -938,7 +953,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                         <View style={styles.flexible}>
                           <Text style={[styles.smallText, { color: palette.text, fontWeight: FontWeight.bold }]}>Jose Maria College Foundation Inc.</Text>
                           <Text style={[styles.metaText, { color: palette.muted }]}>
-                            {platformNames[previewPlatform].label} preview {captionChanged || photosChanged ? '• Final IMC version' : '• Original submission'}
+                            {platformNames[previewPlatform].label} preview {captionChanged || photosChanged ? 'â€¢ Final IMC version' : 'â€¢ Original submission'}
                           </Text>
                         </View>
                       </View>
@@ -1027,7 +1042,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 140, flexShrink: 1 }}>
                           <Ionicons name={photosChanged ? 'images-outline' : 'image-outline'} size={15} color={photosChanged ? palette.success : palette.muted} />
                           <Text numberOfLines={1} style={[labelStyle, photosChanged && { color: palette.success }, { flexShrink: 1 }]}>
-                            {hasSnapshot ? photosChanged ? 'Photos replaced by IMC' : 'Photos as submitted' : 'Final photos'} · {finalPhotos.length} {finalPhotos.length === 1 ? 'photo' : 'photos'}
+                            {hasSnapshot ? photosChanged ? 'Photos replaced by IMC' : 'Photos as submitted' : 'Final photos'} Â· {finalPhotos.length} {finalPhotos.length === 1 ? 'photo' : 'photos'}
                           </Text>
                         </View>
                         {photosChanged && (
@@ -1098,7 +1113,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
               </Text>
               {lightbox && lightbox.photos.length > 1 && (
                 <Text style={[styles.metaText, { color: '#CBD5E1', marginTop: 2 }]}>
-                  Photo {lightbox.index + 1} of {lightbox.photos.length} · Use ← and → keys to browse
+                  Photo {lightbox.index + 1} of {lightbox.photos.length} Â· Use â† and â†’ keys to browse
                 </Text>
               )}
             </View>
