@@ -372,6 +372,14 @@ Route::get('/email-previews/{type?}', function (?string $type = 'reminder-dept-h
 })->name('email.previews');
 }
 
+Route::get('/robots.txt', function () {
+    $path = public_path('robots.txt');
+    if (file_exists($path)) {
+        return response(file_get_contents($path), 200, ['Content-Type' => 'text/plain']);
+    }
+    return response("User-agent: *\nAllow: /\nDisallow: /api/\n", 200, ['Content-Type' => 'text/plain']);
+});
+
 Route::get('/{any}', function () {
     $path = public_path('index.html');
     if (file_exists($path)) {
