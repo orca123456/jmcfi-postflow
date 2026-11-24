@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /login
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /approver/
+Disallow: /requestor/
+Disallow: /imc/
+
+Host: https://postflow.jmc.edu.ph

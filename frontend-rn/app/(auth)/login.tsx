@@ -256,6 +256,9 @@ export default function LoginScreen() {
               />
               <Text style={styles.headerTitle}>JMCFI PostFlow</Text>
               <Text style={styles.headerSubtitle}>Sign in to your account</Text>
+              <Text style={styles.headerPortalNotice}>
+                The official posting request system for Jose Maria College Foundation, Inc. Log in with your institutional credentials to submit, track, and manage content requests for the official JMCFI Facebook page, Instagram account, and website.
+              </Text>
             </View>
 
             <View style={styles.formContainer}>
@@ -409,6 +412,15 @@ const styles = StyleSheet.create({
     color: '#756980',
     marginTop: 4,
     textAlign: 'center',
+  },
+  headerPortalNotice: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#8A7B99',
+    marginTop: 8,
+    textAlign: 'center',
+    maxWidth: 380,
+    alignSelf: 'center',
   },
   formContainer: {
     width: '100%',
