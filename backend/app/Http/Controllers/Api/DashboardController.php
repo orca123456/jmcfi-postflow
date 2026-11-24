@@ -89,6 +89,7 @@ class DashboardController extends Controller
                 'media:id,post_request_id,type,original_name,file_path,mime_type,file_size,is_featured,sort_order',
                 'approvalWorkflows:id,post_request_id,stage,approver_id,action,remarks,acted_at,stage_order',
                 'approvalWorkflows.approver:id,first_name,middle_name,last_name,email',
+                'publishingRecords:id,post_request_id,platform,status,external_post_id,external_url,error_message,published_at',
             ])
             ->orderByDesc('updated_at')
             ->limit(15)
@@ -175,6 +176,7 @@ class DashboardController extends Controller
                 PostRequest::STATUS_SCHEDULED,
                 PostRequest::STATUS_PUBLISHING,
                 PostRequest::STATUS_PUBLISHED,
+                PostRequest::STATUS_PARTIALLY_PUBLISHED,
                 PostRequest::STATUS_PUBLISH_FAILED,
                 PostRequest::STATUS_REJECTED,
                 PostRequest::STATUS_RETURNED_FOR_REVISION,
@@ -414,7 +416,8 @@ class DashboardController extends Controller
                         PostRequest::STATUS_SCHEDULED,
                         PostRequest::STATUS_PUBLISHING,
                         PostRequest::STATUS_PUBLISHED,
-                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_PARTIALLY_PUBLISHED,
+                PostRequest::STATUS_PUBLISH_FAILED,
                         PostRequest::STATUS_REJECTED,
                         PostRequest::STATUS_RETURNED_FOR_REVISION,
                     ]);
@@ -526,7 +529,8 @@ class DashboardController extends Controller
                         PostRequest::STATUS_SCHEDULED,
                         PostRequest::STATUS_PUBLISHING,
                         PostRequest::STATUS_PUBLISHED,
-                        PostRequest::STATUS_PUBLISH_FAILED,
+                        PostRequest::STATUS_PARTIALLY_PUBLISHED,
+                PostRequest::STATUS_PUBLISH_FAILED,
                         PostRequest::STATUS_REJECTED,
                         PostRequest::STATUS_RETURNED_FOR_REVISION,
                     ]);
@@ -700,6 +704,7 @@ class DashboardController extends Controller
             $rejectedCount = (clone $baseQuery)->whereIn('status', [
                 PostRequest::STATUS_REJECTED,
                 PostRequest::STATUS_RETURNED_FOR_REVISION,
+                PostRequest::STATUS_PARTIALLY_PUBLISHED,
                 PostRequest::STATUS_PUBLISH_FAILED,
             ])->count();
             $compliancePct = $totalVolume > 0 ? round(($approvedCount / $totalVolume) * 100) : 0;

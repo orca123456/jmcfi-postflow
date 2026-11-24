@@ -23,18 +23,21 @@ class PublishingController extends Controller
     {
         $user = $request->user();
 
-        // 1. Validate that the user is the publisher (IT Admin)
-        if (!$user->hasAnyRole(['it_publisher', 'it_admin'])) {
+        // 1. Validate that the user is authorized (IT Admin/Publisher, or the post requestor retrying failed/partial publish)
+        $isPublisher = $user->hasAnyRole(['it_publisher', 'it_admin', 'admin']);
+        $isPostRequestor = ((int) $post->requestor_id === (int) $user->id) && in_array($post->status, [PostRequest::STATUS_PUBLISH_FAILED, PostRequest::STATUS_PARTIALLY_PUBLISHED], true);
+
+        if (!$isPublisher && !$isPostRequestor) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Only IT Admin can publish.'
             ], 403);
         }
 
-        $bypassApprovals = $request->boolean('bypass_approvals', false) || $request->input('bypass') == true;
+        $bypassApprovals = ($isPublisher && $request->boolean('bypass_approvals', false)) || ($isPublisher && $request->input('bypass') == true);
 
-        // 2. Validate that the post is ready to be published (must be approved or scheduled), unless Admin is bypassing approvals
-        if (!$bypassApprovals && !in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED, PostRequest::STATUS_PUBLISH_FAILED])) {
+        // 2. Validate that the post is ready to be published (must be approved, scheduled, failed, or partially published)
+        if (!$bypassApprovals && !in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED, PostRequest::STATUS_PUBLISH_FAILED, PostRequest::STATUS_PARTIALLY_PUBLISHED])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Post cannot be published. Current status is ' . $post->status
@@ -105,17 +108,34 @@ class PublishingController extends Controller
                 ->values();
 
             foreach ($publishPlatforms as $platform) {
+                // If platform already published, skip to prevent duplicates
                 if (PublishingRecord::where('post_request_id', $post->id)
                     ->where('platform', $platform)->where('status', 'published')->exists()) {
                     continue;
                 }
-                PublishingRecord::create([
-                    'post_request_id' => $post->id,
-                    'published_by' => $user->id,
-                    'platform' => $platform,
-                    'status' => 'publishing',
-                    'scheduled_at' => now(),
-                ]);
+
+                $record = PublishingRecord::where('post_request_id', $post->id)
+                    ->where('platform', $platform)
+                    ->where('status', '!=', 'published')
+                    ->latest('id')
+                    ->first();
+
+                if ($record) {
+                    $record->update([
+                        'published_by' => $user->id,
+                        'status' => 'publishing',
+                        'scheduled_at' => now(),
+                        'error_message' => null,
+                    ]);
+                } else {
+                    PublishingRecord::create([
+                        'post_request_id' => $post->id,
+                        'published_by' => $user->id,
+                        'platform' => $platform,
+                        'status' => 'publishing',
+                        'scheduled_at' => now(),
+                    ]);
+                }
             }
 
             \App\Services\AuditLogService::log(

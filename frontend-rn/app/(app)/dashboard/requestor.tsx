@@ -25,7 +25,7 @@ import { usePolicyStore } from '../../../store/policy';
 import { FormattedText } from '../../../components/ui/FormattedText';
 import { Toast } from '../../../components/ui/Toast';
 import { PolicyRulesView } from '../../../components/ui/PolicyRulesView';
-import { postsApi, authApi, dashboardApi, categoriesApi, platformApi, resolveImageUrl } from '../../../services/api';
+import { postsApi, authApi, dashboardApi, categoriesApi, platformApi, resolveImageUrl, publishingApi } from '../../../services/api';
 import { useQuery } from '@tanstack/react-query';
 import { PaginationControl } from '../../../components/ui/PaginationControl';
 import { signalPostflowReady } from '../../../utils/postflowReady';
@@ -46,6 +46,7 @@ export default function RequestorDashboard() {
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
   const greetingUserName = user?.name || user?.full_name || (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 'Requestor';
+  const [isRetryingPublish, setIsRetryingPublish] = useState(false);
   const isDarkMode = useThemeStore((s) => s.isDarkMode);
 
   const { policySections, effectiveDate, lastUpdatedDate, fetchPolicy } = usePolicyStore();
@@ -453,17 +454,17 @@ export default function RequestorDashboard() {
         const isReviewing = isDirect && imcAction === 'reviewing' && !['approved', 'scheduled', 'published', 'rejected', 'returned_for_revision'].includes(p.status);
 
         const calculatedStatus = isEditing ? 'EDITING' : (isReviewing ? 'REVIEWING' : (p.status_label ? p.status_label.toUpperCase() : (p.status ? p.status.toUpperCase() : 'UNKNOWN')));
-        const calculatedStatusLabel = isEditing ? 'Editing' : (isReviewing ? 'Reviewing' : (p.status_label || p.status));
-        const calculatedStatusColor = isEditing ? '#6D28D9' : (isReviewing ? '#0284C7' : (p.status === 'published' || p.status === 'approved'
+        const calculatedStatusLabel = isEditing ? 'Editing' : (isReviewing ? 'Reviewing' : (p.status === 'partially_published' ? 'Partially Published' : (p.status_label || p.status)));
+        const calculatedStatusColor = isEditing ? '#6D28D9' : (isReviewing ? '#0284C7' : (p.status === 'partially_published' ? '#D97706' : (p.status === 'published' || p.status === 'approved'
           ? '#15803D'
           : (p.status === 'scheduled'
             ? '#6D28D9'
-            : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309'))));
-        const calculatedStatusBg = isEditing ? '#F3E8FF' : (isReviewing ? '#E0F2FE' : (p.status === 'published' || p.status === 'approved'
+            : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#B91C1C' : '#B45309')))));
+        const calculatedStatusBg = isEditing ? '#F3E8FF' : (isReviewing ? '#E0F2FE' : (p.status === 'partially_published' ? '#FEF3C7' : (p.status === 'published' || p.status === 'approved'
           ? '#DCFCE7'
           : (p.status === 'scheduled'
             ? '#EDE9FE'
-            : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7'))));
+            : (p.status === 'rejected' || p.status === 'returned_for_revision' ? '#FEE2E2' : '#FEF3C7')))));
 
         return {
           status: calculatedStatus,
@@ -2873,14 +2874,16 @@ export default function RequestorDashboard() {
                       const isPublished = selectedQueuePost.rawStatus === 'published';
 
                       const getIcon = (state: string) => {
-                        if (state === 'Rejected') return { name: 'close-circle', color: '#DC2626' };
+                        if (state === 'Rejected' || state === 'Failed') return { name: 'close-circle', color: '#DC2626' };
+                        if (state === 'Partial') return { name: 'alert-circle', color: '#D97706' };
                         if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return { name: 'checkmark-circle', color: '#059669' };
                         if (state === 'Editing') return { name: 'brush', color: '#7C3AED' };
                         if (state === 'Reviewing') return { name: 'eye', color: '#0284C7' };
                         return { name: 'time', color: Colors.textMuted };
                       };
                       const getColor = (state: string) => {
-                        if (state === 'Rejected') return '#DC2626';
+                        if (state === 'Rejected' || state === 'Failed') return '#DC2626';
+                        if (state === 'Partial') return '#D97706';
                         if (state === 'Approved' || state === 'Published' || state === 'Scheduled') return '#059669';
                         if (state === 'Editing') return '#7C3AED';
                         if (state === 'Reviewing') return '#0284C7';
@@ -2909,6 +2912,8 @@ export default function RequestorDashboard() {
 
                         let publishState = 'Waiting';
                         if (isPublished) publishState = 'Published';
+                        else if (selectedQueuePost.rawStatus === 'partially_published') publishState = 'Partial';
+                        else if (selectedQueuePost.rawStatus === 'publish_failed') publishState = 'Failed';
                         else if (isScheduled) publishState = 'Scheduled';
                         else if (imcState === 'Approved') publishState = 'Pending';
 
@@ -2959,6 +2964,8 @@ export default function RequestorDashboard() {
 
                       let publishState = 'Waiting';
                       if (isPublished) publishState = 'Published';
+                      else if (selectedQueuePost.rawStatus === 'partially_published') publishState = 'Partial';
+                      else if (selectedQueuePost.rawStatus === 'publish_failed') publishState = 'Failed';
                       else if (isScheduled) publishState = 'Scheduled';
                       else if (imc === 'Approved') publishState = 'Pending';
 
@@ -3278,6 +3285,30 @@ export default function RequestorDashboard() {
 
               {/* Modal Footer Actions */}
               <View style={styles.modalFooterRow}>
+                {['publish_failed', 'partially_published'].includes(selectedQueuePost.rawStatus) && (
+                  <TouchableOpacity
+                    style={[styles.btnModalClose, { backgroundColor: selectedQueuePost.rawStatus === 'partially_published' ? '#D97706' : '#DC2626', borderColor: 'transparent', marginRight: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
+                    disabled={isRetryingPublish}
+                    onPress={async () => {
+                      setIsRetryingPublish(true);
+                      try {
+                        await publishingApi.publish(Number(selectedQueuePost.id));
+                        showToast('Publishing retry queued! Processing in background.', 'success');
+                        setSelectedQueuePost(null);
+                        await refetchPosts();
+                      } catch (err: any) {
+                        showToast('Retry failed: ' + (err.response?.data?.message || err.message), 'error');
+                      } finally {
+                        setIsRetryingPublish(false);
+                      }
+                    }}
+                  >
+                    <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={[styles.btnModalCloseText, { color: '#FFFFFF' }]}>
+                      {isRetryingPublish ? 'Retrying...' : 'Retry Publishing'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={styles.btnModalClose}
                   onPress={() => {

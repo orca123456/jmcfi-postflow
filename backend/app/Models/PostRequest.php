@@ -26,6 +26,7 @@ class PostRequest extends Model
     public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_PUBLISHING = 'publishing';
     public const STATUS_PUBLISHED = 'published';
+    public const STATUS_PARTIALLY_PUBLISHED = 'partially_published';
     public const STATUS_PUBLISH_FAILED = 'publish_failed';
     public const STATUS_ARCHIVED = 'archived';
 
@@ -225,7 +226,7 @@ class PostRequest extends Model
     {
         if ($this->routing_type !== self::ROUTING_DIRECT_IMC
             || (!$force && $this->submitted_materials !== null)
-            || (!$force && in_array($this->status, [self::STATUS_PUBLISHED, self::STATUS_SCHEDULED, self::STATUS_REJECTED], true))
+            || (!$force && in_array($this->status, [self::STATUS_PUBLISHED, self::STATUS_PARTIALLY_PUBLISHED, self::STATUS_SCHEDULED, self::STATUS_REJECTED], true))
             || !Schema::hasColumn($this->getTable(), 'submitted_materials')) {
             return;
         }

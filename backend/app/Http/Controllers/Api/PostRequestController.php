@@ -1217,6 +1217,7 @@ class PostRequestController extends Controller
                     PostRequest::STATUS_SCHEDULED,
                     PostRequest::STATUS_PUBLISHING,
                     PostRequest::STATUS_PUBLISHED,
+                    PostRequest::STATUS_PARTIALLY_PUBLISHED,
                     PostRequest::STATUS_PUBLISH_FAILED,
                     PostRequest::STATUS_REJECTED,
                     PostRequest::STATUS_RETURNED_FOR_REVISION,

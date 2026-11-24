@@ -6,6 +6,7 @@ use App\Models\PostRequest;
 use App\Models\PublishingRecord;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Notifications\PostPublishedRequestorNotification;
 use App\Services\FacebookPublishingService;
 use App\Services\InstagramPublishingService;
 use App\Services\WordPressPublishingService;
@@ -44,6 +45,15 @@ final class MultiMediaPublishingTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('post_categories', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->default('Announcement');
+            $table->string('slug')->default('announcement');
+            $table->string('color')->nullable();
+            $table->string('icon')->nullable();
+            $table->timestamps();
+        });
+
         foreach ([
             'facebook_page_id' => '123456789',
             'facebook_access_token' => 'fb-valid-token',
@@ -62,6 +72,7 @@ final class MultiMediaPublishingTest extends TestCase
             $table->text('caption_narrative');
             $table->string('status');
             $table->text('target_platforms');
+            $table->integer('requestor_id')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
         });
@@ -84,13 +95,18 @@ final class MultiMediaPublishingTest extends TestCase
             foreach (['platform', 'status', 'external_post_id', 'external_url', 'error_message', 'platform_response'] as $field) {
                 $table->text($field)->nullable();
             }
+            $table->timestamp('scheduled_at')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
         });
 
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->string('first_name')->nullable();
+            $table->string('last_name')->nullable();
+            $table->string('email')->nullable();
             $table->string('status');
+            $table->timestamps();
         });
         Schema::create('roles', function (Blueprint $table) {
             $table->id();
@@ -101,9 +117,12 @@ final class MultiMediaPublishingTest extends TestCase
             $table->integer('model_id');
             $table->string('model_type');
         });
-        DB::table('users')->insert(['id' => 1, 'status' => 'active']);
+        DB::table('users')->insert(['id' => 1, 'first_name' => 'IT', 'last_name' => 'Admin', 'email' => 'admin@jmc.edu.ph', 'status' => 'active']);
+        DB::table('users')->insert(['id' => 2, 'first_name' => 'Den', 'last_name' => 'Requestor', 'email' => 'den@jmc.edu.ph', 'status' => 'active']);
         DB::table('roles')->insert(['id' => 1, 'name' => 'it_admin']);
+        DB::table('roles')->insert(['id' => 2, 'name' => 'requestor']);
         DB::table('model_has_roles')->insert(['role_id' => 1, 'model_id' => 1, 'model_type' => User::class]);
+        DB::table('model_has_roles')->insert(['role_id' => 2, 'model_id' => 2, 'model_type' => User::class]);
 
         Auth::shouldReceive('user')->andReturn(null);
         Log::spy();
@@ -247,5 +266,106 @@ final class MultiMediaPublishingTest extends TestCase
             return $request['featured_media'] === 11
                 && str_contains($request['content'], 'https://example.org/pic2.jpg');
         });
+    }
+
+    public function testPartialPublishingAndIntelligentRetryWithoutDuplicates(): void
+    {
+        // 1. Setup a post with 3 platforms: facebook, instagram, website
+        $post = PostRequest::create([
+            'title' => 'Important College Announcement',
+            'caption_narrative' => 'Please join us for commencement exercises.',
+            'status' => 'approved',
+            'target_platforms' => ['facebook', 'instagram', 'website'],
+            'requestor_id' => 2,
+        ]);
+
+        // WordPress credentials are deleted so Website fails configuration check
+        SystemSetting::where('key', 'wordpress_app_password')->delete();
+
+        $fbService = Mockery::mock(FacebookPublishingService::class);
+        $fbService->shouldReceive('publishPost')->once()->andReturn(['id' => 'fb_post_100']);
+
+        $igService = Mockery::mock(InstagramPublishingService::class);
+        $igService->shouldReceive('publishPost')->once()->andReturn(['id' => 'ig_post_200']);
+
+        $wpService = new WordPressPublishingService(); // Not configured!
+
+        // Run the publish job (First run: FB and IG succeed, Website fails)
+        try {
+            (new AutoPublishJob($post, 1))->handle($fbService, $igService, $wpService);
+        } catch (\Exception $e) {
+            // Expected in unit test mode
+        }
+
+        $freshPost = $post->fresh();
+
+        // Check 1: Post status is partially_published (NOT publish_failed!)
+        self::assertSame('partially_published', $freshPost->status);
+
+        // Check 2: Facebook and Instagram records are marked 'published' with their IDs
+        $fbRecord = PublishingRecord::where('post_request_id', $post->id)->where('platform', 'facebook')->first();
+        self::assertNotNull($fbRecord);
+        self::assertSame('published', $fbRecord->status);
+        self::assertSame('fb_post_100', $fbRecord->external_post_id);
+
+        $igRecord = PublishingRecord::where('post_request_id', $post->id)->where('platform', 'instagram')->first();
+        self::assertNotNull($igRecord);
+        self::assertSame('published', $igRecord->status);
+        self::assertSame('ig_post_200', $igRecord->external_post_id);
+
+        // Check 3: Website record is marked 'failed'
+        $wpRecord = PublishingRecord::where('post_request_id', $post->id)->where('platform', 'wordpress')->first();
+        self::assertNotNull($wpRecord);
+        self::assertSame('failed', $wpRecord->status);
+
+        // Check 4: Requestor notification sent with both successes and failures
+        Notification::assertSentTo(
+            User::find(2),
+            PostPublishedRequestorNotification::class,
+            function ($notification) {
+                return isset($notification->publishResults['facebook'])
+                    && isset($notification->publishResults['instagram'])
+                    && isset($notification->publishErrors['wordpress']);
+            }
+        );
+
+        // -------------------------------------------------------------
+        // SECOND RUN (RETRY):
+        // Now configure WordPress credentials and retry publishing.
+        // FB and IG MUST BE SKIPPED (no second calls / no duplicates)!
+        // -------------------------------------------------------------
+        SystemSetting::create(['key' => 'wordpress_app_password', 'value' => 'configured-pass']);
+
+        // Mocks for FB and IG should receive NO calls!
+        $fbRetryService = Mockery::mock(FacebookPublishingService::class);
+        $fbRetryService->shouldReceive('publishPost')->never();
+
+        $igRetryService = Mockery::mock(InstagramPublishingService::class);
+        $igRetryService->shouldReceive('publishPost')->never();
+
+        Http::fake([
+            '*check existing articles*' => Http::response([]),
+            '*rest_route=/wp/v2/posts*' => Http::sequence()
+                ->push([], 200) // slug check
+                ->push(['id' => 999, 'status' => 'publish', 'link' => 'https://example.org/article-999'], 201),
+        ]);
+
+        (new AutoPublishJob($freshPost, 1))->handle($fbRetryService, $igRetryService, new WordPressPublishingService());
+
+        $finalPost = $freshPost->fresh();
+
+        // Check 5: Status transitioned to 'published'
+        self::assertSame('published', $finalPost->status);
+
+        // Check 6: Website record is now published!
+        $wpFinalRecord = PublishingRecord::where('post_request_id', $post->id)->where('platform', 'wordpress')->first();
+        self::assertSame('published', $wpFinalRecord->status);
+        self::assertSame('999', $wpFinalRecord->external_post_id);
+
+        // Check 7: Original FB and IG records remain intact with 1 record each (NO duplicates)
+        self::assertSame(1, PublishingRecord::where('post_request_id', $post->id)->where('platform', 'facebook')->count());
+        self::assertSame(1, PublishingRecord::where('post_request_id', $post->id)->where('platform', 'instagram')->count());
+        self::assertSame('fb_post_100', PublishingRecord::where('post_request_id', $post->id)->where('platform', 'facebook')->value('external_post_id'));
+        self::assertSame('ig_post_200', PublishingRecord::where('post_request_id', $post->id)->where('platform', 'instagram')->value('external_post_id'));
     }
 }

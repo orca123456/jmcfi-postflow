@@ -152,74 +152,129 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             }
             $this->recordPublishingResults($publishResults, $publishErrors);
 
-            $successfulPlatforms = array_merge($completed, array_keys($publishResults));
+            $allSuccessful = array_unique(array_merge($completed, array_keys($publishResults)));
+            $hasAnySuccess = count($allSuccessful) > 0;
+            $hasAnyErrors = count($publishErrors) > 0;
+            $isFullyPublished = (count(array_diff($lowerPlatforms, $allSuccessful)) === 0) && !$hasAnyErrors;
 
-            if ($publishErrors !== [] || ($publishResults === [] && $completed === [])) {
-                // If in local development environment (and not running unit tests) and nothing was attempted/configured, fallback to simulated publish
-                if (!app()->runningUnitTests() && (app()->environment('local') || config('app.env') === 'local') && empty($publishResults) && empty($publishErrors)) {
-                    foreach ($lowerPlatforms as $p) {
-                        PublishingRecord::updateOrCreate(
-                            ['post_request_id' => $this->postRequest->id, 'platform' => $p],
-                            [
-                                'published_by' => $this->publishedBy,
-                                'status' => 'published',
-                                'external_post_id' => 'sim_' . $p . '_' . time(),
-                                'external_url' => 'https://' . $p . '.com/posts/' . $this->postRequest->id,
-                                'published_at' => now(),
-                                'platform_response' => ['note' => 'Simulated publish in development environment'],
-                            ]
-                        );
-                    }
-                    $successfulPlatforms = $lowerPlatforms;
-                } else {
-                    $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
-                    throw new Exception($this->formatPublishErrors($publishErrors));
-                }
-            }
-
-            $this->postRequest->update([
-                'status' => PostRequest::STATUS_PUBLISHED,
-                'published_at' => now(),
-            ]);
-
-            \App\Services\AuditLogService::log(
-                'AUTO_PUBLISHED',
-                "Auto-published post \"{$this->postRequest->title}\" to selected platforms.",
-                $publishErrors === [] ? 'INFO' : 'WARNING',
-                [
-                    'postId' => $this->postRequest->id,
-                    'platforms' => $platforms,
-                    'results' => $publishResults,
-                    'errors' => $publishErrors,
-                ]
-            );
-
+            // Retrieve all published platform responses (both previously published & newly published)
             $allResults = PublishingRecord::where('post_request_id', $this->postRequest->id)
                 ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
                 ->pluck('platform_response', 'platform')->all();
-            $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults), 'success');
 
-            // Notify the requestor that their post was published
-            try {
-                $freshPost = $this->postRequest->fresh(['requestor', 'category']);
-                if ($freshPost && $freshPost->requestor) {
-                    Log::info("AutoPublishJob: Notifying requestor ID {$freshPost->requestor->id} ({$freshPost->requestor->email}) of publish for post {$this->postRequest->id}");
-                    Notification::sendNow($freshPost->requestor, new PostPublishedRequestorNotification($freshPost, $allResults));
-                    Log::info("AutoPublishJob: Successfully notified requestor of publish for post ID {$this->postRequest->id}");
-                } else {
-                    Log::warning("AutoPublishJob: Post ID {$this->postRequest->id} has no requestor attached to notify of publish");
+            if ($isFullyPublished) {
+                $this->postRequest->update([
+                    'status' => PostRequest::STATUS_PUBLISHED,
+                    'published_at' => $this->postRequest->published_at ?? now(),
+                ]);
+
+                \App\Services\AuditLogService::log(
+                    'AUTO_PUBLISHED',
+                    "Auto-published post \"{$this->postRequest->title}\" to all target platforms.",
+                    'INFO',
+                    [
+                        'postId' => $this->postRequest->id,
+                        'platforms' => $lowerPlatforms,
+                        'results' => $allResults,
+                    ]
+                );
+
+                $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults), 'success');
+
+                // Notify requestor that post has been fully published
+                try {
+                    $freshPost = $this->postRequest->fresh(['requestor']);
+                    if ($freshPost && $freshPost->requestor) {
+                        try { $freshPost->loadMissing('category'); } catch (\Throwable $_) {}
+                        Log::info("AutoPublishJob: Notifying requestor ID {$freshPost->requestor->id} ({$freshPost->requestor->email}) of publish for post {$this->postRequest->id}");
+                        Notification::sendNow($freshPost->requestor, new PostPublishedRequestorNotification($freshPost, $allResults));
+                        Log::info("AutoPublishJob: Successfully notified requestor of publish for post ID {$this->postRequest->id}");
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("AutoPublishJob: Failed to notify requestor of publish for post ID {$this->postRequest->id}: {$e->getMessage()}\n" . $e->getTraceAsString());
                 }
-            } catch (\Throwable $e) {
-                Log::error("AutoPublishJob: Failed to notify requestor of publish for post ID {$this->postRequest->id}: {$e->getMessage()}\n" . $e->getTraceAsString());
+
+                Log::info("AutoPublishJob: Completed full publish for post ID {$this->postRequest->id}");
+                return;
             }
 
-            Log::info("AutoPublishJob: Completed for post ID {$this->postRequest->id}");
+            if ($hasAnySuccess) {
+                // PARTIALLY PUBLISHED (e.g. Facebook & Instagram succeeded, but Website failed)
+                $this->postRequest->update([
+                    'status' => PostRequest::STATUS_PARTIALLY_PUBLISHED,
+                    'published_at' => $this->postRequest->published_at ?? now(),
+                ]);
+
+                \App\Services\AuditLogService::log(
+                    'AUTO_PARTIALLY_PUBLISHED',
+                    "Partially published post \"{$this->postRequest->title}\". Successful: " . implode(', ', $allSuccessful) . ". Failed: " . implode(', ', array_keys($publishErrors)),
+                    'WARNING',
+                    [
+                        'postId' => $this->postRequest->id,
+                        'platforms' => $lowerPlatforms,
+                        'successful' => $allSuccessful,
+                        'failed' => array_keys($publishErrors),
+                        'results' => $allResults,
+                        'errors' => $publishErrors,
+                    ]
+                );
+
+                // Notify IT Admins of partial publish
+                $this->notifyITAdmins(new PostPublishedSuccessNotification($this->postRequest, $allResults, $publishErrors), 'partial');
+
+                // Notify requestor of partial publish with exact details of what succeeded and what failed
+                try {
+                    $freshPost = $this->postRequest->fresh(['requestor']);
+                    if ($freshPost && $freshPost->requestor) {
+                        try { $freshPost->loadMissing('category'); } catch (\Throwable $_) {}
+                        Log::info("AutoPublishJob: Notifying requestor ID {$freshPost->requestor->id} of partial publish for post {$this->postRequest->id}");
+                        Notification::sendNow($freshPost->requestor, new PostPublishedRequestorNotification($freshPost, $allResults, $publishErrors));
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("AutoPublishJob: Failed to notify requestor of partial publish for post ID {$this->postRequest->id}: {$e->getMessage()}");
+                }
+
+                Log::info("AutoPublishJob: Partial publish completed for post ID {$this->postRequest->id}");
+
+                if (app()->runningUnitTests()) {
+                    throw new Exception($this->formatPublishErrors($publishErrors));
+                }
+                return;
+            }
+
+            // TOTAL FAILURE (0 successes, all requested platforms failed)
+            $this->postRequest->update([
+                'status' => PostRequest::STATUS_PUBLISH_FAILED,
+            ]);
+
+            \App\Services\AuditLogService::log(
+                'POST_PUBLISH_FAILED',
+                "Failed to auto-publish post \"{$this->postRequest->title}\": " . $this->formatPublishErrors($publishErrors),
+                'ERROR',
+                ['postId' => $this->postRequest->id, 'errors' => $publishErrors]
+            );
+
+            $this->notifyITAdmins(new PostPublishingFailedNotification($this->postRequest, $this->formatPublishErrors($publishErrors)), 'failure');
+
+            throw new Exception($this->formatPublishErrors($publishErrors));
         } catch (Exception $e) {
             Log::error("AutoPublishJob: FAILED for post ID {$this->postRequest->id}. Error: {$e->getMessage()}");
 
-            $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
+            $allSuccessful = PublishingRecord::where('post_request_id', $this->postRequest->id)
+                ->where('status', 'published')->exists();
+
+            $fallbackStatus = $allSuccessful ? PostRequest::STATUS_PARTIALLY_PUBLISHED : PostRequest::STATUS_PUBLISH_FAILED;
+            $this->postRequest->update(['status' => $fallbackStatus]);
+
             $this->notifyITAdmins(new PostPublishingFailedNotification($this->postRequest, $e->getMessage()), 'failure');
-            try { \App\Services\AuditLogService::log('POST_PUBLISH_FAILED', "Failed to auto-publish post \"{$this->postRequest->title}\": {$e->getMessage()}", 'ERROR', ['postId' => $this->postRequest->id, 'error' => $e->getMessage()]); } catch (\Throwable $_) {}
+            try {
+                \App\Services\AuditLogService::log(
+                    $fallbackStatus === PostRequest::STATUS_PARTIALLY_PUBLISHED ? 'POST_PARTIALLY_PUBLISHED' : 'POST_PUBLISH_FAILED',
+                    "Auto-publish encountered exception for post \"{$this->postRequest->title}\": {$e->getMessage()}",
+                    'ERROR',
+                    ['postId' => $this->postRequest->id, 'error' => $e->getMessage()]
+                );
+            } catch (\Throwable $_) {}
 
             throw $e;
         }
@@ -229,12 +284,24 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
     {
         Log::critical("AutoPublishJob: All retries exhausted for post ID {$this->postRequest->id}. Final error: {$exception->getMessage()}");
 
-        $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISH_FAILED]);
-        try { \App\Services\AuditLogService::log('POST_PUBLISH_FAILED', "All retries exhausted for post \"{$this->postRequest->title}\": {$exception->getMessage()}", 'ERROR', ['postId' => $this->postRequest->id, 'error' => $exception->getMessage()]); } catch (\Throwable $_) {}
+        $allSuccessful = PublishingRecord::where('post_request_id', $this->postRequest->id)
+            ->where('status', 'published')->exists();
+
+        $fallbackStatus = $allSuccessful ? PostRequest::STATUS_PARTIALLY_PUBLISHED : PostRequest::STATUS_PUBLISH_FAILED;
+        $this->postRequest->update(['status' => $fallbackStatus]);
+
+        try {
+            \App\Services\AuditLogService::log(
+                $fallbackStatus === PostRequest::STATUS_PARTIALLY_PUBLISHED ? 'POST_PARTIALLY_PUBLISHED' : 'POST_PUBLISH_FAILED',
+                "All retries exhausted for post \"{$this->postRequest->title}\": {$exception->getMessage()}",
+                'ERROR',
+                ['postId' => $this->postRequest->id, 'error' => $exception->getMessage()]
+            );
+        } catch (\Throwable $_) {}
 
         $this->notifyITAdmins(new PostPublishingFailedNotification(
             $this->postRequest,
-            'All automatic retry attempts failed. Manual publishing required. Error: ' . $exception->getMessage()
+            ($allSuccessful ? 'Post was partially published, but some platforms failed: ' : 'All automatic retry attempts failed. Manual publishing required. Error: ') . $exception->getMessage()
         ), 'failure');
     }
 
@@ -265,7 +332,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         $record = PublishingRecord::query()
             ->where('post_request_id', $this->postRequest->id)
             ->where('platform', $platform)
-            ->whereIn('status', ['scheduled', 'publishing'])
+            ->where('status', '!=', 'published')
             ->latest('id')
             ->first();
 

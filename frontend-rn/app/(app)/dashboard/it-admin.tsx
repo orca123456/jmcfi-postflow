@@ -479,7 +479,7 @@ export default function ITAdminDashboard() {
     alert(`IT Action: "${type}" executed for post:\n"${title}"`);
   };
 
-  const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled' || status === 'publish_failed';
+  const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled' || status === 'publish_failed' || status === 'partially_published';
   const isPublishedLikeStatus = (status?: string) => status === 'published' || status === 'approved';
   const isFailedLikeStatus = (status?: string) => status === 'rejected' || status === 'returned_for_revision' || status === 'publish_failed';
   const isProcessingLikeStatus = (status?: string) => status === 'publishing' || status === 'scheduled';
@@ -3268,7 +3268,7 @@ export default function ITAdminDashboard() {
                                 minWidth: canPublishStatus(post.rawStatus) ? 88 : 32,
                                 height: 32,
                                 borderRadius: 16,
-                                backgroundColor: canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#FEE2E2' : '#DCFCE7') : '#f3f4f6',
+                                backgroundColor: canPublishStatus(post.rawStatus) ? (['publish_failed', 'partially_published'].includes(post.rawStatus) ? (post.rawStatus === 'partially_published' ? '#FEF3C7' : '#FEE2E2') : '#DCFCE7') : '#f3f4f6',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 flexDirection: 'row',
@@ -3278,13 +3278,13 @@ export default function ITAdminDashboard() {
                               }}
                             >
                               <Ionicons 
-                                name={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? 'refresh-outline' : 'send-outline') : 'chevron-forward'} 
+                                name={canPublishStatus(post.rawStatus) ? (['publish_failed', 'partially_published'].includes(post.rawStatus) ? 'refresh-outline' : 'send-outline') : 'chevron-forward'} 
                                 size={16} 
-                                color={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D') : '#6b7280'} 
+                                color={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'partially_published' ? '#D97706' : (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D')) : '#6b7280'} 
                               />
                               {canPublishStatus(post.rawStatus) && (
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D' }}>
-                                  {publishingPostId === post.id ? 'Publishing' : (post.rawStatus === 'publish_failed' ? 'Retry' : 'Publish')}
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: post.rawStatus === 'partially_published' ? '#D97706' : (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D') }}>
+                                  {publishingPostId === post.id ? 'Publishing' : (['publish_failed', 'partially_published'].includes(post.rawStatus) ? 'Retry' : 'Publish')}
                                 </Text>
                               )}
                             </TouchableOpacity>
@@ -3309,7 +3309,7 @@ export default function ITAdminDashboard() {
                                 width: canPublishStatus(post.rawStatus) ? 74 : 32,
                                 height: 32,
                                 borderRadius: 16,
-                                backgroundColor: canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#FEE2E2' : '#DCFCE7') : '#f3f4f6',
+                                backgroundColor: canPublishStatus(post.rawStatus) ? (['publish_failed', 'partially_published'].includes(post.rawStatus) ? (post.rawStatus === 'partially_published' ? '#FEF3C7' : '#FEE2E2') : '#DCFCE7') : '#f3f4f6',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 flexDirection: 'row',
@@ -3318,13 +3318,13 @@ export default function ITAdminDashboard() {
                               }}
                             >
                               <Ionicons 
-                                name={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? 'refresh-outline' : 'send-outline') : 'chevron-forward'} 
+                                name={canPublishStatus(post.rawStatus) ? (['publish_failed', 'partially_published'].includes(post.rawStatus) ? 'refresh-outline' : 'send-outline') : 'chevron-forward'} 
                                 size={16} 
-                                color={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D') : '#6b7280'} 
+                                color={canPublishStatus(post.rawStatus) ? (post.rawStatus === 'partially_published' ? '#D97706' : (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D')) : '#6b7280'} 
                               />
                               {canPublishStatus(post.rawStatus) && (
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D' }}>
-                                  {publishingPostId === post.id ? '...' : (post.rawStatus === 'publish_failed' ? 'Retry' : 'Publish')}
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: post.rawStatus === 'partially_published' ? '#D97706' : (post.rawStatus === 'publish_failed' ? '#DC2626' : '#15803D') }}>
+                                  {publishingPostId === post.id ? '...' : (['publish_failed', 'partially_published'].includes(post.rawStatus) ? 'Retry' : 'Publish')}
                                 </Text>
                               )}
                             </TouchableOpacity>
@@ -10132,16 +10132,16 @@ $response = curl_exec($ch);`}
                     paddingHorizontal: 18,
                     paddingVertical: 9,
                     borderRadius: 8,
-                    backgroundColor: '#16A34A',
+                    backgroundColor: ['publish_failed', 'partially_published'].includes(previewPost?.rawStatus) ? (previewPost?.rawStatus === 'partially_published' ? '#D97706' : '#DC2626') : '#16A34A',
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 8,
                     opacity: publishingPostId === previewPost?.id ? 0.6 : 1,
                   }}
                 >
-                  <Ionicons name="send-outline" size={15} color="#FFFFFF" />
+                  <Ionicons name={['publish_failed', 'partially_published'].includes(previewPost?.rawStatus) ? "refresh-outline" : "send-outline"} size={15} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                    {publishingPostId === previewPost?.id ? 'Publishing...' : 'Publish'}
+                    {publishingPostId === previewPost?.id ? 'Publishing...' : (['publish_failed', 'partially_published'].includes(previewPost?.rawStatus) ? 'Retry' : 'Publish')}
                   </Text>
                 </TouchableOpacity>
               )}

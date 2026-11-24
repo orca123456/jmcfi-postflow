@@ -15,7 +15,8 @@ class PostPublishedRequestorNotification extends Notification
 
     public function __construct(
         public PostRequest $postRequest,
-        public array $publishResults = []
+        public array $publishResults = [],
+        public array $publishErrors = []
     ) {}
 
     public function via(object $notifiable): array
@@ -26,32 +27,51 @@ class PostPublishedRequestorNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         try {
+            $isPartial = !empty($this->publishErrors) || $this->postRequest->status === PostRequest::STATUS_PARTIALLY_PUBLISHED;
+
             $rawPlatforms = $this->postRequest->target_platforms ?? ['facebook', 'instagram'];
             if (is_string($rawPlatforms)) {
                 $rawPlatforms = json_decode($rawPlatforms, true) ?: [$rawPlatforms];
             }
-            $targetPlatformsFormatted = !empty($rawPlatforms)
-                ? implode(', ', array_map(fn($p) => ucfirst(strtolower((string)$p)), (array)$rawPlatforms))
-                : 'Facebook, Instagram';
+
+            $successfulKeys = array_keys($this->publishResults);
+            $failedKeys = array_keys($this->publishErrors);
+
+            $successfulFormatted = !empty($successfulKeys)
+                ? implode(', ', array_map(fn($p) => ucfirst(strtolower((string)$p)), $successfulKeys))
+                : '';
 
             $categoryName = $this->postRequest->category?->name
                 ?? $this->postRequest->other_category_name
                 ?? 'Announcement';
 
             $userName = $notifiable->first_name ?: $notifiable->full_name ?: 'Requestor';
-
             $isDirectImc = ($this->postRequest->routing_type ?? '') === 'direct_imc';
 
             $tableDetails = [
-                'Title'               => $this->postRequest->title,
-                'Category'            => $categoryName,
-                'Published Platforms' => $targetPlatformsFormatted,
-                'Published At'        => now()->format('M d, Y h:i A'),
+                'Title'    => $this->postRequest->title,
+                'Category' => $categoryName,
+                'Status'   => $isPartial ? 'Partially Published' : 'Published',
             ];
 
             if ($isDirectImc) {
                 $tableDetails['Request Type'] = 'Direct IMC';
             }
+
+            if (!empty($successfulFormatted)) {
+                $tableDetails['Published Platforms'] = $successfulFormatted;
+            }
+
+            if (!empty($failedKeys)) {
+                $failedDescriptions = collect($this->publishErrors)->map(function ($msg, $plat) {
+                    $platName = ucfirst($plat);
+                    $shortMsg = strtok($msg, '.');
+                    return "{$platName} ({$shortMsg})";
+                })->implode(', ');
+                $tableDetails['Failed Platforms'] = $failedDescriptions;
+            }
+
+            $tableDetails['Published At'] = now()->format('M d, Y h:i A');
 
             // Safely parse platform results whether stored as array, JSON string, or null
             $fbData = $this->publishResults['facebook'] ?? null;
@@ -78,13 +98,30 @@ class PostPublishedRequestorNotification extends Notification
                 : (config('app.frontend_url') ?: config('app.url') ?: 'https://postflow.jmc.edu.ph');
             $dashboardUrl = rtrim($frontendUrl, '/') . '/dashboard/requestor';
 
-            $bodyMessage = $isDirectImc
-                ? 'Your Direct IMC content request has been successfully published to the target institutional platforms by the IMC team.'
-                : 'Your content request has been successfully published to the target institutional platforms.';
+            if ($isPartial) {
+                $successSentence = !empty($successfulFormatted)
+                    ? "{$successfulFormatted} published successfully."
+                    : '';
+                $failedSentence = !empty($this->publishErrors)
+                    ? collect($this->publishErrors)->map(fn($msg, $plat) => ucfirst($plat) . " publishing failed: {$msg}")->implode(' ')
+                    : 'Some target platforms encountered configuration issues.';
+
+                $bodyMessage = trim("{$successSentence} {$failedSentence}");
+                $statusBadge = 'PARTIALLY PUBLISHED';
+                $statusType = 'warning';
+                $subject = "[JMCFI PostFlow] ⚠️ Your Post Has Been Partially Published — {$this->postRequest->title}";
+            } else {
+                $bodyMessage = $isDirectImc
+                    ? 'Your Direct IMC content request has been successfully published to the target institutional platforms by the IMC team.'
+                    : 'Your content request has been successfully published to the target institutional platforms.';
+                $statusBadge = 'PUBLISHED — SOCIAL MEDIA';
+                $statusType = 'published';
+                $subject = "[JMCFI PostFlow] ✅ Your Post Has Been Published — {$this->postRequest->title}";
+            }
 
             $viewData = [
-                'statusBadge'  => 'PUBLISHED — SOCIAL MEDIA',
-                'statusType'   => 'published',
+                'statusBadge'  => $statusBadge,
+                'statusType'   => $statusType,
                 'greeting'     => "Hello {$userName},",
                 'bodyMessage'  => $bodyMessage,
                 'tableDetails' => $tableDetails,
@@ -94,7 +131,7 @@ class PostPublishedRequestorNotification extends Notification
             ];
 
             return (new MailMessage)
-                ->subject("[JMCFI PostFlow] ✅ Your Post Has Been Published — {$this->postRequest->title}")
+                ->subject($subject)
                 ->view('emails.custom-template', $viewData);
         } catch (\Throwable $e) {
             Log::error("PostPublishedRequestorNotification::toMail failed for post ID {$this->postRequest->id}: {$e->getMessage()}");
@@ -104,11 +141,18 @@ class PostPublishedRequestorNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $isPartial = !empty($this->publishErrors) || $this->postRequest->status === PostRequest::STATUS_PARTIALLY_PUBLISHED;
+
         return [
-            'type'            => 'post_published_success',
-            'post_request_id' => $this->postRequest->id,
-            'post_title'      => $this->postRequest->title,
-            'message'         => "Your post '{$this->postRequest->title}' has been published successfully.",
+            'type'                 => $isPartial ? 'post_partially_published' : 'post_published_success',
+            'post_request_id'      => $this->postRequest->id,
+            'post_title'           => $this->postRequest->title,
+            'status'               => $this->postRequest->status,
+            'successful_platforms' => array_keys($this->publishResults),
+            'failed_platforms'     => array_keys($this->publishErrors),
+            'message'              => $isPartial
+                ? "⚠️ Post '{$this->postRequest->title}' was partially published. Check details for uncompleted platforms."
+                : "✅ Your post '{$this->postRequest->title}' has been published successfully.",
         ];
     }
 
