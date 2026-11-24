@@ -61,8 +61,13 @@ export function deriveAlertTitle(
   if (text.includes('password') && (text.includes('match') || text.includes('confirm'))) return 'Password Mismatch';
   if (text.includes('password')) return 'Password Required';
   if (text.includes('email')) return 'Email Required';
-  if (text.includes('token')) return 'Token Required';
+  if (text.includes('token') && (text.includes('required') || text.includes('enter') || text.includes('provide'))) return 'Token Required';
+  if (text.includes('token') && (text.includes('saved') || text.includes('validated') || text.includes('publishing setup'))) return 'Tokens Saved';
+  if (text.includes('token') && (text.includes('invalid') || text.includes('expired'))) return 'Token Invalid';
+  if (text.includes('token') && text.includes('page access')) return 'Setup Note';
   if (text.includes('select platform') || text.includes('at least one platform')) return 'Select Platform';
+  if (text.includes('failed to save or validate') || text.includes('save or validate')) return 'Setup Failed';
+  if (text.includes('meta validation') || text.includes('publishing setup saved') || text.includes('needs attention')) return 'Setup Attention';
   if (text.includes('video upload') || text.includes('videos are not allowed')) return 'Media Not Supported';
   if (text.includes('upload failed') || text.includes('failed to upload')) return 'Upload Failed';
   if (text.includes('policy')) return 'Policy Alignment';

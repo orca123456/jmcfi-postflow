@@ -221,14 +221,19 @@ class TokenSettingController extends Controller
         $derived = [];
 
         if ($pageId && $facebookToken) {
-            // If a User Access Token was provided, check /me/accounts to derive the Page Access Token
+            // If a User Access Token was provided, check /me/accounts to derive the Page Access Token.
+            // This only works with User tokens; Page Access Tokens will return error #100 on this endpoint —
+            // that is expected and must NOT be treated as a validation failure.
             try {
                 $accountsResponse = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/me/accounts", [
                     'fields' => 'id,name,access_token',
                     'access_token' => $facebookToken,
                 ]);
 
-                if ($accountsResponse->successful()) {
+                // Only process if the call succeeded AND returned usable data.
+                // Error #100 (nonexisting field) means a Page Access Token was supplied — that is fine.
+                $accountsErrorCode = data_get($accountsResponse->json(), 'error.code');
+                if ($accountsResponse->successful() && $accountsErrorCode === null) {
                     $accounts = $accountsResponse->json('data') ?? [];
                     foreach ($accounts as $acc) {
                         if (strval($acc['id'] ?? '') === strval($pageId) && !empty($acc['access_token'])) {
@@ -261,13 +266,17 @@ class TokenSettingController extends Controller
                     'can_post' => $canPost,
                 ];
 
-                // Optionally discover connected Instagram Business Account ID if permitted
+                // Optionally discover connected Instagram Business Account ID if permitted.
+                // This field requires pages_read_engagement and may be unavailable in Development Mode.
+                // Error #100 (nonexisting field) is expected when the app is not in Live Mode — silently skip.
                 try {
                     $igLookup = Http::connectTimeout(5)->timeout(10)->get("https://graph.facebook.com/{$version}/{$pageId}", [
                         'fields' => 'instagram_business_account',
                         'access_token' => $facebookToken,
                     ]);
-                    if ($igLookup->successful()) {
+                    $igErrorCode = data_get($igLookup->json(), 'error.code');
+                    // Only use the result if the request succeeded and no error was returned.
+                    if ($igLookup->successful() && $igErrorCode === null) {
                         $igId = data_get($igLookup->json(), 'instagram_business_account.id');
                         if ($igId) {
                             $checks['facebook']['instagram_business_account_id'] = $igId;
@@ -406,6 +415,12 @@ class TokenSettingController extends Controller
 
         if ($code === 200 || str_contains(strtolower((string) $message), 'publish_actions')) {
             return 'The token is missing the Page publishing permission. Regenerate it with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish.';
+        }
+
+        // Error #100 on /me/accounts means a Page Access Token was used (not a User token) —
+        // this is not an error; the token is still valid for publishing.
+        if ($code === 100 && str_contains(strtolower((string) $message), 'nonexisting field')) {
+            return 'The token appears to be a Page Access Token. This is acceptable — the token will be validated directly against your Page ID.';
         }
 
         return trim($message . ($subcode ? " (subcode {$subcode})" : ''));
