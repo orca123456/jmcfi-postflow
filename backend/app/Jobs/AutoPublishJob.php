@@ -77,20 +77,17 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 ->pluck('platform')->all();
             $publishResults = [];
             $publishErrors = [];
-            $media = $this->postRequest->media()
+
+            // Retrieve all attached image media in deterministic order (featured first, then sort_order)
+            $allImages = $this->postRequest->media()
                 ->where(function ($query) {
                     $query->where('type', 'image')
                         ->orWhere('mime_type', 'like', 'image/%');
                 })
-                ->where('is_featured', true)
-                ->first()
-                ?? $this->postRequest->media()
-                    ->where(function ($query) {
-                        $query->where('type', 'image')
-                            ->orWhere('mime_type', 'like', 'image/%');
-                    })
+                ->orderByDesc('is_featured')
                 ->orderBy('sort_order')
-                ->first();
+                ->get();
+            $media = $allImages->first();
 
             if ($this->postRequest->status !== PostRequest::STATUS_PUBLISHING) {
                 $this->postRequest->update(['status' => PostRequest::STATUS_PUBLISHING]);
@@ -98,8 +95,12 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 
             if (in_array('instagram', $lowerPlatforms, true) && !in_array('instagram', $completed, true)) {
                 try {
-                    $imageUrl = $media ? route('instagram.media', ['media' => $media->id]) : null;
-                    $publishResults['instagram'] = $instagramService->publishPost($this->postRequest->caption_narrative ?? '', $imageUrl);
+                    $imageUrls = $allImages->map(function ($m) {
+                        return route('instagram.media', ['media' => $m->id]);
+                    })->values()->all();
+
+                    $igPayload = count($imageUrls) > 1 ? $imageUrls : ($imageUrls[0] ?? null);
+                    $publishResults['instagram'] = $instagramService->publishPost($this->postRequest->caption_narrative ?? '', $igPayload);
                     Log::info("AutoPublishJob: Successfully published to Instagram for post ID {$this->postRequest->id}");
                 } catch (Exception $e) {
                     $publishErrors['instagram'] = $this->friendlyPublishError($e->getMessage());
@@ -108,19 +109,22 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             }
 
             if (in_array('facebook', $lowerPlatforms, true) && !in_array('facebook', $completed, true)) {
-                $mediaPath = null;
-                if ($media && $media->file_path) {
+                $mediaPaths = $allImages->map(function ($m) {
+                    if (!$m->file_path) {
+                        return null;
+                    }
                     $disk = config('filesystems.default');
                     if (in_array($disk, ['s3', 'b2'], true)) {
-                        $mediaPath = $media->url ?? Storage::disk($disk)->url($media->file_path);
-                    } else {
-                        $localPath = Storage::disk('public')->path($media->file_path);
-                        $mediaPath = file_exists($localPath) ? $localPath : route('instagram.media', ['media' => $media->id]);
+                        return $m->url ?? Storage::disk($disk)->url($m->file_path);
                     }
-                }
+                    $localPath = Storage::disk('public')->path($m->file_path);
+                    return file_exists($localPath) ? $localPath : route('instagram.media', ['media' => $m->id]);
+                })->filter()->values()->all();
+
+                $fbPayload = count($mediaPaths) > 1 ? $mediaPaths : ($mediaPaths[0] ?? null);
 
                 try {
-                    $publishResults['facebook'] = $facebookService->publishPost($this->postRequest->caption_narrative ?? '', $mediaPath);
+                    $publishResults['facebook'] = $facebookService->publishPost($this->postRequest->caption_narrative ?? '', $fbPayload);
                     Log::info("AutoPublishJob: Successfully published to Facebook for post ID {$this->postRequest->id}");
                 } catch (Exception $e) {
                     $publishErrors['facebook'] = $this->friendlyPublishError($e->getMessage());
@@ -134,7 +138,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                     Log::warning("AutoPublishJob: Post ID {$this->postRequest->id} skipped WordPress because credentials are not configured.");
                 } else {
                     try {
-                        $publishResults['wordpress'] = $wordpressService->publishPost($this->postRequest, $media);
+                        $publishResults['wordpress'] = $wordpressService->publishPost($this->postRequest, $media, $allImages);
                         Log::info("AutoPublishJob: Successfully published to WordPress for post ID {$this->postRequest->id}");
                     } catch (Exception $e) {
                         $publishErrors['wordpress'] = $e->getMessage();

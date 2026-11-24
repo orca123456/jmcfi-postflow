@@ -8,6 +8,7 @@ use App\Models\SystemSetting;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -29,7 +30,7 @@ class WordPressPublishingService
         return $url !== '' && $username !== '' && $password !== '';
     }
 
-    public function publishPost(PostRequest $post, ?PostMedia $media = null): array
+    public function publishPost(PostRequest $post, ?PostMedia $media = null, $allMedia = null): array
     {
         $settings = SystemSetting::whereIn('key', [
             'wordpress_url', 'wordpress_username', 'wordpress_app_password',
@@ -51,13 +52,70 @@ class WordPressPublishingService
             }
         }
 
+        $content = $post->caption_narrative ?? '';
         $payload = [
             'title' => $post->title,
-            'content' => $post->caption_narrative ?? '',
+            'content' => $content,
             'status' => 'publish',
             'slug' => $slug,
         ];
-        if ($media) {
+
+        if ($allMedia && count($allMedia) > 0) {
+            $images = collect($allMedia)->values();
+            $featured = $media ?? $images->first();
+
+            if ($featured) {
+                [$stream, $filename] = $this->openMediaStream($featured);
+                try {
+                    $upload = $this->response((clone $client)
+                        ->attach('file', $stream, $filename)
+                        ->post($url . '/?rest_route=/wp/v2/media'), 'upload image');
+                } finally {
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+                }
+                if (empty($upload['id']) || !is_numeric($upload['id'])) {
+                    throw new RuntimeException('WordPress did not return an uploaded image ID.');
+                }
+                $payload['featured_media'] = (int) $upload['id'];
+            }
+
+            $additionalImagesHtml = '';
+            foreach ($images as $img) {
+                if ($featured && (int) $img->id === (int) $featured->id) {
+                    continue;
+                }
+                try {
+                    [$stream, $filename] = $this->openMediaStream($img);
+                    try {
+                        $upload = $this->response((clone $client)
+                            ->attach('file', $stream, $filename)
+                            ->post($url . '/?rest_route=/wp/v2/media'), 'upload additional image');
+                    } finally {
+                        if (is_resource($stream)) {
+                            fclose($stream);
+                        }
+                    }
+                    $imgUrl = $upload['source_url'] ?? data_get($upload, 'guid.rendered');
+                    $imgId = (int) ($upload['id'] ?? 0);
+                    if ($imgUrl) {
+                        $additionalImagesHtml .= sprintf(
+                            '<p><figure class="wp-block-image size-large"><img src="%s" alt="%s" class="wp-image-%d"/></figure></p>',
+                            htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8'),
+                            htmlspecialchars($post->title, ENT_QUOTES, 'UTF-8'),
+                            $imgId
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("WordPress: Could not upload additional media {$img->id}: {$e->getMessage()}");
+                }
+            }
+
+            if ($additionalImagesHtml !== '') {
+                $payload['content'] = $content . "\n\n" . $additionalImagesHtml;
+            }
+        } elseif ($media) {
             [$stream, $filename] = $this->openMediaStream($media);
             try {
                 $upload = $this->response((clone $client)

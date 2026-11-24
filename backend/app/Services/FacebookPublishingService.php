@@ -27,16 +27,109 @@ class FacebookPublishingService
      * Publish a post to the Facebook Page.
      * 
      * @param string $message The content of the post
-     * @param string|null $mediaPath Optional URL to a media file (image)
+     * @param string|array|null $mediaPaths Optional single URL/path or array of URLs/paths for multi-photo album
      * @return array|null Returns the API response containing the post ID if successful
      * @throws Exception
      */
-    public function publishPost(string $message, ?string $mediaPath = null): ?array
+    public function publishPost(string $message, string|array|null $mediaPaths = null): ?array
     {
         if (empty($this->pageId) || empty($this->accessToken)) {
             throw new Exception('Facebook credentials are not configured. Save a valid Page ID and Page Access Token in IT Admin Dashboard.');
         }
 
+        // Strip HTML tags before publishing, as Facebook does not support them
+        $cleanMessage = str_ireplace(['<br>', '<br/>', '<br />', '</p>'], "\n", $message);
+        $cleanMessage = html_entity_decode(strip_tags($cleanMessage), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $cleanMessage = trim($cleanMessage);
+
+        $paths = is_array($mediaPaths) ? array_values(array_filter($mediaPaths)) : ($mediaPaths ? [$mediaPaths] : []);
+
+        if (count($paths) > 1) {
+            return $this->publishMultiPhotoPost($cleanMessage, $paths);
+        }
+
+        $singlePath = $paths[0] ?? null;
+        return $this->publishSinglePhotoOrTextPost($cleanMessage, $singlePath);
+    }
+
+    /**
+     * Publish a multi-photo post (album) to Facebook Page feed.
+     * Each photo is uploaded with published=false, then attached to a single feed post.
+     */
+    protected function publishMultiPhotoPost(string $cleanMessage, array $mediaPaths): array
+    {
+        $attachedMedia = [];
+        $uploadEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/photos";
+
+        foreach ($mediaPaths as $index => $path) {
+            $isUrl = filter_var($path, FILTER_VALIDATE_URL);
+
+            if (!$isUrl && !file_exists($path)) {
+                Log::warning("Facebook multi-photo upload: media file not found at '{$path}'. Skipping this item.");
+                continue;
+            }
+
+            $payload = [
+                'access_token' => $this->accessToken,
+                'published' => 'false',
+            ];
+
+            try {
+                if ($isUrl) {
+                    $payload['url'] = $path;
+                    $response = Http::withoutVerifying()->post($uploadEndpoint, $payload);
+                } else {
+                    $response = Http::withoutVerifying()
+                        ->attach('source', file_get_contents($path), basename($path))
+                        ->post($uploadEndpoint, $payload);
+                }
+
+                if ($response->successful() && !empty($response->json('id'))) {
+                    $photoId = (string) $response->json('id');
+                    $attachedMedia[] = ['media_fbid' => $photoId];
+                    Log::info("Facebook uploaded unpublished photo #{$index}: {$photoId}");
+                } else {
+                    Log::error("Facebook failed to upload unpublished photo #{$index}", [
+                        'status' => $response->status(),
+                        'response' => $response->json(),
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::error("Exception uploading unpublished photo #{$index} to Facebook: " . $e->getMessage());
+            }
+        }
+
+        if (empty($attachedMedia)) {
+            Log::warning("Facebook: No photos were successfully uploaded for multi-photo post. Falling back to text-only post.");
+            return $this->publishSinglePhotoOrTextPost($cleanMessage, null);
+        }
+
+        $feedEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/feed";
+        $feedPayload = [
+            'access_token' => $this->accessToken,
+            'message' => $cleanMessage,
+            'attached_media' => json_encode($attachedMedia),
+        ];
+
+        $response = Http::withoutVerifying()->post($feedEndpoint, $feedPayload);
+
+        if ($response->successful()) {
+            Log::info('Successfully published multi-photo post to Facebook Page.', ['response' => $response->json()]);
+            return $response->json();
+        }
+
+        Log::error('Facebook Graph API multi-photo feed error.', [
+            'status' => $response->status(),
+            'error' => $response->json(),
+        ]);
+        throw new Exception("Facebook API Error: " . $response->body());
+    }
+
+    /**
+     * Publish a single photo or text-only post.
+     */
+    protected function publishSinglePhotoOrTextPost(string $cleanMessage, ?string $mediaPath = null): array
+    {
         $isUrl = $mediaPath ? filter_var($mediaPath, FILTER_VALIDATE_URL) : false;
 
         if ($mediaPath && !$isUrl && !file_exists($mediaPath)) {
@@ -46,11 +139,6 @@ class FacebookPublishingService
         $endpoint = $mediaPath 
             ? "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/photos"
             : "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/feed";
-
-        // Strip HTML tags before publishing, as Facebook does not support them
-        $cleanMessage = str_ireplace(['<br>', '<br/>', '<br />', '</p>'], "\n", $message);
-        $cleanMessage = html_entity_decode(strip_tags($cleanMessage), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $cleanMessage = trim($cleanMessage);
 
         $payload = ['access_token' => $this->accessToken];
         $payload[$mediaPath ? 'caption' : 'message'] = $cleanMessage;
