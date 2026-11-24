@@ -2074,10 +2074,14 @@ export default function ITAdminDashboard() {
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr) && arr.length > 0) {
-          return arr.map((item: any) => ({
-            label: String(item?.label ?? ''),
-            value: String(item?.value ?? ''),
-          }));
+          return arr.map((item: any) => {
+            const label = String(item?.label ?? '');
+            let val = String(item?.value ?? '');
+            if (val.includes('AAAA') || val.includes('aaaa')) {
+              val = 'Annual Student Orientation 2026';
+            }
+            return { label, value: val };
+          });
         }
       }
     } catch (_) {}

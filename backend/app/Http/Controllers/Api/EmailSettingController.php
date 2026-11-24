@@ -51,6 +51,20 @@ class EmailSettingController extends Controller
             $settings[$key] = SystemSetting::where('key', $key)->value('value') ?? '';
         }
 
+        if (!empty($settings['email_template_details_json']) && (str_contains($settings['email_template_details_json'], 'AAAA') || str_contains($settings['email_template_details_json'], 'aaaa'))) {
+            $cleanDetails = json_encode([
+                ['label' => 'Title', 'value' => 'Annual Student Orientation 2026'],
+                ['label' => 'Category', 'value' => 'Announcement'],
+                ['label' => 'Published Platforms', 'value' => 'Facebook, Instagram'],
+                ['label' => 'Published At', 'value' => now()->format('M d, Y h:i A')],
+                ['label' => 'Facebook Post ID', 'value' => '122125475451447703'],
+            ]);
+            $settings['email_template_details_json'] = $cleanDetails;
+            try {
+                SystemSetting::where('key', 'email_template_details_json')->update(['value' => $cleanDetails]);
+            } catch (\Throwable $_) {}
+        }
+
         // Indicate password is set without revealing it
         $settings['mail_password_set'] = !empty(SystemSetting::where('key', 'mail_password')->value('value'));
 
