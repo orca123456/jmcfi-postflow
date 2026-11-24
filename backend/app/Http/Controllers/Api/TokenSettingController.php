@@ -221,31 +221,38 @@ class TokenSettingController extends Controller
         $derived = [];
 
         if ($pageId && $facebookToken) {
+            // If a User Access Token was provided, check /me/accounts to derive the Page Access Token
+            try {
+                $accountsResponse = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/me/accounts", [
+                    'fields' => 'id,name,access_token',
+                    'access_token' => $facebookToken,
+                ]);
+
+                if ($accountsResponse->successful()) {
+                    $accounts = $accountsResponse->json('data') ?? [];
+                    foreach ($accounts as $acc) {
+                        if (strval($acc['id'] ?? '') === strval($pageId) && !empty($acc['access_token'])) {
+                            $pageAccessToken = $acc['access_token'];
+                            if ($pageAccessToken !== $facebookToken) {
+                                $derived['facebook_access_token'] = $pageAccessToken;
+                                $facebookToken = $pageAccessToken;
+                                if (!$request->exists('instagram_access_token') || trim((string) ($validated['instagram_access_token'] ?? '')) === '') {
+                                    $instagramToken = $pageAccessToken;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $_) {}
+
             $response = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/{$pageId}", [
-                'fields' => 'id,name,access_token,instagram_business_account',
+                'fields' => 'id,name,instagram_business_account',
                 'access_token' => $facebookToken,
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
-                $pageAccessToken = data_get($data, 'access_token');
-                if ($pageAccessToken && $pageAccessToken !== $facebookToken) {
-                    $derived['facebook_access_token'] = $pageAccessToken;
-                    $facebookToken = $pageAccessToken;
-                    $instagramToken = $request->exists('instagram_access_token') && trim((string) ($validated['instagram_access_token'] ?? '')) !== trim((string) ($validated['facebook_access_token'] ?? ''))
-                        ? $instagramToken
-                        : $pageAccessToken;
-
-                    $pageTokenResponse = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/{$pageId}", [
-                        'fields' => 'id,name,instagram_business_account',
-                        'access_token' => $pageAccessToken,
-                    ]);
-
-                    if ($pageTokenResponse->successful()) {
-                        $data = array_merge($data, $pageTokenResponse->json());
-                    }
-                }
-
                 $canPost = true; // can_post removed in Graph API v13+; rely on pages_manage_posts permission check
                 $checks['facebook'] = [
                     'valid' => $canPost,
