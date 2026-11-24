@@ -28,6 +28,23 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->reportable(function (\Throwable $e) {
+            // Forward critical server exceptions to Telegram/Webhook alert monitor
+            if (!($e instanceof \Illuminate\Validation\ValidationException ||
+                  $e instanceof \Illuminate\Auth\AuthenticationException ||
+                  $e instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException ||
+                  $e instanceof \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException)) {
+                \App\Services\SystemAlertService::alertError(
+                    class_basename($e),
+                    $e->getMessage(),
+                    [
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]
+                );
+            }
+        });
+
         $exceptions->renderable(function (\Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException $e, \Illuminate\Http\Request $request) {
             if ($request->is('api/*') && !auth('sanctum')->check()) {
                 throw new \Illuminate\Auth\AuthenticationException('Unauthenticated.');

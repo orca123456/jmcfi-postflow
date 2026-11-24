@@ -29,6 +29,7 @@ class AuditLogService
     {
         try {
             $request ??= request();
+            $sanitizedPayload = self::sanitizePayload($payload);
 
             AuditLog::create([
                 'user_id' => $user?->id,
@@ -37,8 +38,20 @@ class AuditLogService
                 'ip_address' => $request->ip(),
                 'device' => substr((string) $request->userAgent(), 0, 500),
                 'severity' => $severity,
-                'payload' => self::sanitizePayload($payload),
+                'payload' => $sanitizedPayload,
             ]);
+
+            // Dispatch real-time Telegram / Webhook alert for high-severity or security events
+            if (in_array(strtoupper($severity), ['ERROR', 'CRITICAL'], true) || 
+                in_array($eventType, ['LOGIN_LOCKED', 'SECURITY_ALERT', 'ATTACK_DETECTED', 'UNAUTHORIZED_ACCESS', 'PUBLISH_FAILED'], true)) {
+                SystemAlertService::dispatch(
+                    title: "Security & System Alert: {$eventType}",
+                    description: $description,
+                    level: $severity,
+                    details: $sanitizedPayload,
+                    ipAddress: $request->ip()
+                );
+            }
         } catch (\Throwable $e) {
             Log::warning('Audit log write failed: ' . $e->getMessage());
         }

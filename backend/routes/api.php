@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\TokenSettingController;
 use App\Http\Controllers\Api\ApiTokenController;
 use App\Http\Controllers\Api\ExternalIntegrationController;
+use App\Http\Controllers\Api\AgentIntegrationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\HealthCheckController;
 
@@ -139,6 +140,19 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // External Integration Endpoint
     Route::post('external/submit-request', [ExternalIntegrationController::class, 'submitRequest']);
+
+    // Agent Integration & Direct Publishing (ChatGPT, Antigravity, Codex, Hermes, Telegram)
+    Route::prefix('agent')->middleware(['throttle:60,1'])->group(function () {
+        Route::get('openapi.json', [AgentIntegrationController::class, 'openApi'])->middleware('role:it_publisher,it_admin');
+        Route::get('posts', [AgentIntegrationController::class, 'index']);
+        Route::get('posts/{id}', [AgentIntegrationController::class, 'show'])->whereNumber('id');
+        Route::post('posts', [AgentIntegrationController::class, 'store']);
+        Route::put('posts/{id}', [AgentIntegrationController::class, 'update'])->whereNumber('id');
+        Route::delete('posts/{id}', [AgentIntegrationController::class, 'destroy'])->middleware('role:it_publisher,it_admin')->whereNumber('id');
+        Route::post('posts/{id}/publish', [AgentIntegrationController::class, 'publish'])->middleware('role:it_publisher,it_admin')->whereNumber('id');
+        Route::get('security-alerts', [AgentIntegrationController::class, 'securityAlerts'])->middleware('role:it_publisher,it_admin');
+        Route::get('system-health', [AgentIntegrationController::class, 'systemHealth']);
+    });
 });
 
 // System Health Check (open for monitoring services & uptime checkers)
