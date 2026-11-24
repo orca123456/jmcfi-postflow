@@ -2941,12 +2941,6 @@ export default function ITAdminDashboard() {
       backgroundImage={require('../../../assets/images/jmcbg2.jpeg')}
       departmentName={user?.department}
       userPhotoUrl={profilePhotoUrl}
-      departmentLogo={(() => {
-        const dept = departmentsList.find((d: any) =>
-          d.display_name === user?.department || d.name === user?.department
-        );
-        return dept ? deptLogos[dept.id] : undefined;
-      })()}
     >
       {/* Title block removed as requested */}
 

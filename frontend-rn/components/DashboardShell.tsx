@@ -260,8 +260,14 @@ export function DashboardShell({
         );
 
         // 2. Keyword & Alias match across departments with logo
-        if (!match) {
-          const isIT = deptLower.includes('bsit') || deptLower.includes('information technology') || deptLower.includes('computer') || deptLower.includes('cite');
+        // Prevent administrative offices (e.g. IT Office) or IT Admins from inheriting academic college logos
+        const isOfficeOrAdmin = deptLower.includes('office') ||
+          (user as any)?.role === 'it_admin' ||
+          (user as any)?.roles?.includes?.('it_admin') ||
+          (user as any)?.roles?.includes?.('it_publisher');
+
+        if (!match && !isOfficeOrAdmin) {
+          const isIT = (deptLower.includes('bsit') || deptLower.includes('information technology') || deptLower.includes('computer') || deptLower.includes('cite')) && !deptLower.includes('office');
           const isAgri = deptLower.includes('agri');
           const isEng = deptLower.includes('engineer');
           const isBsa = deptLower.includes('bsa') || deptLower.includes('accountan');
@@ -443,7 +449,15 @@ export function DashboardShell({
     return () => { cancelled = true; };
   }, [canHaveProgramIndicator, user?.department, (user as any)?.program_head_id, user?.id, propAssignedProgram, liveAssignedProgram]);
 
-  const rawDeptLogo = departmentLogo || (user as any)?.department_logo_url || autoDeptLogo;
+  const isItAdminUser = (user as any)?.role === 'it_admin' ||
+    (user as any)?.roles?.includes?.('it_admin') ||
+    (user as any)?.roles?.includes?.('it_publisher') ||
+    (user as any)?.department === 'Information Technology Office';
+
+  // For IT Admin, default to the official JMCFI School Logo unless an explicit custom logo is provided
+  const rawDeptLogo = isItAdminUser
+    ? (departmentLogo || null)
+    : (departmentLogo || (user as any)?.department_logo_url || autoDeptLogo);
   const resolvedDeptLogo = resolveImageUrl(rawDeptLogo);
   const finalDeptLogo = resolvedDeptLogo && !deptLogoLoadFailed ? resolvedDeptLogo : null;
   React.useEffect(() => {

@@ -141,8 +141,14 @@ class User extends Authenticatable implements MustVerifyEmail
             }
         }
 
+        // Do not alias-match administrative offices (e.g. Information Technology Office) or IT admins to academic college logos.
+        // They default to the official JMCFI School Logo (null in backend, rendered as jmc_logo.png in frontend).
+        if (str_contains($deptClean, 'office') || $this->hasAnyRole(['it_admin', 'it_publisher'])) {
+            return self::$departmentLogoCache[$deptKey] = null;
+        }
+
         // 2. Known Institutional Aliases & Keyword matching
-        $isIT = str_contains($deptClean, 'bsit') || str_contains($deptClean, 'information technology') || str_contains($deptClean, 'computer') || str_contains($deptClean, 'cite');
+        $isIT = (str_contains($deptClean, 'bsit') || str_contains($deptClean, 'cite') || str_contains($deptClean, 'information technology')) && !str_contains($deptClean, 'office');
         $isAgri = str_contains($deptClean, 'agri');
         $isEng = str_contains($deptClean, 'engineer');
         $isBsa = str_contains($deptClean, 'bsa') || str_contains($deptClean, 'accountan');
