@@ -2367,11 +2367,13 @@ export default function ITAdminDashboard() {
       const derived = validationRes.data?.derived || {};
 
       if (
+        derived.facebook_page_id ||
         derived.facebook_access_token ||
         (derived.instagram_business_account_id && derived.instagram_business_account_id !== payload.instagram_business_account_id)
       ) {
         const updatedPayload = {
           ...payload,
+          facebook_page_id: derived.facebook_page_id || payload.facebook_page_id,
           facebook_access_token: derived.facebook_access_token || payload.facebook_access_token,
           instagram_business_account_id: derived.instagram_business_account_id || payload.instagram_business_account_id,
           instagram_access_token: derived.facebook_access_token && (!payload.instagram_access_token || payload.instagram_access_token === payload.facebook_access_token)

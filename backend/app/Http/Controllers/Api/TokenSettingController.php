@@ -221,20 +221,15 @@ class TokenSettingController extends Controller
         $derived = [];
 
         if ($pageId && $facebookToken) {
-            // If a User Access Token was provided, check /me/accounts to derive the Page Access Token.
-            // This only works with User tokens; Page Access Tokens will return error #100 on this endpoint —
-            // that is expected and must NOT be treated as a validation failure.
+            // Check /me/accounts to derive the Page Access Token or automatically detect managed pages.
             try {
                 $accountsResponse = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/me/accounts", [
-                    'fields' => 'id,name,access_token',
                     'access_token' => $facebookToken,
                 ]);
 
-                // Only process if the call succeeded AND returned usable data.
-                // Error #100 (nonexisting field) means a Page Access Token was supplied — that is fine.
-                $accountsErrorCode = data_get($accountsResponse->json(), 'error.code');
-                if ($accountsResponse->successful() && $accountsErrorCode === null) {
+                if ($accountsResponse->successful() && !data_get($accountsResponse->json(), 'error')) {
                     $accounts = $accountsResponse->json('data') ?? [];
+                    $matched = false;
                     foreach ($accounts as $acc) {
                         if (strval($acc['id'] ?? '') === strval($pageId) && !empty($acc['access_token'])) {
                             $pageAccessToken = $acc['access_token'];
@@ -245,7 +240,26 @@ class TokenSettingController extends Controller
                                     $instagramToken = $pageAccessToken;
                                 }
                             }
+                            $matched = true;
                             break;
+                        }
+                    }
+
+                    // If pageId didn't match any managed page (e.g. user entered their personal User ID instead of Page ID)
+                    if (!$matched && count($accounts) > 0) {
+                        if (count($accounts) === 1 && !empty($accounts[0]['access_token'])) {
+                            // Exactly one managed page found: automatically adopt its Page ID and Page Access Token!
+                            $targetPage = $accounts[0];
+                            $derived['facebook_page_id'] = strval($targetPage['id']);
+                            $derived['facebook_access_token'] = $targetPage['access_token'];
+                            $pageId = strval($targetPage['id']);
+                            $facebookToken = $targetPage['access_token'];
+                            if (!$request->exists('instagram_access_token') || trim((string) ($validated['instagram_access_token'] ?? '')) === '') {
+                                $instagramToken = $targetPage['access_token'];
+                            }
+                        } else {
+                            $pageNames = collect($accounts)->map(fn ($a) => ($a['name'] ?? 'Page') . ' (ID: ' . ($a['id'] ?? '') . ')')->implode(', ');
+                            $checks['facebook']['note'] = "Managed Pages available: {$pageNames}. Make sure to enter the correct Page ID.";
                         }
                     }
                 }
@@ -253,18 +267,29 @@ class TokenSettingController extends Controller
 
             $response = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/{$pageId}", [
                 'fields' => 'id,name',
+                'metadata' => '1',
                 'access_token' => $facebookToken,
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
-                $canPost = true; // can_post removed in Graph API v13+; rely on pages_manage_posts permission check
-                $checks['facebook'] = [
-                    'valid' => $canPost,
-                    'id' => $data['id'] ?? null,
-                    'name' => $data['name'] ?? null,
-                    'can_post' => $canPost,
-                ];
+                $nodeType = data_get($data, 'metadata.type');
+
+                if ($nodeType === 'user') {
+                    $checks['facebook'] = [
+                        'valid' => false,
+                        'id' => $data['id'] ?? null,
+                        'name' => $data['name'] ?? null,
+                        'error' => "The ID entered ('{$data['name']}') is a personal Facebook profile, not a Facebook Page. Meta only allows publishing to Facebook Pages. Please enter a Facebook Page ID and Page Access Token.",
+                    ];
+                } else {
+                    $checks['facebook'] = [
+                        'valid' => true,
+                        'id' => $data['id'] ?? null,
+                        'name' => $data['name'] ?? null,
+                        'can_post' => true,
+                    ];
+                }
 
                 // Optionally discover connected Instagram Business Account ID if permitted.
                 // This field requires pages_read_engagement and may be unavailable in Development Mode.

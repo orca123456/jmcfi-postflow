@@ -407,8 +407,8 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             return 'The saved Meta token is invalid or expired. Open Platform Tokens, paste a fresh Page Access Token, then click Save & Validate Publishing Setup.';
         }
 
-        if ($code === 200 || str_contains(strtolower($metaMessage), 'publish_actions')) {
-            return 'The Page token is missing pages_manage_posts. Regenerate the Meta token with pages_manage_posts, pages_read_engagement, pages_show_list, instagram_basic, and instagram_content_publish, then save it in Platform Tokens.';
+        if ($code === 200 || str_contains(strtolower($metaMessage), 'publish_actions') || str_contains(strtolower($metaMessage), 'posting to a page')) {
+            return 'Facebook publishing requires a Page Access Token for a Facebook Page. In Meta Graph API Explorer, select your Facebook Page under "User or Page" dropdown (not User Token), and ensure pages_manage_posts is selected.';
         }
 
         return $metaMessage;
