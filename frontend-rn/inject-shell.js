@@ -235,7 +235,30 @@ if (!html.includes('postflow-shell-css')) {
   console.log('ℹ️  Skeleton CSS already present, skipping.');
 }
 
-// 2. Inject skeleton HTML before <div id="root">
+// 2. Inject SEO and Open Graph metadata
+const SEO_TAGS = `
+    <title>JMCFI PostFlow | Official Social Media & Website Posting Request Portal</title>
+    <meta name="description" content="JMCFI PostFlow is the official content request portal for Jose Maria College Foundation, Inc. Submit requests for announcements and updates to be published on the official JMCFI Facebook page, Instagram, and website." />
+    <meta name="keywords" content="JMCFI, Jose Maria College Foundation Inc, PostFlow, JMC PostFlow, JMC posting portal, content request portal, social media publishing" />
+    <meta name="author" content="Jose Maria College Foundation, Inc." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://postflow.jmc.edu.ph" />
+    <meta property="og:site_name" content="JMCFI PostFlow" />
+    <meta property="og:title" content="JMCFI PostFlow | Official Social Media & Website Posting Request Portal" />
+    <meta property="og:description" content="JMCFI PostFlow is the official content request portal for Jose Maria College Foundation, Inc. Submit requests for announcements and updates to be published on the official JMCFI Facebook page, Instagram, and website." />
+    <meta property="og:image" content="https://postflow.jmc.edu.ph/assets/images/jmc_logo.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="JMCFI PostFlow | Official Posting Request Portal" />
+    <meta name="twitter:description" content="Submit and track posting requests for the official JMCFI Facebook page, Instagram, and website." />
+    <meta name="twitter:image" content="https://postflow.jmc.edu.ph/assets/images/jmc_logo.png" />
+`;
+
+if (!html.includes('Official Social Media & Website Posting Request Portal')) {
+  html = html.replace(/<title>.*?<\/title>/i, SEO_TAGS.trim());
+  console.log('✅ Injected SEO and Open Graph metadata');
+}
+
+// 3. Inject skeleton HTML before <div id="root">
 if (!html.includes('POSTFLOW INSTANT LOADING SHELL')) {
   html = html.replace('<div id="root">', SKELETON_HTML + '\n  <div id="root">');
   console.log('✅ Injected skeleton HTML before #root');
