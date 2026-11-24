@@ -181,15 +181,20 @@ class ExcelTemplateService
     }
 
     /**
-     * Get the latest template file path, returning cached file immediately if present.
+     * Get the latest template file path, regenerating if departments configuration changed.
      */
-    public static function getTemplatePath(): string
+    public static function getTemplatePath(bool $force = false): string
     {
         $path = public_path('templates/jmcfi_user_accounts_template.xlsx');
-        if (file_exists($path) && filesize($path) > 1000) {
-            return $path;
+        try {
+            return self::generateTemplate($path, $force);
+        } catch (\Throwable $e) {
+            Log::warning('ExcelTemplateService::getTemplatePath fallback: ' . $e->getMessage());
+            if (file_exists($path) && filesize($path) > 1000) {
+                return $path;
+            }
+            throw $e;
         }
-        return self::generateTemplate($path);
     }
 
     /**

@@ -1144,7 +1144,14 @@ export default function ITAdminDashboard() {
         let isOfflineFallback = false;
 
         try {
-          const res = await usersApi.downloadTemplate();
+          const res = await usersApi.downloadTemplate({
+            departments: (departmentsList || []).map((d: any) => ({
+              name: d.name,
+              display_name: d.display_name,
+              role_categories: d.role_categories,
+            })),
+            force: true,
+          });
           blob = new Blob([res.data], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           });

@@ -71,7 +71,7 @@ class DepartmentController extends Controller
             ], $request);
 
             try {
-                \App\Services\ExcelTemplateService::generateTemplate();
+                \App\Services\ExcelTemplateService::generateTemplate(null, true);
             } catch (\Throwable $e) {}
 
             return response()->json([
@@ -93,7 +93,7 @@ class DepartmentController extends Controller
         ], $request);
 
         try {
-            \App\Services\ExcelTemplateService::generateTemplate();
+            \App\Services\ExcelTemplateService::generateTemplate(null, true);
         } catch (\Throwable $e) {}
 
         return response()->json([
@@ -123,7 +123,7 @@ class DepartmentController extends Controller
         ], $request);
 
         try {
-            \App\Services\ExcelTemplateService::generateTemplate();
+            \App\Services\ExcelTemplateService::generateTemplate(null, true);
         } catch (\Throwable $e) {}
 
         return response()->json([
@@ -155,7 +155,7 @@ class DepartmentController extends Controller
                 ], $request);
 
                 try {
-                    \App\Services\ExcelTemplateService::generateTemplate();
+                    \App\Services\ExcelTemplateService::generateTemplate(null, true);
                 } catch (\Throwable $e) {}
 
                 return response()->json(['data' => $department]);
@@ -171,7 +171,7 @@ class DepartmentController extends Controller
         ], $request);
 
         try {
-            \App\Services\ExcelTemplateService::generateTemplate();
+            \App\Services\ExcelTemplateService::generateTemplate(null, true);
         } catch (\Throwable $e) {}
 
         return response()->json(null, 204);

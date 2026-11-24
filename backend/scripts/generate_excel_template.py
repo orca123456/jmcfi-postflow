@@ -16,15 +16,26 @@ def generate_template(output_path, config_data=None):
             ],
             "mappings": {
                 "Requestor": [
-                    "BSA",
-                    "College of Information Technology",
-                    "Psyc"
+                    "College of Agriculture",
+                    "College Of Allied Health Sciences Education",
+                    "College Of Business Education",
+                    "College Of Criminal Justice Education",
+                    "College Of Engineering Education",
+                    "College of Information Technology Education",
+                    "College of Nursing",
+                    "College Of Teacher Education",
+                    "Integrated Marketing Communications"
                 ],
                 "Approver": [
-                    "BSA",
-                    "College of Information Technology",
-                    "Institutional Marketing Communication",
-                    "Psyc",
+                    "College of Agriculture",
+                    "College Of Allied Health Sciences Education",
+                    "College Of Business Education",
+                    "College Of Criminal Justice Education",
+                    "College Of Engineering Education",
+                    "College of Information Technology Education",
+                    "College of Nursing",
+                    "College Of Teacher Education",
+                    "Integrated Marketing Communications",
                     "Vice President of Academic Affairs"
                 ],
                 "Admin": [

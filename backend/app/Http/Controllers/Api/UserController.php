@@ -427,9 +427,9 @@ class UserController extends Controller
      */
     public function downloadTemplate(Request $request): BinaryFileResponse
     {
+        $changed = false;
         // If frontend passes new departments to sync, update and regenerate
         if ($request->has('departments') && is_array($request->input('departments')) && count($request->input('departments')) > 0) {
-            $changed = false;
             foreach ($request->input('departments') as $deptData) {
                 $name = is_string($deptData) ? trim($deptData) : trim($deptData['display_name'] ?? $deptData['name'] ?? '');
                 if (!empty($name)) {
@@ -451,12 +451,16 @@ class UserController extends Controller
                     }
                 }
             }
-            if ($changed) {
-                ExcelTemplateService::generateTemplate(null, true);
-            }
         }
 
-        $path = ExcelTemplateService::getTemplatePath();
+        $forceRegen = $changed || $request->boolean('force');
+        try {
+            $path = ExcelTemplateService::getTemplatePath($forceRegen);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('ExcelTemplate download fallback: ' . $e->getMessage());
+            $path = public_path('templates/jmcfi_user_accounts_template.xlsx');
+        }
+
         return response()->download($path, 'jmcfi_user_accounts_template.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
