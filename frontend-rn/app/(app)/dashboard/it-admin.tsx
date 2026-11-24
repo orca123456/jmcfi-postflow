@@ -5775,11 +5775,11 @@ export default function ITAdminDashboard() {
             {/* API Documentation Modal */}
             <Modal visible={showApiDocs} transparent animationType="fade">
               <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 700, maxHeight: '90%', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
+                <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 760, maxHeight: '92%', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0B2545', paddingHorizontal: 24, paddingVertical: 18 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="document-text" size={24} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', fontFamily: 'Kameron_700Bold' }}>API Integration Guide</Text>
+                      <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', fontFamily: 'Kameron_700Bold' }}>API & AI Agent Integration Guide</Text>
                     </View>
                     <TouchableOpacity onPress={() => setShowApiDocs(false)} style={{ padding: 4 }}>
                       <Ionicons name="close" size={24} color="#CBD5E1" />
@@ -5787,66 +5787,91 @@ export default function ITAdminDashboard() {
                   </View>
                   
                   <ScrollView style={{ padding: 24 }}>
-                    <Text style={{ fontSize: 15, color: Colors.textPrimary, marginBottom: 20, lineHeight: 24 }}>
-                      To submit a new Post Request automatically from an external system (like a main university website), you must send an HTTP <Text style={{ fontWeight: '700' }}>POST</Text> request to the endpoint below and include a valid Developer API Token in the <Text style={{ fontWeight: '700' }}>Authorization</Text> header.
+                    <Text style={{ fontSize: 14, color: Colors.textPrimary, marginBottom: 16, lineHeight: 22 }}>
+                      PostFlow supports both external CMS integrations and <Text style={{ fontWeight: '700', color: '#0B2545' }}>AI Agents</Text> (ChatGPT, Antigravity, Codex, Hermes, Telegram bots). Include your Developer API Token as a Bearer token in the <Text style={{ fontWeight: '700' }}>Authorization</Text> header.
                     </Text>
 
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Endpoint URL</Text>
-                    <View style={{ backgroundColor: '#F1F5F9', padding: 12, borderRadius: 8, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#0F172A', fontSize: 14 }}>
-                        POST {typeof window !== 'undefined' ? window.location.origin : 'https://jmcfi-postflow-production.up.railway.app'}/api/external/submit-request
+                    {/* Agent OpenAPI Schema Card */}
+                    <View style={{ backgroundColor: '#EEF2FF', padding: 16, borderRadius: 10, borderWidth: 1, borderColor: '#C7D2FE', marginBottom: 20 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Ionicons name="sparkles" size={18} color="#4338CA" />
+                        <Text style={{ fontWeight: '700', color: '#3730A3', fontSize: 14 }}>OpenAPI 3.0 Machine Schema (For ChatGPT, Antigravity & Codex)</Text>
+                      </View>
+                      <Text style={{ color: '#4338CA', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>
+                        Import this schema directly into Custom GPT Actions, Antigravity skills, or API tools to let the AI automatically understand all CRUD commands and direct publishing.
+                      </Text>
+                      <View style={{ backgroundColor: '#fff', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                        <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#1E1B4B', fontSize: 13, fontWeight: '600' }}>
+                          GET {typeof window !== 'undefined' ? window.location.origin : 'https://postflow.jmc.edu.ph'}/api/agent/openapi.json
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Endpoints Table Summary */}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Available Agent Endpoints</Text>
+                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', padding: 12, marginBottom: 20 }}>
+                      <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#0F172A', lineHeight: 22 }}>
+                        • <Text style={{ fontWeight: '700', color: '#2563EB' }}>POST</Text> /api/agent/posts  (Create post or Direct Publish)<Text style={{ color: '#059669', fontWeight: '700' }}> [bypass_approval: true]</Text>{'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#059669' }}>GET</Text>  /api/agent/posts  (List & search posts with filters){'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#059669' }}>GET</Text>  /api/agent/posts/{'{id}'}  (Get full details & live URLs){'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#D97706' }}>PUT</Text>  /api/agent/posts/{'{id}'}  (Update title, narrative, platforms){'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#DC2626' }}>DEL</Text>  /api/agent/posts/{'{id}'}  (Delete post){'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#2563EB' }}>POST</Text> /api/agent/posts/{'{id}'}/publish  (Force direct publish){'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#059669' }}>GET</Text>  /api/agent/security-alerts  (Intruder logs & server errors){'\n'}
+                        • <Text style={{ fontWeight: '700', color: '#059669' }}>GET</Text>  /api/agent/system-health  (Health & platform status)
                       </Text>
                     </View>
 
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: JavaScript (Fetch)</Text>
-                    <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
-                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
-                        {`fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://jmcfi-postflow-production.up.railway.app'}/api/external/submit-request', {
+                    {/* Example 1: Direct Publish / Bypass Approval */}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                      Example 1: Create & Direct Publish (Bypass Approval Workflow)
+                    </Text>
+                    <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 12, lineHeight: 18 }}>
+                        {`fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postflow.jmc.edu.ph'}/api/agent/posts', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Authorization': 'Bearer YOUR_TOKEN_HERE'
+    'Authorization': 'Bearer YOUR_DEVELOPER_TOKEN'
   },
   body: JSON.stringify({
-    title: "Emergency Campus Alert!",
-    caption_narrative: "Campus is closed due to heavy rain.",
-    target_platforms: ["facebook"],
-    image_url: "https://jmcfi.edu.ph/images/alert.jpg",
-    publish_direct: true // <--- Set to true to bypass approvers!
+    title: "Campus Library Extended Hours",
+    caption_narrative: "Library will remain open until 10:00 PM tonight for exam week.",
+    target_platforms: ["facebook", "instagram"],
+    image_url: "https://example.com/banner.jpg",
+    bypass_approval: true // <--- Set to true to bypass approval workflow and publish immediately!
   })
 })`}
                       </Text>
                     </View>
 
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Example: PHP (cURL)</Text>
-                    <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 24 }}>
-                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
-                        {`$ch = curl_init('${typeof window !== 'undefined' ? window.location.origin : 'https://jmcfi-postflow-production.up.railway.app'}/api/external/submit-request');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-  "title" => "New Campus Event!",
-  "caption_narrative" => "Join us this Friday...",
-  "target_platforms" => ["facebook"],
-  "image_url" => "https://example.com/image.jpg"
-]));
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-  'Content-Type: application/json',
-  'Accept: application/json',
-  'Authorization: Bearer YOUR_TOKEN_HERE'
-]);
-$response = curl_exec($ch);`}
+                    {/* Example 2: Security & Hacker Monitor */}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                      Example 2: Inspect Security Alerts & Hacker Activity (Vacation Monitor)
+                    </Text>
+                    <View style={{ backgroundColor: '#1E293B', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+                      <Text selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#E2E8F0', fontSize: 12, lineHeight: 18 }}>
+                        {`// Query recent brute force lockouts, unauthorized tampering, or server exceptions
+fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postflow.jmc.edu.ph'}/api/agent/security-alerts?limit=10', {
+  headers: {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer YOUR_DEVELOPER_TOKEN'
+  }
+})`}
                       </Text>
                     </View>
 
+                    {/* Security Note */}
                     <View style={{ backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', marginBottom: 20 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <Ionicons name="shield-checkmark" size={16} color="#DC2626" />
-                        <Text style={{ fontWeight: '700', color: '#991B1B', fontSize: 13 }}>Security Note</Text>
+                        <Text style={{ fontWeight: '700', color: '#991B1B', fontSize: 13 }}>Security Controls</Text>
                       </View>
                       <Text style={{ color: '#7F1D1D', fontSize: 13, lineHeight: 20 }}>
-                        If a token is compromised, click "Revoke" on the dashboard. Any applications using that token will instantly lose access and be unable to submit further requests.
+                        • All requests require Bearer token authentication. Unauthorized requests return 401.{'\n'}
+                        • Direct publishing (`bypass_approval`) and post deletion require IT Admin privileges.{'\n'}
+                        • If a token is compromised, click "Revoke" below to invalidate it instantly.
                       </Text>
                     </View>
                   </ScrollView>
