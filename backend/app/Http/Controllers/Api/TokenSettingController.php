@@ -22,39 +22,7 @@ class TokenSettingController extends Controller
      */
     public function getPlatformAvailability(): JsonResponse
     {
-        $keys = [
-            'facebook_page_id', 'facebook_access_token', 'facebook_credentials_verified',
-            'instagram_business_account_id', 'instagram_access_token', 'instagram_credentials_verified',
-            'wordpress_url', 'wordpress_username', 'wordpress_app_password', 'wordpress_credentials_verified',
-        ];
-
-        $settings = SystemSetting::whereIn('key', $keys)->pluck('value', 'key');
-
-        $fbConfigured = !empty(trim((string) ($settings->get('facebook_page_id') ?? ''))) 
-            && !empty(trim((string) ($settings->get('facebook_access_token') ?? '')));
-        $igConfigured = !empty(trim((string) ($settings->get('instagram_business_account_id') ?? ''))) 
-            && !empty(trim((string) ($settings->get('instagram_access_token') ?? '')));
-        $wpConfigured = !empty(trim((string) ($settings->get('wordpress_url') ?? ''))) 
-            && !empty(trim((string) ($settings->get('wordpress_username') ?? ''))) 
-            && !empty(trim((string) ($settings->get('wordpress_app_password') ?? '')));
-
-        return response()->json([
-            'facebook' => [
-                'name' => 'Facebook',
-                'configured' => $fbConfigured,
-                'verified' => $settings->get('facebook_credentials_verified') === '1',
-            ],
-            'instagram' => [
-                'name' => 'Instagram',
-                'configured' => $igConfigured,
-                'verified' => $settings->get('instagram_credentials_verified') === '1',
-            ],
-            'wordpress' => [
-                'name' => 'Website (WordPress)',
-                'configured' => $wpConfigured,
-                'verified' => $settings->get('wordpress_credentials_verified') === '1',
-            ],
-        ]);
+        return response()->json(SystemSetting::getPlatformAvailability());
     }
 
     public function getTokens(): JsonResponse
@@ -254,7 +222,7 @@ class TokenSettingController extends Controller
 
         if ($pageId && $facebookToken) {
             $response = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/{$pageId}", [
-                'fields' => 'id,name,can_post,access_token,instagram_business_account',
+                'fields' => 'id,name,access_token,instagram_business_account',
                 'access_token' => $facebookToken,
             ]);
 
@@ -269,7 +237,7 @@ class TokenSettingController extends Controller
                         : $pageAccessToken;
 
                     $pageTokenResponse = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/{$pageId}", [
-                        'fields' => 'id,name,can_post,instagram_business_account',
+                        'fields' => 'id,name,instagram_business_account',
                         'access_token' => $pageAccessToken,
                     ]);
 
@@ -278,7 +246,7 @@ class TokenSettingController extends Controller
                     }
                 }
 
-                $canPost = (bool) data_get($data, 'can_post', true);
+                $canPost = true; // can_post removed in Graph API v13+; rely on pages_manage_posts permission check
                 $checks['facebook'] = [
                     'valid' => $canPost,
                     'id' => $data['id'] ?? null,
@@ -289,10 +257,6 @@ class TokenSettingController extends Controller
 
                 if (data_get($data, 'instagram_business_account.id')) {
                     $derived['instagram_business_account_id'] = data_get($data, 'instagram_business_account.id');
-                }
-
-                if (!$canPost) {
-                    $checks['facebook']['error'] = 'This token can view the Page but cannot publish to it. Use Save & Validate again so PostFlow can save the derived Page Access Token, or generate the token with a Facebook account that has Page content access.';
                 }
             } else {
                 $checks['facebook']['error'] = $this->friendlyMetaError($response->json(), $response->body());
