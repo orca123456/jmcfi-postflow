@@ -59,6 +59,52 @@ class InstagramPublishingService
             throw new Exception('Instagram API Error: media container id was not returned.');
         }
 
+        // Poll container status until FINISHED before calling media_publish
+        $statusEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$creationId}";
+        $maxAttempts = 15;
+        $isReady = false;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            // Wait 2 seconds before checking status
+            sleep(2);
+
+            $statusResponse = Http::get($statusEndpoint, [
+                'fields' => 'status_code,status',
+                'access_token' => $this->accessToken,
+            ]);
+
+            if ($statusResponse->successful()) {
+                $statusCode = strtoupper((string) ($statusResponse->json('status_code') ?? ''));
+                Log::info("Instagram media container status check (attempt {$attempt}/{$maxAttempts}): {$statusCode}", [
+                    'creation_id' => $creationId,
+                    'status_data' => $statusResponse->json(),
+                ]);
+
+                if ($statusCode === 'FINISHED') {
+                    $isReady = true;
+                    break;
+                }
+
+                if ($statusCode === 'ERROR') {
+                    $errorMsg = $statusResponse->json('status') ?? 'Instagram media processing encountered an error.';
+                    throw new Exception("Instagram API container processing failed: {$errorMsg}");
+                }
+
+                if ($statusCode === 'EXPIRED') {
+                    throw new Exception("Instagram media container expired before publishing.");
+                }
+            } else {
+                Log::warning("Instagram media container status check failed (attempt {$attempt}/{$maxAttempts})", [
+                    'creation_id' => $creationId,
+                    'response' => $statusResponse->body(),
+                ]);
+            }
+        }
+
+        if (!$isReady) {
+            throw new Exception("Instagram media container is not ready after {$maxAttempts} attempts. The media may still be processing.");
+        }
+
         $publishEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$this->businessAccountId}/media_publish";
 
         $publishResponse = Http::asForm()->post($publishEndpoint, [

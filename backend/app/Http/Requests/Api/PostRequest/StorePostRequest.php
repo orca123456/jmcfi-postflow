@@ -70,6 +70,33 @@ class StorePostRequest extends FormRequest
             if (!$isDirectImc && !$hasMedia && !$hasDocs) {
                 $validator->errors()->add('media', 'Please attach at least one photo or media file before submitting.');
             }
+
+            // Check that every selected target platform is configured before allowing submission
+            $targetPlatforms = $this->input('target_platforms', []);
+            if (is_string($targetPlatforms)) {
+                $decoded = json_decode($targetPlatforms, true);
+                $targetPlatforms = is_array($decoded) ? $decoded : array_map('trim', explode(',', $targetPlatforms));
+            }
+            if (is_array($targetPlatforms) && !empty($targetPlatforms)) {
+                $unconfigured = [];
+                foreach ($targetPlatforms as $platform) {
+                    if (!empty($platform) && !\App\Models\SystemSetting::isPlatformConfigured($platform)) {
+                        $unconfigured[] = match (strtolower(trim($platform))) {
+                            'facebook' => 'Facebook',
+                            'instagram' => 'Instagram',
+                            'wordpress', 'website', 'portal', 'wp' => 'Website',
+                            default => ucfirst($platform),
+                        };
+                    }
+                }
+                if (!empty($unconfigured)) {
+                    $names = implode(', ', array_unique($unconfigured));
+                    $validator->errors()->add(
+                        'target_platforms',
+                        "Cannot submit request: {$names} has not finished configuration in the system. Please deselect it before submitting."
+                    );
+                }
+            }
         });
     }
 }

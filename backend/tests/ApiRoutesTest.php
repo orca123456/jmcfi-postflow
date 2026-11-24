@@ -686,9 +686,33 @@ final class ApiRoutesTest extends TestCase
             'title' => 'Sample Draft Title',
             'caption_narrative' => 'Sample draft caption content',
             'is_draft' => true,
+            'target_platforms' => ['facebook', 'instagram'],
         ]);
 
         $response->assertStatus(201);
+    }
+
+    public function test_submission_rejects_unconfigured_target_platforms(): void
+    {
+        $user = $this->createTestUser('requestor');
+        Sanctum::actingAs($user);
+
+        // Ensure settings are empty
+        \App\Models\SystemSetting::whereIn('key', [
+            'facebook_page_id', 'facebook_access_token',
+            'instagram_business_account_id', 'instagram_access_token',
+        ])->delete();
+
+        $response = $this->postJson('/api/posts', [
+            'title' => 'Submission Title',
+            'caption_narrative' => 'Submission caption content',
+            'is_draft' => false,
+            'routing_type' => 'direct_imc',
+            'target_platforms' => ['facebook', 'instagram'],
+        ]);
+
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['target_platforms']);
     }
 
     public function test_authenticated_user_can_fetch_posts_list(): void

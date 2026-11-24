@@ -226,15 +226,15 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
       const data = res?.data?.data || res?.data || {};
       setPlatformAvailability({
         facebook: {
-          configured: Boolean(data.facebook?.configured ?? data.facebook?.page_id),
+          configured: data.facebook?.configured !== undefined ? Boolean(data.facebook.configured) : Boolean(data.facebook?.page_id),
           verified: Boolean(data.facebook?.verified),
         },
         instagram: {
-          configured: Boolean(data.instagram?.configured ?? data.instagram?.account_id),
+          configured: data.instagram?.configured !== undefined ? Boolean(data.instagram.configured) : Boolean(data.instagram?.business_account_id || data.instagram?.account_id),
           verified: Boolean(data.instagram?.verified),
         },
         wordpress: {
-          configured: Boolean(data.wordpress?.configured ?? data.wordpress?.url),
+          configured: data.wordpress?.configured !== undefined ? Boolean(data.wordpress.configured) : Boolean(data.wordpress?.url),
           verified: Boolean(data.wordpress?.verified),
         },
       });
@@ -248,11 +248,28 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
   const titleInputRef = useRef<TextInput>(null);
   const captionText = formCaption.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').trim();
   const selectedPlatformCount = Object.values(targetPlatforms).filter(Boolean).length;
-  const formReady = Boolean(formTitle.trim() && captionText && selectedPlatformCount);
+
+  const unconfiguredPlatforms = useMemo(() => {
+    const list: string[] = [];
+    if (targetPlatforms.facebook && platformAvailability.facebook?.configured === false) {
+      list.push('Facebook');
+    }
+    if (targetPlatforms.instagram && platformAvailability.instagram?.configured === false) {
+      list.push('Instagram');
+    }
+    if (targetPlatforms.website && platformAvailability.wordpress?.configured === false) {
+      list.push('Website');
+    }
+    return list;
+  }, [targetPlatforms, platformAvailability]);
+
+  const formReady = Boolean(formTitle.trim() && captionText && selectedPlatformCount && unconfiguredPlatforms.length === 0);
   const fieldErrors = {
     title: submitAttempted && !formTitle.trim() ? 'Add a request title.' : '',
     caption: submitAttempted && !captionText ? 'Write a caption for this request.' : '',
-    platforms: submitAttempted && !selectedPlatformCount ? 'Choose at least one publishing destination.' : '',
+    platforms: unconfiguredPlatforms.length > 0
+      ? `Cannot proceed: ${unconfiguredPlatforms.join(', ')} has not finished configuration in the system. Please deselect ${unconfiguredPlatforms.length > 1 ? 'them' : 'it'} to continue.`
+      : (submitAttempted && !selectedPlatformCount ? 'Choose at least one publishing destination.' : ''),
   };
   const validationSummary = Object.values(fieldErrors).filter(Boolean).join(' ');
 
@@ -841,6 +858,11 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
     const selectedPlatforms = Object.keys(targetPlatforms).filter(
       (platform) => targetPlatforms[platform as keyof typeof targetPlatforms],
     );
+    if (unconfiguredPlatforms.length > 0) {
+      alert(`Cannot submit request: The following platform(s) have not finished configuration: ${unconfiguredPlatforms.join(', ')}. Please deselect ${unconfiguredPlatforms.length > 1 ? 'them' : 'it'} before submitting.`);
+      focusInvalidField('platforms');
+      return;
+    }
     if (!formReady) {
       focusInvalidField(!formTitle.trim() ? 'title' : !captionText ? 'caption' : 'platforms');
       return;
@@ -1538,6 +1560,26 @@ export const ModernRequestorDashboard: React.FC<ModernRequestorDashboardProps> =
                 <Text style={styles.platformSectionSub}>
                   Choose where to publish. Photo requirements apply to your selected platforms.
                 </Text>
+
+                {unconfiguredPlatforms.length > 0 && (
+                  <View style={{
+                    backgroundColor: palette.dark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+                    borderColor: palette.dark ? '#B91C1C' : '#FCA5A5',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    padding: 10,
+                    marginTop: 8,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}>
+                    <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: palette.dark ? '#FCA5A5' : '#991B1B', flex: 1, fontWeight: '600' }}>
+                      Cannot proceed to submit: {unconfiguredPlatforms.join(', ')} has not finished configuration in the system. Please deselect {unconfiguredPlatforms.length > 1 ? 'them' : 'it'} to continue.
+                    </Text>
+                  </View>
+                )}
 
                 <View nativeID="imc-request-platforms" style={styles.targetPlatformCardsRow}>
                   {/* Facebook */}

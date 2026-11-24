@@ -475,6 +475,17 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
       alert('Please select at least one publishing platform.');
       return;
     }
+    const unconfigured = chosen.filter((p) => {
+      if (p === 'facebook' && platformAvail.facebook?.configured === false) return true;
+      if (p === 'instagram' && platformAvail.instagram?.configured === false) return true;
+      if (p === 'website' && platformAvail.wordpress?.configured === false) return true;
+      return false;
+    });
+    if (unconfigured.length > 0) {
+      const names = unconfigured.map((p) => p === 'website' ? 'Website' : (p.charAt(0).toUpperCase() + p.slice(1))).join(', ');
+      alert(`Cannot publish: ${names} has not finished configuration in the system. Please deselect ${unconfigured.length > 1 ? 'them' : 'it'} before proceeding.`);
+      return;
+    }
     onPublish(finalCaption, finalImages, [...chosen]);
   };
 

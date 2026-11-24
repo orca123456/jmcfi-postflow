@@ -122,6 +122,14 @@ export default function RequestorDashboard() {
     instagram?: { configured: boolean; verified: boolean };
     wordpress?: { configured: boolean; verified: boolean };
   }>({});
+
+  const unconfiguredSelectedPlatforms = useMemo(() => {
+    const list: string[] = [];
+    if (platforms.facebook && platformAvailability.facebook?.configured === false) list.push('Facebook');
+    if (platforms.instagram && platformAvailability.instagram?.configured === false) list.push('Instagram');
+    if (platforms.portal && platformAvailability.wordpress?.configured === false) list.push('Website');
+    return list;
+  }, [platforms, platformAvailability]);
   const [publishDate, setPublishDate] = useState('');
   const [publishTime, setPublishTime] = useState('');
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
@@ -760,6 +768,11 @@ export default function RequestorDashboard() {
     const selectedPlatforms = Object.keys(platforms).filter(k => (platforms as any)[k]);
     if (selectedPlatforms.length === 0) {
       alert('Please select at least one target platform before submitting.');
+      return;
+    }
+
+    if (unconfiguredSelectedPlatforms.length > 0) {
+      alert(`Cannot submit request: The following selected platform(s) have not finished configuration: ${unconfiguredSelectedPlatforms.join(', ')}. Please deselect ${unconfiguredSelectedPlatforms.length > 1 ? 'them' : 'it'} before submitting.`);
       return;
     }
 
@@ -1500,6 +1513,25 @@ export default function RequestorDashboard() {
                     </View>
                     <Text style={styles.cardTitle}>Target Platforms</Text>
                   </View>
+
+                  {unconfiguredSelectedPlatforms.length > 0 && (
+                    <View style={{
+                      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+                      borderColor: isDarkMode ? '#B91C1C' : '#FCA5A5',
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: 10,
+                      marginBottom: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}>
+                      <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                      <Text style={{ fontSize: 12, color: isDarkMode ? '#FCA5A5' : '#991B1B', flex: 1, fontWeight: '600' }}>
+                        Cannot proceed to submit: {unconfiguredSelectedPlatforms.join(', ')} has not finished configuration in the system. Please deselect {unconfiguredSelectedPlatforms.length > 1 ? 'them' : 'it'} to continue.
+                      </Text>
+                    </View>
+                  )}
 
                   <View style={styles.platformsList}>
                     <TouchableOpacity accessibilityRole="checkbox" accessibilityLabel="Facebook" accessibilityState={{ checked: platforms.facebook }} {...(Platform.OS === 'web' ? { 'aria-checked': platforms.facebook } : {})} style={styles.platformRow} onPress={() => togglePlatform('facebook')}>
