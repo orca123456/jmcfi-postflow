@@ -247,7 +247,7 @@ class TokenSettingController extends Controller
             } catch (\Throwable $_) {}
 
             $response = Http::connectTimeout(5)->timeout(15)->get("https://graph.facebook.com/{$version}/{$pageId}", [
-                'fields' => 'id,name,instagram_business_account',
+                'fields' => 'id,name',
                 'access_token' => $facebookToken,
             ]);
 
@@ -259,12 +259,22 @@ class TokenSettingController extends Controller
                     'id' => $data['id'] ?? null,
                     'name' => $data['name'] ?? null,
                     'can_post' => $canPost,
-                    'instagram_business_account_id' => data_get($data, 'instagram_business_account.id'),
                 ];
 
-                if (data_get($data, 'instagram_business_account.id')) {
-                    $derived['instagram_business_account_id'] = data_get($data, 'instagram_business_account.id');
-                }
+                // Optionally discover connected Instagram Business Account ID if permitted
+                try {
+                    $igLookup = Http::connectTimeout(5)->timeout(10)->get("https://graph.facebook.com/{$version}/{$pageId}", [
+                        'fields' => 'instagram_business_account',
+                        'access_token' => $facebookToken,
+                    ]);
+                    if ($igLookup->successful()) {
+                        $igId = data_get($igLookup->json(), 'instagram_business_account.id');
+                        if ($igId) {
+                            $checks['facebook']['instagram_business_account_id'] = $igId;
+                            $derived['instagram_business_account_id'] = $igId;
+                        }
+                    }
+                } catch (\Throwable $_) {}
             } else {
                 $checks['facebook']['error'] = $this->friendlyMetaError($response->json(), $response->body());
             }
