@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text,
   TouchableOpacity, useWindowDimensions, View,

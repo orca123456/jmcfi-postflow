@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Auth\LoginRequest;
 use App\Http\Requests\Api\Auth\RegisterRequest;
 use App\Http\Resources\Api\UserResource;
 use App\Models\User;
+use App\Notifications\AccountCreatedCredentialsNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -283,6 +284,13 @@ class AuthController extends Controller
         $user->assignRole($role);
 
         $token = $user->createToken('postflow-api')->plainTextToken;
+
+        // Send Welcome & Credentials Email to the user's institutional inbox
+        try {
+            $user->notify(new AccountCreatedCredentialsNotification($user, $request->password, $role));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to dispatch welcome email to {$user->email}: " . $e->getMessage());
+        }
 
         AuditLogService::logForUser($user, 'ACCOUNT_REGISTERED', 'New account registered: ' . $user->full_name, 'INFO', [
             'email' => $user->email,
