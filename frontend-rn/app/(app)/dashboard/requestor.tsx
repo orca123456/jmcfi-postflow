@@ -3275,6 +3275,50 @@ export default function RequestorDashboard() {
 
                     <View style={styles.metaDivider} />
 
+                    {/* Platform Publishing Breakdown — only for partial/failed */}
+                    {(['publish_failed', 'partially_published'].includes(selectedQueuePost.rawStatus)) && (() => {
+                      const recs = selectedQueuePost.rawPost?.publishing_records ?? [];
+                      if (!Array.isArray(recs) || recs.length === 0) return null;
+                      return (
+                        <View style={styles.metaRowGrid}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.metaLabel}>Platform Status</Text>
+                            <View style={{ marginTop: 6, gap: 6 }}>
+                              {recs.map((rec: any) => {
+                                const isPub = rec.status === 'published';
+                                const isFail = rec.status === 'failed';
+                                const pName = String(rec.platform || '').charAt(0).toUpperCase() + String(rec.platform || '').slice(1);
+                                return (
+                                  <View key={rec.id ?? rec.platform} style={{ gap: 2 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons
+                                          name={isPub ? 'checkmark-circle' : (isFail ? 'close-circle' : 'time-outline')}
+                                          size={14}
+                                          color={isPub ? '#16A34A' : (isFail ? '#DC2626' : '#2563EB')}
+                                        />
+                                        <Text style={[styles.metaVal, { fontWeight: '600' }]}>{pName}</Text>
+                                      </View>
+                                      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, backgroundColor: isPub ? '#DCFCE7' : (isFail ? '#FEE2E2' : '#DBEAFE') }}>
+                                        <Text style={{ fontSize: 10, fontWeight: '700', color: isPub ? '#16A34A' : (isFail ? '#DC2626' : '#2563EB') }}>
+                                          {isPub ? 'Published' : (isFail ? 'Failed' : 'Processing')}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    {isFail && Boolean(rec.error_message) && (
+                                      <Text style={{ fontSize: 11, color: '#DC2626', marginLeft: 20 }}>{rec.error_message}</Text>
+                                    )}
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })()}
+
+                    <View style={styles.metaDivider} />
+
                     <View style={styles.metaRow}>
                       <Text style={styles.metaLabel}>Caption / Main Text</Text>
                       <FormattedText style={styles.metaCaptionBox}>{selectedQueuePost.caption}</FormattedText>

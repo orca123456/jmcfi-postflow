@@ -481,13 +481,15 @@ export default function ITAdminDashboard() {
 
   const canPublishStatus = (status?: string) => status === 'approved' || status === 'scheduled' || status === 'publish_failed' || status === 'partially_published';
   const isPublishedLikeStatus = (status?: string) => status === 'published' || status === 'approved';
+  const isPartiallyPublishedStatus = (status?: string) => status === 'partially_published';
   const isFailedLikeStatus = (status?: string) => status === 'rejected' || status === 'returned_for_revision' || status === 'publish_failed';
   const isProcessingLikeStatus = (status?: string) => status === 'publishing' || status === 'scheduled';
   const statusBadgeStyle = (status?: string) => {
     if (isPublishedLikeStatus(status)) return { backgroundColor: '#DCFCE7', color: '#16A34A' };
+    if (isPartiallyPublishedStatus(status)) return { backgroundColor: '#FEF3C7', color: '#D97706' };
     if (isFailedLikeStatus(status)) return { backgroundColor: '#FEE2E2', color: '#DC2626' };
     if (isProcessingLikeStatus(status)) return { backgroundColor: '#DBEAFE', color: '#2563EB' };
-    return { backgroundColor: '#FEF3C7', color: '#B45309' };
+    return { backgroundColor: '#F1F5F9', color: '#64748B' };
   };
 
   // ── Animated spinner rotation ──
@@ -2832,7 +2834,11 @@ export default function ITAdminDashboard() {
       if (requestsStatus === 'Pending') {
         matchesStatus = ['pending_office_head', 'pending_vice_president', 'pending_imc_qa', 'publishing', 'draft'].includes(post.rawStatus);
       } else if (requestsStatus === 'Published') {
-        matchesStatus = ['published', 'approved'].includes(post.rawStatus);
+        matchesStatus = ['published', 'approved', 'partially_published'].includes(post.rawStatus);
+      } else if (requestsStatus === 'Partial') {
+        matchesStatus = post.rawStatus === 'partially_published';
+      } else if (requestsStatus === 'Failed') {
+        matchesStatus = post.rawStatus === 'publish_failed';
       } else if (requestsStatus === 'Rejected') {
         matchesStatus = ['rejected', 'returned_for_revision'].includes(post.rawStatus);
       } else if (requestsStatus === 'Draft' || requestsStatus === 'Drafts') {
@@ -3092,7 +3098,7 @@ export default function ITAdminDashboard() {
 
                   {isRequestsStatusDropdownOpen && (
                     <View style={{ position: 'absolute', top: 38, left: 0, right: 'auto', backgroundColor: '#fff', borderRadius: 8, padding: 6, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 140, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 999 }}>
-                      {['All Status', 'Pending', 'Published', 'Rejected', 'Draft'].map((opt: any) => (
+                      {['All Status', 'Pending', 'Published', 'Partial', 'Failed', 'Rejected', 'Draft'].map((opt: any) => (
                         <TouchableOpacity
                           key={opt}
                           style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 6, backgroundColor: requestsStatus === opt ? '#f1f5f9' : 'transparent' }}
@@ -9984,6 +9990,51 @@ $response = curl_exec($ch);`}
                         </Text>
                       </View>
                     </View>
+
+                    {/* Platform Publishing Breakdown (shown when partially_published or publish_failed) */}
+                    {(['partially_published', 'publish_failed'].includes(previewPost?.rawStatus)) && (() => {
+                      const recs = previewPost?.rawPost?.publishing_records ?? [];
+                      if (!Array.isArray(recs) || recs.length === 0) return null;
+                      return (
+                        <View style={{ marginTop: 8, padding: 12, borderRadius: 8, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Platform Status</Text>
+                          <View style={{ gap: 6 }}>
+                            {recs.map((rec: any) => {
+                              const isPub = rec.status === 'published';
+                              const isFail = rec.status === 'failed';
+                              const pName = String(rec.platform || '').charAt(0).toUpperCase() + String(rec.platform || '').slice(1);
+                              return (
+                                <View key={rec.id ?? rec.platform} style={{ gap: 2 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <Ionicons
+                                        name={isPub ? 'checkmark-circle' : (isFail ? 'close-circle' : 'time-outline')}
+                                        size={14}
+                                        color={isPub ? '#16A34A' : (isFail ? '#DC2626' : '#2563EB')}
+                                      />
+                                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>{pName}</Text>
+                                    </View>
+                                    <View style={{
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 2,
+                                      borderRadius: 4,
+                                      backgroundColor: isPub ? '#DCFCE7' : (isFail ? '#FEE2E2' : '#DBEAFE'),
+                                    }}>
+                                      <Text style={{ fontSize: 10, fontWeight: '700', color: isPub ? '#16A34A' : (isFail ? '#DC2626' : '#2563EB') }}>
+                                        {isPub ? 'Published' : (isFail ? 'Failed' : 'Processing')}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {isFail && Boolean(rec.error_message) && (
+                                    <Text style={{ fontSize: 11, color: '#DC2626', marginLeft: 20 }}>{rec.error_message}</Text>
+                                  )}
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      );
+                    })()}
                   </View>
 
                   {/* ── Approval Timeline ── */}

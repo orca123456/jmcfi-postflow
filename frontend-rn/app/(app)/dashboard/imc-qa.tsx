@@ -709,7 +709,7 @@ export default function ImcQaDashboard() {
     const s = String(status || '').toLowerCase();
     return s === 'pending_imc_qa' || s === 'pending' || s === 'pending_qa';
   };
-  const isApprovedStatus = (status: string) => ['APPROVED', 'SCHEDULED', 'PUBLISHED'].includes(status);
+  const isApprovedStatus = (status: string) => ['APPROVED', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'PARTIALLY_PUBLISHED'].includes(status);
 
 
 

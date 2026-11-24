@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import RenderHtml from 'react-native-render-html';
 import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../constants/theme';
-import { postsApi, resolveImageUrl } from '../../services/api';
+import { postsApi, publishingApi, resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
 import { FacebookMediaGrid, isImageMedia } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
@@ -21,7 +21,7 @@ export const isDirectImcDetailsRequest = (request: any): boolean =>
 
 type Photo = { uri: string; name: string };
 type Palette = ReturnType<typeof getPalette>;
-type ProgressStep = { label: string; detail: string; complete?: boolean; active?: boolean; error?: boolean };
+type ProgressStep = { label: string; detail: string; complete?: boolean; active?: boolean; error?: boolean; warning?: boolean };
 
 const getPalette = (dark: boolean) => ({
   surface: Platform.OS === 'web' ? Colors.surface : dark ? '#172033' : Colors.surface,
@@ -292,6 +292,8 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
   const [previewPlatform, setPreviewPlatform] = useState<'facebook' | 'instagram' | 'website'>('facebook');
   const [previewVersion, setPreviewVersion] = useState<'imc' | 'original'>('imc');
   const [websiteActiveIndex, setWebsiteActiveIndex] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryFeedback, setRetryFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const modalWidth = Math.min(820, Math.max(0, width - Spacing.xl));
   const columns = width >= 1080;
   const raw = request?.rawPost ?? request ?? {};
@@ -304,9 +306,10 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
   const revision = status === 'returned_for_revision' || action === 'returned_for_revision';
   const published = status === 'published';
   const scheduled = status === 'scheduled';
+  const partiallyPublished = status === 'partially_published';
   const failed = status === 'publish_failed';
   const publishing = status === 'publishing';
-  const finalized = !draft && (['approved', 'scheduled', 'publishing', 'published', 'publish_failed'].includes(status)
+  const finalized = !draft && (['approved', 'scheduled', 'publishing', 'published', 'partially_published', 'publish_failed'].includes(status)
     || (action === 'approved' && !rejected && !revision));
   const snapshot = raw.submitted_materials ?? request?.submitted_materials;
   const hasSnapshot = Boolean(snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) && Array.isArray((snapshot as any).media) && (snapshot as any).media.length > 0);
@@ -349,7 +352,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
   const isReviewing = action === 'reviewing';
   const isAwaitingReview = !draft && !rejected && !revision && !finalized && !isEditing && !isReviewing;
 
-  const statusLabel = draft ? 'Draft' : rejected ? 'Rejected' : revision ? 'Revision requested' : published ? 'Published' : scheduled ? 'Scheduled'
+  const statusLabel = draft ? 'Draft' : rejected ? 'Rejected' : revision ? 'Revision requested' : published ? 'Published' : partiallyPublished ? 'Partially Published' : scheduled ? 'Scheduled'
     : failed ? 'Publication needs attention' : publishing ? 'Publishing' : finalized ? 'Ready for publication'
       : isEditing ? 'Currently editing by IMC'
         : isReviewing ? 'Under review by IMC'
@@ -359,8 +362,9 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
     : rejected ? 'IMC did not accept this request. Read the review notes below before preparing another request.'
       : revision ? 'Review the IMC feedback and update your request before resubmitting.'
         : published ? 'Your publication has been released. The final caption and images are shown below.'
+          : partiallyPublished ? 'Some platforms were published successfully while others encountered issues. You can retry publishing for the remaining platforms.'
           : scheduled ? 'IMC has scheduled your publication.'
-            : failed ? 'IMC has finalized the content, but publication did not finish. The publishing team needs to check the release.'
+            : failed ? 'IMC has finalized the content, but publication did not finish. You can retry publishing once platform connections are verified.'
               : publishing ? 'Your publication materials are being sent to the selected platforms.'
                 : finalized ? 'IMC has reviewed and finalized the content. Publication is the next step.'
                   : isEditing ? 'IMC is actively preparing your graphics and final publication caption.'
@@ -384,17 +388,33 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
     },
     {
       label: 'Publish',
-      detail: published ? 'Published' : scheduled ? 'Scheduled' : failed ? 'Needs attention' : 'Waiting',
+      detail: published ? 'Published' : partiallyPublished ? 'Partially published' : scheduled ? 'Scheduled' : failed ? 'Needs attention' : 'Waiting',
       complete: published,
-      active: finalized && !published,
+      active: finalized && !published && !failed && !partiallyPublished,
+      warning: partiallyPublished,
       error: failed,
     },
   ];
 
   const getStepIcon = (step: ProgressStep) => {
     if (step.error) return { name: 'close-circle' as const, color: '#DC2626' };
+    if (step.warning) return { name: 'alert-circle' as const, color: '#D97706' };
     if (step.complete) return { name: 'checkmark-circle' as const, color: '#059669' };
     return { name: 'time' as const, color: step.active ? palette.purple : '#94A3B8' };
+  };
+
+  const handleRetryPublish = async () => {
+    setIsRetrying(true);
+    setRetryFeedback(null);
+    try {
+      const postId = Number(raw.id ?? request?.id);
+      await publishingApi.publish(postId);
+      setRetryFeedback({ type: 'success', message: 'Publishing retry queued! Processing in the background.' });
+    } catch (err: any) {
+      setRetryFeedback({ type: 'error', message: 'Retry failed: ' + (err.response?.data?.message || err.message || 'Unknown error') });
+    } finally {
+      setIsRetrying(false);
+    }
   };
 
   // Preview photos: when IMC changes/edits photos, show IMC edited photos; otherwise show original
@@ -431,7 +451,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
 
   const currentLightboxPhoto = lightbox ? (lightbox.photos[lightbox.index] || lightbox.photos[0]) : null;
 
-  useEffect(() => { setLightbox(null); setPreviewPlatform('facebook'); setPreviewVersion('imc'); setWebsiteActiveIndex(0); }, [request?.id]);
+  useEffect(() => { setLightbox(null); setPreviewPlatform('facebook'); setPreviewVersion('imc'); setWebsiteActiveIndex(0); setRetryFeedback(null); setIsRetrying(false); }, [request?.id]);
   useEffect(() => { setLightboxFailed(false); }, [currentLightboxPhoto?.uri]);
   useEffect(() => {
     if (Platform.OS !== 'web' || !isDirectImcDetailsRequest(request)) return;
@@ -677,6 +697,57 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                       }) : <Text style={[styles.bodyText, { color: palette.muted }]}>No platforms recorded.</Text>}
                     </View>
                   </View>
+
+                  {/* Platform Publishing Status Breakdown */}
+                  {(() => {
+                    const recs = raw.publishing_records ?? request?.publishing_records ?? raw.publishingRecords ?? request?.publishingRecords;
+                    if (!Array.isArray(recs) || recs.length === 0) return null;
+                    return (
+                      <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: dark ? '#1E293B' : '#F8FAFC', borderWidth: 1, borderColor: palette.border }}>
+                        <Text style={[labelStyle, { marginBottom: 6 }]}>Platform Publishing Breakdown</Text>
+                        <View style={{ gap: 6 }}>
+                          {recs.map((rec: any) => {
+                            const isPub = rec.status === 'published';
+                            const isFail = rec.status === 'failed';
+                            const pName = rec.platform.charAt(0).toUpperCase() + rec.platform.slice(1);
+                            return (
+                              <View key={rec.id || rec.platform} style={{ flexDirection: 'column', gap: 2 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons
+                                      name={isPub ? 'checkmark-circle' : (isFail ? 'close-circle' : 'time-outline')}
+                                      size={14}
+                                      color={isPub ? '#16A34A' : (isFail ? '#DC2626' : '#2563EB')}
+                                    />
+                                    <Text style={[styles.smallText, { color: palette.text, fontWeight: FontWeight.semiBold }]}>{pName}</Text>
+                                  </View>
+                                  <View style={{
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 2,
+                                    borderRadius: 4,
+                                    backgroundColor: isPub ? (dark ? '#052E16' : '#DCFCE7') : (isFail ? (dark ? '#450A0A' : '#FEE2E2') : (dark ? '#172554' : '#DBEAFE')),
+                                  }}>
+                                    <Text style={{
+                                      fontSize: 10,
+                                      fontWeight: '700',
+                                      color: isPub ? '#16A34A' : (isFail ? '#DC2626' : '#2563EB'),
+                                    }}>
+                                      {isPub ? 'Published' : (isFail ? 'Failed' : 'Publishing')}
+                                    </Text>
+                                  </View>
+                                </View>
+                                {isFail && Boolean(rec.error_message) && (
+                                  <Text style={{ fontSize: 10, color: '#DC2626', marginLeft: 20 }}>
+                                    {rec.error_message}
+                                  </Text>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })()}
 
                   {/* Original Caption inside Request Information */}
                   <View nativeID="direct-imc-submitted" style={[styles.infoField, { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: palette.border }]}>
@@ -974,10 +1045,42 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
           </ScrollView>
 
           {/* Modal Footer Actions matching standard request */}
-          <View style={[styles.footer, { backgroundColor: dark ? palette.mutedSurface : '#FAFAFA', borderColor: palette.border }]}>
-            <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close request details" style={[styles.closeButton, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.closeButtonText, { color: palette.text }]}>Close</Text>
-            </TouchableOpacity>
+          <View style={[styles.footer, { backgroundColor: dark ? palette.mutedSurface : '#FAFAFA', borderColor: palette.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              {!!retryFeedback && (
+                <Text style={{ fontSize: 12, fontWeight: '600', color: retryFeedback.type === 'success' ? '#059669' : '#DC2626' }}>
+                  {retryFeedback.message}
+                </Text>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              {(failed || partiallyPublished) && (
+                <TouchableOpacity
+                  onPress={handleRetryPublish}
+                  disabled={isRetrying}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry publishing failed platforms"
+                  style={[
+                    styles.closeButton,
+                    {
+                      backgroundColor: partiallyPublished ? '#D97706' : '#DC2626',
+                      borderColor: 'transparent',
+                      flexDirection: 'row',
+                      gap: 6,
+                      opacity: isRetrying ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons name="refresh-outline" size={15} color="#FFFFFF" />
+                  <Text style={[styles.closeButtonText, { color: '#FFFFFF', fontWeight: '700' }]}>
+                    {isRetrying ? 'Retrying...' : 'Retry Publishing'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close request details" style={[styles.closeButton, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                <Text style={[styles.closeButtonText, { color: palette.text }]}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
