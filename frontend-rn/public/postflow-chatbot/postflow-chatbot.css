@@ -115,3 +115,14 @@
 .pf-dark .pf-input{color:#f1eafa}.pf-dark .pf-input::placeholder,.pf-dark .pf-compose-hint{color:#a18cac}
 .pf-dark .pf-send:disabled{background:#382947;color:#967ba9}.pf-dark .pf-busy .pf-send{background:var(--pf-grape);color:#fff}
 .pf-dark .pf-greeting,.pf-dark .pf-greeting::after{background:#251b3d;border-color:#483459}.pf-dark .pf-greeting-action{color:#d6b4ee}
+
+/* ── Feedback Form QR Code ── */
+.pf-qr-section{display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;padding:2px 0 16px !important;width:100% !important;box-sizing:border-box !important}
+.pf-qr-title{display:block !important;width:100% !important;font-size:15px;line-height:22px;font-weight:600;color:#382046;margin:0 0 10px 0 !important;text-align:center !important;letter-spacing:-.2px;white-space:nowrap}
+.pf-dark .pf-qr-title{color:#eee3f6}
+.pf-qr-link{display:inline-flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;background:#fff !important;padding:8px !important;border-radius:14px !important;border:1.5px solid #e9def2 !important;box-shadow:0 4px 18px rgba(75,0,130,.09) !important;cursor:pointer;text-decoration:none;transition:all .18s cubic-bezier(.2,.8,.2,1) !important;box-sizing:border-box}
+.pf-qr-link:hover,.pf-qr-link:active,.pf-qr-link:focus,.pf-qr-link:focus-within{transform:translateY(-2px) scale(1.02);border-color:#38bdf8 !important;box-shadow:0 0 0 3.5px rgba(56,189,248,.38),0 8px 24px rgba(56,189,248,.25) !important}
+.pf-qr-link:focus-visible{outline:2px solid #38bdf8 !important;outline-offset:3px}
+.pf-qr-code{width:190px !important;height:190px !important;max-width:100%;display:block !important;object-fit:contain;image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:crisp-edges}
+.pf-dark .pf-qr-link{background:#fff !important;border-color:#5a4372 !important;box-shadow:0 6px 24px rgba(0,0,0,.4) !important}
+.pf-dark .pf-qr-link:hover,.pf-dark .pf-qr-link:active,.pf-dark .pf-qr-link:focus{border-color:#38bdf8 !important;box-shadow:0 0 0 3.5px rgba(56,189,248,.45),0 8px 26px rgba(56,189,248,.3) !important}

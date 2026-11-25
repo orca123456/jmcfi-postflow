@@ -10,12 +10,14 @@ import {
   Image,
   PanResponder,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing } from '../constants/theme';
 import { chatbotApi } from '../services/api';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
+import { FEEDBACK_FORM_URL, FEEDBACK_QR_PNG_BASE64 } from '../constants/feedbackQr';
 
 interface Message {
   id: string;
@@ -607,6 +609,38 @@ export function ChatBot() {
             showsVerticalScrollIndicator={false}
             {...({ role: 'log' } as any)}
           >
+            {/* Feedback QR Code */}
+            <View style={{ alignItems: 'center', marginVertical: 10 }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? '#eee3f6' : '#382046', marginBottom: 10, textAlign: 'center' }}>
+                Data Gathering Link
+              </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL(FEEDBACK_FORM_URL)}
+                activeOpacity={0.8}
+                accessibilityRole="link"
+                accessibilityLabel="Scan or tap QR code to open Google Form"
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: 8,
+                  borderRadius: 14,
+                  borderWidth: 1.5,
+                  borderColor: '#e9def2',
+                  shadowColor: '#4B0082',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 12,
+                  elevation: 4,
+                  alignItems: 'center',
+                }}
+              >
+                <Image
+                  source={{ uri: FEEDBACK_QR_PNG_BASE64 }}
+                  style={{ width: 180, height: 180 }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
             {messages.map((msg) => (
               <View
                 key={msg.id}

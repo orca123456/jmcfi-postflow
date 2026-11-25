@@ -18,6 +18,7 @@ import { characterStyles } from './postflowCharacterStyles';
 import { useApproverReviewCount } from './useApproverReviewCount';
 import { consumeAssistantWelcome, getAssistantWelcome, subscribeAssistantWelcome } from '../utils/assistantWelcome';
 import { getAssistantSoundEnabled, subscribeAssistantSound, setAssistantSoundEnabled, playAssistantSound, prepareAssistantAudio } from '../utils/assistantSound.web';
+import { FEEDBACK_FORM_URL, FEEDBACK_QR_PNG_BASE64 } from '../constants/feedbackQr';
 
 const BASE = '/postflow-chatbot';
 const CSS_ID = 'postflow-chatbot-css';
@@ -38,7 +39,7 @@ function loadStylesheet(): Promise<void> {
     const link = document.createElement('link');
     link.id = CSS_ID;
     link.rel = 'stylesheet';
-    link.href = `${BASE}/postflow-chatbot.css`;
+    link.href = `${BASE}/postflow-chatbot.css?v=20261125_v2`;
     link.addEventListener('load', () => { link.dataset.loaded = '1'; resolve(); }, { once: true });
     link.addEventListener('error', () => resolve(), { once: true });
     document.head.appendChild(link);
@@ -240,7 +241,8 @@ export function ChatBot() {
         const roomBelow = v.top + v.height - r.bottom - m - 12;
         const below = roomBelow > roomAbove;
         root.classList.toggle('pf-below', below);
-        panel.style.height = `${Math.max(0, Math.min(role === 'approver' ? 496 : 448, below ? roomBelow : roomAbove))}px`;
+        const desiredH = role === 'approver' ? 620 : 580;
+        panel.style.height = `${Math.max(380, Math.min(desiredH, below ? roomBelow : roomAbove))}px`;
         const greetingWidth = Math.min(220, v.width - 24);
         const fitsLeft = r.left - greetingWidth - 10 >= v.left + m;
         const fitsRight = r.right + greetingWidth + 10 <= v.left + v.width - m;
@@ -520,6 +522,71 @@ export function ChatBot() {
         </header>
         <div className="pf-messages" data-pf-messages="" aria-live="polite" aria-relevant="additions">
           <div className="pf-introduction">
+            <div
+              className="pf-qr-section"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                padding: '4px 0 16px',
+                textAlign: 'center',
+              }}
+            >
+              <span
+                className="pf-qr-title"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'center',
+                  fontSize: '15px',
+                  lineHeight: '22px',
+                  fontWeight: 600,
+                  color: isDarkMode ? '#eee3f6' : '#382046',
+                  marginBottom: '10px',
+                  letterSpacing: '-0.2px',
+                }}
+              >
+                Data Gathering Link
+              </span>
+              <a
+                href={FEEDBACK_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pf-qr-link"
+                title="Click or scan to open Google Form"
+                aria-label="Scan or click QR code to open Google Form"
+                style={{
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#ffffff',
+                  padding: '8px',
+                  borderRadius: '14px',
+                  boxShadow: isDarkMode ? '0 6px 24px rgba(0,0,0,0.4)' : '0 4px 18px rgba(75,0,130,0.09)',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <img
+                  src="/postflow-chatbot/assets/feedback-qr.svg"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = FEEDBACK_QR_PNG_BASE64;
+                  }}
+                  alt="Data Gathering QR Code"
+                  className="pf-qr-code"
+                  style={{
+                    width: '190px',
+                    height: '190px',
+                    maxWidth: '100%',
+                    display: 'block',
+                    objectFit: 'contain',
+                  }}
+                />
+              </a>
+            </div>
             <div className="pf-welcome"><h3>{greeting}</h3><p>{welcome}</p></div>
             {role === 'approver' && <p className={`pf-review-summary ${review.count !== null && review.count > 0 ? 'pf-review-pending' : ''}`} role="status" aria-live="polite" aria-atomic="true">{reviewMessage}</p>}
             <p className="pf-topic-label">Explore a topic</p>
