@@ -10203,6 +10203,34 @@ fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postf
                 </TouchableOpacity>
               )}
 
+              {/* When post is already marked published, provide Push to Social Media so admins can trigger/re-push social media */}
+              {previewPost?.rawStatus === 'published' && (
+                <TouchableOpacity
+                  disabled={publishingPostId === previewPost?.id}
+                  onPress={() => handlePublish(previewPost.id)}
+                  style={{
+                    paddingHorizontal: 18,
+                    paddingVertical: 9,
+                    borderRadius: 8,
+                    backgroundColor: '#2563EB',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    opacity: publishingPostId === previewPost?.id ? 0.6 : 1,
+                    shadowColor: '#2563EB',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  <Ionicons name="share-social-outline" size={15} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                    {publishingPostId === previewPost?.id ? 'Publishing...' : 'Push to Social Media'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {canPublishStatus(previewPost?.rawStatus) && (
                 <TouchableOpacity
                   disabled={publishingPostId === previewPost?.id}

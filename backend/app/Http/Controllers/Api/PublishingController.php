@@ -36,8 +36,18 @@ class PublishingController extends Controller
 
         $bypassApprovals = ($isPublisher && $request->boolean('bypass_approvals', false)) || ($isPublisher && $request->input('bypass') == true);
 
-        // 2. Validate that the post is ready to be published (must be approved, scheduled, failed, or partially published)
-        if (!$bypassApprovals && !in_array($post->status, [PostRequest::STATUS_APPROVED, PostRequest::STATUS_SCHEDULED, PostRequest::STATUS_PUBLISH_FAILED, PostRequest::STATUS_PARTIALLY_PUBLISHED])) {
+        // 2. Validate that the post is ready to be published (must be approved, scheduled, failed, partially published, or retrying published)
+        $allowedStatuses = [
+            PostRequest::STATUS_APPROVED,
+            PostRequest::STATUS_SCHEDULED,
+            PostRequest::STATUS_PUBLISH_FAILED,
+            PostRequest::STATUS_PARTIALLY_PUBLISHED,
+        ];
+        if ($isPublisher) {
+            $allowedStatuses[] = PostRequest::STATUS_PUBLISHED;
+        }
+
+        if (!$bypassApprovals && !in_array($post->status, $allowedStatuses, true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Post cannot be published. Current status is ' . $post->status
@@ -108,8 +118,8 @@ class PublishingController extends Controller
                 ->values();
 
             foreach ($publishPlatforms as $platform) {
-                // If platform already published, skip to prevent duplicates
-                if (PublishingRecord::where('post_request_id', $post->id)
+                // If platform already published, skip to prevent duplicates (unless force requested)
+                if (!$request->boolean('force', false) && PublishingRecord::where('post_request_id', $post->id)
                     ->where('platform', $platform)->where('status', 'published')->exists()) {
                     continue;
                 }
