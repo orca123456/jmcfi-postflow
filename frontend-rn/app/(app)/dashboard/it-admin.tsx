@@ -10203,8 +10203,8 @@ fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postf
                 </TouchableOpacity>
               )}
 
-              {/* When post is already marked published, provide Push to Social Media so admins can trigger/re-push social media */}
-              {previewPost?.rawStatus === 'published' && (
+              {/* When post is already published, partially published, or stuck in publishing, provide Push to Social Media so admins can trigger/re-push social media */}
+              {['published', 'publishing', 'partially_published'].includes(previewPost?.rawStatus) && (
                 <TouchableOpacity
                   disabled={publishingPostId === previewPost?.id}
                   onPress={() => handlePublish(previewPost.id)}

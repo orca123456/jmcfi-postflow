@@ -45,6 +45,7 @@ class PublishingController extends Controller
         ];
         if ($isPublisher) {
             $allowedStatuses[] = PostRequest::STATUS_PUBLISHED;
+            $allowedStatuses[] = PostRequest::STATUS_PUBLISHING;
         }
 
         if (!$bypassApprovals && !in_array($post->status, $allowedStatuses, true)) {
@@ -54,6 +55,7 @@ class PublishingController extends Controller
             ], 422);
         }
 
+        Cache::forget('post-publish-' . $post->id);
         $lock = Cache::lock('post_request_publish_' . $post->id, 30);
         if (! $lock->get()) {
             return response()->json([

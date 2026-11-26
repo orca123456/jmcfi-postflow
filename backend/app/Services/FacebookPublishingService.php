@@ -69,19 +69,24 @@ class FacebookPublishingService
                 continue;
             }
 
-            $payload = [
-                'access_token' => $this->accessToken,
-                'published' => 'false',
-            ];
-
             try {
                 if ($isUrl) {
-                    $payload['url'] = $path;
-                    $response = Http::withoutVerifying()->post($uploadEndpoint, $payload);
+                    $response = Http::withoutVerifying()
+                        ->asForm()
+                        ->timeout(45)
+                        ->post($uploadEndpoint, [
+                            'access_token' => $this->accessToken,
+                            'published' => false,
+                            'url' => $path,
+                        ]);
                 } else {
                     $response = Http::withoutVerifying()
+                        ->timeout(60)
                         ->attach('source', file_get_contents($path), basename($path))
-                        ->post($uploadEndpoint, $payload);
+                        ->post($uploadEndpoint, [
+                            'access_token' => $this->accessToken,
+                            'published' => 'false',
+                        ]);
                 }
 
                 if ($response->successful() && !empty($response->json('id'))) {
@@ -94,7 +99,7 @@ class FacebookPublishingService
                         'response' => $response->json(),
                     ]);
                 }
-            } catch (Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error("Exception uploading unpublished photo #{$index} to Facebook: " . $e->getMessage());
             }
         }
@@ -105,13 +110,28 @@ class FacebookPublishingService
         }
 
         $feedEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$this->pageId}/feed";
-        $feedPayload = [
+
+        // In Meta Graph API, attached_media can be passed either as indexed form fields
+        // attached_media[0]={"media_fbid":"..."} or as a JSON array of objects.
+        $formPayload = [
             'access_token' => $this->accessToken,
             'message' => $cleanMessage,
-            'attached_media' => json_encode($attachedMedia),
         ];
+        foreach ($attachedMedia as $i => $item) {
+            $formPayload["attached_media[{$i}]"] = is_string($item) ? $item : json_encode($item);
+        }
 
-        $response = Http::withoutVerifying()->post($feedEndpoint, $feedPayload);
+        $response = Http::withoutVerifying()->asForm()->timeout(45)->post($feedEndpoint, $formPayload);
+
+        // Fallback attempt: pass raw array directly in JSON payload if form is not accepted
+        if (!$response->successful()) {
+            $jsonPayload = [
+                'access_token' => $this->accessToken,
+                'message' => $cleanMessage,
+                'attached_media' => $attachedMedia,
+            ];
+            $response = Http::withoutVerifying()->timeout(45)->post($feedEndpoint, $jsonPayload);
+        }
 
         if ($response->successful()) {
             Log::info('Successfully published multi-photo post to Facebook Page.', ['response' => $response->json()]);
@@ -147,14 +167,15 @@ class FacebookPublishingService
             if ($mediaPath) {
                 if ($isUrl) {
                     $payload['url'] = $mediaPath;
-                    $response = Http::withoutVerifying()->post($endpoint, $payload);
+                    $response = Http::withoutVerifying()->asForm()->timeout(45)->post($endpoint, $payload);
                 } else {
                     $response = Http::withoutVerifying()
+                        ->timeout(60)
                         ->attach('source', file_get_contents($mediaPath), basename($mediaPath))
                         ->post($endpoint, $payload);
                 }
             } else {
-                $response = Http::withoutVerifying()->post($endpoint, $payload);
+                $response = Http::withoutVerifying()->asForm()->timeout(30)->post($endpoint, $payload);
             }
 
             if ($response->successful()) {
@@ -167,7 +188,7 @@ class FacebookPublishingService
                 ]);
                 throw new Exception("Facebook API Error: " . $response->body());
             }
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Exception while publishing to Facebook: ' . $e->getMessage());
             throw $e;
         }

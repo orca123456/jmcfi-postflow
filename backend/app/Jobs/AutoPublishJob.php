@@ -105,7 +105,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                     $igPayload = count($imageUrls) > 1 ? $imageUrls : ($imageUrls[0] ?? null);
                     $publishResults['instagram'] = $instagramService->publishPost($this->postRequest->caption_narrative ?? '', $igPayload);
                     Log::info("AutoPublishJob: Successfully published to Instagram for post ID {$this->postRequest->id}");
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     $publishErrors['instagram'] = $this->friendlyPublishError($e->getMessage());
                     Log::error('AutoPublishJob: Publish to Instagram failed: ' . $e->getMessage());
                 }
@@ -129,7 +129,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                 try {
                     $publishResults['facebook'] = $facebookService->publishPost($this->postRequest->caption_narrative ?? '', $fbPayload);
                     Log::info("AutoPublishJob: Successfully published to Facebook for post ID {$this->postRequest->id}");
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     $publishErrors['facebook'] = $this->friendlyPublishError($e->getMessage());
                     Log::error('AutoPublishJob: Publish to Facebook failed: ' . $e->getMessage());
                 }
@@ -143,7 +143,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
                     try {
                         $publishResults['wordpress'] = $wordpressService->publishPost($this->postRequest, $media, $allImages);
                         Log::info("AutoPublishJob: Successfully published to WordPress for post ID {$this->postRequest->id}");
-                    } catch (Exception $e) {
+                    } catch (\Throwable $e) {
                         $publishErrors['wordpress'] = $e->getMessage();
                         Log::error('AutoPublishJob: Publish to WordPress failed: ' . $e->getMessage());
                     }
@@ -354,9 +354,8 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 
     private function fallbackPublisherId(): int
     {
-        return (int) User::whereHas('roles', fn ($query) => $query->whereIn('name', ['it_publisher', 'it_admin', 'admin']))
-            ->where('status', 'active')
-            ->value('id');
+        return (int) (User::whereHas('roles', fn ($query) => $query->whereIn('name', ['it_publisher', 'it_admin', 'admin', 'imc_qa_checker']))
+            ->value('id') ?? User::value('id') ?? 1);
     }
 
     private function externalPostId(string $platform, array $response): ?string
