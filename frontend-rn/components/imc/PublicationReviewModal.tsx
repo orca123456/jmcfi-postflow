@@ -726,7 +726,14 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                       </View>
                       {originalCaption ? (
                         <View style={[styles.originalCaptionBox, isDarkMode && styles.originalCaptionBoxDark]}>
-                          <RenderedCaption value={originalCaption} dark={isDarkMode} />
+                          <ScrollView
+                            nestedScrollEnabled
+                            showsVerticalScrollIndicator={true}
+                            style={styles.originalCaptionScroll}
+                            contentContainerStyle={{ flexGrow: 1 }}
+                          >
+                            <RenderedCaption value={originalCaption} dark={isDarkMode} />
+                          </ScrollView>
                         </View>
                       ) : (
                         <Text style={[styles.secondaryVal, { fontStyle: 'italic', marginTop: 4 }]}>
@@ -1905,11 +1912,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     padding: 10,
-    maxHeight: 150,
+    maxHeight: 200,
+    overflow: 'hidden',
   },
   originalCaptionBoxDark: {
     backgroundColor: '#0F172A',
     borderColor: '#334155',
+  },
+  originalCaptionScroll: {
+    maxHeight: 180,
   },
   captionWrap: {
     width: '100%',
