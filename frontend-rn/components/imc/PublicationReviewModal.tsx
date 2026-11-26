@@ -51,6 +51,39 @@ export interface PublicationReviewModalProps {
   isPublishing?: boolean;
 }
 
+/**
+ * Converts HTML-formatted captions (e.g. from pasted web text, Facebook, or rich-text editors)
+ * into clean, readable plain text with preserved line breaks and decoded entities.
+ */
+export function stripHtmlToPlainText(html: string): string {
+  if (!html || typeof html !== 'string') return '';
+  if (!html.includes('<') && !html.includes('&')) return html.trim();
+
+  let text = html
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\s*\/\s*(p|div|tr|h[1-6])\s*>/gi, '\n')
+    .replace(/<\s*li\s*>/gi, '• ')
+    .replace(/<\s*\/\s*li\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+
+  text = text
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;|&apos;/gi, "'")
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#(\d+);/g, (_, dec) => {
+      try {
+        return String.fromCharCode(Number(dec));
+      } catch {
+        return '';
+      }
+    });
+
+  return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 const textValue = (value: any): string => {
   if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
   return value && typeof value === 'object'
@@ -243,11 +276,13 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
     );
   }, [request, raw]);
 
+  const cleanOriginal = useMemo(() => stripHtmlToPlainText(originalCaption), [originalCaption]);
+
   // Initialize or reset form whenever request changes
   useEffect(() => {
     if (request) {
       const initialCaption = raw.caption_narrative || raw.caption || request.caption || request.caption_narrative || '';
-      setFinalCaption(initialCaption);
+      setFinalCaption(stripHtmlToPlainText(initialCaption));
       setCarouselIndex(0);
       const snapshot = raw.submitted_materials || request.submitted_materials;
       const hasSnapshot = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot);
@@ -445,11 +480,12 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
     if (!request) return;
     setIsSavingDraft(true);
     try {
+      const cleanText = stripHtmlToPlainText(finalCaption);
       const hasNewFiles = finalImages.some((img) => Boolean(img.file));
-      let payload: any = { caption_narrative: finalCaption };
+      let payload: any = { caption_narrative: cleanText };
       if (hasNewFiles) {
         const formData = new FormData();
-        formData.append('caption_narrative', finalCaption);
+        formData.append('caption_narrative', cleanText);
         finalImages.forEach((img) => {
           if (img.file) {
             formData.append('media[]', img.file);
@@ -473,7 +509,8 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
 
   const handlePublishClick = () => {
     if (!isDirectImcRequest(request)) return;
-    if (!finalCaption.trim()) {
+    const cleanText = stripHtmlToPlainText(finalCaption);
+    if (!cleanText.trim()) {
       alert('Please provide a final caption before publishing.');
       return;
     }
@@ -493,7 +530,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
       alert(`Cannot publish: ${names} has not finished configuration in the system. Please deselect ${unconfigured.length > 1 ? 'them' : 'it'} before proceeding.`);
       return;
     }
-    onPublish(finalCaption, finalImages, [...chosen]);
+    onPublish(cleanText, finalImages, [...chosen]);
   };
 
   if (!visible || !isDirectImcRequest(request)) return null;
@@ -1235,16 +1272,28 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                         <Text style={[styles.fieldLabel, isDarkMode && styles.fieldLabelDark]}>
                           Final Caption
                         </Text>
-                        {finalCaption !== originalCaption && (
-                          <TouchableOpacity
-                            onPress={() => setFinalCaption(originalCaption)}
-                            style={styles.revertBtn}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons name="refresh-outline" size={12} color="#4C007C" style={{ marginRight: 3 }} />
-                            <Text style={styles.revertBtnText}>Revert to original</Text>
-                          </TouchableOpacity>
-                        )}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          {finalCaption.includes('<') && (
+                            <TouchableOpacity
+                              onPress={() => setFinalCaption(stripHtmlToPlainText(finalCaption))}
+                              style={[styles.revertBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="sparkles-outline" size={12} color="#1D4ED8" style={{ marginRight: 3 }} />
+                              <Text style={[styles.revertBtnText, { color: '#1D4ED8' }]}>Clean HTML</Text>
+                            </TouchableOpacity>
+                          )}
+                          {finalCaption.trim() !== cleanOriginal.trim() && (
+                            <TouchableOpacity
+                              onPress={() => setFinalCaption(cleanOriginal)}
+                              style={styles.revertBtn}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="refresh-outline" size={12} color="#4C007C" style={{ marginRight: 3 }} />
+                              <Text style={styles.revertBtnText}>Revert to original</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
 
                       <TextInput
@@ -1254,7 +1303,13 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                         placeholder="Enter or refine the finalized publication caption..."
                         placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
                         value={finalCaption}
-                        onChangeText={setFinalCaption}
+                        onChangeText={(text) => {
+                          if (text.includes('<div') || text.includes('<p>') || text.includes('<span') || text.includes('style=')) {
+                            setFinalCaption(stripHtmlToPlainText(text));
+                          } else {
+                            setFinalCaption(text);
+                          }
+                        }}
                         maxLength={2200}
                         textAlignVertical="top"
                       />

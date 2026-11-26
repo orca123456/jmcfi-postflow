@@ -537,7 +537,13 @@ class PostRequestController extends Controller
             // Apply any edits submitted by reviewer (e.g. from [Edit & Approve])
             $updateData = [];
             if ($request->has('caption_narrative') && !empty(trim((string) $request->caption_narrative))) {
-                $updateData['caption_narrative'] = $request->caption_narrative;
+                $caption = (string) $request->caption_narrative;
+                if (str_contains($caption, '<')) {
+                    $clean = str_ireplace(['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'], "\n", $caption);
+                    $clean = html_entity_decode(strip_tags($clean), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $caption = trim(preg_replace("/\n{3,}/", "\n\n", $clean));
+                }
+                $updateData['caption_narrative'] = $caption;
             }
             if ($request->has('title') && !empty(trim((string) $request->title))) {
                 $updateData['title'] = $request->title;
@@ -974,7 +980,13 @@ class PostRequestController extends Controller
             $postRequest->captureSubmittedMaterials();
 
             if ($request->has('caption_narrative')) {
-                $postRequest->caption_narrative = $request->input('caption_narrative');
+                $caption = (string) $request->input('caption_narrative');
+                if (str_contains($caption, '<')) {
+                    $clean = str_ireplace(['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'], "\n", $caption);
+                    $clean = html_entity_decode(strip_tags($clean), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $caption = trim(preg_replace("/\n{3,}/", "\n\n", $clean));
+                }
+                $postRequest->caption_narrative = $caption;
                 $postRequest->save();
             } else {
                 $postRequest->touch();
