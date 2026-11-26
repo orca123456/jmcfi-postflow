@@ -76,7 +76,7 @@ class FacebookPublishingService
                         ->timeout(45)
                         ->post($uploadEndpoint, [
                             'access_token' => $this->accessToken,
-                            'published' => false,
+                            'published' => 'false',
                             'url' => $path,
                         ]);
                 } else {
@@ -116,6 +116,7 @@ class FacebookPublishingService
         $formPayload = [
             'access_token' => $this->accessToken,
             'message' => $cleanMessage,
+            'attached_media' => json_encode($attachedMedia),
         ];
         foreach ($attachedMedia as $i => $item) {
             $formPayload["attached_media[{$i}]"] = is_string($item) ? $item : json_encode($item);

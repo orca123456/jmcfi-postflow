@@ -40,6 +40,25 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(FacebookPublishingService $facebookService, InstagramPublishingService $instagramService, WordPressPublishingService $wordpressService): void
     {
+        @set_time_limit(180);
+
+        // Fail-safe shutdown function: if the PHP process exits abruptly (e.g. fatal timeout),
+        // ensure this post does not stay stuck in 'publishing' indefinitely.
+        $postId = $this->postRequest->id;
+        register_shutdown_function(function () use ($postId) {
+            try {
+                $post = PostRequest::find($postId);
+                if ($post && $post->status === PostRequest::STATUS_PUBLISHING) {
+                    $hasSuccess = PublishingRecord::where('post_request_id', $postId)
+                        ->where('status', 'published')->exists();
+                    $post->update([
+                        'status' => $hasSuccess ? PostRequest::STATUS_PARTIALLY_PUBLISHED : PostRequest::STATUS_PUBLISH_FAILED
+                    ]);
+                    Log::warning("AutoPublishJob: Recovered stuck publishing status via shutdown handler for post ID {$postId}");
+                }
+            } catch (\Throwable $_) {}
+        });
+
         $this->postRequest->refresh();
         Log::info("AutoPublishJob: Starting publish for post ID {$this->postRequest->id} - {$this->postRequest->title}");
 
@@ -260,7 +279,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
             $this->notifyITAdmins(new PostPublishingFailedNotification($this->postRequest, $this->formatPublishErrors($publishErrors)), 'failure');
 
             throw new Exception($this->formatPublishErrors($publishErrors));
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             Log::error("AutoPublishJob: FAILED for post ID {$this->postRequest->id}. Error: {$e->getMessage()}");
 
             $allSuccessful = PublishingRecord::where('post_request_id', $this->postRequest->id)
@@ -283,7 +302,7 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         }
     }
 
-    public function failed(Exception $exception): void
+    public function failed(\Throwable $exception): void
     {
         Log::critical("AutoPublishJob: All retries exhausted for post ID {$this->postRequest->id}. Final error: {$exception->getMessage()}");
 
