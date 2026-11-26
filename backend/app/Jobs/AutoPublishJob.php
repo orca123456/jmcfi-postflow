@@ -43,8 +43,28 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         $this->postRequest->refresh();
         Log::info("AutoPublishJob: Starting publish for post ID {$this->postRequest->id} - {$this->postRequest->title}");
 
-        if ($this->postRequest->status === PostRequest::STATUS_PUBLISHED) {
-            Log::info("AutoPublishJob: Post ID {$this->postRequest->id} is already published. Skipping.");
+        $platforms = is_string($this->postRequest->target_platforms)
+            ? json_decode($this->postRequest->target_platforms, true)
+            : $this->postRequest->target_platforms;
+
+        if (!is_array($platforms) || empty($platforms)) {
+            $platforms = ['facebook'];
+        }
+
+        $lowerPlatforms = array_unique(array_map(fn ($platform) => match (strtolower(trim($platform))) {
+            'fb' => 'facebook',
+            'ig' => 'instagram',
+            'portal', 'website', 'wp' => 'wordpress',
+            default => strtolower(trim($platform)),
+        }, $platforms));
+
+        $completed = PublishingRecord::where('post_request_id', $this->postRequest->id)
+            ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
+            ->pluck('platform')->all();
+
+        // Only skip if EVERY requested platform has already been successfully published in PublishingRecord
+        if ($this->postRequest->status === PostRequest::STATUS_PUBLISHED && !empty($lowerPlatforms) && count(array_diff($lowerPlatforms, $completed)) === 0) {
+            Log::info("AutoPublishJob: Post ID {$this->postRequest->id} is already published to all platforms (" . implode(', ', $completed) . "). Skipping.");
             return;
         }
 
@@ -58,23 +78,6 @@ class AutoPublishJob implements ShouldQueue, ShouldBeUnique
         }
 
         try {
-            $platforms = is_string($this->postRequest->target_platforms)
-                ? json_decode($this->postRequest->target_platforms, true)
-                : $this->postRequest->target_platforms;
-
-            if (!is_array($platforms)) {
-                $platforms = [];
-            }
-
-            $lowerPlatforms = array_unique(array_map(fn ($platform) => match (strtolower(trim($platform))) {
-                'fb' => 'facebook',
-                'ig' => 'instagram',
-                'portal', 'website', 'wp' => 'wordpress',
-                default => strtolower(trim($platform)),
-            }, $platforms));
-            $completed = PublishingRecord::where('post_request_id', $this->postRequest->id)
-                ->where('status', 'published')->whereIn('platform', $lowerPlatforms)
-                ->pluck('platform')->all();
             $publishResults = [];
             $publishErrors = [];
 

@@ -167,7 +167,7 @@ class WordPressPublishingService
 
     private function openMediaUrlStream(string $mediaUrl): array
     {
-        $response = Http::connectTimeout(5)->timeout(25)->withoutRedirecting()->get($mediaUrl);
+        $response = Http::withoutVerifying()->connectTimeout(5)->timeout(25)->withoutRedirecting()->get($mediaUrl);
         if (!$response->successful()) {
             throw new RuntimeException("WordPress image could not be downloaded (HTTP {$response->status()}). Re-upload the image before publishing.");
         }
@@ -196,7 +196,7 @@ class WordPressPublishingService
             throw new RuntimeException('WordPress must use a publicly accessible website address.');
         }
 
-        return Http::withBasicAuth($username, $password)->acceptJson()
+        return Http::withoutVerifying()->withBasicAuth($username, $password)->acceptJson()
             ->connectTimeout(5)->timeout(25)->withoutRedirecting()
             ->withOptions(['curl' => [CURLOPT_RESOLVE => ["{$host}:443:{$addresses[0]}"]]]);
     }

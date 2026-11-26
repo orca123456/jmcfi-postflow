@@ -62,7 +62,7 @@ class InstagramPublishingService
 
         $containerEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$this->businessAccountId}/media";
 
-        $containerResponse = Http::asForm()->post($containerEndpoint, [
+        $containerResponse = Http::withoutVerifying()->asForm()->post($containerEndpoint, [
             'image_url' => $imageUrl,
             'caption' => $cleanCaption,
             'access_token' => $this->accessToken,
@@ -102,7 +102,7 @@ class InstagramPublishingService
                 continue;
             }
 
-            $response = Http::asForm()->post($containerEndpoint, [
+            $response = Http::withoutVerifying()->asForm()->post($containerEndpoint, [
                 'image_url' => $imageUrl,
                 'is_carousel_item' => 'true',
                 'access_token' => $this->accessToken,
@@ -132,7 +132,7 @@ class InstagramPublishingService
         }
 
         // Step 3: Create parent CAROUSEL container
-        $carouselResponse = Http::asForm()->post($containerEndpoint, [
+        $carouselResponse = Http::withoutVerifying()->asForm()->post($containerEndpoint, [
             'media_type' => 'CAROUSEL',
             'caption' => $cleanCaption,
             'children' => implode(',', $itemContainerIds),
@@ -167,7 +167,7 @@ class InstagramPublishingService
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             sleep(2);
 
-            $statusResponse = Http::get($statusEndpoint, [
+            $statusResponse = Http::withoutVerifying()->get($statusEndpoint, [
                 'fields' => 'status_code,status',
                 'access_token' => $this->accessToken,
             ]);
@@ -212,7 +212,7 @@ class InstagramPublishingService
     {
         $publishEndpoint = "https://graph.facebook.com/{$this->graphApiVersion}/{$this->businessAccountId}/media_publish";
 
-        $publishResponse = Http::asForm()->post($publishEndpoint, [
+        $publishResponse = Http::withoutVerifying()->asForm()->post($publishEndpoint, [
             'creation_id' => $creationId,
             'access_token' => $this->accessToken,
         ]);

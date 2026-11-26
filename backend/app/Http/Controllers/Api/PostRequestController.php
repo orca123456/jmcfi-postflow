@@ -612,15 +612,60 @@ class PostRequestController extends Controller
                     }
                 }
             } else {
-                // All approvals done â€” IMC gave final sign-off
+                // All approvals done — IMC gave final sign-off
                 $isScheduled = $postRequest->preferred_schedule_at && \Carbon\Carbon::parse($postRequest->preferred_schedule_at)->isFuture();
                 $updateData = [
-                    'status' => $isScheduled ? PostRequest::STATUS_SCHEDULED : PostRequest::STATUS_PUBLISHED,
+                    'status' => $isScheduled ? PostRequest::STATUS_SCHEDULED : PostRequest::STATUS_PUBLISHING,
                 ];
                 if (Schema::hasColumn($postRequest->getTable(), 'published_at')) {
                     $updateData['published_at'] = $isScheduled ? null : now();
                 }
                 $postRequest->update($updateData);
+
+                // Initialize PublishingRecord entries for target platforms so progress & results are tracked
+                $platforms = is_string($postRequest->target_platforms) ? json_decode($postRequest->target_platforms, true) : $postRequest->target_platforms;
+                if (!is_array($platforms) || empty($platforms)) {
+                    $platforms = ['facebook'];
+                }
+                $lowerPlatforms = array_map('strtolower', $platforms);
+                $publishPlatforms = collect($lowerPlatforms)
+                    ->map(fn ($platform) => match ($platform) {
+                        'fb' => 'facebook',
+                        'ig' => 'instagram',
+                        'portal', 'website', 'wp' => 'wordpress',
+                        default => $platform,
+                    })
+                    ->filter(fn ($platform) => in_array($platform, ['facebook', 'instagram', 'wordpress'], true))
+                    ->unique()
+                    ->values();
+
+                foreach ($publishPlatforms as $platform) {
+                    if (\App\Models\PublishingRecord::where('post_request_id', $postRequest->id)
+                        ->where('platform', $platform)->where('status', 'published')->exists()) {
+                        continue;
+                    }
+                    $record = \App\Models\PublishingRecord::where('post_request_id', $postRequest->id)
+                        ->where('platform', $platform)
+                        ->where('status', '!=', 'published')
+                        ->latest('id')
+                        ->first();
+                    if ($record) {
+                        $record->update([
+                            'published_by' => $user->id,
+                            'status' => $isScheduled ? 'scheduled' : 'publishing',
+                            'scheduled_at' => $isScheduled ? $postRequest->preferred_schedule_at : now(),
+                            'error_message' => null,
+                        ]);
+                    } else {
+                        \App\Models\PublishingRecord::create([
+                            'post_request_id' => $postRequest->id,
+                            'published_by' => $user->id,
+                            'platform' => $platform,
+                            'status' => $isScheduled ? 'scheduled' : 'publishing',
+                            'scheduled_at' => $isScheduled ? $postRequest->preferred_schedule_at : now(),
+                        ]);
+                    }
+                }
             }
 
             $this->clearDashboardCache();

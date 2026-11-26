@@ -84,9 +84,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Audit Logs (Admin only)
     Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('role:it_publisher,it_admin');
 
-    // Publishing (Strictly IT Admin & IT Publisher only)
-    Route::post('publishing/{post}/schedule', [App\Http\Controllers\Api\PublishingController::class, 'schedule'])->middleware('role:it_publisher,it_admin');
-    Route::post('publishing/{post}/publish', [App\Http\Controllers\Api\PublishingController::class, 'publish'])->middleware('role:it_publisher,it_admin');
+    // Publishing (Strictly IT Admin, IT Publisher & IMC QA)
+    Route::post('publishing/{post}/schedule', [App\Http\Controllers\Api\PublishingController::class, 'schedule'])->middleware('role:it_publisher,it_admin,imc_qa_checker');
+    Route::post('publishing/{post}/publish', [App\Http\Controllers\Api\PublishingController::class, 'publish'])->middleware('role:it_publisher,it_admin,imc_qa_checker');
     Route::post('posts/{postRequest}/admin-bypass-approve', [App\Http\Controllers\Api\PostRequestController::class, 'adminBypassApprove'])->middleware('role:it_publisher,it_admin');
 
     // Policy Settings (update admin only)

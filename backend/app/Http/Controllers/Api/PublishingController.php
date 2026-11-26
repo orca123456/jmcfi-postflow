@@ -23,14 +23,14 @@ class PublishingController extends Controller
     {
         $user = $request->user();
 
-        // 1. Validate that the user is authorized (IT Admin/Publisher, or the post requestor retrying failed/partial publish)
-        $isPublisher = $user->hasAnyRole(['it_publisher', 'it_admin', 'admin']);
+        // 1. Validate that the user is authorized (IT Admin/Publisher, IMC, or the post requestor retrying failed/partial publish)
+        $isPublisher = $user->hasAnyRole(['it_publisher', 'it_admin', 'admin', 'imc_qa_checker']);
         $isPostRequestor = ((int) $post->requestor_id === (int) $user->id) && in_array($post->status, [PostRequest::STATUS_PUBLISH_FAILED, PostRequest::STATUS_PARTIALLY_PUBLISHED], true);
 
         if (!$isPublisher && !$isPostRequestor) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only IT Admin can publish.'
+                'message' => 'Unauthorized. Only IT Admin and IMC can publish.'
             ], 403);
         }
 
@@ -188,7 +188,7 @@ class PublishingController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->hasRole('it_publisher')) {
+        if (!$user->hasAnyRole(['it_publisher', 'it_admin', 'admin', 'imc_qa_checker'])) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
