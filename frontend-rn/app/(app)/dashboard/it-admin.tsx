@@ -9769,6 +9769,7 @@ fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postf
                       ? validList
                       : (previewPost?.image ? [resolveImageUrl(previewPost.image) || previewPost.image] : []);
 
+                    const refinedCaption = checklist?.refined_caption;
                     const originalCaption = checklist?.original_caption;
                     const effectiveCaption = refinedCaption || previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title || '';
                     const isCaptionRefined = Boolean(refinedCaption && originalCaption && refinedCaption.trim() !== originalCaption.trim());
