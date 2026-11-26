@@ -39,6 +39,7 @@ import { AISettingsPanel } from '../../../components/AISettingsPanel';
 import { triggerCsvDownload } from '../../../utils/export';
 import { signalPostflowReady } from '../../../utils/postflowReady';
 import { usePrefetchAllTabs } from '../../../utils/usePrefetchAllTabs';
+import { stripEmojis } from '../../../utils/textFilters';
 import { ProfilePictureCropperModal } from '../../../components/ui/ProfilePictureCropperModal';
 import { FacebookMediaGrid, getImageUrisFromMedia } from '../../../components/social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../../../components/social/InstagramMediaCarousel';
@@ -9768,7 +9769,6 @@ fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postf
                       ? validList
                       : (previewPost?.image ? [resolveImageUrl(previewPost.image) || previewPost.image] : []);
 
-                    const refinedCaption = checklist?.refined_caption;
                     const originalCaption = checklist?.original_caption;
                     const effectiveCaption = refinedCaption || previewPost?.rawPost?.caption_narrative || previewPost?.rawPost?.description || previewPost?.title || '';
                     const isCaptionRefined = Boolean(refinedCaption && originalCaption && refinedCaption.trim() !== originalCaption.trim());
@@ -9861,7 +9861,7 @@ fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postf
                               <Ionicons name="globe-outline" size={14} color="#21759B" />
                               <Text style={{ fontSize: 11, fontWeight: '700', color: '#21759B' }}>Website Article Preview</Text>
                             </View>
-                            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 6 }}>{previewPost?.title}</Text>
+                            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 6 }}>{stripEmojis(previewPost?.title || '')}</Text>
                             <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
                               By {previewPost?.requestedBy || 'JMCFI Admin'} • {previewPost?.department || 'News'} • {previewPost?.requestedOn}
                             </Text>
@@ -9871,7 +9871,7 @@ fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://postf
                               </TouchableOpacity>
                             )}
                             <FormattedText style={{ fontSize: 13, color: '#334155', lineHeight: 20 }}>
-                              {effectiveCaption || 'No article content provided.'}
+                              {stripEmojis(effectiveCaption) || 'No article content provided.'}
                             </FormattedText>
                           </View>
                         )}

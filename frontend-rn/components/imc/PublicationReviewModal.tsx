@@ -21,6 +21,7 @@ import { BorderRadius, Colors, FontSize, FontWeight, Spacing } from '../../const
 import { dashboardStyles, dashboardUi } from '../ui/dashboardDesign';
 import { FacebookMediaGrid, isImageMedia } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
+import { stripEmojis } from '../../utils/textFilters';
 
 const BRAND_PURPLE = '#4C007C';
 
@@ -934,7 +935,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
 
                         {/* Headline Title */}
                         <Text style={[styles.websiteHeadline, isDarkMode && styles.websiteHeadlineDark]}>
-                          {request.title || raw.title || 'Untitled Content Request'}
+                          {stripEmojis(request.title || raw.title || 'Untitled Content Request')}
                         </Text>
 
                         {/* Byline */}
@@ -1007,7 +1008,7 @@ export const PublicationReviewModal: React.FC<PublicationReviewModalProps> = ({
                         {/* Article Body */}
                         <View style={styles.websiteArticleBody}>
                           {previewCaptionText ? (
-                            <RenderedCaption value={previewCaptionText} dark={isDarkMode} />
+                            <RenderedCaption value={stripEmojis(previewCaptionText)} dark={isDarkMode} />
                           ) : (
                             <Text style={styles.mockupCaptionEmpty}>No article caption provided.</Text>
                           )}

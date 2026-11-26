@@ -10,6 +10,7 @@ import { postsApi, publishingApi, resolveImageUrl } from '../../services/api';
 import { useThemeStore } from '../../store/theme';
 import { FacebookMediaGrid, isImageMedia } from '../social/FacebookMediaGrid';
 import { InstagramMediaCarousel } from '../social/InstagramMediaCarousel';
+import { stripEmojis } from '../../utils/textFilters';
 
 const BRAND_PURPLE = '#4C007C';
 
@@ -858,7 +859,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
 
                       {/* Headline Title */}
                       <Text style={[styles.websiteHeadline, { color: palette.text }]}>
-                        {textValue(raw.title ?? request.title) || 'Untitled Content Request'}
+                        {stripEmojis(textValue(raw.title ?? request.title) || 'Untitled Content Request')}
                       </Text>
 
                       {/* Byline */}
@@ -927,7 +928,7 @@ export function DirectImcRequestDetailsModal({ request, onClose }: { request: an
                       {/* Article Body */}
                       <View style={styles.websiteArticleBody}>
                         {previewCaption ? (
-                          <Caption value={previewCaption} palette={palette} />
+                          <Caption value={stripEmojis(previewCaption)} palette={palette} />
                         ) : (
                           <Text style={[styles.bodyText, { color: palette.muted }]}>No article caption provided.</Text>
                         )}

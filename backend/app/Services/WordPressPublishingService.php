@@ -52,9 +52,10 @@ class WordPressPublishingService
             }
         }
 
-        $content = $post->caption_narrative ?? '';
+        $title = $this->stripEmojis($post->title ?? '');
+        $content = $this->stripEmojis($post->caption_narrative ?? '');
         $payload = [
-            'title' => $post->title,
+            'title' => $title,
             'content' => $content,
             'status' => 'publish',
             'slug' => $slug,
@@ -103,7 +104,7 @@ class WordPressPublishingService
                         $additionalImagesHtml .= sprintf(
                             '<p><figure class="wp-block-image size-large"><img src="%s" alt="%s" class="wp-image-%d"/></figure></p>',
                             htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8'),
-                            htmlspecialchars($post->title, ENT_QUOTES, 'UTF-8'),
+                            htmlspecialchars($title, ENT_QUOTES, 'UTF-8'),
                             $imgId
                         );
                     }
@@ -217,5 +218,29 @@ class WordPressPublishingService
         }
 
         return $article;
+    }
+
+    /**
+     * Remove emojis and non-alphanumeric pictographs from text for WordPress publishing.
+     */
+    public function stripEmojis(?string $text): string
+    {
+        if ($text === null || $text === '') {
+            return '';
+        }
+
+        // Comprehensive emoji ranges in Unicode
+        $regex = '/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F1E0}-\x{1F1FF}\x{1F900}-\x{1F9FF}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{FE00}-\x{FE0F}\x{1F3FB}-\x{1F3FF}\x{200D}\x{20D0}-\x{20FF}\x{2300}-\x{23FF}\x{2B50}\x{2B55}\x{2934}\x{2935}\x{25AA}\x{25AB}\x{25B6}\x{25C0}\x{25FB}-\x{25FE}]/u';
+
+        $clean = preg_replace($regex, '', $text) ?? $text;
+
+        // Clean up multi-spaces on each line while preserving line breaks
+        $clean = preg_replace('/[ \t]{2,}/', ' ', $clean) ?? $clean;
+        // Clean up spacing before punctuation left by stripped emojis
+        $clean = preg_replace('/[ \t]+([.,!?:;])/', '$1', $clean) ?? $clean;
+        // Remove trailing spaces on lines
+        $clean = preg_replace('/[ \t]+$/m', '', $clean) ?? $clean;
+
+        return trim($clean);
     }
 }
